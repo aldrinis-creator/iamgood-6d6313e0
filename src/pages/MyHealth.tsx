@@ -111,6 +111,9 @@ const MyHealth = () => {
         {/* Activity Tracker */}
         {selectedTool === "Activity" && <ActivityTracker />}
 
+        {/* Nutrition Advisor */}
+        {selectedTool === "Nutrition" && <NutritionAdvisor />}
+
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
           <Card className="bg-success/5 border-success/20">
