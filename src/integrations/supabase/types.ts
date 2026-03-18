@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          created_at: string
+          exercise_minutes: number
+          exercise_type: string | null
+          id: string
+          log_date: string
+          notes: string | null
+          sleep_hours: number
+          steps: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exercise_minutes?: number
+          exercise_type?: string | null
+          id?: string
+          log_date?: string
+          notes?: string | null
+          sleep_hours?: number
+          steps?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exercise_minutes?: number
+          exercise_type?: string | null
+          id?: string
+          log_date?: string
+          notes?: string | null
+          sleep_hours?: number
+          steps?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       care_journal: {
         Row: {
           created_at: string
