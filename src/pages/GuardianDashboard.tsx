@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import CareJournal from "@/components/CareJournal";
+import WardActivitySummary from "@/components/WardActivitySummary";
 interface Notification {
   id: string;
   title: string;
@@ -310,6 +311,9 @@ const GuardianDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Ward Activity */}
+        {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
 
         {/* Care Journal */}
         {wardUserId && <CareJournal wardUserId={wardUserId} />}
