@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
-import CareJournal from "@/components/CareJournal";
+
 import ActivityTracker from "@/components/ActivityTracker";
 
 const healthTools = [
