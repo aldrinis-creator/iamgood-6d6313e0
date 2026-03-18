@@ -73,9 +73,9 @@ const NavTabs = () => {
               }`}
             >
               <div className="relative">
-                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""}`} />
+                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""} ${badge > 0 && tab.label === "Appointments" ? "text-destructive" : ""}`} />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse">
+                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center ${tab.label === "Appointments" ? "animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]" : "animate-pulse"}`}>
                     {badge > 9 ? "9+" : badge}
                   </span>
                 )}
