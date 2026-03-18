@@ -7,6 +7,7 @@ import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
+import useCheckInAudio from "@/hooks/useCheckInAudio";
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
