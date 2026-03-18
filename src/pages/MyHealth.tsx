@@ -107,6 +107,9 @@ const MyHealth = () => {
         {/* Medication Manager */}
         {selectedTool === "Tablets" && <MedicationManager />}
 
+        {/* Activity Tracker */}
+        {selectedTool === "Activity" && <ActivityTracker />}
+
         {/* Care Journal */}
         {selectedTool === "Care Journal" && <CareJournal />}
 
