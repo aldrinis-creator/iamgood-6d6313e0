@@ -11,6 +11,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import GuardianTab from "@/components/GuardianTab";
 
 const RECORD_TYPES = [
   "Prescription",
@@ -470,30 +471,7 @@ const MedicalVault = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="guardian" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">My Guardians</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { name: "Priya Sharma", relation: "Daughter", phone: "+91 98765 43210", primary: true },
-                  { name: "Rahul Sharma", relation: "Son", phone: "+91 98765 43211", primary: false },
-                ].map((g) => (
-                  <div key={g.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="font-medium text-sm">{g.name}</p>
-                      <p className="text-xs text-muted-foreground">{g.relation} • {g.phone}</p>
-                    </div>
-                    {g.primary && (
-                      <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">Primary</span>
-                    )}
-                  </div>
-                ))}
-                <Button variant="outline" className="w-full">+ Add Guardian</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <GuardianTab userId={session?.user?.id} />
 
           <TabsContent value="vault" className="space-y-4 mt-4">
             <Card>

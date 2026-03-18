@@ -1,25 +1,170 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, Ambulance, AlertTriangle, Wifi } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, Ambulance, AlertTriangle, Wifi, Bell } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+  type: string;
+}
+
+interface CheckIn {
+  id: string;
+  scheduled_at: string;
+  status: string;
+  responded_at: string | null;
+}
 
 const GuardianDashboard = () => {
+  const { session } = useAuth();
   const [showAmbulanceBooking, setShowAmbulanceBooking] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
+  const [wardName, setWardName] = useState("Ward");
+
+  const fetchNotifications = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (data) setNotifications(data as Notification[]);
+  }, [session?.user?.id]);
+
+  const fetchWardCheckIns = useCallback(async () => {
+    if (!session?.user?.id) return;
+
+    // Get the user's phone from their profile
+    const { data: myProfile } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", session.user.id)
+      .single();
+
+    if (!myProfile?.phone) return;
+
+    // Find guardians entries where this user's phone matches
+    const { data: guardianEntries } = await supabase
+      .from("guardians")
+      .select("user_id")
+      .eq("guardian_phone", myProfile.phone)
+      .limit(1);
+
+    if (!guardianEntries || guardianEntries.length === 0) return;
+    const wardUserId = guardianEntries[0].user_id;
+
+    // Get ward's name
+    const { data: wardProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", wardUserId)
+      .single();
+
+    if (wardProfile?.full_name) setWardName(wardProfile.full_name);
+
+    // Get today's check-ins
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { data: checkIns } = await supabase
+      .from("check_ins")
+      .select("id, scheduled_at, status, responded_at")
+      .eq("user_id", wardUserId)
+      .gte("scheduled_at", todayStart.toISOString())
+      .order("scheduled_at", { ascending: true });
+
+    if (checkIns) setTodayCheckIns(checkIns);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchWardCheckIns();
+  }, [fetchNotifications, fetchWardCheckIns]);
+
+  const markAsRead = async (id: string) => {
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const formatCheckInTime = (scheduled_at: string) => {
+    return new Date(scheduled_at).toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    });
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "ok": return "Checked In";
+      case "missed": return "Missed";
+      case "pending": return "Pending";
+      default: return status;
+    }
+  };
 
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        {/* Notification Alerts */}
+        {notifications.filter((n) => !n.read).length > 0 && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Bell className="w-5 h-5 text-destructive" />
+                <h3 className="font-semibold text-sm">
+                  Alerts{" "}
+                  <Badge variant="destructive" className="ml-1">{unreadCount}</Badge>
+                </h3>
+              </div>
+              {notifications
+                .filter((n) => !n.read)
+                .slice(0, 3)
+                .map((n) => (
+                  <div
+                    key={n.id}
+                    className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1"
+                  >
+                    <p className="text-sm font-medium">{n.title}</p>
+                    <p className="text-xs text-muted-foreground">{n.message}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2"
+                      onClick={() => markAsRead(n.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* User Status */}
         <Card className="border-success/30 bg-success/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-success flex items-center justify-center text-success-foreground font-bold">
-                  A
+                  {wardName.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-semibold">Arjun</p>
+                  <p className="font-semibold">{wardName}</p>
                   <p className="text-xs text-success font-medium">● Online — Safe</p>
                 </div>
               </div>
@@ -123,26 +268,32 @@ const GuardianDashboard = () => {
           </Card>
         )}
 
-        {/* Recent Check-Ins */}
+        {/* Today's Check-Ins (real data) */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Today's Check-iNs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {[
-              { time: "7:00 AM", status: "Checked In", ok: true },
-              { time: "12:00 PM", status: "Checked In", ok: true },
-              { time: "7:00 PM", status: "Pending", ok: false },
-            ].map((ci) => (
-              <div key={ci.time} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                <span className="text-sm">{ci.time}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  ci.ok ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
-                }`}>
-                  {ci.status}
-                </span>
-              </div>
-            ))}
+            {todayCheckIns.length > 0 ? (
+              todayCheckIns.map((ci) => (
+                <div key={ci.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <span className="text-sm">{formatCheckInTime(ci.scheduled_at)}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    ci.status === "ok"
+                      ? "bg-success/10 text-success"
+                      : ci.status === "missed"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {getStatusLabel(ci.status)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No check-ins recorded today
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
