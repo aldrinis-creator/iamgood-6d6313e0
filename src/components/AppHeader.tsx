@@ -7,6 +7,7 @@ const AppHeader = () => {
   const { userName, role } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const todayApptCount = useTodayAppointments();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
