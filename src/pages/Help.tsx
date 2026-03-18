@@ -53,9 +53,6 @@ const Help = () => {
   ];
 
   const handleTabClick = (tab: HelpTab) => {
-    if (tab === "settings") { navigate("/settings"); return; }
-    if (tab === "privacy") { navigate("/privacy-policy"); return; }
-    if (tab === "terms") { navigate("/terms-of-service"); return; }
     setActiveTab(tab);
   };
 
