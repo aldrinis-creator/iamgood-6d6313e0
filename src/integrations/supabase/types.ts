@@ -143,6 +143,42 @@ export type Database = {
         }
         Relationships: []
       }
+      face_scans: {
+        Row: {
+          confidence: string
+          created_at: string
+          heart_rate: number
+          id: string
+          sample_count: number
+          scanned_at: string
+          stress_level: string
+          stress_score: number
+          user_id: string
+        }
+        Insert: {
+          confidence: string
+          created_at?: string
+          heart_rate: number
+          id?: string
+          sample_count?: number
+          scanned_at?: string
+          stress_level: string
+          stress_score: number
+          user_id: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          heart_rate?: number
+          id?: string
+          sample_count?: number
+          scanned_at?: string
+          stress_level?: string
+          stress_score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       guardians: {
         Row: {
           created_at: string
