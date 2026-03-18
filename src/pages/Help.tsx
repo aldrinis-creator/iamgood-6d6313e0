@@ -102,7 +102,7 @@ const Help = () => {
 
         {activeTab === "faq" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">
                 Learn about all the features and how to use My Health Companion effectively.
               </p>
@@ -112,7 +112,21 @@ const Help = () => {
               </Button>
             </div>
 
-            {faqSections.map((section) => (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search FAQs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {filteredSections.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">No FAQs match "{searchQuery}"</p>
+            )}
+
+            {filteredSections.map((section) => (
               <Card key={section.title}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
