@@ -74,6 +74,75 @@ export type Database = {
         }
         Relationships: []
       }
+      appointments: {
+        Row: {
+          alarm_enabled: boolean
+          alarm_sound: string
+          appointment_type: string
+          created_at: string
+          description: string | null
+          doctor_name: string | null
+          end_date: string | null
+          end_time: string | null
+          first_alert: string
+          id: string
+          location: string | null
+          recurrence: string
+          second_alert: string | null
+          share_status: string
+          shared_with_doctor: boolean
+          start_date: string
+          start_time: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alarm_enabled?: boolean
+          alarm_sound?: string
+          appointment_type?: string
+          created_at?: string
+          description?: string | null
+          doctor_name?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          first_alert?: string
+          id?: string
+          location?: string | null
+          recurrence?: string
+          second_alert?: string | null
+          share_status?: string
+          shared_with_doctor?: boolean
+          start_date: string
+          start_time: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alarm_enabled?: boolean
+          alarm_sound?: string
+          appointment_type?: string
+          created_at?: string
+          description?: string | null
+          doctor_name?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          first_alert?: string
+          id?: string
+          location?: string | null
+          recurrence?: string
+          second_alert?: string | null
+          share_status?: string
+          shared_with_doctor?: boolean
+          start_date?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       care_journal: {
         Row: {
           created_at: string
