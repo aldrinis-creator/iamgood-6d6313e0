@@ -53,9 +53,6 @@ const Help = () => {
   ];
 
   const handleTabClick = (tab: HelpTab) => {
-    if (tab === "settings") { navigate("/settings"); return; }
-    if (tab === "privacy") { navigate("/privacy-policy"); return; }
-    if (tab === "terms") { navigate("/terms-of-service"); return; }
     setActiveTab(tab);
   };
 
@@ -158,6 +155,64 @@ const Help = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {activeTab === "settings" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Manage your app preferences and configurations.</p>
+            <Button variant="outline" className="w-full" onClick={() => navigate("/settings")}>
+              <SettingsIcon className="w-4 h-4 mr-2" />
+              Open Full Settings
+            </Button>
+          </div>
+        )}
+
+        {activeTab === "privacy" && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-foreground">Privacy Policy</h2>
+            <p className="text-xs text-muted-foreground">
+              Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
+            </p>
+            {[
+              { heading: "Information We Collect", content: "We collect personal information you provide, including your name, phone number, emergency contacts, health data, and location when using emergency features. We also collect device information and usage data to improve our services." },
+              { heading: "Use of Cookies", content: "We use cookies and similar technologies to remember your preferences, maintain your session, and analyse how our app is used. You can manage your cookie preferences via the Cookie Settings option in the app footer." },
+              { heading: "How We Use Your Data", content: "Your data is used to provide emergency response services, notify your guardians during emergencies, store your medical records securely, and improve our services. We do not sell your personal information to third parties." },
+              { heading: "Data Sharing", content: "We share your information only with your designated guardians, emergency services when you trigger an SOS, and service providers who assist in delivering our services. All third parties are bound by confidentiality agreements." },
+              { heading: "Data Security", content: "We implement industry-standard security measures including encryption, secure servers, and access controls to protect your personal and medical data. Your medical vault data is encrypted at rest and in transit." },
+              { heading: "Your Rights", content: "You have the right to access, correct, or delete your personal data. You can export your data or request account deletion through the Settings page. We will respond to your requests within 30 days." },
+              { heading: "Contact Us", content: "If you have questions about this Privacy Policy, please contact us at privacy@checkin-app.in." },
+            ].map((s) => (
+              <section key={s.heading} className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
+                <p className="text-sm text-muted-foreground">{s.content}</p>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {activeTab === "terms" && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-foreground">Terms of Service</h2>
+            <p className="text-xs text-muted-foreground">
+              Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
+            </p>
+            {[
+              { heading: "Acceptance of Terms", content: "By accessing or using Check-iN, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services." },
+              { heading: "Description of Service", content: "Check-iN is a Personal Emergency Response System (PERS) that provides health check-ins, emergency SOS alerts, guardian notifications, medical vault storage, and related services." },
+              { heading: "User Accounts", content: "You are responsible for maintaining the confidentiality of your account credentials and for all activities under your account. You must provide accurate and complete information during registration." },
+              { heading: "Emergency Services Disclaimer", content: "Check-iN is not an emergency service provider. In case of a medical emergency, always call your local emergency number (112 in India) immediately. Our SOS feature notifies your designated guardians but does not guarantee emergency response." },
+              { heading: "Subscription & Payments", content: "Certain features require a paid subscription. All prices are listed in Indian Rupees (₹). Subscriptions auto-renew unless cancelled before the renewal date. Ambulance services are charged separately at ₹1,500 for the first 5 km and ₹300 per km thereafter." },
+              { heading: "Limitation of Liability", content: "To the maximum extent permitted by law, Check-iN and its affiliates shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service." },
+              { heading: "Termination", content: "We reserve the right to suspend or terminate your account if you violate these terms. You may delete your account at any time through the Settings page." },
+              { heading: "Governing Law", content: "These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India." },
+              { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at support@checkin-app.in." },
+            ].map((s) => (
+              <section key={s.heading} className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
+                <p className="text-sm text-muted-foreground">{s.content}</p>
+              </section>
+            ))}
           </div>
         )}
 
