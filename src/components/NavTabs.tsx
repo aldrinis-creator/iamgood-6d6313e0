@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 
 const NavTabs = () => {
   const navigate = useNavigate();
