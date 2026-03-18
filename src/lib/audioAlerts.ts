@@ -78,3 +78,7 @@ export const testAlert = (mode: AudioAlertMode) => {
     playVoiceReminder("This is a test. It's time for your Check-iN.");
   }
 };
+
+export const playMedicationVoice = (medName: string) => {
+  playVoiceReminder(`Time to take ${medName}`);
+};

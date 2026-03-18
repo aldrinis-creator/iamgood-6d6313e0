@@ -2,6 +2,7 @@ import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wr
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
+import MedicationManager from "@/components/medications/MedicationManager";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -102,32 +103,7 @@ const MyHealth = () => {
         )}
 
         {/* Medication Manager */}
-        {selectedTool === "Tablets" && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <h2 className="text-lg font-semibold">Medication Manager</h2>
-              <div className="space-y-2">
-                {[
-                  { name: "Metformin 500mg", time: "8:00 AM", taken: true },
-                  { name: "Amlodipine 5mg", time: "8:00 AM", taken: true },
-                  { name: "Atorvastatin 10mg", time: "9:00 PM", taken: false },
-                ].map((med) => (
-                  <div key={med.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{med.name}</p>
-                      <p className="text-xs text-muted-foreground">{med.time}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      med.taken ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {med.taken ? "✓ Taken" : "Pending"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {selectedTool === "Tablets" && <MedicationManager />}
 
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
