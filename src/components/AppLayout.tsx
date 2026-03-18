@@ -36,6 +36,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <NavTabs />
         {role === "user" && <SOSButton />}
         <EmergencyModeOverlay />
+        <CookieConsent />
       </div>
     </div>
   );
