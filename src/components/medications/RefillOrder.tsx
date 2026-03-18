@@ -178,26 +178,6 @@ const RefillOrder = () => {
         </Card>
       </div>
 
-      {/* Scan Prescription */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Camera className="w-4 h-4 text-success" />
-          Scan Prescription
-        </h3>
-        <Card className="border-success/20 bg-success/5">
-          <CardContent className="p-4 text-center space-y-3">
-            <Camera className="w-12 h-12 text-success mx-auto" />
-            <p className="text-sm text-muted-foreground">
-              Upload or scan your prescription to compare prices and find savings.
-            </p>
-            <Input type="file" accept="image/*" className="max-w-xs mx-auto" />
-            <Button className="w-full bg-success text-success-foreground hover:bg-success/90">
-              Upload Prescription
-            </Button>
-            <p className="text-xs text-muted-foreground">Coming soon in Phase 2</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };

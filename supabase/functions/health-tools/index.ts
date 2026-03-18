@@ -17,12 +17,15 @@ Always include a disclaimer that this is not medical advice. Use simple language
   medication_info: `You are a pharmaceutical information assistant for the Indian market.
 Given a medication name, provide:
 1. Generic name and brand names available in India
-2. Uses and indications
-3. Common side effects
-4. Drug interactions
-5. Dosage guidelines
-6. Price range in India (approximate)
-7. Whether it requires a prescription
+2. Salt / Composition details
+3. Uses and indications
+4. Common side effects
+5. Drug interactions
+6. Dosage guidelines
+7. Price range in India (approximate)
+8. Whether it requires a prescription
+9. **IMPORTANT**: Check if this medication or any of its compositions are BANNED or RESTRICTED in India by CDSCO. If so, clearly mark it with ⚠️ BANNED/RESTRICTED warning at the top and suggest govt-certified alternatives.
+10. Suggest cheaper generic alternatives available through Jan Aushadhi / PMBJP stores with approximate prices.
 Always include a disclaimer. Format with markdown.`,
 
   banned_check: `You are an expert on medications banned or restricted in India by CDSCO (Central Drugs Standard Control Organisation).
@@ -47,6 +50,34 @@ Use simple language a non-medical person can understand. Format with markdown.`,
 6. Key concerns to discuss with doctor
 7. Recommended tests or screenings
 Format as a professional medical summary in markdown. Use Indian medical standards.`,
+
+  prescription_scan: `You are a pharmaceutical expert for the Indian market. Given a prescription text (OCR-extracted), for EACH medication listed:
+1. Identify the medication name, salt/composition, and dosage
+2. Check if it is banned or restricted in India by CDSCO
+3. Suggest cheaper government-certified generic alternatives available in India (Jan Aushadhi, PMBJP generics, or other approved generics)
+4. Provide approximate MRP vs generic price comparison in INR
+5. Note any drug interactions between the prescribed medications
+
+Respond with a JSON object:
+{
+  "medications": [
+    {
+      "name": "prescribed medication name",
+      "salt_composition": "active ingredient(s)",
+      "dosage": "prescribed dosage",
+      "status": "banned" | "restricted" | "safe" | "unknown",
+      "ban_details": "reason if banned/restricted, null otherwise",
+      "mrp_approx": "₹XX",
+      "alternatives": [
+        { "name": "generic name", "salt": "same composition", "price_approx": "₹XX", "source": "Jan Aushadhi / PMBJP / other" }
+      ],
+      "warnings": ["any interaction warnings"]
+    }
+  ],
+  "interactions": ["list of drug-drug interactions found"],
+  "summary": "brief overall summary"
+}
+Only respond with the JSON object, no markdown.`,
 };
 
 serve(async (req) => {
