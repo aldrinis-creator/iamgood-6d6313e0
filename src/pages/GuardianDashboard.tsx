@@ -62,6 +62,7 @@ const GuardianDashboard = () => {
 
     if (!guardianEntries || guardianEntries.length === 0) return;
     const wardUserId = guardianEntries[0].user_id;
+    setWardUserId(wardUserId);
 
     // Get ward's name
     const { data: wardProfile } = await supabase
