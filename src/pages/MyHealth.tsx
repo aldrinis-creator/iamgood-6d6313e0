@@ -8,6 +8,7 @@ import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
 import HealthServices from "@/components/HealthServices";
+import FaceScan from "@/components/FaceScan";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
