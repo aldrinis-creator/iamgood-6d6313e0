@@ -40,16 +40,37 @@ interface ActivityLog {
 }
 
 const METRICS = [
-  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos" },
-  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary" },
-  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success" },
-  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary" },
-  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos" },
-  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success" },
-  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary" },
-  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success" },
-  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos" },
+  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))", goal: 80 },
+  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))", goal: 10000 },
+  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))", goal: 5 },
+  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))", goal: 160 },
+  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))", goal: 500 },
+  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))", goal: 120 },
+  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))", goal: 16 },
+  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))", goal: 10 },
+  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))", goal: 98 },
 ] as const;
+
+const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; stroke: string }) => {
+  const pct = Math.min(value / goal, 1);
+  const r = 16;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct);
+  const isComplete = value >= goal;
+  return (
+    <svg width="40" height="40" className="absolute inset-0 m-auto">
+      <circle cx="20" cy="20" r={r} fill="none" stroke="hsl(var(--border))" strokeWidth="3" />
+      <circle
+        cx="20" cy="20" r={r} fill="none"
+        stroke={isComplete ? "hsl(var(--success))" : stroke}
+        strokeWidth="3" strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={offset}
+        transform="rotate(-90 20 20)"
+        className="transition-all duration-500"
+      />
+    </svg>
+  );
+};
 
 const ActivityTracker = () => {
   const { user } = useAuth();
@@ -254,20 +275,28 @@ const ActivityTracker = () => {
 
       {/* Summary Cards — 3×3 grid */}
       <div className="grid grid-cols-3 gap-2">
-        {METRICS.map((m) => (
-          <Card key={m.key}>
-            <CardContent className="p-3 flex flex-col items-center gap-1">
-              <m.icon className={`w-5 h-5 ${m.color}`} />
-              <span className="text-[10px] text-muted-foreground">{m.label}</span>
-              <span className="text-sm font-semibold">
-                {m.key === "distance_km"
-                  ? Number(getValue(m.key)).toFixed(1)
-                  : getValue(m.key).toLocaleString()}
-                {m.unit && <span className="text-[10px] text-muted-foreground ml-0.5">{m.unit}</span>}
-              </span>
-            </CardContent>
-          </Card>
-        ))}
+        {METRICS.map((m) => {
+          const val = getValue(m.key);
+          const pct = Math.round(Math.min((val / m.goal) * 100, 100));
+          return (
+            <Card key={m.key}>
+              <CardContent className="p-3 flex flex-col items-center gap-1">
+                <div className="relative w-10 h-10 flex items-center justify-center">
+                  <RadialProgress value={val} goal={m.goal} stroke={m.stroke} />
+                  <m.icon className={`w-4 h-4 ${m.color} z-10`} />
+                </div>
+                <span className="text-[10px] text-muted-foreground">{m.label}</span>
+                <span className="text-sm font-semibold">
+                  {m.key === "distance_km"
+                    ? Number(val).toFixed(1)
+                    : val.toLocaleString()}
+                  {m.unit && <span className="text-[10px] text-muted-foreground ml-0.5">{m.unit}</span>}
+                </span>
+                <span className="text-[9px] text-muted-foreground">{pct}% of {m.goal.toLocaleString()}</span>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Log Form */}
