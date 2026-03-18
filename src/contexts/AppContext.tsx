@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type UserRole = "user" | "guardian";
 
@@ -6,12 +7,10 @@ interface AppState {
   role: UserRole;
   setRole: (role: UserRole) => void;
   isLoggedIn: boolean;
-  setIsLoggedIn: (v: boolean) => void;
   emergencyMode: boolean;
   triggerSOS: () => void;
   cancelSOS: () => void;
   userName: string;
-  setUserName: (name: string) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -23,16 +22,20 @@ export const useApp = () => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>("user");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { session, profile } = useAuth();
   const [emergencyMode, setEmergencyMode] = useState(false);
-  const [userName, setUserName] = useState("Arjun");
+  const [roleOverride, setRoleOverride] = useState<UserRole | null>(null);
 
+  const isLoggedIn = !!session;
+  const userName = profile?.full_name || "User";
+  const role: UserRole = roleOverride ?? ((profile?.role === "guardian" ? "guardian" : "user") as UserRole);
+
+  const setRole = useCallback((r: UserRole) => setRoleOverride(r), []);
   const triggerSOS = useCallback(() => setEmergencyMode(true), []);
   const cancelSOS = useCallback(() => setEmergencyMode(false), []);
 
   return (
-    <AppContext.Provider value={{ role, setRole, isLoggedIn, setIsLoggedIn, emergencyMode, triggerSOS, cancelSOS, userName, setUserName }}>
+    <AppContext.Provider value={{ role, setRole, isLoggedIn, emergencyMode, triggerSOS, cancelSOS, userName }}>
       {children}
     </AppContext.Provider>
   );

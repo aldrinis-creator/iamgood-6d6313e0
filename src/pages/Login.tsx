@@ -4,21 +4,77 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useApp, UserRole } from "@/contexts/AppContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Shield, Heart, Plus, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
-  const { setIsLoggedIn, setRole, setUserName } = useApp();
+  const { signIn, resetPassword } = useAuth();
   const navigate = useNavigate();
-  const [loginRole, setLoginRole] = useState<UserRole>("user");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRole(loginRole);
-    setIsLoggedIn(true);
-    navigate(loginRole === "user" ? "/dashboard" : "/guardian");
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+    if (error) {
+      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
+    } else {
+      // Role is determined from profile; navigate after auth state updates
+      navigate("/dashboard");
+    }
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    const { error } = await resetPassword(forgotEmail);
+    setForgotLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Password reset email sent", description: "Check your inbox for the reset link." });
+      setShowForgot(false);
+    }
+  };
+
+  if (showForgot) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
+              <Heart className="w-8 h-8 text-success-foreground fill-current" />
+            </div>
+            <h1 className="text-2xl font-bold text-primary">Reset Password</h1>
+            <p className="text-sm text-muted-foreground">Enter your email to receive a reset link</p>
+          </div>
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input placeholder="Enter your email" className="text-base" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={forgotLoading}>
+              {forgotLoading ? "Sending..." : "Send Reset Link"}
+            </Button>
+          </form>
+          <div className="text-center">
+            <button className="text-sm text-primary underline" onClick={() => setShowForgot(false)}>
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -31,45 +87,17 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">Your Personal Emergency Response System</p>
         </div>
 
-        {/* Role Selection */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setLoginRole("user")}
-            className={`flex-1 p-4 rounded-xl border-2 text-center transition-all ${
-              loginRole === "user"
-                ? "border-primary bg-primary/5"
-                : "border-border"
-            }`}
-          >
-            <Heart className="w-6 h-6 mx-auto mb-1 text-primary" />
-            <p className="text-sm font-semibold">User</p>
-            <p className="text-xs text-muted-foreground">Being protected</p>
-          </button>
-          <button
-            onClick={() => setLoginRole("guardian")}
-            className={`flex-1 p-4 rounded-xl border-2 text-center transition-all ${
-              loginRole === "guardian"
-                ? "border-primary bg-primary/5"
-                : "border-border"
-            }`}
-          >
-            <Shield className="w-6 h-6 mx-auto mb-1 text-primary" />
-            <p className="text-sm font-semibold">Guardian</p>
-            <p className="text-xs text-muted-foreground">Family/Responder</p>
-          </button>
-        </div>
-
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label>Email or Phone</Label>
-            <Input placeholder="Enter email or phone" className="text-base" type="email" />
+            <Label>Email</Label>
+            <Input placeholder="Enter email" className="text-base" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div>
             <Label>Password</Label>
-            <Input placeholder="Enter password" className="text-base" type="password" />
+            <Input placeholder="Enter password" className="text-base" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg">
-            Sign In
+          <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
           </Button>
         </form>
 
@@ -78,7 +106,7 @@ const Login = () => {
             Don't have an account? <span className="underline">Register</span>
           </button>
           <br />
-          <button className="text-sm text-muted-foreground">Forgot Password?</button>
+          <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
         </div>
       </div>
     </div>
@@ -88,8 +116,15 @@ const Login = () => {
 export default Login;
 
 export const Register = () => {
-  const { setIsLoggedIn, setRole, setUserName } = useApp();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneCode, setPhoneCode] = useState("+91");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [dob, setDob] = useState("");
+  const [loading, setLoading] = useState(false);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", relation: "" }]);
 
   const addGuardian = () => {
@@ -104,10 +139,57 @@ export const Register = () => {
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const updateGuardian = (i: number, field: string, value: string) => {
+    setGuardians(guardians.map((g, idx) => idx === i ? { ...g, [field]: value } : g));
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRole("user");
-    setIsLoggedIn(true);
+    if (!fullName || !email || !password) {
+      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+    // Validate at least primary guardian
+    if (!guardians[0].name || !guardians[0].phone) {
+      toast({ title: "Primary guardian name and phone are required", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    const { data, error } = await signUp(email, password, { full_name: fullName });
+    
+    if (error) {
+      setLoading(false);
+      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    const userId = data?.user?.id;
+    if (userId) {
+      // Update profile with phone and DOB
+      await supabase.from("profiles").update({
+        phone: `${phoneCode}${phone}`,
+        date_of_birth: dob || null,
+      }).eq("id", userId);
+
+      // Insert guardians
+      const guardianRows = guardians
+        .filter((g) => g.name && g.phone)
+        .map((g, i) => ({
+          user_id: userId,
+          guardian_name: g.name,
+          guardian_phone: g.phone,
+          relation: g.relation || null,
+          is_primary: i === 0,
+        }));
+
+      if (guardianRows.length > 0) {
+        await supabase.from("guardians").insert(guardianRows);
+      }
+    }
+
+    setLoading(false);
+    toast({ title: "Account created!", description: "Check your email to verify your account." });
     navigate("/dashboard");
   };
 
@@ -123,7 +205,6 @@ export const Register = () => {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {/* Personal Details */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Personal Details</CardTitle>
@@ -131,37 +212,36 @@ export const Register = () => {
             <CardContent className="space-y-3">
               <div>
                 <Label>Full Name</Label>
-                <Input placeholder="Enter your name" className="text-base" />
+                <Input placeholder="Enter your name" className="text-base" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
               </div>
               <div>
                 <Label>Phone Number</Label>
                 <div className="flex gap-2">
-                  <Select defaultValue="+91">
+                  <Select value={phoneCode} onValueChange={setPhoneCode}>
                     <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="+91">+91</SelectItem>
                       <SelectItem value="+1">+1</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input placeholder="Phone number" className="flex-1 text-base" />
+                  <Input placeholder="Phone number" className="flex-1 text-base" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
               </div>
               <div>
                 <Label>Email</Label>
-                <Input placeholder="Email address" className="text-base" type="email" />
+                <Input placeholder="Email address" className="text-base" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
                 <Label>Password</Label>
-                <Input placeholder="Create password" className="text-base" type="password" />
+                <Input placeholder="Create password" className="text-base" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
               <div>
                 <Label>Date of Birth</Label>
-                <Input type="date" className="text-base" />
+                <Input type="date" className="text-base" value={dob} onChange={(e) => setDob(e.target.value)} />
               </div>
             </CardContent>
           </Card>
 
-          {/* Guardians */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -179,25 +259,21 @@ export const Register = () => {
                     </span>
                   )}
                   {i > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => removeGuardian(i)}
-                      className="absolute top-2 right-2 text-muted-foreground hover:text-sos"
-                    >
+                    <button type="button" onClick={() => removeGuardian(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-sos">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                   <div>
                     <Label className="text-xs">Name</Label>
-                    <Input placeholder="Guardian name" className="text-base" />
+                    <Input placeholder="Guardian name" className="text-base" value={g.name} onChange={(e) => updateGuardian(i, "name", e.target.value)} />
                   </div>
                   <div>
                     <Label className="text-xs">Phone</Label>
-                    <Input placeholder="Phone number" className="text-base" />
+                    <Input placeholder="Phone number" className="text-base" value={g.phone} onChange={(e) => updateGuardian(i, "phone", e.target.value)} />
                   </div>
                   <div>
                     <Label className="text-xs">Relation</Label>
-                    <Select>
+                    <Select value={g.relation} onValueChange={(val) => updateGuardian(i, "relation", val)}>
                       <SelectTrigger><SelectValue placeholder="Select relation" /></SelectTrigger>
                       <SelectContent>
                         {["Spouse", "Son", "Daughter", "Sibling", "Friend", "Neighbor", "Other"].map((r) => (
@@ -216,8 +292,8 @@ export const Register = () => {
             </CardContent>
           </Card>
 
-          <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg">
-            Create Account
+          <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={loading}>
+            {loading ? "Creating Account..." : "Create Account"}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
