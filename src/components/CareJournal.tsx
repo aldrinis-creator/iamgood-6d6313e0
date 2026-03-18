@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,11 @@ type JournalEntry = {
   created_at: string;
 };
 
-const CareJournal = () => {
+interface CareJournalProps {
+  wardUserId: string;
+}
+
+const CareJournal = ({ wardUserId }: CareJournalProps) => {
   const { session } = useAuth();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +48,14 @@ const CareJournal = () => {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const userId = session?.user?.id;
+  const guardianId = session?.user?.id;
 
   const fetchEntries = async () => {
-    if (!userId) return;
+    if (!wardUserId) return;
     const { data, error } = await supabase
       .from("care_journal")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", wardUserId)
       .order("entry_date", { ascending: false })
       .limit(30);
 
@@ -65,7 +69,7 @@ const CareJournal = () => {
 
   useEffect(() => {
     fetchEntries();
-  }, [userId]);
+  }, [wardUserId]);
 
   const toggleSymptom = (symptom: string) => {
     setSelectedSymptoms((prev) =>
@@ -74,14 +78,15 @@ const CareJournal = () => {
   };
 
   const handleSave = async () => {
-    if (!userId || !mood) {
-      toast.error("Please select your mood");
+    if (!guardianId || !wardUserId || !mood) {
+      toast.error("Please select your ward's mood");
       return;
     }
     setSaving(true);
 
     const { error } = await supabase.from("care_journal").insert({
-      user_id: userId,
+      user_id: wardUserId,
+      created_by: guardianId,
       mood,
       symptoms: selectedSymptoms,
       notes: notes.trim() || null,
@@ -141,7 +146,7 @@ const CareJournal = () => {
           <CardContent className="p-4 space-y-4">
             {/* Mood selector */}
             <div>
-              <p className="text-sm font-medium mb-2">How are you feeling today?</p>
+              <p className="text-sm font-medium mb-2">How is your ward feeling today?</p>
               <div className="flex gap-2 justify-between">
                 {MOODS.map((m) => (
                   <button
@@ -183,7 +188,7 @@ const CareJournal = () => {
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="How was your day? Any observations…"
+                placeholder="Observations about your ward's day…"
                 maxLength={1000}
                 rows={3}
               />
@@ -200,7 +205,7 @@ const CareJournal = () => {
       {entries.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground text-sm">
-            No journal entries yet. Tap "New Entry" to start logging your daily health.
+            No journal entries yet. Tap "New Entry" to start logging your ward's daily health.
           </CardContent>
         </Card>
       ) : (

@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-
+import CareJournal from "@/components/CareJournal";
 interface Notification {
   id: string;
   title: string;
@@ -29,6 +29,7 @@ const GuardianDashboard = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("Ward");
+  const [wardUserId, setWardUserId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -61,6 +62,7 @@ const GuardianDashboard = () => {
 
     if (!guardianEntries || guardianEntries.length === 0) return;
     const wardUserId = guardianEntries[0].user_id;
+    setWardUserId(wardUserId);
 
     // Get ward's name
     const { data: wardProfile } = await supabase
@@ -308,6 +310,9 @@ const GuardianDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Care Journal */}
+        {wardUserId && <CareJournal wardUserId={wardUserId} />}
       </div>
     </AppLayout>
   );

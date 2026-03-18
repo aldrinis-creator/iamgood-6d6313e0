@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
-import CareJournal from "@/components/CareJournal";
+
 import ActivityTracker from "@/components/ActivityTracker";
 
 const healthTools = [
@@ -15,7 +15,7 @@ const healthTools = [
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
-  { icon: BookOpen, label: "Care Journal", color: "bg-success/10 text-success" },
+  
 ];
 
 const healthToolsSubItems = [
@@ -109,9 +109,6 @@ const MyHealth = () => {
 
         {/* Activity Tracker */}
         {selectedTool === "Activity" && <ActivityTracker />}
-
-        {/* Care Journal */}
-        {selectedTool === "Care Journal" && <CareJournal />}
 
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
