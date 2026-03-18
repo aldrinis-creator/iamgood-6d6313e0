@@ -52,7 +52,7 @@ const Index = () => {
           <Button
             size="lg"
             variant="outline"
-            className="w-full border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 text-lg py-6"
+            className="w-full border-primary-foreground/50 bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25 text-lg py-6"
             onClick={() => navigate("/login")}
           >
             Sign In
