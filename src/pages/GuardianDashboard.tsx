@@ -310,6 +310,9 @@ const GuardianDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Care Journal */}
+        {wardUserId && <CareJournal wardUserId={wardUserId} />}
       </div>
     </AppLayout>
   );
