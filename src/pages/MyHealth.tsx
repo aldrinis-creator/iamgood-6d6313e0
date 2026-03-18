@@ -106,6 +106,9 @@ const MyHealth = () => {
         {/* Medication Manager */}
         {selectedTool === "Tablets" && <MedicationManager />}
 
+        {/* Care Journal */}
+        {selectedTool === "Care Journal" && <CareJournal />}
+
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
           <Card className="bg-success/5 border-success/20">
