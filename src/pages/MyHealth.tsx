@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
+import AmbulanceBooking from "@/components/AmbulanceBooking";
 
 import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
