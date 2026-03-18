@@ -8,11 +8,13 @@ import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
+import useMedicationAlarms from "@/hooks/useMedicationAlarms";
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   useCheckInAudio();
+  useMedicationAlarms();
 
   return (
     <div className="min-h-screen bg-background">

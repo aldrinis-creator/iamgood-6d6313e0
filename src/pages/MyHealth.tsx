@@ -2,6 +2,7 @@ import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wr
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
+import MedicationManager from "@/components/medications/MedicationManager";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
