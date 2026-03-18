@@ -42,6 +42,7 @@ type HelpTab = "faq" | "contact" | "settings" | "privacy" | "terms";
 
 const Help = () => {
   const [activeTab, setActiveTab] = useState<HelpTab>("faq");
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
