@@ -88,6 +88,18 @@ const GuardianDashboard = () => {
   useEffect(() => {
     fetchNotifications();
     fetchWardCheckIns();
+
+    // Realtime subscription for new notifications
+    const channel = supabase
+      .channel("guardian-notifications")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => fetchNotifications()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [fetchNotifications, fetchWardCheckIns]);
 
   const markAsRead = async (id: string) => {
