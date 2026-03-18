@@ -49,7 +49,7 @@ const AppHeader = () => {
             { label: "Home", path: "/dashboard" },
             { label: "Appointments", path: "/appointments", glow: todayApptCount > 0 },
             { label: "My Health", path: "/my-health" },
-            { label: "My Health", path: "/my-health" },
+            { label: "Help", path: "/help" },
           ].map((tab) => (
             <button
               key={tab.path}

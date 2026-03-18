@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, Settings, Shield } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Shield } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -44,7 +44,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: Heart, label: "My Health", path: "/my-health" },
-    { icon: Settings, label: "Settings", path: "/settings" },
+    { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
   const guardianTabs = [
