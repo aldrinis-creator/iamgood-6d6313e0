@@ -53,6 +53,7 @@ export type Database = {
       care_journal: {
         Row: {
           created_at: string
+          created_by: string | null
           entry_date: string
           id: string
           mood: string
@@ -63,6 +64,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           entry_date?: string
           id?: string
           mood: string
@@ -73,6 +75,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           entry_date?: string
           id?: string
           mood?: string
