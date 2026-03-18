@@ -27,7 +27,7 @@ interface CheckIn {
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
-  const [showAmbulanceBooking, setShowAmbulanceBooking] = useState(false);
+  const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("Ward");
