@@ -100,7 +100,7 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
               <p className="text-sm font-medium">Share Location with Guardians</p>
               <p className="text-xs text-muted-foreground">Include your location in SOS alerts</p>
             </div>
-            <Switch defaultChecked />
+            <Switch checked={settings.shareLocation} onCheckedChange={(v) => updateSetting("shareLocation", v)} />
           </div>
           <div className="flex items-center justify-between py-3">
             <div>
