@@ -135,6 +135,9 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">Your Personal Emergency Response System</p>
         </div>
 
+        <GoogleSignInButton />
+        <OrDivider />
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <Label>Email</Label>
