@@ -1,1 +1,4 @@
 project_id = "magnrdegcegxdtgapyez"
+
+[functions.nutrition-advisor]
+verify_jwt = false
