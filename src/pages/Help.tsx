@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut } from "lucide-react";
+import { useState, useMemo } from "react";
+import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
