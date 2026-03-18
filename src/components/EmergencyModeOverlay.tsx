@@ -6,12 +6,10 @@ import { Button } from "@/components/ui/button";
 const EmergencyModeOverlay = () => {
   const { emergencyMode, cancelSOS } = useApp();
   const [countdown, setCountdown] = useState(5);
-  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
     if (!emergencyMode) {
       setCountdown(5);
-      setCancelled(false);
       return;
     }
 
@@ -27,11 +25,6 @@ const EmergencyModeOverlay = () => {
 
     return () => clearInterval(timer);
   }, [emergencyMode]);
-
-  const handleCancel = () => {
-    setCancelled(true);
-    cancelSOS();
-  };
 
   if (!emergencyMode) return null;
 
@@ -50,7 +43,7 @@ const EmergencyModeOverlay = () => {
               Alerting guardians in {countdown} seconds...
             </p>
             <Button
-              onClick={handleCancel}
+              onClick={cancelSOS}
               variant="outline"
               size="lg"
               className="bg-transparent border-2 border-sos-foreground text-sos-foreground hover:bg-sos-foreground hover:text-sos text-lg px-8 py-6"
@@ -66,23 +59,33 @@ const EmergencyModeOverlay = () => {
               Your live location and medical data have been shared.
             </p>
             <div className="flex gap-3 justify-center mt-6">
+              <a href="tel:112">
+                <Button
+                  variant="outline"
+                  className="bg-transparent border-2 border-sos-foreground text-sos-foreground hover:bg-sos-foreground hover:text-sos"
+                >
+                  <Phone className="w-4 h-4 mr-2" />
+                  Call 112
+                </Button>
+              </a>
               <Button
                 variant="outline"
                 className="bg-transparent border-2 border-sos-foreground text-sos-foreground hover:bg-sos-foreground hover:text-sos"
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                Call 112
-              </Button>
-              <Button
-                variant="outline"
-                className="bg-transparent border-2 border-sos-foreground text-sos-foreground hover:bg-sos-foreground hover:text-sos"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                      const { latitude, longitude } = pos.coords;
+                      window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, "_blank");
+                    });
+                  }
+                }}
               >
                 <MapPin className="w-4 h-4 mr-2" />
                 Share Location
               </Button>
             </div>
             <Button
-              onClick={handleCancel}
+              onClick={cancelSOS}
               variant="ghost"
               className="text-sos-foreground/80 hover:text-sos-foreground mt-4"
             >
