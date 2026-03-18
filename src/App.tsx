@@ -14,6 +14,7 @@ import MedicalVault from "./pages/MedicalVault";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const queryClient = new QueryClient();
 
