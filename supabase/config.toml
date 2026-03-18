@@ -2,3 +2,6 @@ project_id = "magnrdegcegxdtgapyez"
 
 [functions.nutrition-advisor]
 verify_jwt = false
+
+[functions.health-tools]
+verify_jwt = false

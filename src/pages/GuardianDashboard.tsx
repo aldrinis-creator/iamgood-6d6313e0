@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, Ambulance, AlertTriangle, Wifi, Bell } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import CareJournal from "@/components/CareJournal";
+import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 interface Notification {
   id: string;
@@ -26,7 +27,7 @@ interface CheckIn {
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
-  const [showAmbulanceBooking, setShowAmbulanceBooking] = useState(false);
+  const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("Ward");
@@ -241,47 +242,15 @@ const GuardianDashboard = () => {
           <Button
             className="flex-col h-auto py-4 bg-sos hover:bg-sos/90"
             size="lg"
-            onClick={() => setShowAmbulanceBooking(true)}
+            onClick={() => setShowAmbulance(!showAmbulance)}
           >
-            <Ambulance className="w-5 h-5 mb-1" />
+            <Navigation className="w-5 h-5 mb-1" />
             <span className="text-xs">Ambulance</span>
           </Button>
         </div>
 
         {/* Ambulance Booking */}
-        {showAmbulanceBooking && (
-          <Card className="border-sos/30">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-sos" />
-                <h3 className="font-semibold">Priority Ambulance Booking</h3>
-              </div>
-              <div className="bg-muted rounded-lg p-3 space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Base fare (first 5 km)</span>
-                  <span className="font-semibold">₹1,500</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Additional (per km)</span>
-                  <span className="font-semibold">₹300</span>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Estimated arrival: 8–12 minutes • Nearest unit: 2.3 km away
-              </p>
-              <Button className="w-full bg-sos hover:bg-sos/90 text-lg py-6">
-                🚑 Confirm Ambulance — ₹1,500
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground"
-                onClick={() => setShowAmbulanceBooking(false)}
-              >
-                Cancel
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {showAmbulance && <AmbulanceBooking />}
 
         {/* Today's Check-Ins (real data) */}
         <Card>

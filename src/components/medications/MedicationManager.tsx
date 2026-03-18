@@ -1,9 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Pill, Package, Bell } from "lucide-react";
+import { CalendarDays, Pill, Package, Bell, ShieldAlert } from "lucide-react";
 import TodaySchedule from "./TodaySchedule";
 import MedicationList from "./MedicationList";
 import RefillOrder from "./RefillOrder";
 import AlarmSettings from "./AlarmSettings";
+import BannedMedications from "./BannedMedications";
 
 const MedicationManager = () => {
   return (
@@ -14,7 +15,7 @@ const MedicationManager = () => {
       </h2>
 
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="today" className="text-xs gap-1">
             <CalendarDays className="w-3 h-3" /> Today
           </TabsTrigger>
@@ -24,23 +25,19 @@ const MedicationManager = () => {
           <TabsTrigger value="refill" className="text-xs gap-1">
             <Package className="w-3 h-3" /> Refill
           </TabsTrigger>
+          <TabsTrigger value="banned" className="text-xs gap-1">
+            <ShieldAlert className="w-3 h-3" /> Banned
+          </TabsTrigger>
           <TabsTrigger value="alarms" className="text-xs gap-1">
             <Bell className="w-3 h-3" /> Alarms
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="today">
-          <TodaySchedule />
-        </TabsContent>
-        <TabsContent value="meds">
-          <MedicationList />
-        </TabsContent>
-        <TabsContent value="refill">
-          <RefillOrder />
-        </TabsContent>
-        <TabsContent value="alarms">
-          <AlarmSettings />
-        </TabsContent>
+        <TabsContent value="today"><TodaySchedule /></TabsContent>
+        <TabsContent value="meds"><MedicationList /></TabsContent>
+        <TabsContent value="refill"><RefillOrder /></TabsContent>
+        <TabsContent value="banned"><BannedMedications /></TabsContent>
+        <TabsContent value="alarms"><AlarmSettings /></TabsContent>
       </Tabs>
     </div>
   );
