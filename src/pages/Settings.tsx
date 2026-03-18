@@ -107,7 +107,7 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
               <p className="text-sm font-medium">Share Health Data</p>
               <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
             </div>
-            <Switch defaultChecked />
+            <Switch checked={settings.shareHealthData} onCheckedChange={(v) => updateSetting("shareHealthData", v)} />
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
