@@ -47,7 +47,8 @@ const AppHeader = () => {
         <nav className="flex gap-1 bg-primary-foreground/10 rounded-lg p-1">
           {[
             { label: "Home", path: "/dashboard" },
-            { label: "Appointments", path: "/appointments" },
+            { label: "Appointments", path: "/appointments", glow: todayApptCount > 0 },
+            { label: "My Health", path: "/my-health" },
             { label: "My Health", path: "/my-health" },
           ].map((tab) => (
             <button
