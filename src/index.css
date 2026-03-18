@@ -120,3 +120,40 @@
 .animate-sos-pulse {
   animation: sos-pulse 1.5s ease-in-out infinite;
 }
+
+/* Accessibility overrides */
+.a11y-hide-images img {
+  visibility: hidden !important;
+}
+
+.a11y-highlight-headings h1,
+.a11y-highlight-headings h2,
+.a11y-highlight-headings h3,
+.a11y-highlight-headings h4,
+.a11y-highlight-headings h5,
+.a11y-highlight-headings h6 {
+  outline: 2px solid hsl(213 53% 23%) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.a11y-highlight-links a {
+  outline: 2px solid hsl(213 53% 23%) !important;
+  outline-offset: 1px;
+  text-decoration: underline !important;
+}
+
+.a11y-pause-animations *,
+.a11y-pause-animations *::before,
+.a11y-pause-animations *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+.a11y-text-color * {
+  color: var(--a11y-text-color) !important;
+}
+
+.a11y-bg-color {
+  background-color: var(--a11y-bg-color) !important;
+}
