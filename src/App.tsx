@@ -13,6 +13,7 @@ import MyHealth from "./pages/MyHealth";
 import MedicalVault from "./pages/MedicalVault";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/medical-vault" element={<MedicalVault />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/subscription" element={<Subscription />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/appointments" element={<MedicalVault />} />
             <Route path="/reports" element={<GuardianDashboard />} />
             <Route path="/guardian-settings" element={<Settings />} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface CookieConsentProps {
   forceShow?: boolean;
@@ -30,7 +31,8 @@ const CookieConsent: React.FC<CookieConsentProps> = ({ forceShow = false, onClos
         <div className="flex items-start gap-3">
           <Cookie className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
-            We use cookies to improve your experience. By continuing, you agree to our use of cookies.
+            We use cookies to improve your experience. By continuing, you agree to our use of cookies. Read our{" "}
+            <Link to="/privacy-policy" className="underline text-primary hover:text-primary/80">Privacy Policy</Link>.
           </p>
         </div>
         <div className="flex gap-2 justify-end">
