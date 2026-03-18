@@ -566,30 +566,28 @@ const Settings = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Shield className="w-5 h-5 text-primary" />
-                  Data Sharing with Guardians
+                  Privacy & Security
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">Manage your privacy and data settings</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between py-3 border-b border-border">
                   <div>
-                    <p className="text-sm font-medium">Share Location</p>
-                    <p className="text-xs text-muted-foreground">Allow guardians to see your location during SOS</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <div>
-                    <p className="text-sm font-medium">Share Health Data</p>
-                    <p className="text-xs text-muted-foreground">Allow guardians to view your health profile</p>
+                    <p className="text-sm font-medium">Share Location with Guardians</p>
+                    <p className="text-xs text-muted-foreground">Include your location in SOS alerts</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
                 <div className="flex items-center justify-between py-3">
                   <div>
-                    <p className="text-sm font-medium">Share Wellness Score</p>
-                    <p className="text-xs text-muted-foreground">Include wellness data in guardian reports</p>
+                    <p className="text-sm font-medium">Share Health Data</p>
+                    <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
                   </div>
                   <Switch defaultChecked />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
+                  <Button variant="outline" size="sm">Manage Cookie Preferences</Button>
                 </div>
               </CardContent>
             </Card>
@@ -597,14 +595,53 @@ const Settings = () => {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Lock className="w-5 h-5 text-destructive" />
-                  Data Privacy Controls
+                  <Shield className="w-5 h-5 text-primary" />
+                  Data & Privacy Controls
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Exercise your rights under GDPR (EU) and India's DPDP Act 2023. All requests are processed within 30 days.
+                </p>
+                <a href="/privacy-policy" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
+                  View your rights in our Privacy Policy ↗
+                </a>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="outline" size="sm" className="w-full">Request My Data</Button>
-                <Button variant="outline" size="sm" className="w-full">Correct My Information</Button>
-                <Button variant="destructive" size="sm" className="w-full">Request Account Deletion</Button>
+                {[
+                  { icon: "📋", title: "Request My Data", desc: "Get a copy of all personal data we hold about you.", ref: "GDPR Art. 15 / DPDP §11", color: "bg-primary/5 border-primary/20" },
+                  { icon: "✏️", title: "Correct My Data", desc: "Request correction of inaccurate or incomplete personal data.", ref: "GDPR Art. 16 / DPDP §12", color: "bg-warning/5 border-warning/20" },
+                  { icon: "🗑️", title: "Delete My Data", desc: "Request erasure of your personal data ('Right to be Forgotten').", ref: "GDPR Art. 17 / DPDP §13", color: "bg-destructive/5 border-destructive/20" },
+                  { icon: "📦", title: "Export My Data", desc: "Receive your data in a portable, machine-readable format.", ref: "GDPR Art. 20 / DPDP §11", color: "bg-success/5 border-success/20" },
+                  { icon: "🚫", title: "Object to Processing", desc: "Object to how we process your personal data for specific purposes.", ref: "GDPR Art. 21 / DPDP §14", color: "bg-accent/50 border-accent" },
+                ].map((item) => (
+                  <div key={item.title} className={`flex items-center justify-between p-3 rounded-lg border ${item.color}`}>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold flex items-center gap-1.5">
+                        <span>{item.icon}</span> {item.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.ref}</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="shrink-0 ml-3">Request</Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Your Request History</CardTitle>
+                <p className="text-xs text-muted-foreground">Track the status of your privacy requests</p>
+              </CardHeader>
+              <CardContent>
+                <div className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Data Access</p>
+                    <p className="text-xs text-muted-foreground">20 Feb 2026, 13:42</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs gap-1 text-success border-success/30">
+                    <CheckCircle className="w-3 h-3" /> Completed
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           </div>

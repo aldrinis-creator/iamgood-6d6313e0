@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut } from "lucide-react";
+import { useState, useMemo } from "react";
+import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { faqSections, FAQ_VERSION } from "@/data/faqData";
@@ -41,6 +42,7 @@ type HelpTab = "faq" | "contact" | "settings" | "privacy" | "terms";
 
 const Help = () => {
   const [activeTab, setActiveTab] = useState<HelpTab>("faq");
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
@@ -61,6 +63,21 @@ const Help = () => {
     toast.success("Logged out successfully");
     navigate("/login");
   };
+
+  const filteredSections = useMemo(() => {
+    if (!searchQuery.trim()) return faqSections;
+    const q = searchQuery.toLowerCase();
+    return faqSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) =>
+            item.question.toLowerCase().includes(q) ||
+            item.answer.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [searchQuery]);
 
   return (
     <AppLayout>
@@ -85,7 +102,7 @@ const Help = () => {
 
         {activeTab === "faq" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">
                 Learn about all the features and how to use My Health Companion effectively.
               </p>
@@ -95,7 +112,21 @@ const Help = () => {
               </Button>
             </div>
 
-            {faqSections.map((section) => (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search FAQs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {filteredSections.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">No FAQs match "{searchQuery}"</p>
+            )}
+
+            {filteredSections.map((section) => (
               <Card key={section.title}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
