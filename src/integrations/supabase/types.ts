@@ -546,6 +546,36 @@ export type Database = {
         }
         Relationships: []
       }
+      privacy_requests: {
+        Row: {
+          created_at: string
+          id: string
+          legal_basis: string | null
+          request_type: string
+          resolved_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          legal_basis?: string | null
+          request_type: string
+          resolved_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          legal_basis?: string | null
+          request_type?: string
+          resolved_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
