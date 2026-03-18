@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import usePushSubscription from "@/hooks/usePushSubscription";
 import { formatDistanceToNow, format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "language" | "access" | "privacy";
 
@@ -53,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
   const queryClient = useQueryClient();
+  const { settings, updateSetting } = useUserSettings();
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["privacy_requests", session?.user?.id],
@@ -98,14 +100,14 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
               <p className="text-sm font-medium">Share Location with Guardians</p>
               <p className="text-xs text-muted-foreground">Include your location in SOS alerts</p>
             </div>
-            <Switch defaultChecked />
+            <Switch checked={settings.shareLocation} onCheckedChange={(v) => updateSetting("shareLocation", v)} />
           </div>
           <div className="flex items-center justify-between py-3">
             <div>
               <p className="text-sm font-medium">Share Health Data</p>
               <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
             </div>
-            <Switch defaultChecked />
+            <Switch checked={settings.shareHealthData} onCheckedChange={(v) => updateSetting("shareHealthData", v)} />
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
@@ -191,22 +193,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  // Alerts state
-  const [audioAlerts, setAudioAlerts] = useState(true);
-  const [voiceReminders, setVoiceReminders] = useState(true);
-  const [vibration, setVibration] = useState(true);
-  const [checkInPush, setCheckInPush] = useState(true);
-  const [medPush, setMedPush] = useState(true);
-  const [guardianPush, setGuardianPush] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(true);
-
-  // Check-In state
-  const [sleepMode, setSleepMode] = useState(true);
-  const [nudgeFrequency, setNudgeFrequency] = useState("4");
-  const [fallDetection, setFallDetection] = useState(true);
-
-  // Appts state
-  const [preAlert, setPreAlert] = useState("15min");
+  const { settings, updateSetting } = useUserSettings();
 
   // Guardians state
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -374,7 +361,7 @@ const Settings = () => {
                       <p className="text-xs text-muted-foreground">Play a chime when check-in is due</p>
                     </div>
                   </div>
-                  <Switch checked={audioAlerts} onCheckedChange={setAudioAlerts} />
+                  <Switch checked={settings.audioAlerts} onCheckedChange={(v) => updateSetting("audioAlerts", v)} />
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-border">
                   <div className="flex items-center gap-3">
@@ -384,7 +371,7 @@ const Settings = () => {
                       <p className="text-xs text-muted-foreground">Spoken nudges when health tasks are incomplete</p>
                     </div>
                   </div>
-                  <Switch checked={voiceReminders} onCheckedChange={setVoiceReminders} />
+                  <Switch checked={settings.voiceReminders} onCheckedChange={(v) => updateSetting("voiceReminders", v)} />
                 </div>
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
@@ -394,7 +381,7 @@ const Settings = () => {
                       <p className="text-xs text-muted-foreground">Always enabled for check-in reminders</p>
                     </div>
                   </div>
-                  <Switch checked={vibration} onCheckedChange={setVibration} />
+                  <Switch checked={settings.vibration} onCheckedChange={(v) => updateSetting("vibration", v)} />
                 </div>
               </CardContent>
             </Card>
@@ -413,21 +400,21 @@ const Settings = () => {
                     <p className="text-sm font-medium">Check-In Reminders</p>
                     <p className="text-xs text-muted-foreground">Get reminded when it's time to check in</p>
                   </div>
-                  <Switch checked={checkInPush} onCheckedChange={setCheckInPush} />
+                  <Switch checked={settings.checkInPush} onCheckedChange={(v) => updateSetting("checkInPush", v)} />
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-border">
                   <div>
                     <p className="text-sm font-medium">Medication Reminders</p>
                     <p className="text-xs text-muted-foreground">Get notified when medications are due</p>
                   </div>
-                  <Switch checked={medPush} onCheckedChange={setMedPush} />
+                  <Switch checked={settings.medPush} onCheckedChange={(v) => updateSetting("medPush", v)} />
                 </div>
                 <div className="flex items-center justify-between py-3">
                   <div>
                     <p className="text-sm font-medium">Guardian Updates</p>
                     <p className="text-xs text-muted-foreground">Receive updates when guardians respond</p>
                   </div>
-                  <Switch checked={guardianPush} onCheckedChange={setGuardianPush} />
+                  <Switch checked={settings.guardianPush} onCheckedChange={(v) => updateSetting("guardianPush", v)} />
                 </div>
               </CardContent>
             </Card>
@@ -446,7 +433,7 @@ const Settings = () => {
                     <p className="text-sm font-medium">Enable Weekly Report</p>
                     <p className="text-xs text-muted-foreground">Sends check-in, medication, wellness & activity data to you and your guardians</p>
                   </div>
-                  <Switch checked={weeklyReport} onCheckedChange={setWeeklyReport} />
+                  <Switch checked={settings.weeklyReport} onCheckedChange={(v) => updateSetting("weeklyReport", v)} />
                 </div>
               </CardContent>
             </Card>
@@ -459,16 +446,16 @@ const Settings = () => {
             {/* Sleep Mode / Check-Out pills */}
             <div className="flex gap-2">
               <Badge
-                variant={sleepMode ? "default" : "outline"}
+                variant={settings.sleepMode ? "default" : "outline"}
                 className="cursor-pointer gap-1.5 px-3 py-1.5"
-                onClick={() => setSleepMode(true)}
+                onClick={() => updateSetting("sleepMode", true)}
               >
-                <Moon className="w-3.5 h-3.5" /> Sleep Mode {sleepMode && <span className="text-xs">(Active)</span>}
+                <Moon className="w-3.5 h-3.5" /> Sleep Mode {settings.sleepMode && <span className="text-xs">(Active)</span>}
               </Badge>
               <Badge
-                variant={!sleepMode ? "default" : "outline"}
+                variant={!settings.sleepMode ? "default" : "outline"}
                 className="cursor-pointer gap-1.5 px-3 py-1.5"
-                onClick={() => setSleepMode(false)}
+                onClick={() => updateSetting("sleepMode", false)}
               >
                 <Star className="w-3.5 h-3.5" /> Check-Out
               </Badge>
@@ -488,7 +475,7 @@ const Settings = () => {
                     <p className="text-sm font-medium">Nudge Frequency</p>
                     <p className="text-xs text-muted-foreground">Alerts will be sent to your guardians if you remain inactive</p>
                   </div>
-                  <Select value={nudgeFrequency} onValueChange={setNudgeFrequency}>
+                  <Select value={settings.nudgeFrequency} onValueChange={(v) => updateSetting("nudgeFrequency", v)}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -519,7 +506,7 @@ const Settings = () => {
                     <p className="text-sm font-medium">Enable Fall Detection</p>
                     <p className="text-xs text-muted-foreground">Monitors accelerometer for sudden falls</p>
                   </div>
-                  <Switch checked={fallDetection} onCheckedChange={setFallDetection} />
+                  <Switch checked={settings.fallDetection} onCheckedChange={(v) => updateSetting("fallDetection", v)} />
                 </div>
                 <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
                   <p className="text-xs text-foreground">
@@ -543,7 +530,7 @@ const Settings = () => {
                 <p className="text-xs text-muted-foreground">Choose how early you want to be reminded before an appointment</p>
               </CardHeader>
               <CardContent>
-                <RadioGroup value={preAlert} onValueChange={setPreAlert} className="space-y-2">
+                <RadioGroup value={settings.preAlert} onValueChange={(v) => updateSetting("preAlert", v)} className="space-y-2">
                   {[
                     { value: "5min", label: "5 minutes before" },
                     { value: "10min", label: "10 minutes before" },
