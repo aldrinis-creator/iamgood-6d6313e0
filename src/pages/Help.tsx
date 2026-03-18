@@ -3,6 +3,7 @@ import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download,
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { faqSections, FAQ_VERSION } from "@/data/faqData";
