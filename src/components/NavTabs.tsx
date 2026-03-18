@@ -44,7 +44,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: Heart, label: "My Health", path: "/my-health" },
-    { icon: Settings, label: "Settings", path: "/settings" },
+    { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
   const guardianTabs = [
