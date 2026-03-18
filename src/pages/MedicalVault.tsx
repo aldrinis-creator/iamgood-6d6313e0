@@ -11,6 +11,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import GuardianTab from "@/components/GuardianTab";
 
 const RECORD_TYPES = [
   "Prescription",
