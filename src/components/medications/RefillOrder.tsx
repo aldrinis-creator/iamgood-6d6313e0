@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, ShoppingCart, Camera, Package } from "lucide-react";
+import { AlertTriangle, ShoppingCart, Camera, Package, ShieldAlert, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Medication {
@@ -15,6 +15,11 @@ interface Medication {
   remaining_quantity: number;
   total_quantity: number;
   low_stock_threshold: number;
+}
+
+interface BannedStatus {
+  status: "banned" | "restricted" | "warning" | "safe" | "unknown";
+  details: string;
 }
 
 const RefillOrder = () => {
