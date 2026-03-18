@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import usePushSubscription from "@/hooks/usePushSubscription";
 import { formatDistanceToNow, format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "language" | "access" | "privacy";
 
