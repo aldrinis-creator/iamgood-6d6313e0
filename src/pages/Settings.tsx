@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import usePushSubscription from "@/hooks/usePushSubscription";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "language" | "access" | "privacy";
 
@@ -33,6 +34,157 @@ interface Guardian {
   nominated_at: string;
   is_vault_nominee: boolean;
 }
+
+const PRIVACY_ACTIONS = [
+  { type: "data_access", icon: "📋", title: "Request My Data", desc: "Get a copy of all personal data we hold about you.", ref: "GDPR Art. 15 / DPDP §11", color: "bg-primary/5 border-primary/20" },
+  { type: "correction", icon: "✏️", title: "Correct My Data", desc: "Request correction of inaccurate or incomplete personal data.", ref: "GDPR Art. 16 / DPDP §12", color: "bg-warning/5 border-warning/20" },
+  { type: "deletion", icon: "🗑️", title: "Delete My Data", desc: "Request erasure of your personal data ('Right to be Forgotten').", ref: "GDPR Art. 17 / DPDP §13", color: "bg-destructive/5 border-destructive/20" },
+  { type: "export", icon: "📦", title: "Export My Data", desc: "Receive your data in a portable, machine-readable format.", ref: "GDPR Art. 20 / DPDP §11", color: "bg-success/5 border-success/20" },
+  { type: "objection", icon: "🚫", title: "Object to Processing", desc: "Object to how we process your personal data for specific purposes.", ref: "GDPR Art. 21 / DPDP §14", color: "bg-accent/50 border-accent" },
+];
+
+const TYPE_LABELS: Record<string, string> = {
+  data_access: "Data Access",
+  correction: "Data Correction",
+  deletion: "Data Deletion",
+  export: "Data Export",
+  objection: "Processing Objection",
+};
+
+const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
+  const queryClient = useQueryClient();
+
+  const { data: requests = [], isLoading } = useQuery({
+    queryKey: ["privacy_requests", session?.user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("privacy_requests" as any)
+        .select("*")
+        .eq("user_id", session!.user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async ({ request_type, legal_basis }: { request_type: string; legal_basis: string }) => {
+      const { error } = await supabase
+        .from("privacy_requests" as any)
+        .insert({ user_id: session!.user.id, request_type, legal_basis } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["privacy_requests"] });
+      toast.success("Privacy request submitted. We'll process it within 30 days.");
+    },
+    onError: () => toast.error("Failed to submit request. Please try again."),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            Privacy & Security
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Manage your privacy and data settings</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <p className="text-sm font-medium">Share Location with Guardians</p>
+              <p className="text-xs text-muted-foreground">Include your location in SOS alerts</p>
+            </div>
+            <Switch defaultChecked />
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-medium">Share Health Data</p>
+              <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
+            </div>
+            <Switch defaultChecked />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
+            <Button variant="outline" size="sm">Manage Cookie Preferences</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            Data & Privacy Controls
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Exercise your rights under GDPR (EU) and India's DPDP Act 2023. All requests are processed within 30 days.
+          </p>
+          <a href="/privacy-policy" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
+            View your rights in our Privacy Policy ↗
+          </a>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {PRIVACY_ACTIONS.map((item) => (
+            <div key={item.type} className={`flex items-center justify-between p-3 rounded-lg border ${item.color}`}>
+              <div className="flex-1">
+                <p className="text-sm font-semibold flex items-center gap-1.5">
+                  <span>{item.icon}</span> {item.title}
+                </p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.ref}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 ml-3"
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate({ request_type: item.type, legal_basis: item.ref })}
+              >
+                {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Request"}
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Your Request History</CardTitle>
+          <p className="text-xs text-muted-foreground">Track the status of your privacy requests</p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {isLoading ? (
+            <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : requests.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No privacy requests yet.</p>
+          ) : (
+            requests.map((r: any) => (
+              <div key={r.id} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{TYPE_LABELS[r.request_type] || r.request_type}</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(r.created_at), "dd MMM yyyy, HH:mm")}</p>
+                </div>
+                {r.status === "completed" ? (
+                  <Badge variant="outline" className="text-xs gap-1 text-success border-success/30">
+                    <CheckCircle className="w-3 h-3" /> Completed
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs gap-1 text-warning border-warning/30">
+                    <HelpCircle className="w-3 h-3" /> Pending
+                  </Badge>
+                )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("alerts");
@@ -561,90 +713,7 @@ const Settings = () => {
 
         {/* ============ PRIVACY TAB ============ */}
         {activeTab === "privacy" && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-primary" />
-                  Privacy & Security
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">Manage your privacy and data settings</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <div>
-                    <p className="text-sm font-medium">Share Location with Guardians</p>
-                    <p className="text-xs text-muted-foreground">Include your location in SOS alerts</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium">Share Health Data</p>
-                    <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
-                  <Button variant="outline" size="sm">Manage Cookie Preferences</Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-primary" />
-                  Data & Privacy Controls
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Exercise your rights under GDPR (EU) and India's DPDP Act 2023. All requests are processed within 30 days.
-                </p>
-                <a href="/privacy-policy" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
-                  View your rights in our Privacy Policy ↗
-                </a>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { icon: "📋", title: "Request My Data", desc: "Get a copy of all personal data we hold about you.", ref: "GDPR Art. 15 / DPDP §11", color: "bg-primary/5 border-primary/20" },
-                  { icon: "✏️", title: "Correct My Data", desc: "Request correction of inaccurate or incomplete personal data.", ref: "GDPR Art. 16 / DPDP §12", color: "bg-warning/5 border-warning/20" },
-                  { icon: "🗑️", title: "Delete My Data", desc: "Request erasure of your personal data ('Right to be Forgotten').", ref: "GDPR Art. 17 / DPDP §13", color: "bg-destructive/5 border-destructive/20" },
-                  { icon: "📦", title: "Export My Data", desc: "Receive your data in a portable, machine-readable format.", ref: "GDPR Art. 20 / DPDP §11", color: "bg-success/5 border-success/20" },
-                  { icon: "🚫", title: "Object to Processing", desc: "Object to how we process your personal data for specific purposes.", ref: "GDPR Art. 21 / DPDP §14", color: "bg-accent/50 border-accent" },
-                ].map((item) => (
-                  <div key={item.title} className={`flex items-center justify-between p-3 rounded-lg border ${item.color}`}>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold flex items-center gap-1.5">
-                        <span>{item.icon}</span> {item.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{item.desc}</p>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.ref}</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="shrink-0 ml-3">Request</Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Your Request History</CardTitle>
-                <p className="text-xs text-muted-foreground">Track the status of your privacy requests</p>
-              </CardHeader>
-              <CardContent>
-                <div className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Data Access</p>
-                    <p className="text-xs text-muted-foreground">20 Feb 2026, 13:42</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs gap-1 text-success border-success/30">
-                    <CheckCircle className="w-3 h-3" /> Completed
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <PrivacyTab session={session} navigate={navigate} />
         )}
       </div>
     </AppLayout>
