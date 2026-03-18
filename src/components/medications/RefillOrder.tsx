@@ -26,6 +26,8 @@ const RefillOrder = () => {
   const { session } = useAuth();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
+  const [bannedMap, setBannedMap] = useState<Record<string, BannedStatus>>({});
+  const [checkingBanned, setCheckingBanned] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
