@@ -5,6 +5,7 @@ import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import { useApp } from "@/contexts/AppContext";
+import CookieConsent from "@/components/CookieConsent";
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
@@ -35,6 +36,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <NavTabs />
         {role === "user" && <SOSButton />}
         <EmergencyModeOverlay />
+        <CookieConsent />
       </div>
     </div>
   );
