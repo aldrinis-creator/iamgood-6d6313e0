@@ -186,7 +186,7 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
   );
 };
 
-
+const Settings = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("alerts");
   const navigate = useNavigate();
   const { session } = useAuth();
