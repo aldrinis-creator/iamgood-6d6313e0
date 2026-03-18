@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, Ambulance, AlertTriangle, Wifi, Bell } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import CareJournal from "@/components/CareJournal";
+import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 interface Notification {
   id: string;
