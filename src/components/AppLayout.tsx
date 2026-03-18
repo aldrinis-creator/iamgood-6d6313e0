@@ -12,6 +12,7 @@ import useCheckInAudio from "@/hooks/useCheckInAudio";
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
   const [showCookieSettings, setShowCookieSettings] = useState(false);
+  useCheckInAudio();
 
   return (
     <div className="min-h-screen bg-background">
