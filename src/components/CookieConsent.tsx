@@ -2,7 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 
-const CookieConsent: React.FC = () => {
+interface CookieConsentProps {
+  forceShow?: boolean;
+  onClose?: () => void;
+}
+
+const CookieConsent: React.FC<CookieConsentProps> = ({ forceShow = false, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -14,9 +19,10 @@ const CookieConsent: React.FC = () => {
   const handleChoice = (choice: "accepted" | "rejected") => {
     localStorage.setItem("cookie-consent", choice);
     setIsVisible(false);
+    onClose?.();
   };
 
-  if (!isVisible) return null;
+  if (!isVisible && !forceShow) return null;
 
   return (
     <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md">
