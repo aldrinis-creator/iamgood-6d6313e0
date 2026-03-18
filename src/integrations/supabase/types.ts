@@ -50,6 +50,7 @@ export type Database = {
       guardians: {
         Row: {
           created_at: string
+          guardian_email: string | null
           guardian_name: string
           guardian_phone: string
           id: string
@@ -59,6 +60,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          guardian_email?: string | null
           guardian_name: string
           guardian_phone: string
           id?: string
@@ -68,6 +70,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          guardian_email?: string | null
           guardian_name?: string
           guardian_phone?: string
           id?: string
@@ -157,6 +160,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          guardian_id: string | null
+          id: string
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          message: string
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
