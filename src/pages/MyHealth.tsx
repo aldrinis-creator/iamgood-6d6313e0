@@ -15,7 +15,7 @@ const healthTools = [
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
-  { icon: BookOpen, label: "Care Journal", color: "bg-success/10 text-success" },
+  
 ];
 
 const healthToolsSubItems = [
