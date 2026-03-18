@@ -2,11 +2,16 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ScanFace, Camera, CameraOff, Heart, Brain, AlertTriangle } from "lucide-react";
+import { ScanFace, Camera, CameraOff, Heart, Brain, AlertTriangle, History, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { format } from "date-fns";
 
-const SCAN_DURATION = 30; // seconds
-const SAMPLE_RATE = 15; // frames per second for analysis
-const MIN_SAMPLES = SCAN_DURATION * SAMPLE_RATE * 0.6; // need at least 60% of expected samples
+const SCAN_DURATION = 30;
+const SAMPLE_RATE = 15;
+const MIN_SAMPLES = SCAN_DURATION * SAMPLE_RATE * 0.6;
 
 type ScanPhase = "idle" | "starting" | "scanning" | "analyzing" | "results";
 
@@ -36,6 +41,26 @@ const FaceScan = () => {
   const [timeLeft, setTimeLeft] = useState(SCAN_DURATION);
   const [results, setResults] = useState<ScanResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: scanHistory = [] } = useQuery({
+    queryKey: ["face-scans", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("face_scans")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("scanned_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   const stopCamera = useCallback(() => {
     if (intervalRef.current) {
@@ -50,13 +75,37 @@ const FaceScan = () => {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  const saveResults = async (scanResults: ScanResults, sampleCount: number) => {
+    if (!user) return;
+    const { error } = await supabase.from("face_scans").insert({
+      user_id: user.id,
+      heart_rate: scanResults.heartRate,
+      stress_level: scanResults.stressLevel,
+      stress_score: scanResults.stressScore,
+      confidence: scanResults.confidence,
+      sample_count: sampleCount,
+    });
+    if (error) {
+      toast.error("Failed to save scan results");
+    } else {
+      toast.success("Scan saved to your history");
+      queryClient.invalidateQueries({ queryKey: ["face-scans", user.id] });
+    }
+  };
+
+  const deleteScan = async (id: string) => {
+    const { error } = await supabase.from("face_scans").delete().eq("id", id);
+    if (error) {
+      toast.error("Failed to delete scan");
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["face-scans", user?.id] });
+    }
+  };
+
   const analyzeSignal = (samples: number[]): ScanResults => {
-    // Simple rPPG: find dominant frequency in green channel signal
-    // Remove DC component (detrend)
     const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
     const detrended = samples.map((s) => s - mean);
 
-    // Apply simple moving average smoothing
     const smoothed: number[] = [];
     const windowSize = 5;
     for (let i = 0; i < detrended.length; i++) {
@@ -69,18 +118,13 @@ const FaceScan = () => {
       smoothed.push(sum / count);
     }
 
-    // Count zero crossings (positive direction) as a proxy for peaks
     let crossings = 0;
     for (let i = 1; i < smoothed.length; i++) {
-      if (smoothed[i - 1] < 0 && smoothed[i] >= 0) {
-        crossings++;
-      }
+      if (smoothed[i - 1] < 0 && smoothed[i] >= 0) crossings++;
     }
 
     const durationSec = samples.length / SAMPLE_RATE;
     let heartRate = Math.round((crossings / durationSec) * 60);
-
-    // Clamp to physiological range
     heartRate = Math.max(50, Math.min(140, heartRate));
 
     const { level, score } = getStressFromHR(heartRate);
@@ -114,16 +158,14 @@ const FaceScan = () => {
         setProgress(pct);
         setTimeLeft(Math.max(0, SCAN_DURATION - Math.floor(elapsed)));
 
-        // Sample green channel from forehead region
         if (canvasRef.current && videoRef.current) {
           const ctx = canvasRef.current.getContext("2d");
           if (ctx) {
             ctx.drawImage(videoRef.current, 0, 0, 320, 240);
-            // Sample center-top region (forehead area)
             const imgData = ctx.getImageData(100, 30, 120, 60);
             let greenSum = 0;
             for (let i = 0; i < imgData.data.length; i += 4) {
-              greenSum += imgData.data[i + 1]; // green channel
+              greenSum += imgData.data[i + 1];
             }
             const greenAvg = greenSum / (imgData.data.length / 4);
             greenSamples.current.push(greenAvg);
@@ -135,10 +177,10 @@ const FaceScan = () => {
           intervalRef.current = null;
           setPhase("analyzing");
 
-          // Brief pause for UX then show results
           setTimeout(() => {
             const scanResults = analyzeSignal(greenSamples.current);
             setResults(scanResults);
+            saveResults(scanResults, greenSamples.current.length);
             stopCamera();
             setPhase("results");
           }, 1500);
@@ -160,12 +202,23 @@ const FaceScan = () => {
     setError(null);
   };
 
+  const stressColor = (level: string) =>
+    level === "Low" ? "text-success" : level === "Moderate" ? "text-amber-500" : "text-sos";
+
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
-        <ScanFace className="w-5 h-5 text-success" />
-        AI Face Scan
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <ScanFace className="w-5 h-5 text-success" />
+          AI Face Scan
+        </h2>
+        {scanHistory.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}>
+            <History className="w-4 h-4 mr-1" />
+            {showHistory ? "Hide" : "History"}
+          </Button>
+        )}
+      </div>
 
       {/* Disclaimer */}
       <div className="flex items-start gap-2 p-3 bg-accent/50 rounded-lg text-xs text-muted-foreground">
@@ -175,6 +228,40 @@ const FaceScan = () => {
           Results should not be used for diagnosis. Consult a doctor for health concerns.
         </span>
       </div>
+
+      {/* Scan History */}
+      {showHistory && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Recent Scans</h3>
+            {scanHistory.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No scans yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {scanHistory.map((scan: any) => (
+                  <div key={scan.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm">
+                    <div className="flex items-center gap-3">
+                      <Heart className="w-4 h-4 text-primary" />
+                      <span className="font-medium">{scan.heart_rate} BPM</span>
+                      <span className={`text-xs font-medium ${stressColor(scan.stress_level)}`}>
+                        {scan.stress_level}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(scan.scanned_at), "MMM d, h:mm a")}
+                      </span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteScan(scan.id)}>
+                        <Trash2 className="w-3 h-3 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Camera View */}
       {(phase === "starting" || phase === "scanning" || phase === "analyzing") && (
@@ -188,17 +275,11 @@ const FaceScan = () => {
               muted
             />
             <canvas ref={canvasRef} width={320} height={240} className="hidden" />
-
-            {/* Scan overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-between p-4">
-              {/* Face guide */}
               <div className="w-40 h-48 border-2 border-dashed border-success/60 rounded-[50%] mt-4" />
-
               <div className="w-full space-y-2 bg-background/80 backdrop-blur-sm rounded-lg p-3">
                 {phase === "analyzing" ? (
-                  <p className="text-sm text-center font-medium animate-pulse">
-                    Analyzing your vitals…
-                  </p>
+                  <p className="text-sm text-center font-medium animate-pulse">Analyzing your vitals…</p>
                 ) : (
                   <>
                     <div className="flex justify-between text-xs">
@@ -225,9 +306,9 @@ const FaceScan = () => {
                 <span className="text-xs text-muted-foreground">BPM (est.)</span>
               </CardContent>
             </Card>
-            <Card className={`border-${results.stressLevel === "Low" ? "success" : results.stressLevel === "Moderate" ? "amber" : "sos"}/20`}>
+            <Card>
               <CardContent className="p-4 flex flex-col items-center gap-2">
-                <Brain className="w-8 h-8 text-success" />
+                <Brain className={`w-8 h-8 ${stressColor(results.stressLevel)}`} />
                 <span className="text-2xl font-bold">{results.stressLevel}</span>
                 <span className="text-xs text-muted-foreground">Stress Level</span>
               </CardContent>
