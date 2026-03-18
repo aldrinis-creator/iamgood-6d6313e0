@@ -192,22 +192,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  // Alerts state
-  const [audioAlerts, setAudioAlerts] = useState(true);
-  const [voiceReminders, setVoiceReminders] = useState(true);
-  const [vibration, setVibration] = useState(true);
-  const [checkInPush, setCheckInPush] = useState(true);
-  const [medPush, setMedPush] = useState(true);
-  const [guardianPush, setGuardianPush] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(true);
-
-  // Check-In state
-  const [sleepMode, setSleepMode] = useState(true);
-  const [nudgeFrequency, setNudgeFrequency] = useState("4");
-  const [fallDetection, setFallDetection] = useState(true);
-
-  // Appts state
-  const [preAlert, setPreAlert] = useState("15min");
+  const { settings, updateSetting } = useUserSettings();
 
   // Guardians state
   const [guardians, setGuardians] = useState<Guardian[]>([]);
