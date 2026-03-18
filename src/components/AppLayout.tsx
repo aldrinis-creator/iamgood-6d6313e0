@@ -29,13 +29,22 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p>This app provides general health information only.</p>
               <p>Not a substitute for professional medical advice.</p>
             </div>
-            <button
-              onClick={() => setShowCookieSettings(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              Cookie Settings
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <Link
+                to="/privacy-policy"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+              >
+                Privacy Policy
+              </Link>
+              <span className="text-muted-foreground">·</span>
+              <button
+                onClick={() => setShowCookieSettings(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Cookie Settings
+              </button>
+            </div>
           </footer>
         </main>
         <NavTabs />
