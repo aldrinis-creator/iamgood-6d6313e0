@@ -1,6 +1,7 @@
 import { Globe, User, Bell } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 
 const AppHeader = () => {
   const { userName, role } = useApp();
