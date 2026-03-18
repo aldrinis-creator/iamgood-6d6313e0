@@ -13,6 +13,13 @@ import { type AudioAlertMode, getAudioMode, setAudioMode, testAlert } from "@/li
 const Settings = () => {
   const [fallDetection, setFallDetection] = useState(true);
   const [inactivityDetection, setInactivityDetection] = useState(true);
+  const [audioMode, setAudioModeState] = useState<AudioAlertMode>(getAudioMode());
+
+  const handleAudioModeChange = (value: string) => {
+    const mode = value as AudioAlertMode;
+    setAudioModeState(mode);
+    setAudioMode(mode);
+  };
   const [safeZones, setSafeZones] = useState([
     { name: "Home", address: "Sector 15, Gurugram", radius: "200m" },
     { name: "Pharmacy", address: "MG Road, Gurugram", radius: "100m" },
