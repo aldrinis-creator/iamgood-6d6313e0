@@ -1,4 +1,5 @@
-import { Globe, User, Bell } from "lucide-react";
+import { User, Bell } from "lucide-react";
+import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
@@ -33,7 +34,7 @@ const AppHeader = () => {
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-sos rounded-full" />
           </button>
-          <Globe className="w-5 h-5 opacity-70" />
+          <AccessibilityMenu />
           <button
             onClick={() => navigate("/settings")}
             className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center"
