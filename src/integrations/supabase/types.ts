@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      check_ins: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          responded_at: string | null
+          response: string | null
+          scheduled_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          responded_at?: string | null
+          response?: string | null
+          scheduled_at: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          responded_at?: string | null
+          response?: string | null
+          scheduled_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       guardians: {
         Row: {
           created_at: string
@@ -40,6 +73,87 @@ export type Database = {
           id?: string
           is_primary?: boolean
           relation?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      health_profile: {
+        Row: {
+          allergies: string[] | null
+          blood_group: string | null
+          chronic_conditions: string[] | null
+          created_at: string
+          current_medications: string[] | null
+          emergency_notes: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allergies?: string[] | null
+          blood_group?: string | null
+          chronic_conditions?: string[] | null
+          created_at?: string
+          current_medications?: string[] | null
+          emergency_notes?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allergies?: string[] | null
+          blood_group?: string | null
+          chronic_conditions?: string[] | null
+          created_at?: string
+          current_medications?: string[] | null
+          emergency_notes?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      medical_records: {
+        Row: {
+          created_at: string
+          description: string | null
+          doctor_name: string | null
+          file_name: string | null
+          file_url: string | null
+          hospital_name: string | null
+          id: string
+          record_date: string | null
+          record_type: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          doctor_name?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          hospital_name?: string | null
+          id?: string
+          record_date?: string | null
+          record_type: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          doctor_name?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          hospital_name?: string | null
+          id?: string
+          record_date?: string | null
+          record_type?: string
+          title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -71,6 +185,48 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      sos_events: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          resolved_at: string | null
+          status: string
+          trigger_type: string
+          triggered_at: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          trigger_type?: string
+          triggered_at?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          trigger_type?: string
+          triggered_at?: string
+          user_id?: string
         }
         Relationships: []
       }
