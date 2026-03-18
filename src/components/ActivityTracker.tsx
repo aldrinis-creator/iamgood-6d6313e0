@@ -275,20 +275,28 @@ const ActivityTracker = () => {
 
       {/* Summary Cards — 3×3 grid */}
       <div className="grid grid-cols-3 gap-2">
-        {METRICS.map((m) => (
-          <Card key={m.key}>
-            <CardContent className="p-3 flex flex-col items-center gap-1">
-              <m.icon className={`w-5 h-5 ${m.color}`} />
-              <span className="text-[10px] text-muted-foreground">{m.label}</span>
-              <span className="text-sm font-semibold">
-                {m.key === "distance_km"
-                  ? Number(getValue(m.key)).toFixed(1)
-                  : getValue(m.key).toLocaleString()}
-                {m.unit && <span className="text-[10px] text-muted-foreground ml-0.5">{m.unit}</span>}
-              </span>
-            </CardContent>
-          </Card>
-        ))}
+        {METRICS.map((m) => {
+          const val = getValue(m.key);
+          const pct = Math.round(Math.min((val / m.goal) * 100, 100));
+          return (
+            <Card key={m.key}>
+              <CardContent className="p-3 flex flex-col items-center gap-1">
+                <div className="relative w-10 h-10 flex items-center justify-center">
+                  <RadialProgress value={val} goal={m.goal} stroke={m.stroke} />
+                  <m.icon className={`w-4 h-4 ${m.color} z-10`} />
+                </div>
+                <span className="text-[10px] text-muted-foreground">{m.label}</span>
+                <span className="text-sm font-semibold">
+                  {m.key === "distance_km"
+                    ? Number(val).toFixed(1)
+                    : val.toLocaleString()}
+                  {m.unit && <span className="text-[10px] text-muted-foreground ml-0.5">{m.unit}</span>}
+                </span>
+                <span className="text-[9px] text-muted-foreground">{pct}% of {m.goal.toLocaleString()}</span>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Log Form */}
