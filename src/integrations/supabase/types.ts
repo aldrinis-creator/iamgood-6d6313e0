@@ -16,35 +16,59 @@ export type Database = {
     Tables: {
       activity_logs: {
         Row: {
+          active_minutes: number | null
+          breaths_per_min: number | null
+          cadence: number | null
+          calories: number | null
           created_at: string
+          distance_km: number | null
           exercise_minutes: number
           exercise_type: string | null
+          floors_climbed: number | null
+          heart_rate: number | null
           id: string
           log_date: string
           notes: string | null
           sleep_hours: number
+          spo2: number | null
           steps: number
           user_id: string
         }
         Insert: {
+          active_minutes?: number | null
+          breaths_per_min?: number | null
+          cadence?: number | null
+          calories?: number | null
           created_at?: string
+          distance_km?: number | null
           exercise_minutes?: number
           exercise_type?: string | null
+          floors_climbed?: number | null
+          heart_rate?: number | null
           id?: string
           log_date?: string
           notes?: string | null
           sleep_hours?: number
+          spo2?: number | null
           steps?: number
           user_id: string
         }
         Update: {
+          active_minutes?: number | null
+          breaths_per_min?: number | null
+          cadence?: number | null
+          calories?: number | null
           created_at?: string
+          distance_km?: number | null
           exercise_minutes?: number
           exercise_type?: string | null
+          floors_climbed?: number | null
+          heart_rate?: number | null
           id?: string
           log_date?: string
           notes?: string | null
           sleep_hours?: number
+          spo2?: number | null
           steps?: number
           user_id?: string
         }
