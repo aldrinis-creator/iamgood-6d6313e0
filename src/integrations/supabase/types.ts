@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      care_journal: {
+        Row: {
+          created_at: string
+          entry_date: string
+          id: string
+          mood: string
+          notes: string | null
+          symptoms: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          mood: string
+          notes?: string | null
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          mood?: string
+          notes?: string | null
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       check_ins: {
         Row: {
           created_at: string
