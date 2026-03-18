@@ -549,6 +549,51 @@ export type Database = {
         }
         Relationships: []
       }
+      wellness_logs: {
+        Row: {
+          created_at: string
+          energy_level: number | null
+          id: string
+          log_date: string
+          mindfulness_minutes: number | null
+          mood: string
+          mood_score: number
+          notes: string | null
+          sleep_hours: number | null
+          sleep_quality: number | null
+          stress_level: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          energy_level?: number | null
+          id?: string
+          log_date?: string
+          mindfulness_minutes?: number | null
+          mood?: string
+          mood_score?: number
+          notes?: string | null
+          sleep_hours?: number | null
+          sleep_quality?: number | null
+          stress_level?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          energy_level?: number | null
+          id?: string
+          log_date?: string
+          mindfulness_minutes?: number | null
+          mood?: string
+          mood_score?: number
+          notes?: string | null
+          sleep_hours?: number | null
+          sleep_quality?: number | null
+          stress_level?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
