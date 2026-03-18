@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
 
 import ActivityTracker from "@/components/ActivityTracker";
+import NutritionAdvisor from "@/components/NutritionAdvisor";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
