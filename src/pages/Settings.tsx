@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
   const queryClient = useQueryClient();
+  const { settings, updateSetting } = useUserSettings();
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["privacy_requests", session?.user?.id],
