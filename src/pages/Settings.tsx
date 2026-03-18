@@ -54,6 +54,53 @@ const Settings = () => {
           </CardContent>
         </Card>
 
+        {/* Audio Alerts */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Volume2 className="w-5 h-5 text-primary" />
+              Audio Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <RadioGroup value={audioMode} onValueChange={handleAudioModeChange} className="space-y-2">
+              <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50">
+                <RadioGroupItem value="off" id="audio-off" />
+                <Label htmlFor="audio-off" className="text-sm cursor-pointer flex-1">
+                  <span className="font-medium">Off</span>
+                  <span className="block text-xs text-muted-foreground">No audio reminders</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50">
+                <RadioGroupItem value="chime" id="audio-chime" />
+                <Label htmlFor="audio-chime" className="text-sm cursor-pointer flex-1">
+                  <span className="font-medium">Chime</span>
+                  <span className="block text-xs text-muted-foreground">Pleasant three-tone alert sound</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50">
+                <RadioGroupItem value="voice" id="audio-voice" />
+                <Label htmlFor="audio-voice" className="text-sm cursor-pointer flex-1">
+                  <span className="font-medium">Voice</span>
+                  <span className="block text-xs text-muted-foreground">Spoken reminder: "It's time for your Check-iN"</span>
+                </Label>
+              </div>
+            </RadioGroup>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={audioMode === "off"}
+              onClick={() => testAlert(audioMode)}
+            >
+              <Volume2 className="w-4 h-4 mr-1" /> Test Sound
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Audio alerts play when the app is open at check-in times. For best results, keep the app active or install as a home screen app.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Inactivity Detection */}
         <Card>
           <CardHeader className="pb-2">
