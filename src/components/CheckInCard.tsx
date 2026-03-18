@@ -36,32 +36,39 @@ const CheckInCard = () => {
   };
 
   return (
-    <Card className="border-2 border-success/30 bg-success/5">
+    <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
         {!checkedIn ? (
           <div className="text-center space-y-3">
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">Check-iN Window Active</span>
-            </div>
-            <p className="text-accessible font-medium text-foreground">
-              {userName}, are you Okay?
+            <p className="text-accessible font-semibold text-foreground">
+              {userName}, did you Check-In today?
             </p>
             <button
               onClick={handleCheckIn}
-              className="w-20 h-20 rounded-full bg-success text-success-foreground mx-auto flex items-center justify-center animate-pulse-heart shadow-lg"
+              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart"
               aria-label="Check in - I'm okay"
+              style={{
+                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
+              }}
             >
-              <Heart className="w-10 h-10 fill-current" />
+              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
             </button>
             <p className="text-sm text-muted-foreground">
-              Tap the heart to Check-iN • <span className="font-semibold text-sos">{timeLeft}</span> remaining
+              Tap the heart to Check-iN
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Next check-in: {getNextCheckIn()} • <span className="font-semibold text-sos">{timeLeft}</span> remaining
             </p>
           </div>
         ) : (
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-success text-success-foreground mx-auto flex items-center justify-center">
-              <Heart className="w-8 h-8 fill-current" />
+          <div className="text-center space-y-3">
+            <div
+              className="relative w-24 h-24 mx-auto flex items-center justify-center"
+              style={{
+                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(160 84% 39% / 0.15) 60%, transparent 80%)',
+              }}
+            >
+              <Heart className="w-12 h-12 text-success fill-current" />
             </div>
             <p className="text-accessible font-semibold text-success">✓ Checked In!</p>
             <p className="text-sm text-muted-foreground">
