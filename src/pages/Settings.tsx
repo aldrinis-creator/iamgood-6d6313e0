@@ -132,6 +132,9 @@ const Settings = () => {
           </CardContent>
         </Card>
 
+        {/* Push Notifications */}
+        <PushNotificationCard />
+
         {/* Inactivity Detection */}
         <Card>
           <CardHeader className="pb-2">
