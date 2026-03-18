@@ -124,21 +124,7 @@ const MyHealth = () => {
         {selectedTool === "Services" && <HealthServices />}
 
         {/* Face Scan */}
-        {selectedTool === "Face Scan" && (
-          <Card className="bg-success/5 border-success/20">
-            <CardContent className="p-4 text-center space-y-3">
-              <ScanFace className="w-16 h-16 text-success mx-auto" />
-              <h2 className="text-lg font-semibold">AI Face Scan</h2>
-              <p className="text-sm text-muted-foreground">
-                Analyze your vitals through facial recognition. Place your face in front of the camera for 30 seconds.
-              </p>
-              <button className="w-full py-3 bg-success text-success-foreground rounded-lg font-semibold">
-                Start Face Scan
-              </button>
-              <p className="text-xs text-muted-foreground">Coming soon in Phase 2</p>
-            </CardContent>
-          </Card>
-        )}
+        {selectedTool === "Face Scan" && <FaceScan />}
       </div>
     </AppLayout>
   );
