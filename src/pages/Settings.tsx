@@ -11,6 +11,36 @@ import AppLayout from "@/components/AppLayout";
 import { type AudioAlertMode, getAudioMode, setAudioMode, testAlert } from "@/lib/audioAlerts";
 import usePushSubscription from "@/hooks/usePushSubscription";
 
+const PushNotificationCard = () => {
+  const { isSubscribed, loading, supported, subscribe, unsubscribe } = usePushSubscription();
+
+  if (!supported) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <BellRing className="w-5 h-5 text-primary" />
+          Push Notifications
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm">Enable push reminders</Label>
+          <Switch
+            checked={isSubscribed}
+            disabled={loading}
+            onCheckedChange={(checked) => (checked ? subscribe() : unsubscribe())}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Receive medication reminders even when the app is in the background or closed.
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Settings = () => {
   const [fallDetection, setFallDetection] = useState(true);
   const [inactivityDetection, setInactivityDetection] = useState(true);
