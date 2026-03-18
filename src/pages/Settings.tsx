@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import usePushSubscription from "@/hooks/usePushSubscription";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "language" | "access" | "privacy";
 
