@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
+import CareJournal from "@/components/CareJournal";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -104,6 +105,9 @@ const MyHealth = () => {
 
         {/* Medication Manager */}
         {selectedTool === "Tablets" && <MedicationManager />}
+
+        {/* Care Journal */}
+        {selectedTool === "Care Journal" && <CareJournal />}
 
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
