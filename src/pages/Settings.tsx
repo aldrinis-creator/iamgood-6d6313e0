@@ -5,8 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, MapPin, Smartphone, Plus, Trash2, Bell } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Clock, MapPin, Smartphone, Plus, Trash2, Bell, Volume2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import { type AudioAlertMode, getAudioMode, setAudioMode, testAlert } from "@/lib/audioAlerts";
 
 const Settings = () => {
   const [fallDetection, setFallDetection] = useState(true);
