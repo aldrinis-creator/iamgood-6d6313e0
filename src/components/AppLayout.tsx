@@ -28,7 +28,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p>This app provides general health information only.</p>
               <p>Not a substitute for professional medical advice.</p>
             </div>
-            <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <button
+              onClick={() => setShowCookieSettings(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
               <Settings className="w-3.5 h-3.5" />
               Cookie Settings
             </button>
@@ -37,7 +40,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <NavTabs />
         {role === "user" && <SOSButton />}
         <EmergencyModeOverlay />
-        <CookieConsent />
+        <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
       </div>
     </div>
   );
