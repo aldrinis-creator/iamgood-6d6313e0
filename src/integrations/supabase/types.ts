@@ -256,7 +256,10 @@ export type Database = {
           guardian_phone: string
           id: string
           is_primary: boolean
+          is_vault_nominee: boolean
+          nominated_at: string
           relation: string | null
+          status: string
           user_id: string
         }
         Insert: {
@@ -266,7 +269,10 @@ export type Database = {
           guardian_phone: string
           id?: string
           is_primary?: boolean
+          is_vault_nominee?: boolean
+          nominated_at?: string
           relation?: string | null
+          status?: string
           user_id: string
         }
         Update: {
@@ -276,7 +282,10 @@ export type Database = {
           guardian_phone?: string
           id?: string
           is_primary?: boolean
+          is_vault_nominee?: boolean
+          nominated_at?: string
           relation?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: []
