@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import MedicationManager from "@/components/medications/MedicationManager";
 import CareJournal from "@/components/CareJournal";
+import ActivityTracker from "@/components/ActivityTracker";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -105,6 +106,9 @@ const MyHealth = () => {
 
         {/* Medication Manager */}
         {selectedTool === "Tablets" && <MedicationManager />}
+
+        {/* Activity Tracker */}
+        {selectedTool === "Activity" && <ActivityTracker />}
 
         {/* Care Journal */}
         {selectedTool === "Care Journal" && <CareJournal />}
