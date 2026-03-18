@@ -255,6 +255,9 @@ export const Register = () => {
           <p className="text-sm text-muted-foreground">Set up your safety profile</p>
         </div>
 
+        <GoogleSignInButton label="Sign up with Google" />
+        <OrDivider />
+
         <form onSubmit={handleRegister} className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
