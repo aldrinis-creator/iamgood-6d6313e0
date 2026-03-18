@@ -7,6 +7,7 @@ import MedicationManager from "@/components/medications/MedicationManager";
 import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
+import HealthServices from "@/components/HealthServices";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -117,6 +118,10 @@ const MyHealth = () => {
 
         {/* Wellness Tracker */}
         {selectedTool === "Wellness" && <WellnessTracker />}
+
+        {/* Services */}
+        {selectedTool === "Services" && <HealthServices />}
+
         {/* Face Scan */}
         {selectedTool === "Face Scan" && (
           <Card className="bg-success/5 border-success/20">
