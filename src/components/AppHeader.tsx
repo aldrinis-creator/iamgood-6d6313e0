@@ -54,13 +54,16 @@ const AppHeader = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors relative ${
                 location.pathname === tab.path
                   ? "bg-primary-foreground text-primary"
                   : "text-primary-foreground/70 hover:text-primary-foreground"
-              }`}
+              } ${"glow" in tab && tab.glow ? "ring-2 ring-destructive shadow-[0_0_12px_hsl(var(--destructive))]" : ""}`}
             >
               {tab.label}
+              {"glow" in tab && tab.glow && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
+              )}
             </button>
           ))}
         </nav>
