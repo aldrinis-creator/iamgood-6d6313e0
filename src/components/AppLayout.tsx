@@ -37,6 +37,13 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 Privacy Policy
               </Link>
               <span className="text-muted-foreground">·</span>
+              <Link
+                to="/terms-of-service"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+              >
+                Terms of Service
+              </Link>
+              <span className="text-muted-foreground">·</span>
               <button
                 onClick={() => setShowCookieSettings(true)}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
