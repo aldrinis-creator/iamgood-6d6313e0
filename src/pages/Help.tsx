@@ -64,6 +64,21 @@ const Help = () => {
     navigate("/login");
   };
 
+  const filteredSections = useMemo(() => {
+    if (!searchQuery.trim()) return faqSections;
+    const q = searchQuery.toLowerCase();
+    return faqSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) =>
+            item.question.toLowerCase().includes(q) ||
+            item.answer.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [searchQuery]);
+
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
