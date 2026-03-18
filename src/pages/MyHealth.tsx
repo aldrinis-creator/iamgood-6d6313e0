@@ -81,33 +81,7 @@ const MyHealth = () => {
           </div>
         )}
 
-        {/* Ambulance Booking */}
-        {selectedTool === "Ambulance" && (
-          <Card className="border-sos/30 bg-sos/5">
-            <CardContent className="p-4 space-y-3">
-              <h2 className="text-lg font-semibold text-sos">🚑 Priority Ambulance</h2>
-              <p className="text-sm text-muted-foreground">
-                One-tap ambulance booking with priority dispatch.
-              </p>
-              <div className="bg-card rounded-lg p-3 space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>First 5 km</span>
-                  <span className="font-semibold">₹1,500</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>After 5 km</span>
-                  <span className="font-semibold">₹300/km</span>
-                </div>
-              </div>
-              <button className="w-full py-3 bg-sos text-sos-foreground rounded-lg font-semibold text-accessible">
-                🚨 Request Ambulance Now
-              </button>
-              <p className="text-xs text-center text-muted-foreground">
-                Pro subscription required • Available 24/7
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {selectedTool === "Ambulance" && <AmbulanceBooking />}
 
         {/* Medication Manager */}
         {selectedTool === "Tablets" && <MedicationManager />}
