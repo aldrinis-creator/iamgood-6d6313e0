@@ -1,10 +1,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Pill, Package, Bell, ShieldAlert } from "lucide-react";
+import { CalendarDays, Pill, Package, Bell, ShieldAlert, Camera } from "lucide-react";
 import TodaySchedule from "./TodaySchedule";
 import MedicationList from "./MedicationList";
 import RefillOrder from "./RefillOrder";
 import AlarmSettings from "./AlarmSettings";
 import BannedMedications from "./BannedMedications";
+import PrescriptionScanner from "./PrescriptionScanner";
 
 const MedicationManager = () => {
   return (
@@ -15,12 +16,15 @@ const MedicationManager = () => {
       </h2>
 
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="w-full grid grid-cols-5">
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="today" className="text-xs gap-1">
             <CalendarDays className="w-3 h-3" /> Today
           </TabsTrigger>
           <TabsTrigger value="meds" className="text-xs gap-1">
-            <Pill className="w-3 h-3" /> My Meds
+            <Pill className="w-3 h-3" /> Meds
+          </TabsTrigger>
+          <TabsTrigger value="scan" className="text-xs gap-1">
+            <Camera className="w-3 h-3" /> Scan
           </TabsTrigger>
           <TabsTrigger value="refill" className="text-xs gap-1">
             <Package className="w-3 h-3" /> Refill
@@ -35,6 +39,7 @@ const MedicationManager = () => {
 
         <TabsContent value="today"><TodaySchedule /></TabsContent>
         <TabsContent value="meds"><MedicationList /></TabsContent>
+        <TabsContent value="scan"><PrescriptionScanner /></TabsContent>
         <TabsContent value="refill"><RefillOrder /></TabsContent>
         <TabsContent value="banned"><BannedMedications /></TabsContent>
         <TabsContent value="alarms"><AlarmSettings /></TabsContent>

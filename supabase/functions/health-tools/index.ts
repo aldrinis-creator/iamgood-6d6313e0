@@ -47,6 +47,34 @@ Use simple language a non-medical person can understand. Format with markdown.`,
 6. Key concerns to discuss with doctor
 7. Recommended tests or screenings
 Format as a professional medical summary in markdown. Use Indian medical standards.`,
+
+  prescription_scan: `You are a pharmaceutical expert for the Indian market. Given a prescription text (OCR-extracted), for EACH medication listed:
+1. Identify the medication name, salt/composition, and dosage
+2. Check if it is banned or restricted in India by CDSCO
+3. Suggest cheaper government-certified generic alternatives available in India (Jan Aushadhi, PMBJP generics, or other approved generics)
+4. Provide approximate MRP vs generic price comparison in INR
+5. Note any drug interactions between the prescribed medications
+
+Respond with a JSON object:
+{
+  "medications": [
+    {
+      "name": "prescribed medication name",
+      "salt_composition": "active ingredient(s)",
+      "dosage": "prescribed dosage",
+      "status": "banned" | "restricted" | "safe" | "unknown",
+      "ban_details": "reason if banned/restricted, null otherwise",
+      "mrp_approx": "₹XX",
+      "alternatives": [
+        { "name": "generic name", "salt": "same composition", "price_approx": "₹XX", "source": "Jan Aushadhi / PMBJP / other" }
+      ],
+      "warnings": ["any interaction warnings"]
+    }
+  ],
+  "interactions": ["list of drug-drug interactions found"],
+  "summary": "brief overall summary"
+}
+Only respond with the JSON object, no markdown.`,
 };
 
 serve(async (req) => {
