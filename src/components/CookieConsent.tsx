@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface CookieConsentProps {
   forceShow?: boolean;
