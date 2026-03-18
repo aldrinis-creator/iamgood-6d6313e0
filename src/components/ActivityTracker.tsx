@@ -40,16 +40,37 @@ interface ActivityLog {
 }
 
 const METRICS = [
-  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos" },
-  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary" },
-  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success" },
-  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary" },
-  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos" },
-  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success" },
-  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary" },
-  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success" },
-  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos" },
+  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))", goal: 80 },
+  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))", goal: 10000 },
+  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))", goal: 5 },
+  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))", goal: 160 },
+  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))", goal: 500 },
+  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))", goal: 120 },
+  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))", goal: 16 },
+  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))", goal: 10 },
+  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))", goal: 98 },
 ] as const;
+
+const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; stroke: string }) => {
+  const pct = Math.min(value / goal, 1);
+  const r = 16;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct);
+  const isComplete = value >= goal;
+  return (
+    <svg width="40" height="40" className="absolute inset-0 m-auto">
+      <circle cx="20" cy="20" r={r} fill="none" stroke="hsl(var(--border))" strokeWidth="3" />
+      <circle
+        cx="20" cy="20" r={r} fill="none"
+        stroke={isComplete ? "hsl(var(--success))" : stroke}
+        strokeWidth="3" strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={offset}
+        transform="rotate(-90 20 20)"
+        className="transition-all duration-500"
+      />
+    </svg>
+  );
+};
 
 const ActivityTracker = () => {
   const { user } = useAuth();
