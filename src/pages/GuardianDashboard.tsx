@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-
+import CareJournal from "@/components/CareJournal";
 interface Notification {
   id: string;
   title: string;
