@@ -396,6 +396,42 @@ export type Database = {
           },
         ]
       }
+      nutrition_personas: {
+        Row: {
+          age: number | null
+          allergies: string[] | null
+          created_at: string
+          diet_type: string
+          health_goals: string[] | null
+          id: string
+          updated_at: string
+          user_id: string
+          weight_kg: number | null
+        }
+        Insert: {
+          age?: number | null
+          allergies?: string[] | null
+          created_at?: string
+          diet_type?: string
+          health_goals?: string[] | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          weight_kg?: number | null
+        }
+        Update: {
+          age?: number | null
+          allergies?: string[] | null
+          created_at?: string
+          diet_type?: string
+          health_goals?: string[] | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
