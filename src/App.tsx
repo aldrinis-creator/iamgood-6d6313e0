@@ -19,6 +19,7 @@ import Subscription from "./pages/Subscription";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
+import Appointments from "./pages/Appointments";
 
 const queryClient = new QueryClient();
 
@@ -43,7 +44,7 @@ const App = () => (
               <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/appointments" element={<ProtectedRoute><MedicalVault /></ProtectedRoute>} />
+              <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><GuardianDashboard /></ProtectedRoute>} />
               <Route path="/guardian-settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

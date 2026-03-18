@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 
 const NavTabs = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const NavTabs = () => {
   const { role } = useApp();
   const { session } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const todayApptCount = useTodayAppointments();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
@@ -40,7 +42,7 @@ const NavTabs = () => {
 
   const userTabs = [
     { icon: Home, label: "Home", path: "/dashboard" },
-    { icon: Calendar, label: "Appointments", path: "/appointments" },
+    { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: Heart, label: "My Health", path: "/my-health" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
@@ -71,9 +73,9 @@ const NavTabs = () => {
               }`}
             >
               <div className="relative">
-                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""}`} />
+                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""} ${badge > 0 && tab.label === "Appointments" ? "text-destructive" : ""}`} />
                 {badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse">
+                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center ${tab.label === "Appointments" ? "animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]" : "animate-pulse"}`}>
                     {badge > 9 ? "9+" : badge}
                   </span>
                 )}
