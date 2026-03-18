@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import NavTabs from "@/components/NavTabs";
@@ -9,6 +9,7 @@ import CookieConsent from "@/components/CookieConsent";
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
+  const [showCookieSettings, setShowCookieSettings] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
