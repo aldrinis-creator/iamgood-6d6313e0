@@ -46,6 +46,36 @@ const RefillOrder = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Check all meds for banned status
+  const checkBannedMeds = useCallback(async (meds: Medication[]) => {
+    if (meds.length === 0) return;
+    setCheckingBanned(true);
+    const results: Record<string, BannedStatus> = {};
+    for (const med of meds) {
+      try {
+        const { data } = await supabase.functions.invoke("health-tools", {
+          body: { type: "banned_check", payload: med.name },
+        });
+        if (data?.response) {
+          try {
+            const parsed = JSON.parse(data.response);
+            if (parsed.status === "banned" || parsed.status === "restricted" || parsed.status === "warning") {
+              results[med.id] = parsed;
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+    setBannedMap(results);
+    setCheckingBanned(false);
+  }, []);
+
+  useEffect(() => {
+    if (allMeds.length > 0 && Object.keys(bannedMap).length === 0) {
+      checkBannedMeds(allMeds);
+    }
+  }, [allMeds, checkBannedMeds, bannedMap]);
+
   const handleRefill = async (med: Medication) => {
     await supabase
       .from("medications")
