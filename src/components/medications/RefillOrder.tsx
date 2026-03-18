@@ -89,6 +89,28 @@ const RefillOrder = () => {
 
   return (
     <div className="space-y-4">
+      {/* Banned Warnings */}
+      {Object.keys(bannedMap).length > 0 && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-destructive" />
+              <h3 className="text-sm font-semibold text-destructive">Banned/Restricted Medication Alert</h3>
+            </div>
+            {allMeds.filter((m) => bannedMap[m.id]).map((med) => (
+              <div key={med.id} className="p-2 rounded bg-card border border-destructive/20 text-xs">
+                <p className="font-medium">{med.name} — <span className="text-destructive uppercase">{bannedMap[med.id].status}</span></p>
+                <p className="text-muted-foreground">{bannedMap[med.id].details}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {checkingBanned && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2">
+          <Loader2 className="w-3 h-3 animate-spin" /> Checking medications against banned list...
+        </div>
+      )}
       {/* Low Stock Alerts */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold flex items-center gap-2">
