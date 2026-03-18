@@ -312,6 +312,9 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Ward Activity */}
+        {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
+
         {/* Care Journal */}
         {wardUserId && <CareJournal wardUserId={wardUserId} />}
       </div>
