@@ -20,6 +20,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
+import Help from "./pages/Help";
 
 const queryClient = new QueryClient();
 
