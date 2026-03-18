@@ -36,6 +36,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/appointments" element={<MedicalVault />} />
             <Route path="/reports" element={<GuardianDashboard />} />
             <Route path="/guardian-settings" element={<Settings />} />
