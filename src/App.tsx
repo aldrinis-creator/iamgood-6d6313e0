@@ -19,6 +19,7 @@ import Subscription from "./pages/Subscription";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
+import Appointments from "./pages/Appointments";
 
 const queryClient = new QueryClient();
 
