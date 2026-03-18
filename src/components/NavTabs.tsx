@@ -12,6 +12,7 @@ const NavTabs = () => {
   const { role } = useApp();
   const { session } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const todayApptCount = useTodayAppointments();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
