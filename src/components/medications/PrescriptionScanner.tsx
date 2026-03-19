@@ -207,10 +207,9 @@ const PrescriptionScanner = () => {
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {result && (
-        <PrescriptionResults result={result} />
-      )}
+      {result && <PrescriptionResults result={result} />}
+
+      {result && <SaveToVaultButton result={result} />}
 
       <p className="text-[10px] text-muted-foreground text-center">
         ⚠️ This tool provides informational guidance only. Always consult your doctor before changing medications.
