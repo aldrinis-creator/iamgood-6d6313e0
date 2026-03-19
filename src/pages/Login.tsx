@@ -76,25 +76,6 @@ const Login = () => {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  const resolveEmail = async (input: string): Promise<string | null> => {
-    if (!isPhoneInput(input)) return input;
-    const phone = formatPhone(input);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("phone", phone)
-      .maybeSingle();
-    if (!data) return null;
-    // Get the user's email from auth via a workaround: we stored it during signup
-    // We need to look up email — but profiles don't store email.
-    // Use supabase admin or a different approach: try signing in directly won't work.
-    // Better: query auth.users is not possible from client. So we add a lightweight RPC or
-    // just ask the edge function. Simpler: store email in profiles or use a DB function.
-    // For now, use a direct query on profiles — but profiles doesn't have email.
-    // Fallback: use a database function to look up email by phone.
-    return null;
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
