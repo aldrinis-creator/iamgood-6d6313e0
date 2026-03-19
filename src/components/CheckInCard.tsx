@@ -251,7 +251,7 @@ const CheckInCard = () => {
             <div
               className="relative w-24 h-24 mx-auto flex items-center justify-center"
               style={{
-                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(160 84% 39% / 0.15) 60%, transparent 80%)',
+                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
               <Heart className="w-12 h-12 text-success fill-current" />
