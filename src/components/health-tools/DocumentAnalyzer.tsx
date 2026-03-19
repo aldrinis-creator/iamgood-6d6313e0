@@ -27,6 +27,14 @@ const isTextFile = (file: File) => {
   return textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
 };
 
+const analysisSteps = [
+  { label: "Uploading document…", duration: 1500 },
+  { label: "Reading content…", duration: 3000 },
+  { label: "Identifying key findings…", duration: 5000 },
+  { label: "Generating plain-language summary…", duration: 8000 },
+  { label: "Finalizing analysis…", duration: 12000 },
+];
+
 const DocumentAnalyzer = () => {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [mode, setMode] = useState<InputMode>("photo");
@@ -36,7 +44,33 @@ const DocumentAnalyzer = () => {
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Animated progress while loading
+  useEffect(() => {
+    if (!loading) { setProgress(0); setStepIndex(0); return; }
+    let frame: number;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      // Asymptotic progress: approaches 95% over ~15s
+      const pct = Math.min(95, (elapsed / (elapsed + 6000)) * 100);
+      setProgress(pct);
+      // Update step label
+      const idx = analysisSteps.findIndex((s) => elapsed < s.duration);
+      setStepIndex(idx === -1 ? analysisSteps.length - 1 : idx);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [loading]);
+
+  // Snap to 100% briefly when result arrives
+  useEffect(() => {
+    if (result && loading) setProgress(100);
+  }, [result, loading]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
