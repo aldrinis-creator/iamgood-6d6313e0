@@ -155,6 +155,36 @@ const DocumentAnalyzer = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <h3 className="font-semibold text-base">Analyzing Document…</h3>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-sm text-muted-foreground animate-pulse">
+              {analysisSteps[stepIndex]?.label}
+            </p>
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/6" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground text-center">
+          This may take 10–30 seconds depending on document complexity.
+        </p>
+      </div>
+    );
+  }
+
   if (result) {
     return (
       <div className="space-y-4">
