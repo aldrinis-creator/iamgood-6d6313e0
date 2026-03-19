@@ -108,7 +108,7 @@ const CheckInCard = () => {
     if (existing && existing.length > 0) {
       const checkIn = existing[0];
       setCurrentCheckInId(checkIn.id);
-      setCheckedIn(checkIn.status === "ok");
+      setCheckedIn(checkIn.status === "responded");
     } else {
       // Create a pending check-in for this window
       const { data: created, error: insertError } = await supabase
@@ -183,7 +183,7 @@ const CheckInCard = () => {
     const { error } = await supabase
       .from("check_ins")
       .update({
-        status: "ok",
+        status: "responded",
         response: "ok",
         responded_at: new Date().toISOString(),
       })
