@@ -294,7 +294,7 @@ const Register = () => {
                     <SelectItem value="+1">+1</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input placeholder="Phone number" className="flex-1 text-base min-h-[48px]" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input placeholder="10-digit mobile number" className="flex-1 text-base min-h-[48px]" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} />
               </div>
             </div>
             <div>
