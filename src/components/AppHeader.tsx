@@ -1,8 +1,10 @@
-import { User, Bell } from "lucide-react";
+import { User, Bell, LogOut, Settings } from "lucide-react";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const AppHeader = () => {
   const { userName, role } = useApp();
