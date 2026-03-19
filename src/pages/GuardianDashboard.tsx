@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import CareJournal from "@/components/CareJournal";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
+import WardHealthPassport from "@/components/WardHealthPassport";
 import { playChime, playVoiceReminder, getAudioMode } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
