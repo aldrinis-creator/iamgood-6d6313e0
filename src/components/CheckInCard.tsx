@@ -44,6 +44,11 @@ const getNextCheckInTime = () => {
   return tomorrow;
 };
 
+const getMinutesUntilNext = () => {
+  const next = getNextCheckInTime();
+  return (next.getTime() - Date.now()) / 60000;
+};
+
 const formatTimeLeft = (ms: number) => {
   if (ms <= 0) return "00:00";
   const totalSecs = Math.floor(ms / 1000);
@@ -70,6 +75,8 @@ const CheckInCard = () => {
   const [loading, setLoading] = useState(false);
   const [currentCheckInId, setCurrentCheckInId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState("");
+  const [isApproaching, setIsApproaching] = useState(false);
+  const [approachingMinutes, setApproachingMinutes] = useState(0);
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
@@ -150,17 +157,26 @@ const CheckInCard = () => {
     return () => clearInterval(interval);
   }, [loadCurrentCheckIn]);
 
-  // Countdown timer to next check-in
+  // Countdown timer + approaching detection
   useEffect(() => {
     const tick = () => {
       const next = getNextCheckInTime();
       const ms = next.getTime() - Date.now();
       setTimeLeft(formatTimeLeft(ms));
+      const minsLeft = getMinutesUntilNext();
+      const currentWindow = getCurrentWindow();
+      // Approaching = within 30 min of next window AND not currently in an active window (or already checked in)
+      if (minsLeft <= 30 && minsLeft > 0 && (currentWindow === null || checkedIn)) {
+        setIsApproaching(true);
+        setApproachingMinutes(Math.ceil(minsLeft));
+      } else {
+        setIsApproaching(false);
+      }
     };
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [checkedIn]);
 
   const handleCheckIn = async () => {
     if (!session?.user?.id || loading) return;
@@ -223,7 +239,27 @@ const CheckInCard = () => {
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
-        {!checkedIn ? (
+        {isApproaching && !checkedIn && getCurrentWindow() === null ? (
+          <div className="text-center space-y-3">
+            <p className="text-accessible font-semibold text-foreground">
+              {userName}, Check-iN coming up!
+            </p>
+            <div
+              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart"
+              style={{
+                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
+              }}
+            >
+              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">
+              Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Get ready for your next check-in at {formatHour(getNextCheckInTime().getHours())}
+            </p>
+          </div>
+        ) : !checkedIn ? (
           <div className="text-center space-y-3">
             <p className="text-accessible font-semibold text-foreground">
               {userName}, did you Check-In today?

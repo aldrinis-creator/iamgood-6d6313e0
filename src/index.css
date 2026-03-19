@@ -28,7 +28,7 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 47% 55%;
+    --success: 134 63% 48%;
     --success-foreground: 0 0% 100%;
 
     --sos: 0 84% 60%;
@@ -60,7 +60,7 @@
     --popover: 213 53% 14%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 145 47% 55%;
+    --primary: 134 63% 48%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 213 40% 20%;
@@ -75,7 +75,7 @@
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 96%;
 
-    --success: 145 47% 55%;
+    --success: 134 63% 48%;
     --success-foreground: 0 0% 100%;
 
     --sos: 0 84% 60%;
