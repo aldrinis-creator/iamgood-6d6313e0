@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, AlertTriangle, Loader2, ShieldAlert } from "lucide-react";
+import { Search, Loader2, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
+import { bannedDrugs, bannedSingleSubstances } from "@/data/bannedDrugs";
 
 const commonBanned = ["Nimesulide", "Furazolidone", "Phenylpropanolamine", "Dextropropoxyphene", "Cisapride", "Phenformin"];
 
@@ -13,6 +13,26 @@ const BannedMedications = () => {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [showFullList, setShowFullList] = useState(false);
+  const [listFilter, setListFilter] = useState("");
+
+  // Local quick-match against the official list
+  const localMatch = useMemo(() => {
+    if (!query.trim()) return null;
+    const q = query.toLowerCase();
+    // Check single substances
+    if (bannedSingleSubstances.some(s => q.includes(s) || s.includes(q))) {
+      return bannedDrugs.find(d => d.name.toLowerCase().includes(q));
+    }
+    // Check full list
+    return bannedDrugs.find(d => d.name.toLowerCase().includes(q));
+  }, [query]);
+
+  const filteredList = useMemo(() => {
+    if (!listFilter.trim()) return bannedDrugs.slice(0, 50);
+    const f = listFilter.toLowerCase();
+    return bannedDrugs.filter(d => d.name.toLowerCase().includes(f)).slice(0, 50);
+  }, [listFilter]);
 
   const check = async (name?: string) => {
     const q = name || query;
@@ -51,7 +71,7 @@ const BannedMedications = () => {
         <CardContent className="p-3 flex items-start gap-2">
           <ShieldAlert className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Check if a medication is banned or restricted in India by CDSCO. This uses AI and may not be 100% current.
+            Official CDSCO banned drugs list (518 entries, updated 22.11.2021). Search locally or use AI for detailed analysis.
           </p>
         </CardContent>
       </Card>
@@ -70,6 +90,18 @@ const BannedMedications = () => {
         ))}
       </div>
 
+      {/* Local match indicator */}
+      {localMatch && !loading && !result && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-3 space-y-1">
+            <p className="text-xs font-semibold text-destructive">🚫 Found in CDSCO Banned List</p>
+            <p className="text-xs">{localMatch.name}</p>
+            <p className="text-[10px] text-muted-foreground">Ref: {localMatch.notification}</p>
+            <p className="text-[10px] text-muted-foreground">Tap Search for detailed AI analysis with alternatives.</p>
+          </CardContent>
+        </Card>
+      )}
+
       {result && (
         <Card className={statusConfig[result.status]?.bg || ""}>
           <CardContent className="p-4 space-y-2">
@@ -86,6 +118,32 @@ const BannedMedications = () => {
             {result.source && <p className="text-[10px] text-muted-foreground">Source: {result.source}</p>}
           </CardContent>
         </Card>
+      )}
+
+      {/* Full banned list browser */}
+      <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => setShowFullList(!showFullList)}>
+        {showFullList ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+        Browse Full Banned List ({bannedDrugs.length} drugs)
+      </Button>
+
+      {showFullList && (
+        <div className="space-y-2">
+          <Input placeholder="Filter list..." value={listFilter} onChange={(e) => setListFilter(e.target.value)} className="text-xs" />
+          <div className="max-h-64 overflow-y-auto space-y-1">
+            {filteredList.map((d) => (
+              <div key={d.id} className="flex items-start gap-2 p-2 rounded border border-border text-xs">
+                <span className="text-destructive font-mono shrink-0">{d.id}.</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{d.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{d.notification}</p>
+                </div>
+              </div>
+            ))}
+            {filteredList.length === 50 && !listFilter && (
+              <p className="text-[10px] text-muted-foreground text-center">Showing first 50. Use filter to search.</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
