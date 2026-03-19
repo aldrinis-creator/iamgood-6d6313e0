@@ -111,7 +111,7 @@ export function useFallDetection() {
       window.removeEventListener("devicemotion", handleMotion);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [enabled, triggerFallAlert]);
+  }, [enabled, triggerFallAlert, thresholds]);
 
   return {
     fallDetected,

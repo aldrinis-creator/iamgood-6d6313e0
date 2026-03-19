@@ -35,6 +35,7 @@ const DEFAULTS: UserSettings = {
   sleepMode: true,
   nudgeFrequency: "4",
   fallDetection: true,
+  fallSensitivity: "medium",
   preAlert: "15min",
   shareLocation: true,
   shareHealthData: true,
