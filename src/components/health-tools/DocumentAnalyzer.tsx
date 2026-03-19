@@ -1,6 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,6 +27,14 @@ const isTextFile = (file: File) => {
   return textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
 };
 
+const analysisSteps = [
+  { label: "Uploading document…", duration: 1500 },
+  { label: "Reading content…", duration: 3000 },
+  { label: "Identifying key findings…", duration: 5000 },
+  { label: "Generating plain-language summary…", duration: 8000 },
+  { label: "Finalizing analysis…", duration: 12000 },
+];
+
 const DocumentAnalyzer = () => {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [mode, setMode] = useState<InputMode>("photo");
@@ -34,7 +44,33 @@ const DocumentAnalyzer = () => {
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Animated progress while loading
+  useEffect(() => {
+    if (!loading) { setProgress(0); setStepIndex(0); return; }
+    let frame: number;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      // Asymptotic progress: approaches 95% over ~15s
+      const pct = Math.min(95, (elapsed / (elapsed + 6000)) * 100);
+      setProgress(pct);
+      // Update step label
+      const idx = analysisSteps.findIndex((s) => elapsed < s.duration);
+      setStepIndex(idx === -1 ? analysisSteps.length - 1 : idx);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [loading]);
+
+  // Snap to 100% briefly when result arrives
+  useEffect(() => {
+    if (result && loading) setProgress(100);
+  }, [result, loading]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -118,6 +154,36 @@ const DocumentAnalyzer = () => {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <h3 className="font-semibold text-base">Analyzing Document…</h3>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-sm text-muted-foreground animate-pulse">
+              {analysisSteps[stepIndex]?.label}
+            </p>
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/6" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-5/6" />
+            </div>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground text-center">
+          This may take 10–30 seconds depending on document complexity.
+        </p>
+      </div>
+    );
+  }
 
   if (result) {
     return (
