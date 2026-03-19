@@ -126,7 +126,8 @@ const GuardianDashboard = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "ok": return "Checked In";
+      case "ok":
+      case "responded": return "Checked In";
       case "missed": return "Missed";
       case "pending": return "Pending";
       default: return status;
@@ -253,6 +254,17 @@ const GuardianDashboard = () => {
         {showAmbulance && <AmbulanceBooking />}
 
         {/* Today's Check-Ins (real data) */}
+        {(() => {
+          const missedCount = todayCheckIns.filter((ci) => ci.status === "missed").length;
+          return missedCount > 0 ? (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+              <p className="text-sm font-medium text-destructive">
+                {wardName} missed {missedCount} check-in{missedCount > 1 ? "s" : ""} today
+              </p>
+            </div>
+          ) : null;
+        })()}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Today's Check-iNs</CardTitle>
@@ -260,13 +272,13 @@ const GuardianDashboard = () => {
           <CardContent className="space-y-2">
             {todayCheckIns.length > 0 ? (
               todayCheckIns.map((ci) => (
-                <div key={ci.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div key={ci.id} className={`flex items-center justify-between py-2 border-b border-border last:border-0 ${ci.status === "missed" ? "bg-destructive/5 -mx-2 px-2 rounded" : ""}`}>
                   <span className="text-sm">{formatCheckInTime(ci.scheduled_at)}</span>
                   <span className={`text-xs px-2 py-1 rounded-full ${
-                    ci.status === "ok"
+                    ci.status === "ok" || ci.status === "responded"
                       ? "bg-success/10 text-success"
                       : ci.status === "missed"
-                      ? "bg-destructive/10 text-destructive"
+                      ? "bg-destructive/10 text-destructive font-semibold"
                       : "bg-muted text-muted-foreground"
                   }`}>
                     {getStatusLabel(ci.status)}
