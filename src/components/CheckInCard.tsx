@@ -183,7 +183,7 @@ const CheckInCard = () => {
     const { error } = await supabase
       .from("check_ins")
       .update({
-        status: "ok",
+        status: "responded",
         response: "ok",
         responded_at: new Date().toISOString(),
       })
