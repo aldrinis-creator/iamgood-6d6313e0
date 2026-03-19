@@ -16,14 +16,19 @@ import { useUserSettings } from "@/hooks/useUserSettings";
  * Thresholds are tuned to reduce false positives (dropping phone, sitting down hard).
  */
 
-const FREE_FALL_THRESHOLD = 4; // m/s² — below this = free fall
-const IMPACT_THRESHOLD = 30; // m/s² — above this = hard impact
+const SENSITIVITY_MAP: Record<string, { freeFall: number; impact: number }> = {
+  high: { freeFall: 5, impact: 22 },
+  medium: { freeFall: 4, impact: 30 },
+  low: { freeFall: 2.5, impact: 38 },
+};
+
 const FREE_FALL_TO_IMPACT_WINDOW = 500; // ms
 const COOLDOWN = 30_000; // ms — don't re-trigger within 30s
 const COUNTDOWN_SECONDS = 15;
 
 export function useFallDetection() {
   const { settings } = useUserSettings();
+  const thresholds = SENSITIVITY_MAP[settings.fallSensitivity] || SENSITIVITY_MAP.medium;
   const [fallDetected, setFallDetected] = useState(false);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
 
@@ -78,14 +83,14 @@ export function useFallDetection() {
       const now = Date.now();
 
       // Detect free-fall
-      if (magnitude < FREE_FALL_THRESHOLD) {
+      if (magnitude < thresholds.freeFall) {
         if (!freeFallTimeRef.current) {
           freeFallTimeRef.current = now;
         }
       }
 
       // Detect impact after free-fall
-      if (magnitude > IMPACT_THRESHOLD && freeFallTimeRef.current) {
+      if (magnitude > thresholds.impact && freeFallTimeRef.current) {
         const elapsed = now - freeFallTimeRef.current;
         if (elapsed < FREE_FALL_TO_IMPACT_WINDOW) {
           freeFallTimeRef.current = null;
@@ -106,7 +111,7 @@ export function useFallDetection() {
       window.removeEventListener("devicemotion", handleMotion);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [enabled, triggerFallAlert]);
+  }, [enabled, triggerFallAlert, thresholds]);
 
   return {
     fallDetected,

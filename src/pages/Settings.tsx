@@ -508,6 +508,24 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.fallDetection} onCheckedChange={(v) => updateSetting("fallDetection", v)} />
                 </div>
+                {settings.fallDetection && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Detection Sensitivity</p>
+                      <p className="text-xs text-muted-foreground">Higher = catches more falls but may have false alarms</p>
+                    </div>
+                    <Select value={settings.fallSensitivity} onValueChange={(v) => updateSetting("fallSensitivity", v)}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
                   <p className="text-xs text-foreground">
                     <strong>How it works:</strong> The sensor looks for a free-fall pattern followed by a sudden impact and stillness. If detected, you'll have 30 seconds to confirm you're okay before an SOS is triggered.

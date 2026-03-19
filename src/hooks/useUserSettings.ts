@@ -16,6 +16,7 @@ export interface UserSettings {
   sleepMode: boolean;
   nudgeFrequency: string;
   fallDetection: boolean;
+  fallSensitivity: string;
   // Appointments
   preAlert: string;
   // Privacy
@@ -34,6 +35,7 @@ const DEFAULTS: UserSettings = {
   sleepMode: true,
   nudgeFrequency: "4",
   fallDetection: true,
+  fallSensitivity: "medium",
   preAlert: "15min",
   shareLocation: true,
   shareHealthData: true,
