@@ -63,9 +63,9 @@ export async function decrypt(
   const iv = fromBase64(ivB64);
   const key = await deriveKey(pin, salt);
   const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
     key,
-    fromBase64(ciphertext)
+    fromBase64(ciphertext) as unknown as ArrayBuffer
   );
   return new TextDecoder().decode(decrypted);
 }
