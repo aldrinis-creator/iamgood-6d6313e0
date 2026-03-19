@@ -100,7 +100,21 @@ const GuardianDashboard = () => {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
-        () => fetchNotifications()
+        (payload: any) => {
+          fetchNotifications();
+          // Play audio alert for missed check-in notifications
+          if (payload?.new?.type === "missed_checkin") {
+            const mode = getAudioMode();
+            if (mode === "chime") {
+              playChime();
+            } else if (mode === "voice") {
+              playVoiceReminder("Alert! Your ward missed their check-in.");
+            } else {
+              // Default: always play chime for missed check-ins even if mode is off
+              playChime();
+            }
+          }
+        }
       )
       .subscribe();
 
