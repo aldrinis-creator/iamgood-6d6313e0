@@ -90,7 +90,7 @@ export function useFallDetection() {
       }
 
       // Detect impact after free-fall
-      if (magnitude > IMPACT_THRESHOLD && freeFallTimeRef.current) {
+      if (magnitude > thresholds.impact && freeFallTimeRef.current) {
         const elapsed = now - freeFallTimeRef.current;
         if (elapsed < FREE_FALL_TO_IMPACT_WINDOW) {
           freeFallTimeRef.current = null;
