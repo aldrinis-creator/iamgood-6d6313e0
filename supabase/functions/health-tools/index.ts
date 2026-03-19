@@ -51,7 +51,7 @@ Use simple language a non-medical person can understand. Format with markdown.`,
 7. Recommended tests or screenings
 Format as a professional medical summary in markdown. Use Indian medical standards.`,
 
-  prescription_scan: `You are a pharmaceutical expert for the Indian market. Given a prescription text (OCR-extracted), for EACH medication listed:
+  prescription_scan: `You are a pharmaceutical expert for the Indian market. Given a prescription (either as text or an image of a prescription), for EACH medication listed:
 1. Identify the medication name, salt/composition, and dosage
 2. Check if it is banned or restricted in India by CDSCO
 3. Suggest cheaper government-certified generic alternatives available in India (Jan Aushadhi, PMBJP generics, or other approved generics)
@@ -98,12 +98,45 @@ serve(async (req) => {
       });
     }
 
-    const MAX_PAYLOAD_CHARS = 20000;
-    let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
-    
-    if (userMessage.length > MAX_PAYLOAD_CHARS) {
-      userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";
-      console.log(`Payload truncated from ${(typeof payload === "string" ? payload : JSON.stringify(payload)).length} to ${MAX_PAYLOAD_CHARS} chars`);
+    // Build messages array - handle image payloads for vision
+    let messages: any[];
+    let model = "google/gemini-3-flash-preview";
+
+    if (type === "prescription_scan" && typeof payload === "object" && payload?.image) {
+      // Vision mode: use multimodal model with image
+      model = "google/gemini-2.5-flash";
+      const imageDataUrl = payload.image as string;
+
+      messages = [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Please read and analyze this prescription image. Extract all medication names, dosages, and details visible in the image.",
+            },
+            {
+              type: "image_url",
+              image_url: { url: imageDataUrl },
+            },
+          ],
+        },
+      ];
+    } else {
+      // Text mode
+      const MAX_PAYLOAD_CHARS = 20000;
+      let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
+
+      if (userMessage.length > MAX_PAYLOAD_CHARS) {
+        userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";
+        console.log(`Payload truncated to ${MAX_PAYLOAD_CHARS} chars`);
+      }
+
+      messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ];
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -112,13 +145,7 @@ serve(async (req) => {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
+      body: JSON.stringify({ model, messages }),
     });
 
     if (!response.ok) {
