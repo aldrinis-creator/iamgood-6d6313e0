@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type } from "lucide-react";
+import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -44,6 +44,8 @@ const DocumentAnalyzer = () => {
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -185,10 +187,33 @@ const DocumentAnalyzer = () => {
     );
   }
 
+  const saveToVault = async () => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Please log in to save"); return; }
+
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: `AI Analysis — ${selectedCat || "General"}`,
+        record_type: "AI Analysis",
+        description: result,
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Saved to Medical Vault");
+    } catch {
+      toast.error("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (result) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearImage(); }}>← Back</Button>
+        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearImage(); setSaved(false); }}>← Back</Button>
         <Card>
           <CardContent className="p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -199,6 +224,20 @@ const DocumentAnalyzer = () => {
             </div>
           </CardContent>
         </Card>
+        <Button
+          onClick={saveToVault}
+          disabled={saving || saved}
+          className="w-full"
+          variant={saved ? "outline" : "default"}
+        >
+          {saved ? (
+            <><Check className="w-4 h-4 mr-2" /> Saved to Medical Vault</>
+          ) : saving ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+          ) : (
+            <><Save className="w-4 h-4 mr-2" /> Save to Medical Vault</>
+          )}
+        </Button>
         <p className="text-xs text-muted-foreground text-center">
           ⚠️ AI analysis is for informational purposes only. Consult a doctor for medical decisions.
         </p>
