@@ -42,14 +42,14 @@ export async function encrypt(
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(pin, salt);
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
     key,
-    new TextEncoder().encode(plaintext)
+    new TextEncoder().encode(plaintext) as unknown as ArrayBuffer
   );
   return {
     ciphertext: toBase64(encrypted),
-    iv: toBase64(iv),
-    salt: toBase64(salt),
+    iv: toBase64(iv.buffer as ArrayBuffer),
+    salt: toBase64(salt.buffer as ArrayBuffer),
   };
 }
 
