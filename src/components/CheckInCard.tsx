@@ -44,6 +44,11 @@ const getNextCheckInTime = () => {
   return tomorrow;
 };
 
+const getMinutesUntilNext = () => {
+  const next = getNextCheckInTime();
+  return (next.getTime() - Date.now()) / 60000;
+};
+
 const formatTimeLeft = (ms: number) => {
   if (ms <= 0) return "00:00";
   const totalSecs = Math.floor(ms / 1000);
