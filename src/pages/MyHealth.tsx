@@ -8,6 +8,7 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
+import MyPersona from "@/components/MyPersona";
 import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
