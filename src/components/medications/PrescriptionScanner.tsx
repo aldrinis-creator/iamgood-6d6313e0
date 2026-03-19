@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard } from "lucide-react";
+import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
