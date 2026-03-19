@@ -38,12 +38,21 @@ const AppHeader = () => {
             <span className="absolute top-1 right-1 w-2 h-2 bg-sos rounded-full" />
           </button>
           <AccessibilityMenu />
-          <button
-            onClick={() => navigate("/settings")}
-            className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center"
-          >
-            <User className="w-4 h-4" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+                <User className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <Settings className="w-4 h-4 mr-2" /> Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={async () => { await signOut(); navigate("/login"); }}>
+                <LogOut className="w-4 h-4 mr-2" /> Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
