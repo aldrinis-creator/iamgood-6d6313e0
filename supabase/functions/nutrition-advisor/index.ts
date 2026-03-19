@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const systemPrompts: Record<string, string> = {
   meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Include calories, macros, and preparation tips. Use Indian cuisine. Personalize based on the user's persona.`,
-  analyze_meal: `You are a nutrition analyst. The user wants to analyze a typical Indian meal. Ask them what they ate or suggest a sample analysis of a common Indian meal with calorie breakdown, macros, and health rating.`,
+  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown, macros (protein, carbs, fat, fiber), health rating (1-10), and suggestions for improvement. Use Indian cuisine context.`,
   post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona.`,
   feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Personalize based on the user's persona.`,
 };
@@ -16,7 +16,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { type, persona } = await req.json();
+    const { type, persona, image } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -30,19 +30,35 @@ serve(async (req) => {
     const istHour = (now.getUTCHours() + 5) % 24 + (now.getUTCMinutes() >= 30 ? 1 : 0);
     const timeContext = `Current IST hour is approximately ${istHour}:00.`;
 
+    // Use vision model when image is provided
+    const model = image ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview";
+
+    let messages: any[];
+    if (image && type === "analyze_meal") {
+      messages = [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `${personaContext}\n${timeContext}\n\nPlease analyze this meal image and provide a detailed nutritional breakdown.` },
+            { type: "image_url", image_url: { url: image } },
+          ],
+        },
+      ];
+    } else {
+      messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `${personaContext}\n${timeContext}\n\nPlease provide your recommendation.` },
+      ];
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `${personaContext}\n${timeContext}\n\nPlease provide your recommendation.` },
-        ],
-      }),
+      body: JSON.stringify({ model, messages }),
     });
 
     if (!response.ok) {
