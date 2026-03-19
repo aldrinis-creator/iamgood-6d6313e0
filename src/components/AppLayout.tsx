@@ -4,6 +4,7 @@ import AppHeader from "@/components/AppHeader";
 import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
+import FallDetectionOverlay from "@/components/FallDetectionOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
