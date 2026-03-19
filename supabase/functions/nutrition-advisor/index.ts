@@ -6,10 +6,10 @@ const corsHeaders = {
 };
 
 const systemPrompts: Record<string, string> = {
-  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Include calories, macros, and preparation tips. Use Indian cuisine. Personalize based on the user's persona.`,
-  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown, macros (protein, carbs, fat, fiber), health rating (1-10), and suggestions for improvement. Use Indian cuisine context.`,
-  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona.`,
-  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Personalize based on the user's persona.`,
+  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Include calories, macros, and preparation tips. Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals.`,
+  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown, macros (protein, carbs, fat, fiber), health rating (1-10), and suggestions for improvement. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions.`,
+  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals.`,
+  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully.`,
 };
 
 serve(async (req) => {
@@ -23,14 +23,13 @@ serve(async (req) => {
     const systemPrompt = systemPrompts[type] || systemPrompts.meal_plan;
 
     const personaContext = persona
-      ? `User persona: Diet=${persona.diet_type}, Allergies=${(persona.allergies || []).join(", ") || "none"}, Goals=${(persona.health_goals || []).join(", ") || "general health"}, Weight=${persona.weight_kg || "unknown"}kg, Age=${persona.age || "unknown"}.`
+      ? `User persona: Diet=${persona.diet_type}, Allergies=${(persona.allergies || []).join(", ") || "none"}, Goals=${(persona.health_goals || []).join(", ") || "general health"}, Weight=${persona.weight_kg || "unknown"}kg, Age=${persona.age || "unknown"}, Activity Level=${persona.activity_level || "unknown"}, Medical Conditions=${(persona.medical_conditions || []).join(", ") || "none"}, Dietary Preferences=${(persona.dietary_preferences || []).join(", ") || "none"}, Blood Group=${persona.blood_group || "unknown"}.`
       : "No persona provided.";
 
     const now = new Date();
     const istHour = (now.getUTCHours() + 5) % 24 + (now.getUTCMinutes() >= 30 ? 1 : 0);
     const timeContext = `Current IST hour is approximately ${istHour}:00.`;
 
-    // Use vision model when image is provided
     const model = image ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview";
 
     let messages: any[];
