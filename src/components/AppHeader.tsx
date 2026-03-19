@@ -1,4 +1,4 @@
-import { User, LogOut, Settings } from "lucide-react";
+import { User, LogOut, Settings, UserCircle } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
@@ -43,6 +43,9 @@ const AppHeader = () => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate("/my-profile")}>
+                <UserCircle className="w-4 h-4 mr-2" /> My Profile
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/settings")}>
                 <Settings className="w-4 h-4 mr-2" /> Settings
               </DropdownMenuItem>

@@ -212,6 +212,39 @@ export type Database = {
         }
         Relationships: []
       }
+      encrypted_documents: {
+        Row: {
+          created_at: string
+          doc_type: string
+          encrypted_value: string
+          id: string
+          iv: string
+          salt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: string
+          encrypted_value: string
+          id?: string
+          iv: string
+          salt: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: string
+          encrypted_value?: string
+          id?: string
+          iv?: string
+          salt?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       face_scans: {
         Row: {
           confidence: string
@@ -581,28 +614,37 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           full_name: string | null
+          gender: string | null
+          height_m: number | null
           id: string
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
+          weight_kg: number | null
         }
         Insert: {
           created_at?: string
           date_of_birth?: string | null
           full_name?: string | null
+          gender?: string | null
+          height_m?: number | null
           id: string
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
+          weight_kg?: number | null
         }
         Update: {
           created_at?: string
           date_of_birth?: string | null
           full_name?: string | null
+          gender?: string | null
+          height_m?: number | null
           id?: string
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
+          weight_kg?: number | null
         }
         Relationships: []
       }
@@ -713,6 +755,27 @@ export type Database = {
           id?: string
           settings?: Json
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vault_pins: {
+        Row: {
+          created_at: string
+          id: string
+          pin_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pin_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pin_hash?: string
           user_id?: string
         }
         Relationships: []
