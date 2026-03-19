@@ -439,38 +439,7 @@ const MyProfile = () => {
           </CardContent>
         </Card>
 
-        {/* Health Information */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Heart className="w-4 h-4 text-destructive" /> Health Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Blood Group</span>
-              <span className="font-medium">{healthProfile?.blood_group || "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Allergies</span>
-              <span className="font-medium text-right max-w-[60%]">
-                {healthProfile?.allergies?.length ? healthProfile.allergies.join(", ") : "None"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Chronic Conditions</span>
-              <span className="font-medium text-right max-w-[60%]">
-                {healthProfile?.chronic_conditions?.length ? healthProfile.chronic_conditions.join(", ") : "None"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Medications</span>
-              <span className="font-medium text-right max-w-[60%]">
-                {healthProfile?.current_medications?.length ? healthProfile.current_medications.join(", ") : "None"}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Health data moved to My Persona in My Health */}
       </div>
 
       {/* Set PIN Dialog */}
