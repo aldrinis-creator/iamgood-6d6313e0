@@ -21,6 +21,7 @@ import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
+import MyProfile from "./pages/MyProfile";
 
 const queryClient = new QueryClient();
 
