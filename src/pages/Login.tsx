@@ -58,10 +58,18 @@ const OrDivider = () => (
   </div>
 );
 
+const isPhoneInput = (value: string) => /^\+?\d[\d\s-]{5,}$/.test(value.trim());
+
+const formatPhone = (value: string) => {
+  const digits = value.replace(/[\s-]/g, "");
+  if (digits.startsWith("+")) return digits;
+  return `+91${digits}`;
+};
+
 const Login = () => {
   const { signIn, resetPassword } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -71,12 +79,26 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signIn(email, password);
+
+    let emailToUse = identifier.trim();
+
+    if (isPhoneInput(emailToUse)) {
+      const phone = formatPhone(emailToUse);
+      // Look up email via a server-side function since we can't access auth.users from client
+      const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
+      if (fnError || !data) {
+        setLoading(false);
+        toast({ title: "Sign in failed", description: "No account found with this phone number.", variant: "destructive" });
+        return;
+      }
+      emailToUse = data as string;
+    }
+
+    const { error } = await signIn(emailToUse, password);
     setLoading(false);
     if (error) {
       toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
     } else {
-      // Role is determined from profile; navigate after auth state updates
       navigate("/dashboard");
     }
   };
@@ -140,8 +162,8 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label>Email</Label>
-            <Input placeholder="Enter email" className="text-base" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Label>Email or Phone</Label>
+            <Input placeholder="Enter email or phone number" className="text-base" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
           </div>
           <div>
             <Label>Password</Label>
