@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const AppHeader = () => {
   const { userName, role } = useApp();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const todayApptCount = useTodayAppointments();
