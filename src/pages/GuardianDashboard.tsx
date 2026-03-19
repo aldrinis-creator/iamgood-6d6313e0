@@ -126,7 +126,8 @@ const GuardianDashboard = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "ok": return "Checked In";
+      case "ok":
+      case "responded": return "Checked In";
       case "missed": return "Missed";
       case "pending": return "Pending";
       default: return status;
