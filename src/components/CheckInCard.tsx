@@ -239,7 +239,27 @@ const CheckInCard = () => {
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
-        {!checkedIn ? (
+        {isApproaching && !checkedIn && getCurrentWindow() === null ? (
+          <div className="text-center space-y-3">
+            <p className="text-accessible font-semibold text-foreground">
+              {userName}, Check-iN coming up!
+            </p>
+            <div
+              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart"
+              style={{
+                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
+              }}
+            >
+              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">
+              Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Get ready for your next check-in at {formatHour(getNextCheckInTime().getHours())}
+            </p>
+          </div>
+        ) : !checkedIn ? (
           <div className="text-center space-y-3">
             <p className="text-accessible font-semibold text-foreground">
               {userName}, did you Check-In today?
