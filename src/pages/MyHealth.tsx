@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, UserCog } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
+import MyPersona from "@/components/MyPersona";
 import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
@@ -27,6 +28,7 @@ const healthTools = [
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
+  { icon: UserCog, label: "My Persona", color: "bg-success/10 text-success" },
 ];
 
 const healthToolsSubItems = [
@@ -57,6 +59,7 @@ const toolComponents: Record<string, React.FC> = {
   "Wellness": WellnessTracker,
   "Services": HealthServices,
   "Face Scan": FaceScan,
+  "My Persona": MyPersona,
 };
 
 const MyHealth = () => {

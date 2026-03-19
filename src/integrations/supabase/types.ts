@@ -545,34 +545,46 @@ export type Database = {
       }
       nutrition_personas: {
         Row: {
+          activity_level: string | null
           age: number | null
           allergies: string[] | null
+          blood_group: string | null
           created_at: string
           diet_type: string
+          dietary_preferences: string[] | null
           health_goals: string[] | null
           id: string
+          medical_conditions: string[] | null
           updated_at: string
           user_id: string
           weight_kg: number | null
         }
         Insert: {
+          activity_level?: string | null
           age?: number | null
           allergies?: string[] | null
+          blood_group?: string | null
           created_at?: string
           diet_type?: string
+          dietary_preferences?: string[] | null
           health_goals?: string[] | null
           id?: string
+          medical_conditions?: string[] | null
           updated_at?: string
           user_id: string
           weight_kg?: number | null
         }
         Update: {
+          activity_level?: string | null
           age?: number | null
           allergies?: string[] | null
+          blood_group?: string | null
           created_at?: string
           diet_type?: string
+          dietary_preferences?: string[] | null
           health_goals?: string[] | null
           id?: string
+          medical_conditions?: string[] | null
           updated_at?: string
           user_id?: string
           weight_kg?: number | null

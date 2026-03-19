@@ -1,33 +1,13 @@
-import { useState, useEffect, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, UserCog, Loader2, ArrowLeft, X, Upload } from "lucide-react";
+import { useState, useRef } from "react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 
 type ActionType = "meal_plan" | "analyze_meal" | "post_workout" | "feeling_unwell";
-
-interface Persona {
-  diet_type: string;
-  allergies: string[];
-  health_goals: string[];
-  weight_kg: number | null;
-  age: number | null;
-}
-
-const defaultPersona: Persona = {
-  diet_type: "vegetarian",
-  allergies: [],
-  health_goals: [],
-  weight_kg: null,
-  age: null,
-};
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
@@ -40,61 +20,15 @@ const actionCards = [
 
 const NutritionAdvisor = () => {
   const { user } = useAuth();
-  const [persona, setPersona] = useState<Persona>(defaultPersona);
-  const [editPersona, setEditPersona] = useState<Persona>(defaultPersona);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [aiResponse, setAiResponse] = useState("");
-  const [allergiesInput, setAllergiesInput] = useState("");
-  const [goalsInput, setGoalsInput] = useState("");
 
   // Meal photo state
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
   const [mealImageBase64, setMealImageBase64] = useState<string | null>(null);
   const [showMealUpload, setShowMealUpload] = useState(false);
   const mealFileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (user) fetchPersona();
-  }, [user]);
-
-  const fetchPersona = async () => {
-    const { data } = await supabase
-      .from("nutrition_personas")
-      .select("*")
-      .eq("user_id", user!.id)
-      .single();
-    if (data) {
-      const p: Persona = {
-        diet_type: data.diet_type,
-        allergies: data.allergies ?? [],
-        health_goals: data.health_goals ?? [],
-        weight_kg: data.weight_kg,
-        age: data.age,
-      };
-      setPersona(p);
-      setEditPersona(p);
-      setAllergiesInput((data.allergies ?? []).join(", "));
-      setGoalsInput((data.health_goals ?? []).join(", "));
-    }
-  };
-
-  const savePersona = async () => {
-    const toSave = {
-      ...editPersona,
-      allergies: allergiesInput.split(",").map(s => s.trim()).filter(Boolean),
-      health_goals: goalsInput.split(",").map(s => s.trim()).filter(Boolean),
-    };
-    const { error } = await supabase.from("nutrition_personas").upsert({
-      user_id: user!.id,
-      ...toSave,
-    }, { onConflict: "user_id" });
-    if (error) { toast.error("Failed to save persona"); return; }
-    setPersona(toSave);
-    setDialogOpen(false);
-    toast.success("Persona saved!");
-  };
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,6 +53,13 @@ const NutritionAdvisor = () => {
     setLoading(true);
     setShowMealUpload(false);
     try {
+      // Fetch persona for AI context
+      let persona = null;
+      if (user) {
+        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).single();
+        if (data) persona = data;
+      }
+
       const body: any = { type, persona };
       if (image) body.image = image;
       const { data, error } = await supabase.functions.invoke("nutrition-advisor", { body });
@@ -169,29 +110,15 @@ const NutritionAdvisor = () => {
             <Upload className="w-8 h-8 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Tap to take photo or upload image</span>
             <span className="text-xs text-muted-foreground">JPG, PNG — max 4MB</span>
-            <input
-              ref={mealFileRef}
-              type="file"
-              accept="image/*"
-              onChange={handleMealImageSelect}
-              className="hidden"
-            />
+            <input ref={mealFileRef} type="file" accept="image/*" onChange={handleMealImageSelect} className="hidden" />
           </label>
         )}
 
         <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            onClick={() => handleAction("analyze_meal", mealImageBase64)}
-            disabled={!mealImageBase64}
-          >
+          <Button className="flex-1" onClick={() => handleAction("analyze_meal", mealImageBase64)} disabled={!mealImageBase64}>
             <Camera className="w-4 h-4 mr-1" /> Analyze Meal
           </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => handleAction("analyze_meal")}
-          >
+          <Button variant="outline" className="flex-1" onClick={() => handleAction("analyze_meal")}>
             Skip Photo
           </Button>
         </div>
@@ -227,60 +154,9 @@ const NutritionAdvisor = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Nutrition Advisor</h2>
-          <p className="text-xs text-muted-foreground">AI-powered meal guidance tailored to you</p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" onClick={() => {
-              setEditPersona(persona);
-              setAllergiesInput(persona.allergies.join(", "));
-              setGoalsInput(persona.health_goals.join(", "));
-            }}>
-              <UserCog className="w-4 h-4 mr-1" /> Edit Persona
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Your Nutrition Persona</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div>
-                <Label>Diet Type</Label>
-                <Select value={editPersona.diet_type} onValueChange={v => setEditPersona(p => ({ ...p, diet_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                    <SelectItem value="non-vegetarian">Non-Vegetarian</SelectItem>
-                    <SelectItem value="vegan">Vegan</SelectItem>
-                    <SelectItem value="eggetarian">Eggetarian</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Allergies (comma-separated)</Label>
-                <Input value={allergiesInput} onChange={e => setAllergiesInput(e.target.value)} placeholder="e.g. peanuts, dairy" />
-              </div>
-              <div>
-                <Label>Health Goals (comma-separated)</Label>
-                <Input value={goalsInput} onChange={e => setGoalsInput(e.target.value)} placeholder="e.g. weight loss, muscle gain" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Weight (kg)</Label>
-                  <Input type="number" value={editPersona.weight_kg ?? ""} onChange={e => setEditPersona(p => ({ ...p, weight_kg: e.target.value ? Number(e.target.value) : null }))} />
-                </div>
-                <div>
-                  <Label>Age</Label>
-                  <Input type="number" value={editPersona.age ?? ""} onChange={e => setEditPersona(p => ({ ...p, age: e.target.value ? Number(e.target.value) : null }))} />
-                </div>
-              </div>
-              <Button onClick={savePersona} className="w-full">Save Persona</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <div>
+        <h2 className="text-lg font-bold">Nutrition Advisor</h2>
+        <p className="text-xs text-muted-foreground">AI-powered meal guidance tailored to your persona</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
