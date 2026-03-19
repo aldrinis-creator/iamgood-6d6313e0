@@ -114,13 +114,26 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
+  const validatePhone = (value: string): string | null => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "Phone number is required. You'll use it to sign in later.";
+    if (phoneCode === "+91" && !/^[6-9]\d{9}$/.test(digits)) {
+      return "Enter a valid 10-digit Indian mobile number (starting with 6-9).";
+    }
+    if (phoneCode !== "+91" && digits.length < 7) {
+      return "Enter a valid phone number.";
+    }
+    return null;
+  };
+
   const handleDetailsNext = () => {
     if (!fullName || !email || !password) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
-    if (!phone) {
-      toast({ title: "Phone number is required", description: "You'll use it to sign in later.", variant: "destructive" });
+    const phoneError = validatePhone(phone);
+    if (phoneError) {
+      toast({ title: "Invalid phone number", description: phoneError, variant: "destructive" });
       return;
     }
     if (selectedRole === "user") {
@@ -281,7 +294,7 @@ const Register = () => {
                     <SelectItem value="+1">+1</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input placeholder="Phone number" className="flex-1 text-base min-h-[48px]" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input placeholder="10-digit mobile number" className="flex-1 text-base min-h-[48px]" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} />
               </div>
             </div>
             <div>
