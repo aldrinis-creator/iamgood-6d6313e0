@@ -1,4 +1,5 @@
-import { User, Bell, LogOut, Settings } from "lucide-react";
+import { User, LogOut, Settings } from "lucide-react";
+import NotificationCenter from "@/components/NotificationCenter";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
