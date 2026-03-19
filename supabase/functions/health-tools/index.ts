@@ -98,7 +98,13 @@ serve(async (req) => {
       });
     }
 
-    const userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
+    const MAX_PAYLOAD_CHARS = 20000;
+    let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
+    
+    if (userMessage.length > MAX_PAYLOAD_CHARS) {
+      userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";
+      console.log(`Payload truncated from ${(typeof payload === "string" ? payload : JSON.stringify(payload)).length} to ${MAX_PAYLOAD_CHARS} chars`);
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

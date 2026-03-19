@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Upload, Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText } from "lucide-react";
+import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
+
+const MAX_INPUT_LENGTH = 5000;
 
 interface Alternative {
   name: string;
@@ -40,35 +41,21 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 };
 
 const PrescriptionScanner = () => {
-  const [mode, setMode] = useState<"upload" | "manual">("upload");
   const [prescriptionText, setPrescriptionText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // For image files, we'll use OCR-like approach - convert to base64 and send to AI
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await analyzePrescription(`[Image uploaded: ${file.name}]\nPlease analyze this prescription image. The image content is provided as base64 data. Extract all medication names, dosages, and instructions visible in the prescription.\n\nBase64 image data (first 500 chars for context): ${base64?.substring(0, 500)}`);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const analyzePrescription = async (text: string) => {
-    if (!text.trim()) {
-      toast.error("Please enter or upload a prescription");
+  const analyzePrescription = async () => {
+    const text = prescriptionText.trim();
+    if (!text) {
+      toast.error("Please enter the medication names from your prescription");
       return;
     }
     setLoading(true);
     setResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("health-tools", {
-        body: { type: "prescription_scan", payload: text },
+        body: { type: "prescription_scan", payload: text.substring(0, MAX_INPUT_LENGTH) },
       });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
@@ -77,7 +64,6 @@ const PrescriptionScanner = () => {
         const parsed: ScanResult = JSON.parse(data.response);
         setResult(parsed);
       } catch {
-        // If AI didn't return valid JSON, try to extract it
         const jsonMatch = data.response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           setResult(JSON.parse(jsonMatch[0]));
@@ -98,52 +84,30 @@ const PrescriptionScanner = () => {
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Scan your prescription to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
+            Type the medication names from your prescription to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
           </p>
         </CardContent>
       </Card>
 
-      {/* Mode toggle */}
-      <div className="flex gap-2">
-        <Button variant={mode === "upload" ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setMode("upload")}>
-          <Camera className="w-4 h-4 mr-1" /> Upload Image
-        </Button>
-        <Button variant={mode === "manual" ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setMode("manual")}>
-          <FileText className="w-4 h-4 mr-1" /> Type Medicines
-        </Button>
-      </div>
-
-      {mode === "upload" ? (
-        <Card>
-          <CardContent className="p-4 text-center space-y-3">
-            <Camera className="w-12 h-12 text-success mx-auto" />
-            <p className="text-sm text-muted-foreground">Upload a photo of your prescription</p>
-            <Input ref={fileRef} type="file" accept="image/*" capture="environment" className="max-w-xs mx-auto" onChange={handleFileUpload} />
-            <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={() => fileRef.current?.click()} disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Upload className="w-4 h-4 mr-1" /> Upload & Analyze</>}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <Textarea
-              placeholder="Enter medication names from your prescription, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"
-              value={prescriptionText}
-              onChange={(e) => setPrescriptionText(e.target.value)}
-              rows={5}
-            />
-            <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={() => analyzePrescription(prescriptionText)} disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Prescription</>}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <Textarea
+            placeholder={"Enter medication names from your prescription, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"}
+            value={prescriptionText}
+            onChange={(e) => setPrescriptionText(e.target.value.substring(0, MAX_INPUT_LENGTH))}
+            rows={5}
+            maxLength={MAX_INPUT_LENGTH}
+          />
+          <p className="text-[10px] text-muted-foreground text-right">{prescriptionText.length.toLocaleString()} / {MAX_INPUT_LENGTH.toLocaleString()}</p>
+          <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={analyzePrescription} disabled={loading}>
+            {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Prescription</>}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Results */}
       {result && (
         <div className="space-y-3">
-          {/* Summary */}
           {result.summary && (
             <Card className="border-primary/20">
               <CardContent className="p-3">
@@ -152,7 +116,6 @@ const PrescriptionScanner = () => {
             </Card>
           )}
 
-          {/* Medications */}
           {result.medications?.map((med, idx) => {
             const config = statusConfig[med.status] || statusConfig.unknown;
             return (
@@ -168,7 +131,6 @@ const PrescriptionScanner = () => {
                     </Badge>
                   </div>
 
-                  {/* Salt composition */}
                   <div className="bg-muted/50 rounded p-2">
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase">Salt / Composition</p>
                     <p className="text-xs">{med.salt_composition}</p>
@@ -180,7 +142,6 @@ const PrescriptionScanner = () => {
                     </div>
                   )}
 
-                  {/* Price & Alternatives */}
                   {med.alternatives && med.alternatives.length > 0 && (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -202,7 +163,6 @@ const PrescriptionScanner = () => {
                     </div>
                   )}
 
-                  {/* Warnings */}
                   {med.warnings && med.warnings.length > 0 && (
                     <div className="space-y-1">
                       {med.warnings.map((w, wi) => (
@@ -217,7 +177,6 @@ const PrescriptionScanner = () => {
             );
           })}
 
-          {/* Drug Interactions */}
           {result.interactions && result.interactions.length > 0 && (
             <Card className="border-orange-300">
               <CardContent className="p-3 space-y-1">
