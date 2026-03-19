@@ -102,24 +102,26 @@ serve(async (req) => {
     let messages: any[];
     let model = "google/gemini-3-flash-preview";
 
-    if (type === "prescription_scan" && typeof payload === "object" && payload?.image) {
+    if (typeof payload === "object" && payload?.image) {
       // Vision mode: use multimodal model with image
       model = "google/gemini-2.5-flash";
       const imageDataUrl = payload.image as string;
+
+      let visionPrompt = "Please read and analyze this image.";
+      if (type === "prescription_scan") {
+        visionPrompt = "Please read and analyze this prescription image. Extract all medication names, dosages, and details visible in the image.";
+      } else if (type === "document_analysis") {
+        const category = payload.category || "General";
+        visionPrompt = `Category: ${category}\n\nPlease read and analyze this medical document image. Extract all text, values, and findings visible in the image and provide a detailed analysis.`;
+      }
 
       messages = [
         { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: "Please read and analyze this prescription image. Extract all medication names, dosages, and details visible in the image.",
-            },
-            {
-              type: "image_url",
-              image_url: { url: imageDataUrl },
-            },
+            { type: "text", text: visionPrompt },
+            { type: "image_url", image_url: { url: imageDataUrl } },
           ],
         },
       ];

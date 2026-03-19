@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload } from "lucide-react";
+import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 
 const MAX_TEXT_LENGTH = 10000;
+const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
 
 const categories = [
   { label: "Medical Images", icon: FileImage, color: "text-primary" },
@@ -15,6 +15,8 @@ const categories = [
   { label: "Prescriptions", icon: FileText, color: "text-primary" },
   { label: "Doctor's Notes", icon: Stethoscope, color: "text-success" },
 ];
+
+type InputMode = "photo" | "text";
 
 const isTextFile = (file: File) => {
   const textTypes = ["text/plain", "text/csv", "text/html", "text/xml", "application/json"];
@@ -25,15 +27,46 @@ const isTextFile = (file: File) => {
 
 const DocumentAnalyzer = () => {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const [mode, setMode] = useState<InputMode>("photo");
   const [file, setFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    if (!selected.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPG, PNG, etc.)");
+      e.target.value = "";
+      return;
+    }
+    if (selected.size > MAX_IMAGE_SIZE) {
+      toast.error("Image must be under 4MB");
+      e.target.value = "";
+      return;
+    }
+
+    setImagePreview(URL.createObjectURL(selected));
+    const reader = new FileReader();
+    reader.onload = () => setImageBase64(reader.result as string);
+    reader.readAsDataURL(selected);
+  };
+
+  const clearImage = () => {
+    setImagePreview(null);
+    setImageBase64(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleTextFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
     if (selected && !isTextFile(selected)) {
-      toast.error("Only text files (.txt, .csv, .md) are supported. Please paste your document content in the text box instead.");
+      toast.error("Only text files (.txt, .csv, .md) are supported.");
       e.target.value = "";
       setFile(null);
       return;
@@ -42,22 +75,39 @@ const DocumentAnalyzer = () => {
   };
 
   const analyze = async () => {
-    if (!textInput && !file) { toast.error("Please provide text or upload a text file"); return; }
+    if (mode === "photo" && !imageBase64) {
+      toast.error("Please upload a photo of your document");
+      return;
+    }
+    if (mode === "text" && !textInput && !file) {
+      toast.error("Please provide text or upload a text file");
+      return;
+    }
+
     setLoading(true);
     try {
-      let content = textInput;
-      if (file && !textInput) {
-        const raw = await file.text();
-        content = raw.substring(0, MAX_TEXT_LENGTH);
-        if (raw.length > MAX_TEXT_LENGTH) {
-          toast.info(`File content truncated to ${MAX_TEXT_LENGTH.toLocaleString()} characters for analysis.`);
+      let payload: any;
+
+      if (mode === "photo" && imageBase64) {
+        payload = {
+          image: imageBase64,
+          category: selectedCat || "General",
+        };
+      } else {
+        let content = textInput;
+        if (file && !textInput) {
+          const raw = await file.text();
+          content = raw.substring(0, MAX_TEXT_LENGTH);
+          if (raw.length > MAX_TEXT_LENGTH) {
+            toast.info(`File content truncated to ${MAX_TEXT_LENGTH.toLocaleString()} characters.`);
+          }
         }
+        content = content.substring(0, MAX_TEXT_LENGTH);
+        payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
       }
-      // Cap textarea input as well
-      content = content.substring(0, MAX_TEXT_LENGTH);
 
       const { data, error } = await supabase.functions.invoke("health-tools", {
-        body: { type: "document_analysis", payload: `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}` },
+        body: { type: "document_analysis", payload },
       });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
@@ -72,7 +122,7 @@ const DocumentAnalyzer = () => {
   if (result) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); }}>← Back</Button>
+        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearImage(); }}>← Back</Button>
         <Card>
           <CardContent className="p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -96,7 +146,7 @@ const DocumentAnalyzer = () => {
         <CardContent className="p-4 text-center space-y-3">
           <Search className="w-12 h-12 text-primary mx-auto" />
           <h3 className="font-semibold">Document Analyzer</h3>
-          <p className="text-sm text-muted-foreground">Paste or upload text from a medical document for AI-powered plain-language analysis.</p>
+          <p className="text-sm text-muted-foreground">Upload a photo or paste text from a medical document for AI-powered plain-language analysis.</p>
         </CardContent>
       </Card>
 
@@ -116,29 +166,76 @@ const DocumentAnalyzer = () => {
         ))}
       </div>
 
+      {/* Mode Toggle */}
+      <div className="flex gap-2">
+        <Button
+          variant={mode === "photo" ? "default" : "outline"}
+          className="flex-1"
+          onClick={() => setMode("photo")}
+        >
+          <Camera className="w-4 h-4 mr-2" /> Photo / Upload
+        </Button>
+        <Button
+          variant={mode === "text" ? "default" : "outline"}
+          className="flex-1"
+          onClick={() => setMode("text")}
+        >
+          <Type className="w-4 h-4 mr-2" /> Manual Text
+        </Button>
+      </div>
+
       {/* Input */}
       <Card>
         <CardContent className="p-4 space-y-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Upload a text file (.txt, .csv, .md)</label>
-            <input
-              type="file"
-              accept=".txt,.csv,.md,.json,.xml,.html,text/plain,text/csv"
-              onChange={handleFileChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium mt-1"
-            />
-          </div>
-          <p className="text-xs text-center text-muted-foreground">— or paste text content below —</p>
-          <div className="relative">
-            <textarea
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[100px]"
-              placeholder="Paste your lab report, prescription, or medical notes here..."
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value.substring(0, MAX_TEXT_LENGTH))}
-              maxLength={MAX_TEXT_LENGTH}
-            />
-            <p className="text-[10px] text-muted-foreground text-right">{textInput.length.toLocaleString()} / {MAX_TEXT_LENGTH.toLocaleString()}</p>
-          </div>
+          {mode === "photo" ? (
+            <>
+              {imagePreview ? (
+                <div className="relative">
+                  <img src={imagePreview} alt="Document preview" className="w-full rounded-lg border border-border max-h-64 object-contain bg-muted" />
+                  <Button size="icon" variant="destructive" className="absolute top-2 right-2 h-7 w-7" onClick={clearImage}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                  <Camera className="w-8 h-8 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Tap to take photo or upload image</span>
+                  <span className="text-xs text-muted-foreground">JPG, PNG — max 4MB</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Upload a text file (.txt, .csv, .md)</label>
+                <input
+                  type="file"
+                  accept=".txt,.csv,.md,.json,.xml,.html,text/plain,text/csv"
+                  onChange={handleTextFileChange}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium mt-1"
+                />
+              </div>
+              <p className="text-xs text-center text-muted-foreground">— or paste text content below —</p>
+              <div className="relative">
+                <textarea
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[100px]"
+                  placeholder="Paste your lab report, prescription, or medical notes here..."
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value.substring(0, MAX_TEXT_LENGTH))}
+                  maxLength={MAX_TEXT_LENGTH}
+                />
+                <p className="text-[10px] text-muted-foreground text-right">{textInput.length.toLocaleString()} / {MAX_TEXT_LENGTH.toLocaleString()}</p>
+              </div>
+            </>
+          )}
           <Button onClick={analyze} disabled={loading} className="w-full">
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : <><Upload className="w-4 h-4 mr-2" /> Analyze Document</>}
           </Button>
