@@ -157,17 +157,26 @@ const CheckInCard = () => {
     return () => clearInterval(interval);
   }, [loadCurrentCheckIn]);
 
-  // Countdown timer to next check-in
+  // Countdown timer + approaching detection
   useEffect(() => {
     const tick = () => {
       const next = getNextCheckInTime();
       const ms = next.getTime() - Date.now();
       setTimeLeft(formatTimeLeft(ms));
+      const minsLeft = getMinutesUntilNext();
+      const currentWindow = getCurrentWindow();
+      // Approaching = within 30 min of next window AND not currently in an active window (or already checked in)
+      if (minsLeft <= 30 && minsLeft > 0 && (currentWindow === null || checkedIn)) {
+        setIsApproaching(true);
+        setApproachingMinutes(Math.ceil(minsLeft));
+      } else {
+        setIsApproaching(false);
+      }
     };
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [checkedIn]);
 
   const handleCheckIn = async () => {
     if (!session?.user?.id || loading) return;
