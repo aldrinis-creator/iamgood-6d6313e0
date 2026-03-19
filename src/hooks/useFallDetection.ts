@@ -83,7 +83,7 @@ export function useFallDetection() {
       const now = Date.now();
 
       // Detect free-fall
-      if (magnitude < FREE_FALL_THRESHOLD) {
+      if (magnitude < thresholds.freeFall) {
         if (!freeFallTimeRef.current) {
           freeFallTimeRef.current = now;
         }
