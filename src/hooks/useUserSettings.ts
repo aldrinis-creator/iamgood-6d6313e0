@@ -16,6 +16,7 @@ export interface UserSettings {
   sleepMode: boolean;
   nudgeFrequency: string;
   fallDetection: boolean;
+  fallSensitivity: string;
   // Appointments
   preAlert: string;
   // Privacy
