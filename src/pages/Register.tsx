@@ -272,7 +272,7 @@ const Register = () => {
               <Input placeholder="Enter your name" className="text-base min-h-[48px]" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </div>
             <div>
-              <Label>Phone Number</Label>
+              <Label>Phone Number *</Label>
               <div className="flex gap-2">
                 <Select value={phoneCode} onValueChange={setPhoneCode}>
                   <SelectTrigger className="w-24 min-h-[48px]"><SelectValue /></SelectTrigger>
