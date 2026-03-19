@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard } from "lucide-react";
+import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -207,10 +207,9 @@ const PrescriptionScanner = () => {
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {result && (
-        <PrescriptionResults result={result} />
-      )}
+      {result && <PrescriptionResults result={result} />}
+
+      {result && <SaveToVaultButton result={result} />}
 
       <p className="text-[10px] text-muted-foreground text-center">
         ⚠️ This tool provides informational guidance only. Always consult your doctor before changing medications.
@@ -304,5 +303,60 @@ const PrescriptionResults = ({ result }: { result: ScanResult }) => (
     )}
   </div>
 );
+
+const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const saveToVault = async () => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Please log in to save"); return; }
+
+      const description = [
+        result.summary,
+        "",
+        "Medications:",
+        ...(result.medications?.map(m =>
+          `• ${m.name} (${m.salt_composition}) — ${m.dosage} — Status: ${m.status.toUpperCase()}${m.ban_details ? ` ⚠️ ${m.ban_details}` : ""}`
+        ) || []),
+        ...(result.interactions?.length ? ["", "Interactions:", ...result.interactions.map(i => `• ${i}`)] : []),
+      ].join("\n");
+
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: "Prescription Analysis",
+        record_type: "Prescription",
+        description,
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Saved to Medical Vault");
+    } catch {
+      toast.error("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Button
+      onClick={saveToVault}
+      disabled={saving || saved}
+      className="w-full"
+      variant={saved ? "outline" : "default"}
+    >
+      {saved ? (
+        <><Check className="w-4 h-4 mr-2" /> Saved to Medical Vault</>
+      ) : saving ? (
+        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+      ) : (
+        <><Save className="w-4 h-4 mr-2" /> Save to Medical Vault</>
+      )}
+    </Button>
+  );
+};
 
 export default PrescriptionScanner;
