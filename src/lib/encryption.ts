@@ -73,7 +73,7 @@ export async function decrypt(
 export async function hashPin(pin: string): Promise<string> {
   const hash = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(pin)
+    new TextEncoder().encode(pin) as unknown as ArrayBuffer
   );
   return toBase64(hash);
 }
