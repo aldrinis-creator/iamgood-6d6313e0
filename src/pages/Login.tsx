@@ -181,8 +181,8 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label>Email</Label>
-            <Input placeholder="Enter email" className="text-base" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Label>Email or Phone</Label>
+            <Input placeholder="Enter email or phone number" className="text-base" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
           </div>
           <div>
             <Label>Password</Label>
