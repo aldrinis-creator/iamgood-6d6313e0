@@ -119,6 +119,10 @@ const Register = () => {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
+    if (!phone) {
+      toast({ title: "Phone number is required", description: "You'll use it to sign in later.", variant: "destructive" });
+      return;
+    }
     if (selectedRole === "user") {
       setStep(3);
     } else {
@@ -268,7 +272,7 @@ const Register = () => {
               <Input placeholder="Enter your name" className="text-base min-h-[48px]" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </div>
             <div>
-              <Label>Phone Number</Label>
+              <Label>Phone Number *</Label>
               <div className="flex gap-2">
                 <Select value={phoneCode} onValueChange={setPhoneCode}>
                   <SelectTrigger className="w-24 min-h-[48px]"><SelectValue /></SelectTrigger>
