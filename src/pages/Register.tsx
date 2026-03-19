@@ -119,6 +119,10 @@ const Register = () => {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
+    if (!phone) {
+      toast({ title: "Phone number is required", description: "You'll use it to sign in later.", variant: "destructive" });
+      return;
+    }
     if (selectedRole === "user") {
       setStep(3);
     } else {
