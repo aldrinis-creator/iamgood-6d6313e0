@@ -75,6 +75,8 @@ const CheckInCard = () => {
   const [loading, setLoading] = useState(false);
   const [currentCheckInId, setCurrentCheckInId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState("");
+  const [isApproaching, setIsApproaching] = useState(false);
+  const [approachingMinutes, setApproachingMinutes] = useState(0);
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
