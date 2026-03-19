@@ -23,7 +23,7 @@ serve(async (req) => {
     const systemPrompt = systemPrompts[type] || systemPrompts.meal_plan;
 
     const personaContext = persona
-      ? `User persona: Diet=${persona.diet_type}, Allergies=${(persona.allergies || []).join(", ") || "none"}, Goals=${(persona.health_goals || []).join(", ") || "general health"}, Weight=${persona.weight_kg || "unknown"}kg, Age=${persona.age || "unknown"}, Activity Level=${persona.activity_level || "unknown"}, Medical Conditions=${(persona.medical_conditions || []).join(", ") || "none"}, Dietary Preferences=${(persona.dietary_preferences || []).join(", ") || "none"}, Blood Group=${persona.blood_group || "unknown"}.`
+      ? `User persona: Diet=${persona.diet_type}, Allergies=${(persona.allergies || []).join(", ") || "none"}, Goals=${(persona.health_goals || []).join(", ") || "general health"}, Weight=${persona.weight_kg || "unknown"}kg, Height=${persona.height_m || "unknown"}m, Age=${persona.age || "unknown"}, Activity Level=${persona.activity_level || "unknown"}, Medical Conditions=${(persona.medical_conditions || []).join(", ") || "none"}, Dietary Preferences=${(persona.dietary_preferences || []).join(", ") || "none"}, Blood Group=${persona.blood_group || "unknown"}, Smoking=${persona.smoking || "unknown"}, Alcohol=${persona.alcohol || "unknown"}.`
       : "No persona provided.";
 
     const now = new Date();
