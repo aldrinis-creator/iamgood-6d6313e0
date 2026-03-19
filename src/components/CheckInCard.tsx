@@ -147,8 +147,38 @@ const CheckInCard = () => {
   }, []);
 
   const handleCheckIn = async () => {
-    if (!session?.user?.id || !currentCheckInId || loading) return;
+    if (!session?.user?.id || loading) return;
     setLoading(true);
+
+    let checkInId = currentCheckInId;
+
+    // If no check-in record exists yet, create one on-the-fly
+    if (!checkInId) {
+      const now = new Date();
+      const windowHour = getCurrentWindow();
+      const scheduledAt = windowHour !== null
+        ? getCheckInWindowStart(windowHour)
+        : now;
+
+      const { data: created, error: insertError } = await supabase
+        .from("check_ins")
+        .insert({
+          user_id: session.user.id,
+          scheduled_at: scheduledAt.toISOString(),
+          status: "pending",
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !created) {
+        console.error("Failed to create check-in:", insertError);
+        toast.error("Check-in failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+      checkInId = created.id;
+      setCurrentCheckInId(checkInId);
+    }
 
     const { error } = await supabase
       .from("check_ins")
@@ -157,7 +187,7 @@ const CheckInCard = () => {
         response: "ok",
         responded_at: new Date().toISOString(),
       })
-      .eq("id", currentCheckInId);
+      .eq("id", checkInId);
 
     if (error) {
       console.error("Failed to check in:", error);
