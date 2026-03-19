@@ -1,4 +1,4 @@
-import { User, LogOut, Settings } from "lucide-react";
+import { User, LogOut, Settings, UserCircle } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
