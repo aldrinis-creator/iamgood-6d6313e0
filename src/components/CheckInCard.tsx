@@ -131,8 +131,23 @@ const CheckInCard = () => {
     }
   }, [session?.user?.id]);
 
+  const prevWindowRef = useRef<number | null>(undefined);
+
   useEffect(() => {
     loadCurrentCheckIn();
+    const interval = setInterval(() => {
+      const newWindow = getCurrentWindow();
+      if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
+        // New check-in window opened — trigger audio alert
+        const mode = getAudioMode();
+        if (mode === "chime") playChime();
+        else if (mode === "voice") playVoiceReminder();
+      }
+      prevWindowRef.current = newWindow;
+      loadCurrentCheckIn();
+    }, 30000);
+    prevWindowRef.current = getCurrentWindow();
+    return () => clearInterval(interval);
   }, [loadCurrentCheckIn]);
 
   // Countdown timer to next check-in
