@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type } from "lucide-react";
+import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
