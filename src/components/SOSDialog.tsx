@@ -157,7 +157,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
             onToggle={() => toggle("blood")}
           />
           <InfoToggle
-            icon={<AlertCircle className="w-4 h-4 text-amber-500" />}
+            icon={<AlertCircle className="w-4 h-4 text-destructive/70" />}
             label="Allergies"
             value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"}
             checked={toggles.allergies}
