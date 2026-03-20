@@ -90,10 +90,10 @@ const HealthPassport = () => {
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
-      const stepsP = Math.min((act.steps ?? 0) / 10000, 1) * 25;
-      const distP = Math.min((Number(act.distance_km) || 0) / 5, 1) * 25;
-      const calP = Math.min((act.calories ?? 0) / 500, 1) * 25;
-      const activeP = Math.min((act.active_minutes ?? 0) / 120, 1) * 25;
+      const stepsP = Math.min((act.steps ?? 0) / goals.steps, 1) * 25;
+      const distP = Math.min((Number(act.distance_km) || 0) / goals.distance_km, 1) * 25;
+      const calP = Math.min((act.calories ?? 0) / goals.calories, 1) * 25;
+      const activeP = Math.min((act.active_minutes ?? 0) / goals.active_minutes, 1) * 25;
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 

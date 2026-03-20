@@ -67,10 +67,11 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
-      const stepsP = Math.min((act.steps ?? 0) / 10000, 1) * 25;
-      const distP = Math.min((Number(act.distance_km) || 0) / 5, 1) * 25;
-      const calP = Math.min((act.calories ?? 0) / 500, 1) * 25;
-      const activeP = Math.min((act.active_minutes ?? 0) / 120, 1) * 25;
+      const g = DEFAULT_ACTIVITY_GOALS;
+      const stepsP = Math.min((act.steps ?? 0) / g.steps, 1) * 25;
+      const distP = Math.min((Number(act.distance_km) || 0) / g.distance_km, 1) * 25;
+      const calP = Math.min((act.calories ?? 0) / g.calories, 1) * 25;
+      const activeP = Math.min((act.active_minutes ?? 0) / g.active_minutes, 1) * 25;
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
