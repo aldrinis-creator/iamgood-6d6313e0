@@ -179,6 +179,7 @@ const Register = () => {
             user_id: userId,
             guardian_name: g.name,
             guardian_phone: g.phone,
+            guardian_email: g.email || null,
             relation: g.relation || null,
             is_primary: i === 0,
           }));
