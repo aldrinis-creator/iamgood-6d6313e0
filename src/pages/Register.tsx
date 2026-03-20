@@ -102,7 +102,7 @@ const Register = () => {
   // Guardian helpers
   const addGuardian = () => {
     if (guardians.length < 5) {
-      setGuardians([...guardians, { name: "", phone: "", relation: "" }]);
+      setGuardians([...guardians, { name: "", phone: "", email: "", relation: "" }]);
     }
   };
   const removeGuardian = (i: number) => {
