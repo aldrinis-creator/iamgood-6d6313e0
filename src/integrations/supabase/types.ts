@@ -331,6 +331,8 @@ export type Database = {
           created_at: string
           current_medications: string[] | null
           emergency_notes: string | null
+          family_doctor_name: string | null
+          family_doctor_phone: string | null
           id: string
           updated_at: string
           user_id: string
@@ -342,6 +344,8 @@ export type Database = {
           created_at?: string
           current_medications?: string[] | null
           emergency_notes?: string | null
+          family_doctor_name?: string | null
+          family_doctor_phone?: string | null
           id?: string
           updated_at?: string
           user_id: string
@@ -353,6 +357,8 @@ export type Database = {
           created_at?: string
           current_medications?: string[] | null
           emergency_notes?: string | null
+          family_doctor_name?: string | null
+          family_doctor_phone?: string | null
           id?: string
           updated_at?: string
           user_id?: string
