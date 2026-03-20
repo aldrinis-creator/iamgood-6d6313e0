@@ -145,10 +145,7 @@ const CheckInCard = () => {
     const interval = setInterval(() => {
       const newWindow = getCurrentWindow();
       if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
-        // New check-in window opened — trigger audio alert
-        const mode = getAudioMode();
-        if (mode === "chime") playChime();
-        else if (mode === "voice") playVoiceReminder();
+        // Audio alerts are now handled by useCheckInAudio hook
       }
       prevWindowRef.current = newWindow;
       loadCurrentCheckIn();
