@@ -80,7 +80,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
-  const [guardians, setGuardians] = useState([{ name: "", phone: "", relation: "" }]);
+  const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
   const progressPercent = (step / totalSteps) * 100;
@@ -102,7 +102,7 @@ const Register = () => {
   // Guardian helpers
   const addGuardian = () => {
     if (guardians.length < 5) {
-      setGuardians([...guardians, { name: "", phone: "", relation: "" }]);
+      setGuardians([...guardians, { name: "", phone: "", email: "", relation: "" }]);
     }
   };
   const removeGuardian = (i: number) => {
@@ -148,8 +148,8 @@ const Register = () => {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
-    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone)) {
-      toast({ title: "Primary guardian name and phone are required", variant: "destructive" });
+    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
+      toast({ title: "Primary guardian name, phone and email are required", description: "Guardian email is essential for emergency notifications.", variant: "destructive" });
       return;
     }
 
@@ -179,6 +179,7 @@ const Register = () => {
             user_id: userId,
             guardian_name: g.name,
             guardian_phone: g.phone,
+            guardian_email: g.email || null,
             relation: g.relation || null,
             is_primary: i === 0,
           }));
@@ -366,12 +367,16 @@ const Register = () => {
                 </button>
               )}
               <div>
-                <Label className="text-xs">Name</Label>
+                <Label className="text-xs">Name *</Label>
                 <Input placeholder="Guardian name" className="text-base min-h-[48px]" value={g.name} onChange={(e) => updateGuardian(i, "name", e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs">Phone</Label>
+                <Label className="text-xs">Phone *</Label>
                 <Input placeholder="Phone number" className="text-base min-h-[48px]" value={g.phone} onChange={(e) => updateGuardian(i, "phone", e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Email {i === 0 ? "*" : "(for notifications)"}</Label>
+                <Input placeholder="guardian@email.com" type="email" className="text-base min-h-[48px]" value={g.email} onChange={(e) => updateGuardian(i, "email", e.target.value)} />
               </div>
               <div>
                 <Label className="text-xs">Relation</Label>
