@@ -62,6 +62,8 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       conditions: hpRes.data?.chronic_conditions ?? [],
       medications: hpRes.data?.current_medications ?? [],
       doctorName: apRes.data?.doctor_name ?? null,
+      familyDoctorName: (hpRes.data as any)?.family_doctor_name ?? null,
+      familyDoctorPhone: (hpRes.data as any)?.family_doctor_phone ?? null,
     });
     setGuardians(gRes.data ?? []);
     setUserName(profileRes.data?.full_name ?? "User");
