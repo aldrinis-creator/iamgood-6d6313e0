@@ -69,9 +69,14 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     return () => clearTimeout(timer);
   }, [counting, timeLeft]);
 
+  const vibrate = (pattern: number | number[]) => {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  };
+
   useEffect(() => {
     if (counting && timeLeft === 0) {
       triggerSOS();
+      vibrate([200, 100, 200, 100, 400]);
       setSent(true);
       setCounting(false);
     }
