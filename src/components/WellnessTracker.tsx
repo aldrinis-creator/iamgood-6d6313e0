@@ -502,11 +502,9 @@ const WellnessTracker = () => {
                   disabled={isDimmed}
                   onClick={() => {
                     if (isActive) {
-                      setActiveExercise(null);
-                      setExerciseTimer(0);
+                      stopExercise();
                     } else {
-                      setActiveExercise(i);
-                      setExerciseTimer(0);
+                      startExercise(i);
                     }
                   }}
                   className={`p-3 rounded-lg border text-left transition-all ${
