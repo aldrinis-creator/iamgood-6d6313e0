@@ -40,7 +40,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     const [hpRes, gRes, apRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("id").eq("user_id", uid),
+      supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
