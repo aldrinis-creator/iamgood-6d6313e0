@@ -303,14 +303,53 @@ const ActivityTracker = () => {
           <Activity className="w-5 h-5 text-primary" />
           Activity Tracker
         </h2>
-        <Button size="sm" onClick={() => setShowForm(!showForm)} variant={showForm ? "outline" : "default"}>
-          {showForm ? "Cancel" : "Log Today"}
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant={showGoals ? "outline" : "secondary"} onClick={() => { setShowGoals(!showGoals); if (showForm) setShowForm(false); }}>
+            <Target className="w-4 h-4 mr-1" />
+            {showGoals ? "Close" : "Goals"}
+          </Button>
+          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "default"}>
+            {showForm ? "Cancel" : "Log Today"}
+          </Button>
+        </div>
       </div>
 
-      {/* Summary Cards — 3×3 grid */}
-      <div className="grid grid-cols-3 gap-2">
-        {METRICS.map((m) => {
+      {/* Goals Editor */}
+      {showGoals && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              Set Daily Goals
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              {METRIC_DEFS.map((m) => (
+                <div key={m.key}>
+                  <Label className="text-[10px]">{m.label}{m.unit ? ` (${m.unit})` : ""}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={goalDraft[m.key]}
+                    onChange={(e) => setGoalDraft(prev => ({ ...prev, [m.key]: Number(e.target.value) || 1 }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                updateSetting("activityGoals", goalDraft);
+                setShowGoals(false);
+                toast({ title: "Goals Updated", description: "Your daily targets have been saved." });
+              }}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Goals
+            </Button>
+          </CardContent>
+        </Card>
+      )
           const val = getValue(m.key);
           const pct = Math.round(Math.min((val / m.goal) * 100, 100));
           return (
