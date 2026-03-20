@@ -8,6 +8,7 @@ import FallDetectionOverlay from "@/components/FallDetectionOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
+import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
 
