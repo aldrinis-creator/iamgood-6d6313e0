@@ -76,11 +76,20 @@ const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; 
 const ActivityTracker = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings, updateSetting } = useUserSettings();
+  const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("daily");
   const [trendData, setTrendData] = useState<ActivityLog[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
+  const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
+
+  // Sync draft when settings load
+  useEffect(() => { setGoalDraft(goals); }, [JSON.stringify(goals)]);
+
+  const METRICS = useMemo(() => METRIC_DEFS.map(m => ({ ...m, goal: goals[m.key] })), [goals]);
 
   // Form state
   const [form, setForm] = useState({
