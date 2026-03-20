@@ -414,6 +414,51 @@ const ActivityTracker = () => {
         </Card>
       )}
 
+      {/* Active Session Card */}
+      {sessionActive && (
+        <Card className="border-primary">
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary animate-pulse" />
+              {sessionExerciseType} Session
+            </h3>
+            <div>
+              <Label className="text-[10px]">Exercise Type</Label>
+              <Select value={sessionExerciseType} onValueChange={setSessionExerciseType}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXERCISE_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-3xl font-bold font-mono tracking-wider">{formatTimer(sessionElapsed)}</p>
+              <p className="text-xs text-muted-foreground">~{estimatedCalories} kcal burned</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setSessionPaused(!sessionPaused)}
+              >
+                {sessionPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
+                {sessionPaused ? "Resume" : "Pause"}
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleStopSession}
+              >
+                <Square className="w-4 h-4 mr-1" />
+                Stop
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Cards — 3×3 grid */}
       <div className="grid grid-cols-3 gap-2">
         {METRICS.map((m) => {
