@@ -28,7 +28,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [medical, setMedical] = useState<MedicalInfo>({
     bloodGroup: null, allergies: [], conditions: [], medications: [], doctorName: null,
   });
-  const [guardianCount, setGuardianCount] = useState(0);
+  const [guardians, setGuardians] = useState<{ guardian_name: string; guardian_phone: string; relation: string | null }[]>([]);
   const [toggles, setToggles] = useState({ blood: true, allergies: true, conditions: true, doctor: true });
   const [counting, setCounting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
