@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings";
 
 interface CategoryScore {
   name: string;
