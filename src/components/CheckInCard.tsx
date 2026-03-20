@@ -6,6 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import CheckInDialog from "@/components/CheckInDialog";
 
 const CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
 
@@ -77,6 +78,7 @@ const CheckInCard = () => {
   const [timeLeft, setTimeLeft] = useState("");
   const [isApproaching, setIsApproaching] = useState(false);
   const [approachingMinutes, setApproachingMinutes] = useState(0);
+  const [showDialog, setShowDialog] = useState(false);
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
@@ -234,6 +236,7 @@ const CheckInCard = () => {
     : formatHour(nextCheckIn.getHours());
 
   return (
+    <>
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
         {isApproaching && !checkedIn && getCurrentWindow() === null ? (
@@ -262,7 +265,7 @@ const CheckInCard = () => {
               {userName}, did you Check-In today?
             </p>
             <button
-              onClick={handleCheckIn}
+              onClick={() => setShowDialog(true)}
               disabled={loading}
               className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
@@ -308,6 +311,13 @@ const CheckInCard = () => {
         </div>
       </CardContent>
     </Card>
+
+    <CheckInDialog
+      open={showDialog}
+      onClose={() => setShowDialog(false)}
+      onConfirmOk={handleCheckIn}
+    />
+    </>
   );
 };
 
