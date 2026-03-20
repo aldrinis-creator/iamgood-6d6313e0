@@ -1,26 +1,43 @@
 
 
-# Customizable Daily Goals for Activity Tracker
+# Add Real-Time "Start Session" Workout Tracker
 
-## Approach
-Store user-customizable goals in the existing `user_settings` table (inside the `settings` JSONB column), alongside other user preferences. No database migration needed.
+## Overview
+Add a "Start Session" button that launches a live workout session with a running timer, exercise type selection, and Start/Pause/Stop controls. When stopped, the session duration is saved to today's activity log (adding to `exercise_minutes` and `active_minutes`). The existing "Log Today" manual entry remains available for other metrics.
 
-## Changes
+## No Database Changes
+The existing `activity_logs` table already has `exercise_minutes`, `exercise_type`, and `active_minutes` columns — sufficient for session data.
 
-### 1. `src/hooks/useUserSettings.ts`
-- Add `activityGoals` to `UserSettings` interface with keys matching each metric (steps, heart_rate, calories, etc.)
-- Set defaults matching current hardcoded values (steps: 10000, calories: 500, etc.)
+## Changes to `src/components/ActivityTracker.tsx`
 
-### 2. `src/components/ActivityTracker.tsx`
-- Import and use `useUserSettings` to get user goals
-- Replace hardcoded `goal` values in `METRICS` with dynamic values from settings
-- Add a "Set Goals" button (Target icon) next to "Log Today"
-- Add a goals editing dialog/card with number inputs for each metric's daily target
-- On save, call `updateSetting("activityGoals", newGoals)` to persist
+### New State & Logic
+- Add session state: `sessionActive`, `sessionPaused`, `sessionStartTime`, `sessionElapsed`, `sessionExerciseType`
+- Use `useRef` for an interval that ticks every second, updating elapsed time
+- Pause/resume toggles the interval
+- Stop calculates total minutes, adds them to today's form values (`exercise_minutes`, `active_minutes`), and auto-saves
 
-### UI Details
-- Goals editor shown as a collapsible card (similar to the log form toggle)
-- Each metric gets a labeled number input with its current goal pre-filled
-- Save button persists to `user_settings` via the existing debounced hook
-- Summary cards and radial progress rings immediately reflect custom goals
+### UI Changes
+- Replace "Log Today" with a prominent **"Start Session"** button (Play icon) when no session is active
+- Keep "Log Today" as a secondary action (renamed to "Manual Log") for entering sleep, heart rate, SpO2, etc.
+- When session is active, show a **Session Card** with:
+  - Exercise type selector (Walking, Running, Yoga, etc.)
+  - Live elapsed timer (MM:SS format)
+  - Pause/Resume button and Stop button
+  - Estimated calories (basic calculation: ~5 kcal/min for moderate activity)
+- On Stop: show a brief session summary, then save to today's log
+
+### Button Layout
+```text
+[ Goals ]  [ Manual Log ]  [ ▶ Start Session ]
+```
+When session active:
+```text
+┌─────────────────────────────┐
+│  🏃 Running Session         │
+│  Exercise: [Walking ▼]      │
+│  ⏱ 12:34                    │
+│  ~62 kcal burned             │
+│  [ ⏸ Pause ]  [ ⏹ Stop ]   │
+└─────────────────────────────┘
+```
 
