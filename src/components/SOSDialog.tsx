@@ -206,6 +206,26 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           <InfoToggle icon={<AlertCircle className="w-4 h-4 text-destructive/70" />} label="Allergies" value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"} checked={toggles.allergies} onToggle={() => toggle("allergies")} />
           <InfoToggle icon={<Pill className="w-4 h-4 text-primary" />} label="Conditions" value={[...medical.conditions, ...medical.medications].length > 0 ? [...medical.conditions, ...medical.medications].join(", ") : "None"} checked={toggles.conditions} onToggle={() => toggle("conditions")} />
           <InfoToggle icon={<Stethoscope className="w-4 h-4 text-success" />} label="Doctor" value={medical.doctorName || "Not set"} checked={toggles.doctor} onToggle={() => toggle("doctor")} />
+          {medical.familyDoctorName && (
+            <div className="flex items-center justify-between bg-success/10 rounded-lg p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Stethoscope className="w-4 h-4 text-success" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Family Doctor</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {medical.familyDoctorName}{medical.familyDoctorPhone ? ` · ${medical.familyDoctorPhone}` : ""}
+                  </p>
+                </div>
+              </div>
+              {medical.familyDoctorPhone && (
+                <a href={`tel:${medical.familyDoctorPhone}`}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
+                    <Phone className="w-4 h-4" />
+                  </Button>
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Guardians list */}
