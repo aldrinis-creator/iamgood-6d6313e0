@@ -80,7 +80,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
-  const [guardians, setGuardians] = useState([{ name: "", phone: "", relation: "" }]);
+  const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
   const progressPercent = (step / totalSteps) * 100;
