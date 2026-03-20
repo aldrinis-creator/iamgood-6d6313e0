@@ -19,6 +19,8 @@ interface MedicalInfo {
   conditions: string[];
   medications: string[];
   doctorName: string | null;
+  familyDoctorName: string | null;
+  familyDoctorPhone: string | null;
 }
 
 interface Guardian {
@@ -33,6 +35,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
   const [medical, setMedical] = useState<MedicalInfo>({
     bloodGroup: null, allergies: [], conditions: [], medications: [], doctorName: null,
+    familyDoctorName: null, familyDoctorPhone: null,
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [toggles, setToggles] = useState({ blood: true, allergies: true, conditions: true, doctor: true });
@@ -47,7 +50,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     const uid = session.user.id;
 
     const [hpRes, gRes, apRes, profileRes] = await Promise.all([
-      supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications").eq("user_id", uid).maybeSingle(),
+      supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
@@ -59,6 +62,8 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       conditions: hpRes.data?.chronic_conditions ?? [],
       medications: hpRes.data?.current_medications ?? [],
       doctorName: apRes.data?.doctor_name ?? null,
+      familyDoctorName: (hpRes.data as any)?.family_doctor_name ?? null,
+      familyDoctorPhone: (hpRes.data as any)?.family_doctor_phone ?? null,
     });
     setGuardians(gRes.data ?? []);
     setUserName(profileRes.data?.full_name ?? "User");
@@ -125,6 +130,10 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       msg += `\n💊 Conditions: ${[...medical.conditions, ...medical.medications].join(", ")}`;
     }
     if (toggles.doctor && medical.doctorName) msg += `\n🩺 Doctor: ${medical.doctorName}`;
+    if (medical.familyDoctorName) {
+      msg += `\n👨‍⚕️ Family Doctor: ${medical.familyDoctorName}`;
+      if (medical.familyDoctorPhone) msg += ` (${medical.familyDoctorPhone})`;
+    }
     msg += "\n\nPlease respond immediately!";
     return msg;
   };
@@ -197,6 +206,26 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           <InfoToggle icon={<AlertCircle className="w-4 h-4 text-destructive/70" />} label="Allergies" value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"} checked={toggles.allergies} onToggle={() => toggle("allergies")} />
           <InfoToggle icon={<Pill className="w-4 h-4 text-primary" />} label="Conditions" value={[...medical.conditions, ...medical.medications].length > 0 ? [...medical.conditions, ...medical.medications].join(", ") : "None"} checked={toggles.conditions} onToggle={() => toggle("conditions")} />
           <InfoToggle icon={<Stethoscope className="w-4 h-4 text-success" />} label="Doctor" value={medical.doctorName || "Not set"} checked={toggles.doctor} onToggle={() => toggle("doctor")} />
+          {medical.familyDoctorName && (
+            <div className="flex items-center justify-between bg-success/10 rounded-lg p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Stethoscope className="w-4 h-4 text-success" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Family Doctor</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {medical.familyDoctorName}{medical.familyDoctorPhone ? ` · ${medical.familyDoctorPhone}` : ""}
+                  </p>
+                </div>
+              </div>
+              {medical.familyDoctorPhone && (
+                <a href={`tel:${medical.familyDoctorPhone}`}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
+                    <Phone className="w-4 h-4" />
+                  </Button>
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Guardians list */}

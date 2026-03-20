@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format, differenceInYears } from "date-fns";
 import { Save, Loader2, UserCog, Droplets, Activity, Apple, Target, CalendarIcon, Ruler, Wine, Cigarette, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import VaultGate from "@/components/VaultGate";
 
 interface PersonaData {
   diet_type: string;
@@ -131,7 +132,7 @@ const ChipPicker = ({
   );
 };
 
-const MyPersona = () => {
+const MyPersonaContent = () => {
   const { user, profile } = useAuth();
   const [persona, setPersona] = useState<PersonaData>(defaultPersona);
   const [loading, setLoading] = useState(true);
@@ -409,6 +410,14 @@ const MyPersona = () => {
         Save Persona
       </Button>
     </div>
+  );
+};
+
+const MyPersona = () => {
+  return (
+    <VaultGate title="My Persona">
+      <MyPersonaContent />
+    </VaultGate>
   );
 };
 
