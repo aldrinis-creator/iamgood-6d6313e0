@@ -521,9 +521,20 @@ const WellnessTracker = () => {
             })}
           </div>
           {form.mindfulness_minutes > 0 && (
-            <p className="text-xs text-success text-center">
-              🧘 {form.mindfulness_minutes} min of mindfulness today
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-success text-center">
+                🧘 {form.mindfulness_minutes} min of mindfulness today
+              </p>
+              <Button
+                onClick={saveWellnessScore}
+                disabled={saving}
+                size="sm"
+                className="w-full bg-success hover:bg-success/90 text-white"
+              >
+                <Award className="w-4 h-4 mr-2" />
+                {saving ? "Saving…" : "Add to Wellness Score"}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
