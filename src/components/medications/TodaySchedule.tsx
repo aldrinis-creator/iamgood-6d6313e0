@@ -26,6 +26,19 @@ interface DoseSlot {
   takenAt: string | null;
 }
 
+const notifyGuardians = async (userId: string, medicationName: string, status: string, scheduledTime: string) => {
+  try {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+      body: JSON.stringify({ user_id: userId, medication_name: medicationName, status, scheduled_time: scheduledTime }),
+    });
+  } catch {
+    // silent fail — guardian notification is best-effort
+  }
+};
+
 const TodaySchedule = () => {
   const { session } = useAuth();
   const [doses, setDoses] = useState<DoseSlot[]>([]);
@@ -38,7 +51,6 @@ const TodaySchedule = () => {
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
 
-    // Fetch medications
     const { data: meds, error: medErr } = await supabase
       .from("medications")
       .select("id, name, dosage, instructions, schedule_times, remaining_quantity")
@@ -50,7 +62,6 @@ const TodaySchedule = () => {
       return;
     }
 
-    // Fetch today's logs
     const { data: logs } = await supabase
       .from("medication_logs")
       .select("id, medication_id, scheduled_at, taken_at, status")
@@ -84,7 +95,6 @@ const TodaySchedule = () => {
           logId = log.id;
           takenAt = log.taken_at;
         } else {
-          // Auto-mark missed if > 1 hour past
           const diffMin = differenceInMinutes(now, scheduledAt);
           if (diffMin > 60) {
             status = "missed";
@@ -102,16 +112,14 @@ const TodaySchedule = () => {
       }
     }
 
-    // Sort: current hour first, then upcoming, then past/missed
     slots.sort((a, b) => {
       const nowMs = now.getTime();
-      const aDiff = Math.abs(a.scheduledAt.getTime() - nowMs);
-      const bDiff = Math.abs(b.scheduledAt.getTime() - nowMs);
       const aIsCurrent = Math.abs(differenceInMinutes(now, a.scheduledAt)) <= 60;
       const bIsCurrent = Math.abs(differenceInMinutes(now, b.scheduledAt)) <= 60;
-
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
+      const aDiff = Math.abs(a.scheduledAt.getTime() - nowMs);
+      const bDiff = Math.abs(b.scheduledAt.getTime() - nowMs);
       return aDiff - bDiff;
     });
 
@@ -137,10 +145,7 @@ const TodaySchedule = () => {
 
     try {
       if (slot.logId) {
-        await supabase
-          .from("medication_logs")
-          .update({ status: "taken", taken_at: now.toISOString() })
-          .eq("id", slot.logId);
+        await supabase.from("medication_logs").update({ status: "taken", taken_at: now.toISOString() }).eq("id", slot.logId);
       } else {
         await supabase.from("medication_logs").insert({
           medication_id: slot.medication.id,
@@ -151,13 +156,13 @@ const TodaySchedule = () => {
         });
       }
 
-      // Decrement remaining_quantity
       await supabase
         .from("medications")
         .update({ remaining_quantity: Math.max(0, slot.medication.remaining_quantity - 1) })
         .eq("id", slot.medication.id);
 
       toast.success(`${slot.medication.name} marked as taken`);
+      notifyGuardians(session.user.id, slot.medication.name, "taken", slot.scheduledAt.toISOString());
       loadSchedule();
     } catch {
       toast.error("Failed to update");
@@ -178,6 +183,7 @@ const TodaySchedule = () => {
         });
       }
       toast.info(`${slot.medication.name} skipped`);
+      notifyGuardians(session.user.id, slot.medication.name, "skipped", slot.scheduledAt.toISOString());
       loadSchedule();
     } catch {
       toast.error("Failed to update");
@@ -226,7 +232,7 @@ const TodaySchedule = () => {
                   <Badge variant="default" className="text-[10px] mt-1">NOW</Badge>
                 )}
                 {slot.status === "missed" && (
-                  <Badge variant="destructive" className="text-[10px] mt-1">MISSED</Badge>
+                  <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
                 )}
                 {slot.status === "taken" && (
                   <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
@@ -242,7 +248,7 @@ const TodaySchedule = () => {
                   <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
                 )}
               </div>
-              {slot.status === "pending" && (
+              {slot.status === "pending" && isCurrent && (
                 <div className="flex gap-1 shrink-0">
                   <Button size="icon" variant="default" className="h-8 w-8" onClick={() => markTaken(slot)}>
                     <Check className="w-4 h-4" />
@@ -251,6 +257,9 @@ const TodaySchedule = () => {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
+              )}
+              {slot.status === "pending" && !isCurrent && isPast && (
+                <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
               )}
               {slot.status === "missed" && (
                 <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
