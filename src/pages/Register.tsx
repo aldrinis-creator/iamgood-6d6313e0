@@ -148,8 +148,8 @@ const Register = () => {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
-    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone)) {
-      toast({ title: "Primary guardian name and phone are required", variant: "destructive" });
+    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
+      toast({ title: "Primary guardian name, phone and email are required", description: "Guardian email is essential for emergency notifications.", variant: "destructive" });
       return;
     }
 
