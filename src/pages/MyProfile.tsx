@@ -110,7 +110,7 @@ const ProfileContent = () => {
     if (!userId) return;
 
     const [guardianRes, healthRes, docsRes, pinRes] = await Promise.all([
-      supabase.from("guardians").select("*").eq("user_id", userId).eq("is_primary", true).limit(1),
+      supabase.from("guardians").select("*").eq("user_id", userId).order("is_primary", { ascending: false }),
       supabase.from("health_profile").select("*").eq("user_id", userId).limit(1),
       supabase.from("encrypted_documents").select("*").eq("user_id", userId),
       supabase.from("vault_pins").select("*").eq("user_id", userId).limit(1),
