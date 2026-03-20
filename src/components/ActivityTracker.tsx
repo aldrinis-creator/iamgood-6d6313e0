@@ -360,14 +360,20 @@ const ActivityTracker = () => {
           <Activity className="w-5 h-5 text-primary" />
           Activity Tracker
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant={showGoals ? "outline" : "secondary"} onClick={() => { setShowGoals(!showGoals); if (showForm) setShowForm(false); }}>
             <Target className="w-4 h-4 mr-1" />
             {showGoals ? "Close" : "Goals"}
           </Button>
-          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "default"}>
-            {showForm ? "Cancel" : "Log Today"}
+          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "secondary"}>
+            {showForm ? "Cancel" : "Manual Log"}
           </Button>
+          {!sessionActive && (
+            <Button size="sm" onClick={handleStartSession}>
+              <Play className="w-4 h-4 mr-1" />
+              Start Session
+            </Button>
+          )}
         </div>
       </div>
 
