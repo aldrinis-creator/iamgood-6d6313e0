@@ -1,50 +1,55 @@
-# Fix Check-In Alerts: Connect Settings to Audio + Add Visual Alerts
 
-## Root Cause
 
-There are **three disconnected problems**:
+# Redesign SOS as a Dialog with Medical Info & 30s Countdown
 
-1. **Settings toggles don't control audio** — The Settings page writes `audioAlerts` and `voiceReminders` to the database (`user_settings.settings` JSONB), but `useCheckInAudio` reads from a **different** localStorage key (`checkin-audio-mode`) via `getAudioMode()`. These are never synced, and `getAudioMode()` defaults to `"off"`.
-2. **No visual alerts (toasts)** — When a check-in is due or missed, there's no toast notification shown to the user. Only the CheckInCard UI changes passively.
-3. **Narrow audio window** — Audio only fires within the first 2 minutes of the check-in hour. If the app loads after that, nothing happens. No repeat nudges.
+## Current State
+- SOS button triggers a full-screen red overlay (`EmergencyModeOverlay`) with a 5s countdown
+- No medical info shown, no toggles for what to share, no "Call 112" prominent button
+- `triggerSOS` in AppContext fires immediately on button press — no pre-send dialog
 
-## Plan
+## New Design (from screenshots)
 
-### 1. Bridge settings to audio mode (`src/hooks/useCheckInAudio.ts`)
+The SOS button should open a **dialog/sheet** (not immediately trigger emergency mode). The dialog shows:
 
-Instead of reading `getAudioMode()` from localStorage, read the user's actual settings:
+1. **Header**: "Emergency SOS" with close X, description text
+2. **"Call 112 Emergency Services"** — big red button (tel: link)
+3. **Divider**: "OR ALERT YOUR EMERGENCY CONTACTS"
+4. **Location note**: "Location will be included in message"
+5. **Medical info section** with toggles (data from `health_profile` + `appointments`):
+   - Blood Type (from `health_profile.blood_group`)
+   - Allergies (from `health_profile.allergies`)
+   - Conditions (from `health_profile.chronic_conditions` + `health_profile.current_medications`)
+   - Doctor (from most recent `appointments.doctor_name`)
+6. **Guardian count**: "N guardian(s) will receive your SOS via SMS & WhatsApp"
+7. **Send SOS button** → starts 30s countdown with progress bar and Cancel button
+8. On countdown expiry → calls `triggerSOS()` from AppContext
 
-- Import `useUserSettings`
-- If `settings.voiceReminders` is true → use voice mode
-- If `settings.audioAlerts` is true → use chime mode
-- Otherwise → off
-- Remove the dependency on the orphaned localStorage key
+## Flow Change
+- **SOS button tap** → opens SOS dialog (does NOT immediately trigger emergency)
+- User reviews medical info toggles, then taps "Send SOS Alert"
+- 30s countdown begins with cancel option
+- If countdown expires → `triggerSOS()` fires, dialog closes
 
-### 2. Add toast + repeat nudges (`src/hooks/useCheckInAudio.ts`)
+## Files to Change
 
-- When a check-in is due (current hour matches a CHECK_IN_HOURS), show a **toast notification** ("Time for your Check-iN! Tap the heart.") in addition to audio
-- Fire the alert within the first **5 minutes** (not 2) of the window
-- Add a **missed check-in nudge**: if 30+ minutes past a check-in hour and no response recorded, show a warning toast ("You missed your 12:00 PM Check-iN") and play the alert again and trigger a SOS to the guardians with location, last recorded health details and call button for flash call to User by email and SMS / WhatsApp (when this made available)  
-- Query `check_ins` status to know if already responded (avoid alerting after check-in)
+### `src/components/SOSButton.tsx`
+- Instead of calling `triggerSOS` directly, set state to open the SOS dialog
+- Render the new `SOSDialog` component
 
-### 3. Add vibration support (`src/hooks/useCheckInAudio.ts`)
+### `src/components/SOSDialog.tsx` (new)
+- Sheet/dialog component with all the UI from screenshots
+- Fetches `health_profile`, `guardians`, recent `appointments` (doctor name) on mount
+- Medical info toggles (blood type, allergies, conditions, doctor) — all ON by default
+- "Send SOS Alert" button starts 30s countdown
+- Countdown section: red border card with "Sending SOS in Xs", progress bar, Cancel button
+- On expiry: calls `triggerSOS()`, shows confirmation
 
-- If `settings.vibration` is true, call `navigator.vibrate([200, 100, 200])` alongside audio alerts
+### `src/components/EmergencyModeOverlay.tsx`
+- Remove — replaced by the new dialog flow. Or keep as a minimal "Alert Sent" confirmation that auto-dismisses.
 
-### 4. Remove orphaned localStorage audio mode (`src/lib/audioAlerts.ts`)
+### `src/contexts/AppContext.tsx`
+- No changes needed — `triggerSOS` and `cancelSOS` remain as-is
 
-- Keep `playChime()` and `playVoiceReminder()` utility functions
-- Remove `getAudioMode()`, `setAudioMode()`, `testAlert()` as they use the disconnected localStorage — replace callers with the settings-based approach
-- Update `AlarmSettings.tsx` and `CheckInCard.tsx` to use `useUserSettings` instead of `getAudioMode()`
+## No database changes needed
+All data already exists in `health_profile`, `guardians`, and `appointments` tables.
 
-### Files Changed
-
-- `src/hooks/useCheckInAudio.ts` — rewrite to use `useUserSettings`, add toasts, vibration, missed detection
-- `src/lib/audioAlerts.ts` — remove orphaned localStorage functions, keep play utilities
-- `src/components/CheckInCard.tsx` — remove direct `getAudioMode()` calls, use settings
-- `src/components/medications/AlarmSettings.tsx` — update test alarm to not use removed functions
-- `src/pages/GuardianDashboard.tsx` — update audio import if needed
-
-### No database changes needed
-
-All check-in status data already exists in the `check_ins` table.
