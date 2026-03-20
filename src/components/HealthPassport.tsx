@@ -149,10 +149,17 @@ const HealthPassport = () => {
     };
   }, [computeScores]);
 
-  const handleAction = (cat: CategoryScore) => {
-    if (cat.name === "Face Scan" && cat.action) {
-      navigate("/my-health");
-    }
+  const categoryRoutes: Record<string, string> = {
+    "Check-iN": "/dashboard",
+    "Face Scan": "/my-health?tool=Face Scan",
+    "Activity": "/my-health?tool=Activity",
+    "Wellness": "/my-health?tool=Wellness",
+    "Medications": "/my-health?tool=Tablets",
+  };
+
+  const handleCategoryTap = (cat: CategoryScore) => {
+    const route = categoryRoutes[cat.name];
+    if (route) navigate(route);
   };
 
   return (
