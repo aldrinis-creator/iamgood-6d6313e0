@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   HeartPulse, Smile, Frown, Meh, Laugh, Angry,
   Moon, Zap, Brain, Save, Wind, Flower2, Music, Eye,
-  TrendingUp, TrendingDown, Minus,
+  TrendingUp, TrendingDown, Minus, Volume2, VolumeX, Award,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
-
+import { startMindfulnessAudio, stopMindfulnessAudio } from "@/lib/mindfulnessAudio";
 const MOODS = [
   { key: "great", label: "Great", icon: Laugh, color: "text-success" },
   { key: "good", label: "Good", icon: Smile, color: "text-success" },
