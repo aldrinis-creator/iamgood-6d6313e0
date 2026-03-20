@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Clock } from "lucide-react";
-import { playChime, playVoiceReminder, getAudioMode } from "@/lib/audioAlerts";
+import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -145,10 +145,7 @@ const CheckInCard = () => {
     const interval = setInterval(() => {
       const newWindow = getCurrentWindow();
       if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
-        // New check-in window opened — trigger audio alert
-        const mode = getAudioMode();
-        if (mode === "chime") playChime();
-        else if (mode === "voice") playVoiceReminder();
+        // Audio alerts are now handled by useCheckInAudio hook
       }
       prevWindowRef.current = newWindow;
       loadCurrentCheckIn();
