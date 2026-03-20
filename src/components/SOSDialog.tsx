@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill } from "lucide-react";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users } from "lucide-react";
 
 interface SOSDialogProps {
   open: boolean;
@@ -28,7 +28,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [medical, setMedical] = useState<MedicalInfo>({
     bloodGroup: null, allergies: [], conditions: [], medications: [], doctorName: null,
   });
-  const [guardianCount, setGuardianCount] = useState(0);
+  const [guardians, setGuardians] = useState<{ guardian_name: string; guardian_phone: string; relation: string | null }[]>([]);
   const [toggles, setToggles] = useState({ blood: true, allergies: true, conditions: true, doctor: true });
   const [counting, setCounting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
@@ -40,7 +40,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     const [hpRes, gRes, apRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("id").eq("user_id", uid),
+      supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
@@ -51,7 +51,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       medications: hpRes.data?.current_medications ?? [],
       doctorName: apRes.data?.doctor_name ?? null,
     });
-    setGuardianCount(gRes.data?.length ?? 0);
+    setGuardians(gRes.data ?? []);
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
             </div>
             <h2 className="text-xl font-bold text-foreground">SOS Alert Sent!</h2>
             <p className="text-muted-foreground text-sm">
-              Your {guardianCount} guardian(s) have been alerted with your location
+              Your {guardians.length} guardian(s) have been alerted with your location
               {toggles.blood && medical.bloodGroup ? " and medical info" : ""}.
             </p>
             <Button onClick={handleClose} variant="outline" className="mt-4">
@@ -188,10 +188,31 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           />
         </div>
 
-        {/* Guardian count */}
-        <p className="text-sm text-muted-foreground mb-4">
-          <span className="font-semibold text-foreground">{guardianCount}</span> guardian(s) will receive your SOS via SMS &amp; WhatsApp
-        </p>
+        {/* Guardians list */}
+        <div className="space-y-2 mb-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">
+              {guardians.length} Guardian(s) will receive your SOS
+            </h3>
+          </div>
+          {guardians.map((g, i) => (
+            <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
+              </div>
+              <a href={`tel:${g.guardian_phone}`}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
+          ))}
+          {guardians.length === 0 && (
+            <p className="text-xs text-muted-foreground">No guardians added yet</p>
+          )}
+        </div>
 
         {/* Countdown or Send button */}
         {counting ? (
