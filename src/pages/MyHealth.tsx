@@ -64,8 +64,17 @@ const toolComponents: Record<string, React.FC> = {
 };
 
 const MyHealth = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tool = searchParams.get("tool");
+    if (tool && (toolComponents[tool] || tool === "Health Tools")) {
+      setSelectedTool(tool);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // If a sub-tool is selected, render it
   if (selectedSubTool) {

@@ -227,11 +227,13 @@ const HealthPassport = () => {
                 </div>
               </div>
               {cat.action ? (
-                <button onClick={() => handleAction(cat)} className="ml-3 text-xs text-primary font-medium flex items-center">
+                <button onClick={() => handleCategoryTap(cat)} className="ml-3 text-xs text-primary font-medium flex items-center">
                   {cat.action} <ChevronRight className="w-3 h-3" />
                 </button>
               ) : (
-                <ChevronRight className="ml-3 w-4 h-4 text-muted-foreground" />
+                <button onClick={() => handleCategoryTap(cat)} className="ml-3">
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
               )}
             </div>
           ))}
