@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
 import HealthPassport from "@/components/HealthPassport";
-import HealthDashboard from "@/components/HealthDashboard";
+
 import AppLayout from "@/components/AppLayout";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -30,8 +30,6 @@ const UserDashboard = () => {
         {/* Check-In Card */}
         {!sleepMode && <CheckInCard />}
 
-        {/* Health Dashboard */}
-        <HealthDashboard />
 
         {/* Health Passport */}
         <HealthPassport />
