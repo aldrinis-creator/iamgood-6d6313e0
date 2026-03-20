@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserSettings, DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -35,6 +36,8 @@ const getBarColor = (score: number) => {
 const HealthPassport = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useUserSettings();
+  const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Face Scan", score: 0, max: 100, action: "Start Scan" },
@@ -87,10 +90,10 @@ const HealthPassport = () => {
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
-      const stepsP = Math.min((act.steps ?? 0) / 10000, 1) * 25;
-      const distP = Math.min((Number(act.distance_km) || 0) / 5, 1) * 25;
-      const calP = Math.min((act.calories ?? 0) / 500, 1) * 25;
-      const activeP = Math.min((act.active_minutes ?? 0) / 120, 1) * 25;
+      const stepsP = Math.min((act.steps ?? 0) / goals.steps, 1) * 25;
+      const distP = Math.min((Number(act.distance_km) || 0) / goals.distance_km, 1) * 25;
+      const calP = Math.min((act.calories ?? 0) / goals.calories, 1) * 25;
+      const activeP = Math.min((act.active_minutes ?? 0) / goals.active_minutes, 1) * 25;
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
