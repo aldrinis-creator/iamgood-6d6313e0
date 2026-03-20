@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import {
   User, Phone, Calendar, Scale, Ruler, Heart, Shield, Eye, EyeOff, Lock,
   Save, Edit, ShieldCheck, Stethoscope, Camera, Upload, X, FileText, Image,
+  Trash2, Mail, Plus, Loader2,
 } from "lucide-react";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { differenceInYears, parse } from "date-fns";
