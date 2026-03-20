@@ -55,8 +55,8 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   }, [fetchGuardians]);
 
   const handleAdd = async () => {
-    if (!userId || !name.trim() || !phone.trim()) {
-      toast.error("Name and phone are required");
+    if (!userId || !name.trim() || !phone.trim() || !email.trim()) {
+      toast.error("Name, phone and email are required for emergency notifications");
       return;
     }
     setAdding(true);
