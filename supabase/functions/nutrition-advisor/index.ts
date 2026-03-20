@@ -5,11 +5,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const jsonFormat = `IMPORTANT: You MUST respond ONLY with a valid JSON array. No markdown, no code fences, no extra text. Each item in the array is a meal/food object with these fields:
+- name (string): meal/food name
+- description (string): brief description
+- calories (number): total kcal
+- protein_g (number): grams of protein
+- carbs_g (number): grams of carbs
+- fats_g (number): grams of fat
+- fiber_g (number): grams of fiber
+- health_benefits (string[]): list of health benefit bullet points personalized to user
+- potential_issues (string[]): list of potential concerns personalized to user
+- health_rating (number 1-10): overall health rating for this user
+- suggestions (string[]): improvement tips
+
+Example: [{"name":"Oats Porridge","description":"Steel-cut oats with milk","calories":220,"protein_g":8,"carbs_g":38,"fats_g":4,"fiber_g":5,"health_benefits":["High fiber aids digestion"],"potential_issues":["Add protein source"],"health_rating":7,"suggestions":["Top with nuts"]}]`;
+
 const systemPrompts: Record<string, string> = {
-  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Include calories, macros, and preparation tips. Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals.`,
-  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown, macros (protein, carbs, fat, fiber), health rating (1-10), and suggestions for improvement. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions.`,
-  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals.`,
-  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully.`,
+  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals. Suggest 2-4 food items. ${jsonFormat}`,
+  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions. Return each distinct food item as a separate object. ${jsonFormat}`,
+  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals. Suggest 2-3 food items. ${jsonFormat}`,
+  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully. Suggest 2-3 food items. ${jsonFormat}`,
 };
 
 serve(async (req) => {
