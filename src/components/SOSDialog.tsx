@@ -19,6 +19,8 @@ interface MedicalInfo {
   conditions: string[];
   medications: string[];
   doctorName: string | null;
+  familyDoctorName: string | null;
+  familyDoctorPhone: string | null;
 }
 
 interface Guardian {
