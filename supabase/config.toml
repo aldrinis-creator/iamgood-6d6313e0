@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.notify-guardian-medication]
 verify_jwt = false
+
+[functions.send-sos-alert]
+verify_jwt = false
