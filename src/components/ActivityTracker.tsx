@@ -349,7 +349,11 @@ const ActivityTracker = () => {
             </Button>
           </CardContent>
         </Card>
-      )
+      )}
+
+      {/* Summary Cards — 3×3 grid */}
+      <div className="grid grid-cols-3 gap-2">
+        {METRICS.map((m) => {
           const val = getValue(m.key);
           const pct = Math.round(Math.min((val / m.goal) * 100, 100));
           return (
