@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useFallDetection } from "@/hooks/useFallDetection";
 import { useApp } from "@/contexts/AppContext";
-import { AlertTriangle, X, Smartphone } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FallDetectionOverlay = () => {
@@ -15,25 +15,12 @@ const FallDetectionOverlay = () => {
     }
   }, [countdownExpired, triggerSOS, cancelFallAlert]);
 
-  // Show permission prompt for iOS users
-  if (enabled && permissionState === "unknown") {
-    return (
-      <div className="fixed bottom-24 left-4 right-4 z-[90] bg-card border border-border rounded-xl p-4 shadow-lg animate-in slide-in-from-bottom duration-300 max-w-md mx-auto">
-        <div className="flex items-start gap-3">
-          <Smartphone className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Motion Sensors Required</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Fall detection needs access to your device's motion sensors. Tap below to enable.
-            </p>
-            <Button onClick={requestPermission} size="sm" className="mt-3 w-full">
-              Enable Motion Sensors
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Auto-request iOS permission once when enabled (requires user gesture from Settings toggle)
+  useEffect(() => {
+    if (enabled && permissionState === "unknown") {
+      requestPermission();
+    }
+  }, [enabled, permissionState, requestPermission]);
 
   if (!fallDetected) return null;
 
