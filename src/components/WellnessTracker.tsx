@@ -472,13 +472,22 @@ const WellnessTracker = () => {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-foreground">{ex.label}</p>
-                <Button
-                  size="sm" variant="outline"
-                  onClick={() => { setActiveExercise(null); setExerciseTimer(0); }}
-                  className="border-destructive text-destructive hover:bg-destructive/10"
-                >
-                  Stop
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={toggleAudio}
+                    className="border-muted-foreground/30"
+                  >
+                    {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={stopExercise}
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                  >
+                    Stop
+                  </Button>
+                </div>
               </div>
             );
           })()}
