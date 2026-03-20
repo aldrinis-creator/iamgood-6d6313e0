@@ -506,7 +506,13 @@ const Settings = () => {
                     <p className="text-sm font-medium">Enable Fall Detection</p>
                     <p className="text-xs text-muted-foreground">Monitors accelerometer for sudden falls</p>
                   </div>
-                  <Switch checked={settings.fallDetection} onCheckedChange={(v) => updateSetting("fallDetection", v)} />
+                  <Switch checked={settings.fallDetection} onCheckedChange={async (v) => {
+                    updateSetting("fallDetection", v);
+                    if (v) {
+                      const { requestMotionPermission } = await import("@/hooks/useFallDetection");
+                      await requestMotionPermission();
+                    }
+                  }} />
                 </div>
                 {settings.fallDetection && (
                   <div className="flex items-center justify-between">

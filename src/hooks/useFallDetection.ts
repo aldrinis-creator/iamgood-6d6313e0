@@ -1,36 +1,37 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
-/**
- * Fall detection using the DeviceMotion API.
- *
- * Algorithm:
- * 1. Continuously monitor acceleration (including gravity).
- * 2. Compute the magnitude of the acceleration vector.
- * 3. A fall produces a characteristic signature:
- *    - Free-fall phase: magnitude drops well below 1g (~0–4 m/s²)
- *    - Impact phase: magnitude spikes above a threshold (~25–35 m/s²)
- * 4. If free-fall is detected followed by an impact within 500ms, we flag a fall.
- * 5. After impact, we wait 2s for any post-fall stillness confirmation.
- *
- * Thresholds are tuned to reduce false positives (dropping phone, sitting down hard).
- */
-
 const SENSITIVITY_MAP: Record<string, { freeFall: number; impact: number }> = {
-  high: { freeFall: 5, impact: 22 },
-  medium: { freeFall: 4, impact: 30 },
-  low: { freeFall: 2.5, impact: 38 },
+  high: { freeFall: 6, impact: 18 },
+  medium: { freeFall: 5, impact: 25 },
+  low: { freeFall: 3, impact: 35 },
 };
 
-const FREE_FALL_TO_IMPACT_WINDOW = 500; // ms
-const COOLDOWN = 30_000; // ms — don't re-trigger within 30s
+const FREE_FALL_TO_IMPACT_WINDOW = 800; // ms
+const COOLDOWN = 30_000;
 const COUNTDOWN_SECONDS = 15;
+
+/** Request iOS 13+ DeviceMotion permission. No-op on Android/desktop. */
+export async function requestMotionPermission(): Promise<"granted" | "denied" | "not-required"> {
+  const DME = DeviceMotionEvent as any;
+  if (typeof DME.requestPermission === "function") {
+    try {
+      const result = await DME.requestPermission();
+      return result === "granted" ? "granted" : "denied";
+    } catch {
+      return "denied";
+    }
+  }
+  // Android / desktop — no permission gate
+  return "not-required";
+}
 
 export function useFallDetection() {
   const { settings } = useUserSettings();
   const thresholds = SENSITIVITY_MAP[settings.fallSensitivity] || SENSITIVITY_MAP.medium;
   const [fallDetected, setFallDetected] = useState(false);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const [permissionState, setPermissionState] = useState<"unknown" | "granted" | "denied">("unknown");
 
   const freeFallTimeRef = useRef<number | null>(null);
   const lastTriggerRef = useRef(0);
@@ -38,6 +39,16 @@ export function useFallDetection() {
   const cancelledRef = useRef(false);
 
   const enabled = settings.fallDetection;
+
+  const requestPermission = useCallback(async () => {
+    const result = await requestMotionPermission();
+    if (result === "granted" || result === "not-required") {
+      setPermissionState("granted");
+    } else {
+      setPermissionState("denied");
+    }
+    return result;
+  }, []);
 
   const cancelFallAlert = useCallback(() => {
     cancelledRef.current = true;
@@ -54,7 +65,6 @@ export function useFallDetection() {
     setFallDetected(true);
     setCountdown(COUNTDOWN_SECONDS);
 
-    // Vibrate to alert user
     if (navigator.vibrate) {
       navigator.vibrate([500, 200, 500, 200, 500]);
     }
@@ -65,15 +75,26 @@ export function useFallDetection() {
           clearInterval(countdownRef.current);
           return 0;
         }
-        // Vibrate each tick
         if (navigator.vibrate) navigator.vibrate(200);
         return prev - 1;
       });
     }, 1000);
   }, []);
 
+  // Auto-request permission on mount when enabled
   useEffect(() => {
-    if (!enabled) return;
+    if (enabled && permissionState === "unknown") {
+      // Check if permission is needed (iOS) — we can't auto-request without gesture,
+      // but we can detect if it's NOT needed (Android/desktop)
+      const DME = DeviceMotionEvent as any;
+      if (typeof DME.requestPermission !== "function") {
+        setPermissionState("granted");
+      }
+    }
+  }, [enabled, permissionState]);
+
+  useEffect(() => {
+    if (!enabled || permissionState !== "granted") return;
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const acc = event.accelerationIncludingGravity;
@@ -111,7 +132,7 @@ export function useFallDetection() {
       window.removeEventListener("devicemotion", handleMotion);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [enabled, triggerFallAlert, thresholds]);
+  }, [enabled, permissionState, triggerFallAlert, thresholds]);
 
   return {
     fallDetected,
@@ -119,5 +140,7 @@ export function useFallDetection() {
     cancelFallAlert,
     countdownExpired: fallDetected && countdown === 0,
     enabled,
+    permissionState,
+    requestPermission,
   };
 }
