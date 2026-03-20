@@ -56,6 +56,7 @@ const DEFAULTS: UserSettings = {
   vibration: true,
   checkInPush: true,
   medPush: true,
+  activityGoals: DEFAULT_ACTIVITY_GOALS,
   guardianPush: true,
   weeklyReport: true,
   sleepMode: true,
