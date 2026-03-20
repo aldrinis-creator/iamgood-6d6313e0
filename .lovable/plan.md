@@ -1,34 +1,26 @@
 
 
-# Auto-Enable Motion Sensors — Remove Recurring Permission Prompt
+# Mindfulness Exercise: Full-Screen Timer with Single Exercise Lock
 
-## Problem
-The "Motion Sensors Required" banner appears frequently on non-iOS devices and nags users. On Android/desktop, no permission is needed. On iOS, the permission prompt requires a user gesture but should only be shown once, not repeatedly.
+## What Changes
 
-## Changes
+**File**: `src/components/WellnessTracker.tsx`
 
-### `src/hooks/useFallDetection.ts`
-- Change initial `permissionState` from `"unknown"` to `"granted"` by default
-- In the mount effect, only set to `"unknown"` if iOS permission API is detected AND permission hasn't been granted yet
-- Store permission result in `localStorage` so once granted on iOS, it's remembered and never asked again
+### 1. Single exercise at a time (already works)
+The current code already enforces one exercise at a time via `activeExercise` state. No logic change needed — clicking another exercise switches to it.
 
-### `src/components/FallDetectionOverlay.tsx`
-- Remove the persistent bottom banner for the permission prompt
-- Instead, only show a one-time subtle toast/notification on iOS if permission is truly needed, or fold the permission request into Settings where fall detection is toggled on
+### 2. Large full-screen timer display
+When an exercise is active, show a prominent overlay/expanded view above the exercise grid:
+- Large circular timer display with the elapsed time in big font (e.g. `text-5xl font-bold`)
+- Exercise name and a circular progress ring showing completion percentage
+- A "Stop" button to cancel the exercise
+- Disable (dim) the other exercise buttons while one is running so only one can be active
 
-## Technical Detail
-```typescript
-// useFallDetection.ts — default to granted, only check iOS
-const [permissionState, setPermissionState] = useState<"unknown" | "granted" | "denied">(() => {
-  const DME = DeviceMotionEvent as any;
-  if (typeof DME.requestPermission !== "function") return "granted"; // Android/desktop
-  if (localStorage.getItem("motion_permission") === "granted") return "granted";
-  return "unknown";
-});
-
-// After successful iOS permission grant:
-localStorage.setItem("motion_permission", "granted");
-```
-
-The overlay banner block (`if (enabled && permissionState === "unknown")`) will be removed entirely. On iOS, the permission will be requested automatically when fall detection is first enabled in Settings (via the existing toggle handler).
+### Technical Approach
+- Add a conditional block above the grid: when `activeExercise !== null`, render a centered timer card with:
+  - Exercise icon + label
+  - Large `formatTimer(exerciseTimer)` in `text-5xl`
+  - Circular progress using SVG circle with `stroke-dashoffset`
+  - Stop button that resets `activeExercise` and `exerciseTimer`
+- Dim non-active exercise buttons with `opacity-40 pointer-events-none`
 
