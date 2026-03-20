@@ -49,6 +49,7 @@ export function useFallDetection() {
     const result = await requestMotionPermission();
     if (result === "granted" || result === "not-required") {
       setPermissionState("granted");
+      try { localStorage.setItem("motion_permission", "granted"); } catch {}
     } else {
       setPermissionState("denied");
     }
