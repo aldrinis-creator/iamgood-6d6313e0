@@ -85,9 +85,66 @@ const ActivityTracker = () => {
   const [showForm, setShowForm] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionPaused, setSessionPaused] = useState(false);
+  const [sessionElapsed, setSessionElapsed] = useState(0);
+  const [sessionExerciseType, setSessionExerciseType] = useState("Walking");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sync draft when settings load
   useEffect(() => { setGoalDraft(goals); }, [JSON.stringify(goals)]);
+
+  // Timer interval
+  useEffect(() => {
+    if (sessionActive && !sessionPaused) {
+      timerRef.current = setInterval(() => {
+        setSessionElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [sessionActive, sessionPaused]);
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  const estimatedCalories = Math.round(sessionElapsed / 60 * 5);
+
+  const handleStartSession = () => {
+    setSessionActive(true);
+    setSessionPaused(false);
+    setSessionElapsed(0);
+    if (showForm) setShowForm(false);
+    if (showGoals) setShowGoals(false);
+  };
+
+  const handleStopSession = async () => {
+    setSessionActive(false);
+    setSessionPaused(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+    const minutes = Math.round(sessionElapsed / 60);
+    // Add session minutes to today's form values
+    setForm((prev) => ({
+      ...prev,
+      exercise_minutes: prev.exercise_minutes + minutes,
+      active_minutes: prev.active_minutes + minutes,
+      calories: prev.calories + estimatedCalories,
+      exercise_type: sessionExerciseType,
+    }));
+    // Auto-save after state update
+    setTimeout(async () => {
+      await handleSave();
+      toast({
+        title: "Session Complete",
+        description: `${formatTimer(sessionElapsed)} — ${minutes} min, ~${estimatedCalories} kcal burned.`,
+      });
+    }, 50);
+    setSessionElapsed(0);
+  };
 
   const METRICS = useMemo(() => METRIC_DEFS.map(m => ({ ...m, goal: goals[m.key] })), [goals]);
 
