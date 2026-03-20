@@ -18,7 +18,17 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
 
-const EXERCISE_TYPES = ["Walking", "Running", "Yoga", "Cycling", "Swimming", "Gym", "Other"];
+const EXERCISE_TYPES = ["Walking", "Running", "Yoga", "Cycling", "Swimming", "Gym", "Other"] as const;
+
+const CALORIE_RATES: Record<string, number> = {
+  Walking: 4,
+  Running: 10,
+  Yoga: 3,
+  Cycling: 8,
+  Swimming: 9,
+  Gym: 6,
+  Other: 5,
+};
 
 type TrendPeriod = "daily" | "weekly" | "monthly";
 
@@ -112,7 +122,8 @@ const ActivityTracker = () => {
     return `${m}:${s}`;
   };
 
-  const estimatedCalories = Math.round(sessionElapsed / 60 * 5);
+  const calorieRate = CALORIE_RATES[sessionExerciseType] ?? 5;
+  const estimatedCalories = Math.round(sessionElapsed / 60 * calorieRate);
 
   const handleStartSession = () => {
     setSessionActive(true);
