@@ -30,8 +30,6 @@ const UserDashboard = () => {
         {/* Check-In Card */}
         {!sleepMode && <CheckInCard />}
 
-        {/* Health Dashboard */}
-        <HealthDashboard />
 
         {/* Health Passport */}
         <HealthPassport />
