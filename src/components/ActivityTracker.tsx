@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Heart, Footprints, MapPin, Activity, Flame, Timer, Wind, Building2, Droplets,
-  Moon, Dumbbell, Save,
+  Moon, Dumbbell, Save, Target,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserSettings, DEFAULT_ACTIVITY_GOALS, type ActivityGoals } from "@/hooks/useUserSettings";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { format, subDays, subWeeks, subMonths, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
@@ -39,17 +40,17 @@ interface ActivityLog {
   notes: string | null;
 }
 
-const METRICS = [
-  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))", goal: 80 },
-  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))", goal: 10000 },
-  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))", goal: 5 },
-  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))", goal: 160 },
-  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))", goal: 500 },
-  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))", goal: 120 },
-  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))", goal: 16 },
-  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))", goal: 10 },
-  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))", goal: 98 },
-] as const;
+const METRIC_DEFS = [
+  { key: "heart_rate" as const, label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))" },
+  { key: "steps" as const, label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "distance_km" as const, label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "cadence" as const, label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "calories" as const, label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))" },
+  { key: "active_minutes" as const, label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "breaths_per_min" as const, label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "floors_climbed" as const, label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "spo2" as const, label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))" },
+];
 
 const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; stroke: string }) => {
   const pct = Math.min(value / goal, 1);
@@ -75,11 +76,20 @@ const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; 
 const ActivityTracker = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings, updateSetting } = useUserSettings();
+  const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("daily");
   const [trendData, setTrendData] = useState<ActivityLog[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
+  const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
+
+  // Sync draft when settings load
+  useEffect(() => { setGoalDraft(goals); }, [JSON.stringify(goals)]);
+
+  const METRICS = useMemo(() => METRIC_DEFS.map(m => ({ ...m, goal: goals[m.key] })), [goals]);
 
   // Form state
   const [form, setForm] = useState({
@@ -293,10 +303,53 @@ const ActivityTracker = () => {
           <Activity className="w-5 h-5 text-primary" />
           Activity Tracker
         </h2>
-        <Button size="sm" onClick={() => setShowForm(!showForm)} variant={showForm ? "outline" : "default"}>
-          {showForm ? "Cancel" : "Log Today"}
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant={showGoals ? "outline" : "secondary"} onClick={() => { setShowGoals(!showGoals); if (showForm) setShowForm(false); }}>
+            <Target className="w-4 h-4 mr-1" />
+            {showGoals ? "Close" : "Goals"}
+          </Button>
+          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "default"}>
+            {showForm ? "Cancel" : "Log Today"}
+          </Button>
+        </div>
       </div>
+
+      {/* Goals Editor */}
+      {showGoals && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              Set Daily Goals
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              {METRIC_DEFS.map((m) => (
+                <div key={m.key}>
+                  <Label className="text-[10px]">{m.label}{m.unit ? ` (${m.unit})` : ""}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={goalDraft[m.key]}
+                    onChange={(e) => setGoalDraft(prev => ({ ...prev, [m.key]: Number(e.target.value) || 1 }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                updateSetting("activityGoals", goalDraft);
+                setShowGoals(false);
+                toast({ title: "Goals Updated", description: "Your daily targets have been saved." });
+              }}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Goals
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards — 3×3 grid */}
       <div className="grid grid-cols-3 gap-2">
