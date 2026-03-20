@@ -384,35 +384,78 @@ const WellnessTracker = () => {
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Brain className="w-4 h-4 text-primary" /> Mindfulness Exercises
           </h3>
+
+          {/* Large timer display when exercise is active */}
+          {activeExercise !== null && (() => {
+            const ex = MINDFULNESS_EXERCISES[activeExercise];
+            const targetSec = ex.duration * 60;
+            const pct = Math.min((exerciseTimer / targetSec) * 100, 100);
+            const radius = 54;
+            const circumference = 2 * Math.PI * radius;
+            const offset = circumference - (pct / 100) * circumference;
+            return (
+              <div className="flex flex-col items-center py-4 gap-3">
+                <div className="relative w-36 h-36 flex items-center justify-center">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r={radius} fill="none" stroke="hsl(var(--secondary))" strokeWidth="8" />
+                    <circle
+                      cx="60" cy="60" r={radius} fill="none"
+                      stroke="hsl(var(--primary))" strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={offset}
+                      className="transition-all duration-1000 ease-linear"
+                    />
+                  </svg>
+                  <div className="flex flex-col items-center z-10">
+                    <ex.icon className="w-6 h-6 text-primary mb-1" />
+                    <span className="text-4xl font-bold tabular-nums text-foreground">
+                      {formatTimer(exerciseTimer)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{ex.duration}:00</span>
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-foreground">{ex.label}</p>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => { setActiveExercise(null); setExerciseTimer(0); }}
+                  className="border-destructive text-destructive hover:bg-destructive/10"
+                >
+                  Stop
+                </Button>
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 gap-2">
-            {MINDFULNESS_EXERCISES.map((ex, i) => (
-              <button
-                key={ex.label}
-                onClick={() => {
-                  if (activeExercise === i) {
-                    setActiveExercise(null);
-                    setExerciseTimer(0);
-                  } else {
-                    setActiveExercise(i);
-                    setExerciseTimer(0);
-                  }
-                }}
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  activeExercise === i
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/30"
-                }`}
-              >
-                <ex.icon className={`w-5 h-5 mb-1 ${activeExercise === i ? "text-primary" : "text-muted-foreground"}`} />
-                <p className="text-xs font-medium">{ex.label}</p>
-                <p className="text-[10px] text-muted-foreground">{ex.desc}</p>
-                {activeExercise === i && (
-                  <p className="text-sm font-semibold text-primary mt-1">
-                    {formatTimer(exerciseTimer)} / {ex.duration}:00
-                  </p>
-                )}
-              </button>
-            ))}
+            {MINDFULNESS_EXERCISES.map((ex, i) => {
+              const isActive = activeExercise === i;
+              const isDimmed = activeExercise !== null && !isActive;
+              return (
+                <button
+                  key={ex.label}
+                  disabled={isDimmed}
+                  onClick={() => {
+                    if (isActive) {
+                      setActiveExercise(null);
+                      setExerciseTimer(0);
+                    } else {
+                      setActiveExercise(i);
+                      setExerciseTimer(0);
+                    }
+                  }}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    isActive
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border hover:border-primary/30"
+                  } ${isDimmed ? "opacity-40 pointer-events-none" : ""}`}
+                >
+                  <ex.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className="text-xs font-medium">{ex.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{ex.desc}</p>
+                </button>
+              );
+            })}
           </div>
           {form.mindfulness_minutes > 0 && (
             <p className="text-xs text-success text-center">
