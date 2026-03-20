@@ -162,35 +162,46 @@ const ActivityTracker = () => {
       notes: form.notes || null,
     };
 
-    // Check if today's entry exists
-    const { data: existing } = await supabase
-      .from("activity_logs")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("log_date", today)
-      .maybeSingle();
+    console.log("Saving activity log:", { user_id: user.id, log_date: today, ...formFields });
 
-    let error;
-    if (existing) {
-      ({ error } = await supabase
+    try {
+      const { data: existing, error: checkError } = await supabase
         .from("activity_logs")
-        .update(formFields)
-        .eq("id", existing.id));
-    } else {
-      ({ error } = await supabase
-        .from("activity_logs")
-        .insert({ user_id: user.id, log_date: today, ...formFields }));
-    }
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("log_date", today)
+        .maybeSingle();
 
-    if (error) {
-      console.error("Activity log save error:", error);
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Saved", description: "Today's activity logged!" });
-      setShowForm(false);
-      fetchData();
+      if (checkError) {
+        console.error("Error checking existing activity log:", checkError);
+      }
+
+      let error;
+      if (existing) {
+        ({ error } = await supabase
+          .from("activity_logs")
+          .update(formFields)
+          .eq("id", existing.id));
+      } else {
+        ({ error } = await supabase
+          .from("activity_logs")
+          .insert({ user_id: user.id, log_date: today, ...formFields }));
+      }
+
+      if (error) {
+        console.error("Activity log save error:", error);
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Saved", description: "Today's activity logged!" });
+        setShowForm(false);
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Unexpected error saving activity:", err);
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // Build chart data based on trend period
