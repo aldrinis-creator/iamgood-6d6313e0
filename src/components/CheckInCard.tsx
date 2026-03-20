@@ -264,7 +264,7 @@ const CheckInCard = () => {
               {userName}, did you Check-In today?
             </p>
             <button
-              onClick={handleCheckIn}
+              onClick={() => setShowDialog(true)}
               disabled={loading}
               className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
