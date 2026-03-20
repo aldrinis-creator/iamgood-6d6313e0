@@ -116,7 +116,7 @@ const ProfileContent = () => {
       supabase.from("vault_pins").select("*").eq("user_id", userId).limit(1),
     ]);
 
-    if (guardianRes.data?.[0]) setGuardian(guardianRes.data[0]);
+    if (guardianRes.data) setGuardians(guardianRes.data);
     if (healthRes.data?.[0]) {
       setDoctorName((healthRes.data[0] as any).family_doctor_name || "");
       setDoctorPhone((healthRes.data[0] as any).family_doctor_phone || "");
