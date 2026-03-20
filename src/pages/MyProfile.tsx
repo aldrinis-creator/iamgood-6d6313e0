@@ -68,8 +68,14 @@ const ProfileContent = () => {
   const [doctorName, setDoctorName] = useState("");
   const [doctorPhone, setDoctorPhone] = useState("");
 
-  // Guardian
-  const [guardian, setGuardian] = useState<any>(null);
+  // Guardians
+  const [guardians, setGuardians] = useState<any[]>([]);
+  const [showGuardianForm, setShowGuardianForm] = useState(false);
+  const [gName, setGName] = useState("");
+  const [gPhone, setGPhone] = useState("");
+  const [gEmail, setGEmail] = useState("");
+  const [gRelation, setGRelation] = useState("");
+  const [addingGuardian, setAddingGuardian] = useState(false);
 
   // Encrypted docs
   const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);
