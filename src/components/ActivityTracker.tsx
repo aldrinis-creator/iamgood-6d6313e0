@@ -146,30 +146,44 @@ const ActivityTracker = () => {
     setSaving(true);
     const today = format(new Date(), "yyyy-MM-dd");
 
-    const { error } = await supabase
+    const formFields = {
+      steps: form.steps,
+      exercise_minutes: form.exercise_minutes,
+      exercise_type: form.exercise_type || null,
+      sleep_hours: form.sleep_hours,
+      heart_rate: form.heart_rate,
+      distance_km: form.distance_km,
+      cadence: form.cadence,
+      calories: form.calories,
+      active_minutes: form.active_minutes,
+      breaths_per_min: form.breaths_per_min,
+      floors_climbed: form.floors_climbed,
+      spo2: form.spo2,
+      notes: form.notes || null,
+    };
+
+    // Check if today's entry exists
+    const { data: existing } = await supabase
       .from("activity_logs")
-      .upsert(
-        {
-          user_id: user.id,
-          log_date: today,
-          steps: form.steps,
-          exercise_minutes: form.exercise_minutes,
-          exercise_type: form.exercise_type || null,
-          sleep_hours: form.sleep_hours,
-          heart_rate: form.heart_rate,
-          distance_km: form.distance_km,
-          cadence: form.cadence,
-          calories: form.calories,
-          active_minutes: form.active_minutes,
-          breaths_per_min: form.breaths_per_min,
-          floors_climbed: form.floors_climbed,
-          spo2: form.spo2,
-          notes: form.notes || null,
-        },
-        { onConflict: "user_id,log_date" }
-      );
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("log_date", today)
+      .maybeSingle();
+
+    let error;
+    if (existing) {
+      ({ error } = await supabase
+        .from("activity_logs")
+        .update(formFields)
+        .eq("id", existing.id));
+    } else {
+      ({ error } = await supabase
+        .from("activity_logs")
+        .insert({ user_id: user.id, log_date: today, ...formFields }));
+    }
 
     if (error) {
+      console.error("Activity log save error:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Saved", description: "Today's activity logged!" });
