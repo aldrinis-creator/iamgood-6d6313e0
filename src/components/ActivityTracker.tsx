@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Heart, Footprints, MapPin, Activity, Flame, Timer, Wind, Building2, Droplets,
-  Moon, Dumbbell, Save, Target,
+  Moon, Dumbbell, Save, Target, Play, Pause, Square,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,9 +85,66 @@ const ActivityTracker = () => {
   const [showForm, setShowForm] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionPaused, setSessionPaused] = useState(false);
+  const [sessionElapsed, setSessionElapsed] = useState(0);
+  const [sessionExerciseType, setSessionExerciseType] = useState("Walking");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sync draft when settings load
   useEffect(() => { setGoalDraft(goals); }, [JSON.stringify(goals)]);
+
+  // Timer interval
+  useEffect(() => {
+    if (sessionActive && !sessionPaused) {
+      timerRef.current = setInterval(() => {
+        setSessionElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [sessionActive, sessionPaused]);
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  const estimatedCalories = Math.round(sessionElapsed / 60 * 5);
+
+  const handleStartSession = () => {
+    setSessionActive(true);
+    setSessionPaused(false);
+    setSessionElapsed(0);
+    if (showForm) setShowForm(false);
+    if (showGoals) setShowGoals(false);
+  };
+
+  const handleStopSession = async () => {
+    setSessionActive(false);
+    setSessionPaused(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+    const minutes = Math.round(sessionElapsed / 60);
+    // Add session minutes to today's form values
+    setForm((prev) => ({
+      ...prev,
+      exercise_minutes: prev.exercise_minutes + minutes,
+      active_minutes: prev.active_minutes + minutes,
+      calories: prev.calories + estimatedCalories,
+      exercise_type: sessionExerciseType,
+    }));
+    // Auto-save after state update
+    setTimeout(async () => {
+      await handleSave();
+      toast({
+        title: "Session Complete",
+        description: `${formatTimer(sessionElapsed)} — ${minutes} min, ~${estimatedCalories} kcal burned.`,
+      });
+    }, 50);
+    setSessionElapsed(0);
+  };
 
   const METRICS = useMemo(() => METRIC_DEFS.map(m => ({ ...m, goal: goals[m.key] })), [goals]);
 
@@ -303,14 +360,20 @@ const ActivityTracker = () => {
           <Activity className="w-5 h-5 text-primary" />
           Activity Tracker
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant={showGoals ? "outline" : "secondary"} onClick={() => { setShowGoals(!showGoals); if (showForm) setShowForm(false); }}>
             <Target className="w-4 h-4 mr-1" />
             {showGoals ? "Close" : "Goals"}
           </Button>
-          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "default"}>
-            {showForm ? "Cancel" : "Log Today"}
+          <Button size="sm" onClick={() => { setShowForm(!showForm); if (showGoals) setShowGoals(false); }} variant={showForm ? "outline" : "secondary"}>
+            {showForm ? "Cancel" : "Manual Log"}
           </Button>
+          {!sessionActive && (
+            <Button size="sm" onClick={handleStartSession}>
+              <Play className="w-4 h-4 mr-1" />
+              Start Session
+            </Button>
+          )}
         </div>
       </div>
 
@@ -347,6 +410,51 @@ const ActivityTracker = () => {
               <Save className="w-4 h-4 mr-2" />
               Save Goals
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Active Session Card */}
+      {sessionActive && (
+        <Card className="border-primary">
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary animate-pulse" />
+              {sessionExerciseType} Session
+            </h3>
+            <div>
+              <Label className="text-[10px]">Exercise Type</Label>
+              <Select value={sessionExerciseType} onValueChange={setSessionExerciseType}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXERCISE_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-3xl font-bold font-mono tracking-wider">{formatTimer(sessionElapsed)}</p>
+              <p className="text-xs text-muted-foreground">~{estimatedCalories} kcal burned</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setSessionPaused(!sessionPaused)}
+              >
+                {sessionPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
+                {sessionPaused ? "Resume" : "Pause"}
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleStopSession}
+              >
+                <Square className="w-4 h-4 mr-1" />
+                Stop
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
