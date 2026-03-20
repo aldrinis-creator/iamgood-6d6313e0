@@ -367,12 +367,16 @@ const Register = () => {
                 </button>
               )}
               <div>
-                <Label className="text-xs">Name</Label>
+                <Label className="text-xs">Name *</Label>
                 <Input placeholder="Guardian name" className="text-base min-h-[48px]" value={g.name} onChange={(e) => updateGuardian(i, "name", e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs">Phone</Label>
+                <Label className="text-xs">Phone *</Label>
                 <Input placeholder="Phone number" className="text-base min-h-[48px]" value={g.phone} onChange={(e) => updateGuardian(i, "phone", e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Email {i === 0 ? "*" : "(for notifications)"}</Label>
+                <Input placeholder="guardian@email.com" type="email" className="text-base min-h-[48px]" value={g.email} onChange={(e) => updateGuardian(i, "email", e.target.value)} />
               </div>
               <div>
                 <Label className="text-xs">Relation</Label>

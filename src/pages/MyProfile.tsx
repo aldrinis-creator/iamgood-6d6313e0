@@ -430,31 +430,116 @@ const ProfileContent = () => {
         </CardContent>
       </Card>
 
-      {/* Primary Guardian */}
-      {guardian && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-primary" /> Primary Guardian
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
+      {/* Guardians Management */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-primary" /> My Guardians
+            <span className="text-xs text-muted-foreground font-normal ml-auto">{guardians.length}/5</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {guardians.length > 0 ? guardians.map((g) => (
+            <div key={g.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div>
-                <p className="font-medium text-sm">{guardian.guardian_name}</p>
-                <p className="text-xs text-muted-foreground">{guardian.guardian_phone}</p>
-                {guardian.relation && <p className="text-xs text-muted-foreground capitalize">{guardian.relation}</p>}
+                <p className="font-medium text-sm">{g.guardian_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
+                </p>
+                {g.guardian_email && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Mail className="w-3 h-3" />{g.guardian_email}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-success border-success text-xs">{guardian.status}</Badge>
-                <Button size="icon" variant="ghost" asChild>
-                  <a href={`tel:${guardian.guardian_phone}`}><Phone className="w-4 h-4 text-primary" /></a>
+                {g.is_primary && (
+                  <Badge className="text-xs">Primary</Badge>
+                )}
+                <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
+                  <a href={`tel:${g.guardian_phone}`}><Phone className="w-3.5 h-3.5 text-primary" /></a>
                 </Button>
+                {!g.is_primary && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-destructive"
+                    onClick={async () => {
+                      const { error } = await supabase.from("guardians").delete().eq("id", g.id);
+                      if (error) toast.error("Failed to remove guardian");
+                      else { toast.success("Guardian removed"); loadData(); }
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )) : (
+            <p className="text-sm text-muted-foreground text-center py-2">No guardians added yet</p>
+          )}
+
+          {showGuardianForm ? (
+            <div className="space-y-3 p-3 rounded-lg border border-border">
+              <div><Label className="text-xs">Name *</Label><Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Guardian name" /></div>
+              <div><Label className="text-xs">Phone *</Label><Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} placeholder="+91 98765 43210" /></div>
+              <div><Label className="text-xs">Email * (for emergency notifications)</Label><Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="guardian@email.com" type="email" /></div>
+              <div>
+                <Label className="text-xs">Relation</Label>
+                <Select value={gRelation} onValueChange={setGRelation}>
+                  <SelectTrigger><SelectValue placeholder="Select relation" /></SelectTrigger>
+                  <SelectContent>
+                    {["Spouse", "Son", "Daughter", "Sibling", "Friend", "Neighbor", "Other"].map((r) => (
+                      <SelectItem key={r} value={r.toLowerCase()}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={addingGuardian}
+                  onClick={async () => {
+                    if (!gName.trim() || !gPhone.trim() || !gEmail.trim()) {
+                      toast.error("Name, phone and email are required");
+                      return;
+                    }
+                    setAddingGuardian(true);
+                    const { error } = await supabase.from("guardians").insert({
+                      user_id: userId!,
+                      guardian_name: gName.trim(),
+                      guardian_phone: gPhone.trim(),
+                      guardian_email: gEmail.trim(),
+                      relation: gRelation || null,
+                      is_primary: guardians.length === 0,
+                    });
+                    if (error) toast.error("Failed to add guardian");
+                    else {
+                      toast.success("Guardian added");
+                      setGName(""); setGPhone(""); setGEmail(""); setGRelation("");
+                      setShowGuardianForm(false);
+                      loadData();
+                    }
+                    setAddingGuardian(false);
+                  }}
+                >
+                  {addingGuardian && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+                  Add Guardian
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowGuardianForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : guardians.length < 5 ? (
+            <Button variant="outline" className="w-full" onClick={() => setShowGuardianForm(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Add Guardian
+            </Button>
+          ) : null}
+
+          <p className="text-[11px] text-muted-foreground">
+            Guardian email is essential — emergency alerts are sent via email and SMS/WhatsApp.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Government ID Cards */}
       <Card>

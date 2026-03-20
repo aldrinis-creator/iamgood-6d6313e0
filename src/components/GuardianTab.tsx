@@ -152,7 +152,7 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
               </div>
               <div>
-                <Label className="text-xs">Email (for notifications)</Label>
+                <Label className="text-xs">Email * (for emergency notifications)</Label>
                 <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="guardian@email.com" type="email" />
               </div>
               <div>
