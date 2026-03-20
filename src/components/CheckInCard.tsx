@@ -6,6 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import CheckInDialog from "@/components/CheckInDialog";
 
 const CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
 
