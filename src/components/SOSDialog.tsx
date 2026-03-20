@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill } from "lucide-react";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users } from "lucide-react";
 
 interface SOSDialogProps {
   open: boolean;
