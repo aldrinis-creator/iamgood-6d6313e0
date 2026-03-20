@@ -10,7 +10,7 @@ import CareJournal from "@/components/CareJournal";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
-import { playChime, playVoiceReminder, getAudioMode } from "@/lib/audioAlerts";
+import { playChime } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
   title: string;
