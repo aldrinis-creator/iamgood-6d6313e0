@@ -78,6 +78,7 @@ const CheckInCard = () => {
   const [timeLeft, setTimeLeft] = useState("");
   const [isApproaching, setIsApproaching] = useState(false);
   const [approachingMinutes, setApproachingMinutes] = useState(0);
+  const [showDialog, setShowDialog] = useState(false);
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
