@@ -212,7 +212,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           </div>
         ) : (
           <Button
-            onClick={() => setCounting(true)}
+            onClick={() => { vibrate(200); setCounting(true); }}
             className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold"
           >
             Send SOS Alert
