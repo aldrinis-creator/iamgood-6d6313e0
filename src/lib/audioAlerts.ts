@@ -57,28 +57,6 @@ export const playVoiceReminder = (message = "It's time for your Check-iN") => {
   window.speechSynthesis.speak(utterance);
 };
 
-export type AudioAlertMode = "off" | "chime" | "voice";
-
-const STORAGE_KEY = "checkin-audio-mode";
-
-export const getAudioMode = (): AudioAlertMode => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "chime" || stored === "voice") return stored;
-  return "off";
-};
-
-export const setAudioMode = (mode: AudioAlertMode) => {
-  localStorage.setItem(STORAGE_KEY, mode);
-};
-
-export const testAlert = (mode: AudioAlertMode) => {
-  if (mode === "chime") {
-    playChime();
-  } else if (mode === "voice") {
-    playVoiceReminder("This is a test. It's time for your Check-iN.");
-  }
-};
-
 export const playMedicationVoice = (medName: string) => {
   playVoiceReminder(`Time to take ${medName}`);
 };
