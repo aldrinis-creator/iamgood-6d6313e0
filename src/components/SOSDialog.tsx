@@ -130,6 +130,10 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       msg += `\n💊 Conditions: ${[...medical.conditions, ...medical.medications].join(", ")}`;
     }
     if (toggles.doctor && medical.doctorName) msg += `\n🩺 Doctor: ${medical.doctorName}`;
+    if (medical.familyDoctorName) {
+      msg += `\n👨‍⚕️ Family Doctor: ${medical.familyDoctorName}`;
+      if (medical.familyDoctorPhone) msg += ` (${medical.familyDoctorPhone})`;
+    }
     msg += "\n\nPlease respond immediately!";
     return msg;
   };
