@@ -45,9 +45,9 @@ const useCheckInAudio = () => {
           const responded = await isCheckInResponded(h, now);
           if (!responded) {
             firedRef.current.add(dueKey);
-            fireAlert("It's time for your Check-iN. Please tap the heart to confirm you're okay.");
+            fireAlert("We hope you are well, Please Check-iN");
             toast("Time for your Check-iN! 💓", {
-              description: "Tap the heart on your dashboard to check in.",
+              description: "We hope you are well. Please tap the heart to check in.",
               duration: 10000,
             });
           }
