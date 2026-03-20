@@ -64,6 +64,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && <SOSButton />}
         <EmergencyModeOverlay />
         {role === "user" && <FallDetectionOverlay />}
+        <BatteryWarning />
         <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
       </div>
     </div>
