@@ -131,7 +131,7 @@ const ChipPicker = ({
   );
 };
 
-const MyPersona = () => {
+const MyPersonaContent = () => {
   const { user, profile } = useAuth();
   const [persona, setPersona] = useState<PersonaData>(defaultPersona);
   const [loading, setLoading] = useState(true);
