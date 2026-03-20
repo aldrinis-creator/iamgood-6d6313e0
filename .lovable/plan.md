@@ -1,39 +1,26 @@
 
 
-# Fix Activity Tracker — RLS + Error Visibility
+# Customizable Daily Goals for Activity Tracker
 
-## Root Cause
-
-The `activity_logs` table's INSERT, SELECT, UPDATE, and DELETE RLS policies are granted `TO public` (anon role). In Supabase, while `public` technically includes all roles, best practice is `TO authenticated` for logged-in user operations — and several other working tables in this project (e.g. `wellness_logs`, `face_scans`) use `TO authenticated`. The mismatch may cause silent failures depending on Supabase configuration.
-
-Additionally, the `maybeSingle()` query checking for existing rows doesn't capture errors — if it fails, the flow silently proceeds to an insert that may also fail.
+## Approach
+Store user-customizable goals in the existing `user_settings` table (inside the `settings` JSONB column), alongside other user preferences. No database migration needed.
 
 ## Changes
 
-### 1. Database Migration — Fix RLS policies on `activity_logs`
+### 1. `src/hooks/useUserSettings.ts`
+- Add `activityGoals` to `UserSettings` interface with keys matching each metric (steps, heart_rate, calories, etc.)
+- Set defaults matching current hardcoded values (steps: 10000, calories: 500, etc.)
 
-Drop and recreate all four user policies with `TO authenticated` (matching the pattern used by `wellness_logs` and other working tables):
+### 2. `src/components/ActivityTracker.tsx`
+- Import and use `useUserSettings` to get user goals
+- Replace hardcoded `goal` values in `METRICS` with dynamic values from settings
+- Add a "Set Goals" button (Target icon) next to "Log Today"
+- Add a goals editing dialog/card with number inputs for each metric's daily target
+- On save, call `updateSetting("activityGoals", newGoals)` to persist
 
-```sql
-DROP POLICY IF EXISTS "Users can insert own activity_logs" ON activity_logs;
-DROP POLICY IF EXISTS "Users can select own activity_logs" ON activity_logs;
-DROP POLICY IF EXISTS "Users can update own activity_logs" ON activity_logs;
-DROP POLICY IF EXISTS "Users can delete own activity_logs" ON activity_logs;
-
-CREATE POLICY "Users can insert own activity_logs" ON activity_logs
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can select own activity_logs" ON activity_logs
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own activity_logs" ON activity_logs
-  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own activity_logs" ON activity_logs
-  FOR DELETE TO authenticated USING (auth.uid() = user_id);
-```
-
-### 2. `src/components/ActivityTracker.tsx` — Add error handling for the existence check
-
-Capture the error from the `maybeSingle()` call. If it errors, log it and fall through to insert. Also add a `console.log` confirming save was triggered with the payload, so we have visibility if the issue persists.
+### UI Details
+- Goals editor shown as a collapsible card (similar to the log form toggle)
+- Each metric gets a labeled number input with its current goal pre-filled
+- Save button persists to `user_settings` via the existing debounced hook
+- Summary cards and radial progress rings immediately reflect custom goals
 
