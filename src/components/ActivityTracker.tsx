@@ -40,17 +40,17 @@ interface ActivityLog {
   notes: string | null;
 }
 
-const METRICS = [
-  { key: "heart_rate", label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))", goal: 80 },
-  { key: "steps", label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))", goal: 10000 },
-  { key: "distance_km", label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))", goal: 5 },
-  { key: "cadence", label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))", goal: 160 },
-  { key: "calories", label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))", goal: 500 },
-  { key: "active_minutes", label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))", goal: 120 },
-  { key: "breaths_per_min", label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))", goal: 16 },
-  { key: "floors_climbed", label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))", goal: 10 },
-  { key: "spo2", label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))", goal: 98 },
-] as const;
+const METRIC_DEFS = [
+  { key: "heart_rate" as const, label: "Heart Rate", unit: "bpm", icon: Heart, color: "text-sos", stroke: "hsl(var(--sos))" },
+  { key: "steps" as const, label: "Steps", unit: "", icon: Footprints, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "distance_km" as const, label: "Distance", unit: "km", icon: MapPin, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "cadence" as const, label: "Cadence", unit: "spm", icon: Activity, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "calories" as const, label: "Calories", unit: "kcal", icon: Flame, color: "text-sos", stroke: "hsl(var(--sos))" },
+  { key: "active_minutes" as const, label: "Active Min", unit: "min", icon: Timer, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "breaths_per_min" as const, label: "Breaths", unit: "/min", icon: Wind, color: "text-primary", stroke: "hsl(var(--primary))" },
+  { key: "floors_climbed" as const, label: "Floors", unit: "", icon: Building2, color: "text-success", stroke: "hsl(var(--success))" },
+  { key: "spo2" as const, label: "SpO2", unit: "%", icon: Droplets, color: "text-sos", stroke: "hsl(var(--sos))" },
+];
 
 const RadialProgress = ({ value, goal, stroke }: { value: number; goal: number; stroke: string }) => {
   const pct = Math.min(value / goal, 1);
