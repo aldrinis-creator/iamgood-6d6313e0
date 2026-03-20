@@ -236,6 +236,7 @@ const CheckInCard = () => {
     : formatHour(nextCheckIn.getHours());
 
   return (
+    <>
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
         {isApproaching && !checkedIn && getCurrentWindow() === null ? (
@@ -310,6 +311,13 @@ const CheckInCard = () => {
         </div>
       </CardContent>
     </Card>
+
+    <CheckInDialog
+      open={showDialog}
+      onClose={() => setShowDialog(false)}
+      onConfirmOk={handleCheckIn}
+    />
+    </>
   );
 };
 
