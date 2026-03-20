@@ -3,6 +3,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCallback, useRef } from "react";
 
+export interface ActivityGoals {
+  steps: number;
+  heart_rate: number;
+  distance_km: number;
+  cadence: number;
+  calories: number;
+  active_minutes: number;
+  breaths_per_min: number;
+  floors_climbed: number;
+  spo2: number;
+}
+
+export const DEFAULT_ACTIVITY_GOALS: ActivityGoals = {
+  steps: 10000,
+  heart_rate: 80,
+  distance_km: 5,
+  cadence: 160,
+  calories: 500,
+  active_minutes: 120,
+  breaths_per_min: 16,
+  floors_climbed: 10,
+  spo2: 98,
+};
+
 export interface UserSettings {
   // Alerts
   audioAlerts: boolean;
@@ -22,6 +46,8 @@ export interface UserSettings {
   // Privacy
   shareLocation: boolean;
   shareHealthData: boolean;
+  // Activity Goals
+  activityGoals: ActivityGoals;
 }
 
 const DEFAULTS: UserSettings = {
