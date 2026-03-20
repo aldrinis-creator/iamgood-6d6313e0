@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useFallDetection } from "@/hooks/useFallDetection";
 import { useApp } from "@/contexts/AppContext";
-import { AlertTriangle, X, Smartphone } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FallDetectionOverlay = () => {
