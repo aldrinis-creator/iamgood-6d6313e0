@@ -1,38 +1,50 @@
 
 
-# Connect Activity Goals to Health Passport + Confirm Fall Detection
+# Fix Fall Detection Not Triggering on Real Phones
 
-## What's Already Done
-**Fall Detection is fully built** — the hook (`useFallDetection.ts`), overlay (`FallDetectionOverlay.tsx`), settings UI (toggle + sensitivity selector in Settings), and SOS auto-trigger are all implemented and wired into `AppLayout`. No changes needed.
+## Root Causes
 
-## What Needs to Change
+There are **three issues** preventing fall detection from working on real phones:
 
-### Health Passport: Use Custom Activity Goals (1 file)
+### 1. iOS requires explicit permission request
+On iOS 13+, `DeviceMotionEvent.requestPermission()` must be called from a user gesture (tap) before `devicemotion` events fire. The current code just adds the event listener silently — iOS will block it.
 
-**File: `src/components/HealthPassport.tsx`**
+### 2. Thresholds are too strict for a phone drop
+The current algorithm expects a "human fall" signature (free-fall → impact), but the user is testing by **dropping the phone**. A phone drop from hand height (~1.5m) produces:
+- Very brief free-fall (~0.5s)
+- Impact magnitude varies widely depending on surface
 
-Currently the Activity score computation (lines 86-95) uses hardcoded divisors:
-- `steps / 10000`, `distance_km / 5`, `calories / 500`, `active_minutes / 120`
+The **medium** sensitivity requires magnitude < 4 m/s² for free-fall AND > 30 m/s² for impact — a phone landing on carpet or a bed won't hit 30. Even on hard floor, the accelerometer may saturate or the event rate may miss the spike.
 
-These should use the user's custom goals from `useUserSettings` instead.
+### 3. No permission state tracking or user prompt
+There's no UI telling the user that motion permissions are needed, and no way to request them.
 
-**Changes:**
-1. Import `useUserSettings` and `DEFAULT_ACTIVITY_GOALS`
-2. Read `settings.activityGoals` (with fallback to defaults)
-3. Replace hardcoded values in the Activity score calculation:
-   - `act.steps / goals.steps`
-   - `act.distance_km / goals.distance_km`
-   - `act.calories / goals.calories`
-   - `act.active_minutes / goals.active_minutes`
+## Plan
 
-This ensures the Health Passport score ring reflects the same targets the user set in the Activity Tracker's "Goals" editor.
+### Changes to `src/hooks/useFallDetection.ts`
+1. **Add iOS permission request** — export a `requestMotionPermission()` function that calls `DeviceMotionEvent.requestPermission()` (when available) and tracks permission state
+2. **Add `permissionGranted` state** so the UI can show a prompt if needed
+3. **Lower thresholds slightly** for "high" sensitivity to better catch phone drops:
+   - high: freeFall 6 → impact 18
+   - medium: freeFall 5 → impact 25
+   - low: freeFall 3 → impact 35
+4. **Widen the free-fall-to-impact window** from 500ms to 800ms — phone drops from hand height take ~550ms
 
-### Ward Health Passport (optional, same pattern)
+### Changes to `src/components/FallDetectionOverlay.tsx`
+1. Add a one-time **"Enable Motion Sensors"** button that calls `requestMotionPermission()` when permission hasn't been granted yet (iOS requirement)
 
-**File: `src/components/WardHealthPassport.tsx`**
+### Changes to `src/pages/Settings.tsx`
+1. When fall detection is toggled ON, trigger the motion permission request so the user grants access immediately
 
-Same hardcoded values exist here. Will update to use default goals (ward's custom goals aren't accessible to guardian, so defaults are appropriate).
+### No database changes needed.
 
-## No Database Changes
-All data already flows through the existing `user_settings.settings` JSONB column and `activity_logs` table.
+## Summary of threshold changes
+
+```text
+Sensitivity   freeFall (m/s²)   impact (m/s²)   window (ms)
+─────────────────────────────────────────────────────────────
+high          6                 18              800
+medium        5                 25              800
+low           3                 35              800
+```
 
