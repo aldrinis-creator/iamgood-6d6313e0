@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-missed-checkins]
 verify_jwt = false
+
+[functions.notify-guardian-medication]
+verify_jwt = false
