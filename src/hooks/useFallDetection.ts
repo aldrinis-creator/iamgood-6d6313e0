@@ -31,7 +31,12 @@ export function useFallDetection() {
   const thresholds = SENSITIVITY_MAP[settings.fallSensitivity] || SENSITIVITY_MAP.medium;
   const [fallDetected, setFallDetected] = useState(false);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
-  const [permissionState, setPermissionState] = useState<"unknown" | "granted" | "denied">("unknown");
+  const [permissionState, setPermissionState] = useState<"unknown" | "granted" | "denied">(() => {
+    const DME = DeviceMotionEvent as any;
+    if (typeof DME.requestPermission !== "function") return "granted";
+    if (typeof localStorage !== "undefined" && localStorage.getItem("motion_permission") === "granted") return "granted";
+    return "unknown";
+  });
 
   const freeFallTimeRef = useRef<number | null>(null);
   const lastTriggerRef = useRef(0);
