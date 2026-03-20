@@ -51,7 +51,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       medications: hpRes.data?.current_medications ?? [],
       doctorName: apRes.data?.doctor_name ?? null,
     });
-    setGuardianCount(gRes.data?.length ?? 0);
+    setGuardians(gRes.data ?? []);
   }, [session?.user?.id]);
 
   useEffect(() => {
