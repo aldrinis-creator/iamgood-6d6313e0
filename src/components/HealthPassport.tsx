@@ -149,10 +149,17 @@ const HealthPassport = () => {
     };
   }, [computeScores]);
 
-  const handleAction = (cat: CategoryScore) => {
-    if (cat.name === "Face Scan" && cat.action) {
-      navigate("/my-health");
-    }
+  const categoryRoutes: Record<string, string> = {
+    "Check-iN": "/dashboard",
+    "Face Scan": "/my-health?tool=Face Scan",
+    "Activity": "/my-health?tool=Activity",
+    "Wellness": "/my-health?tool=Wellness",
+    "Medications": "/my-health?tool=Tablets",
+  };
+
+  const handleCategoryTap = (cat: CategoryScore) => {
+    const route = categoryRoutes[cat.name];
+    if (route) navigate(route);
   };
 
   return (
@@ -220,11 +227,13 @@ const HealthPassport = () => {
                 </div>
               </div>
               {cat.action ? (
-                <button onClick={() => handleAction(cat)} className="ml-3 text-xs text-primary font-medium flex items-center">
+                <button onClick={() => handleCategoryTap(cat)} className="ml-3 text-xs text-primary font-medium flex items-center">
                   {cat.action} <ChevronRight className="w-3 h-3" />
                 </button>
               ) : (
-                <ChevronRight className="ml-3 w-4 h-4 text-muted-foreground" />
+                <button onClick={() => handleCategoryTap(cat)} className="ml-3">
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
               )}
             </div>
           ))}
