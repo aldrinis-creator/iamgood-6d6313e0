@@ -122,7 +122,8 @@ const ActivityTracker = () => {
     return `${m}:${s}`;
   };
 
-  const estimatedCalories = Math.round(sessionElapsed / 60 * 5);
+  const calorieRate = CALORIE_RATES[sessionExerciseType] ?? 5;
+  const estimatedCalories = Math.round(sessionElapsed / 60 * calorieRate);
 
   const handleStartSession = () => {
     setSessionActive(true);
