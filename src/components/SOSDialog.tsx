@@ -1,12 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle } from "lucide-react";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2 } from "lucide-react";
 
 interface SOSDialogProps {
   open: boolean;
@@ -26,6 +25,7 @@ interface MedicalInfo {
 interface Guardian {
   guardian_name: string;
   guardian_phone: string;
+  guardian_email: string | null;
   relation: string | null;
 }
 
@@ -38,22 +38,27 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     familyDoctorName: null, familyDoctorPhone: null,
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
-  const [toggles, setToggles] = useState({ blood: true, allergies: true, conditions: true, doctor: true });
-  const [counting, setCounting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [userDob, setUserDob] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const countingRef = useRef(true);
+  const hasSentRef = useRef(false);
 
   const fetchData = useCallback(async () => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [hpRes, gRes, apRes, profileRes] = await Promise.all([
+    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", uid),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
+      supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", uid).maybeSingle(),
+      supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("wellness_logs").select("mood, stress_level, energy_level").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     setMedical({
@@ -67,8 +72,15 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     });
     setGuardians(gRes.data ?? []);
     setUserName(profileRes.data?.full_name ?? "User");
+    setUserPhone(profileRes.data?.phone ?? "");
+    setUserDob(profileRes.data?.date_of_birth ?? "");
 
-    // Try to get location
+    // Store latest health data for the SOS message
+    (window as any).__sosHealthData = {
+      activity: activityRes.data,
+      wellness: wellnessRes.data,
+    };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -81,67 +93,126 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   useEffect(() => {
     if (open) {
       fetchData();
-      setCounting(false);
+      countingRef.current = true;
+      hasSentRef.current = false;
       setTimeLeft(30);
       setSent(false);
+      setSending(false);
+    } else {
+      countingRef.current = false;
     }
   }, [open, fetchData]);
 
   useEffect(() => {
-    if (!counting || timeLeft <= 0) return;
-    const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
+    if (!open || timeLeft <= 0) return;
+    const timer = setTimeout(() => {
+      if (countingRef.current) setTimeLeft((t) => t - 1);
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [counting, timeLeft]);
+  }, [open, timeLeft]);
 
   const vibrate = (pattern: number | number[]) => {
     if (navigator.vibrate) navigator.vibrate(pattern);
   };
 
-  useEffect(() => {
-    if (counting && timeLeft === 0) {
-      triggerSOS();
-      vibrate([200, 100, 200, 100, 400]);
-      setSent(true);
-      setCounting(false);
-    }
-  }, [counting, timeLeft, triggerSOS]);
-
-  const handleCancel = () => {
-    setCounting(false);
-    setTimeLeft(30);
-    cancelSOS();
-  };
-
-  const handleClose = () => {
-    if (counting) handleCancel();
-    onClose();
-  };
-
-  const toggle = (key: keyof typeof toggles) => setToggles((p) => ({ ...p, [key]: !p[key] }));
-
-  const buildSOSMessage = () => {
+  const buildSOSMessage = useCallback(() => {
+    const healthData = (window as any).__sosHealthData;
     let msg = `🚨 SOS ALERT from ${userName}!`;
+    if (userPhone) msg += `\n📞 Phone: ${userPhone}`;
+    if (userDob) msg += `\n🎂 DOB: ${userDob}`;
     if (location) {
       msg += `\n📍 Location: https://maps.google.com/?q=${location.lat},${location.lng}`;
     }
-    if (toggles.blood && medical.bloodGroup) msg += `\n🩸 Blood Type: ${medical.bloodGroup}`;
-    if (toggles.allergies && medical.allergies.length > 0) msg += `\n⚠️ Allergies: ${medical.allergies.join(", ")}`;
-    if (toggles.conditions && (medical.conditions.length > 0 || medical.medications.length > 0)) {
-      msg += `\n💊 Conditions: ${[...medical.conditions, ...medical.medications].join(", ")}`;
-    }
-    if (toggles.doctor && medical.doctorName) msg += `\n🩺 Doctor: ${medical.doctorName}`;
+    if (medical.bloodGroup) msg += `\n🩸 Blood Type: ${medical.bloodGroup}`;
+    if (medical.allergies.length > 0) msg += `\n⚠️ Allergies: ${medical.allergies.join(", ")}`;
+    if (medical.conditions.length > 0) msg += `\n💊 Conditions: ${medical.conditions.join(", ")}`;
+    if (medical.medications.length > 0) msg += `\n💊 Medications: ${medical.medications.join(", ")}`;
     if (medical.familyDoctorName) {
       msg += `\n👨‍⚕️ Family Doctor: ${medical.familyDoctorName}`;
       if (medical.familyDoctorPhone) msg += ` (${medical.familyDoctorPhone})`;
     }
-    msg += "\n\nPlease respond immediately!";
+    // Current health data
+    if (healthData?.activity) {
+      const a = healthData.activity;
+      if (a.heart_rate) msg += `\n❤️ Last Heart Rate: ${a.heart_rate} bpm`;
+      if (a.spo2) msg += `\n🫁 SpO2: ${a.spo2}%`;
+      if (a.steps) msg += `\n🚶 Steps Today: ${a.steps}`;
+    }
+    if (healthData?.wellness) {
+      const w = healthData.wellness;
+      if (w.mood) msg += `\n😊 Mood: ${w.mood}`;
+      if (w.stress_level) msg += `\n😰 Stress Level: ${w.stress_level}/5`;
+    }
+    msg += "\n\n⚠️ Please respond immediately!";
     return msg;
-  };
+  }, [userName, userPhone, userDob, location, medical]);
 
-  const getWhatsAppLink = (phone: string) => {
+  const getWhatsAppLink = useCallback((phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
     return `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(buildSOSMessage())}`;
+  }, [buildSOSMessage]);
+
+  const sendAlerts = useCallback(async () => {
+    if (hasSentRef.current) return;
+    hasSentRef.current = true;
+    setSending(true);
+    vibrate([200, 100, 200, 100, 400]);
+
+    // Trigger SOS event in DB
+    await triggerSOS();
+
+    const message = buildSOSMessage();
+
+    // Open WhatsApp for each guardian
+    guardians.forEach((g, i) => {
+      setTimeout(() => {
+        window.open(getWhatsAppLink(g.guardian_phone), "_blank");
+      }, i * 500);
+    });
+
+    // Send email alerts via edge function
+    const guardianEmails = guardians
+      .map((g) => g.guardian_email)
+      .filter(Boolean) as string[];
+
+    try {
+      await supabase.functions.invoke("send-sos-alert", {
+        body: {
+          user_id: session?.user?.id,
+          message,
+          guardian_emails: guardianEmails,
+          doctor_email: null, // Doctor email not stored separately
+          doctor_name: medical.familyDoctorName,
+          user_name: userName,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to send SOS emails:", e);
+    }
+
+    setSending(false);
+    setSent(true);
+  }, [guardians, triggerSOS, buildSOSMessage, getWhatsAppLink, session?.user?.id, medical.familyDoctorName, userName]);
+
+  // Auto-send when countdown reaches 0
+  useEffect(() => {
+    if (timeLeft === 0 && countingRef.current && !hasSentRef.current) {
+      countingRef.current = false;
+      sendAlerts();
+    }
+  }, [timeLeft, sendAlerts]);
+
+  const handleCancel = () => {
+    countingRef.current = false;
+    setTimeLeft(30);
+    cancelSOS();
+    onClose();
+  };
+
+  const handleClose = () => {
+    if (!sent) handleCancel();
+    else onClose();
   };
 
   if (sent) {
@@ -150,14 +221,27 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
         <SheetContent side="bottom" className="rounded-t-2xl pb-10">
           <div className="text-center space-y-4 py-6">
             <div className="w-16 h-16 rounded-full bg-sos/10 flex items-center justify-center mx-auto">
-              <span className="text-3xl">🚨</span>
+              <CheckCircle2 className="w-8 h-8 text-sos" />
             </div>
-            <h2 className="text-xl font-bold text-foreground">SOS Alert Sent!</h2>
+            <h2 className="text-xl font-bold text-foreground">SOS Alerts Sent!</h2>
             <p className="text-muted-foreground text-sm">
-              Your {guardians.length} guardian(s) have been alerted via SMS & WhatsApp with your location
-              {toggles.blood && medical.bloodGroup ? " and medical info" : ""}.
+              Emergency alerts sent to {guardians.length} guardian(s) via Email & WhatsApp with your profile, health data & location.
             </p>
-            <Button onClick={handleClose} variant="outline" className="mt-4">
+            {medical.familyDoctorPhone && (
+              <a href={`tel:${medical.familyDoctorPhone}`}>
+                <Button className="bg-success text-success-foreground gap-2 mt-2">
+                  <Phone className="w-4 h-4" /> Call Family Doctor
+                </Button>
+              </a>
+            )}
+            <div className="pt-2">
+              <a href="tel:112">
+                <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold gap-2">
+                  <Phone className="w-5 h-5" /> Call 112 Emergency
+                </Button>
+              </a>
+            </div>
+            <Button onClick={handleClose} variant="outline" className="mt-2">
               Close
             </Button>
           </div>
@@ -171,69 +255,57 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
         <SheetHeader className="text-left pb-2">
           <SheetTitle className="text-xl font-bold text-sos flex items-center gap-2">
-            🚨 Emergency SOS
+            🚨 Emergency SOS Active
           </SheetTitle>
           <p className="text-sm text-muted-foreground">
-            Get immediate help or alert your emergency contacts
+            Alerts will be sent automatically when the timer reaches zero
           </p>
         </SheetHeader>
+
+        {/* Countdown - prominent */}
+        <div className="border-2 border-sos rounded-xl p-4 space-y-3 mt-4 animate-pulse">
+          <div className="text-center">
+            <p className="text-sos font-bold text-3xl tabular-nums">{timeLeft}s</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {sending ? "Sending alerts..." : "Sending SOS to all guardians & doctor"}
+            </p>
+          </div>
+          <Progress value={((30 - timeLeft) / 30) * 100} className="h-2 [&>div]:bg-sos" />
+          <Button onClick={handleCancel} variant="outline" className="w-full border-sos text-sos hover:bg-sos/10 h-12 text-base font-semibold">
+            <X className="w-5 h-5 mr-2" />
+            Cancel SOS
+          </Button>
+        </div>
 
         {/* Call 112 */}
         <a href="tel:112" className="block mt-4">
           <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-14 text-lg font-semibold gap-2">
             <Phone className="w-5 h-5" />
-            Call 112 Emergency Services
+            Call 112 Now
           </Button>
         </a>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-muted-foreground font-medium uppercase">Or Alert Your Emergency Contacts</span>
-          <div className="flex-1 h-px bg-border" />
+        {/* What will be sent */}
+        <div className="mt-5 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">What will be shared:</h3>
+
+          <div className="space-y-2 text-sm">
+            <InfoRow icon={<MapPin className="w-4 h-4 text-success" />} label="Live Location" value={location ? "✓ Captured" : "Acquiring..."} />
+            <InfoRow icon={<Droplets className="w-4 h-4 text-sos" />} label="Blood Type" value={medical.bloodGroup || "Not set"} />
+            <InfoRow icon={<AlertCircle className="w-4 h-4 text-destructive/70" />} label="Allergies" value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"} />
+            <InfoRow icon={<Pill className="w-4 h-4 text-primary" />} label="Conditions & Meds" value={[...medical.conditions, ...medical.medications].join(", ") || "None"} />
+            {medical.familyDoctorName && (
+              <InfoRow icon={<Stethoscope className="w-4 h-4 text-success" />} label="Family Doctor" value={`${medical.familyDoctorName}${medical.familyDoctorPhone ? ` · ${medical.familyDoctorPhone}` : ""}`} />
+            )}
+          </div>
         </div>
 
-        {/* Location note */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-          <MapPin className="w-4 h-4 text-success" />
-          <span>Location will be included in message</span>
-        </div>
-
-        {/* Medical Info Toggles */}
-        <div className="space-y-3 mb-5">
-          <h3 className="text-sm font-semibold text-foreground">Medical Information to Share</h3>
-          <InfoToggle icon={<Droplets className="w-4 h-4 text-sos" />} label="Blood Type" value={medical.bloodGroup || "Not set"} checked={toggles.blood} onToggle={() => toggle("blood")} />
-          <InfoToggle icon={<AlertCircle className="w-4 h-4 text-destructive/70" />} label="Allergies" value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"} checked={toggles.allergies} onToggle={() => toggle("allergies")} />
-          <InfoToggle icon={<Pill className="w-4 h-4 text-primary" />} label="Conditions" value={[...medical.conditions, ...medical.medications].length > 0 ? [...medical.conditions, ...medical.medications].join(", ") : "None"} checked={toggles.conditions} onToggle={() => toggle("conditions")} />
-          <InfoToggle icon={<Stethoscope className="w-4 h-4 text-success" />} label="Doctor" value={medical.doctorName || "Not set"} checked={toggles.doctor} onToggle={() => toggle("doctor")} />
-          {medical.familyDoctorName && (
-            <div className="flex items-center justify-between bg-success/10 rounded-lg p-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <Stethoscope className="w-4 h-4 text-success" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Family Doctor</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {medical.familyDoctorName}{medical.familyDoctorPhone ? ` · ${medical.familyDoctorPhone}` : ""}
-                  </p>
-                </div>
-              </div>
-              {medical.familyDoctorPhone && (
-                <a href={`tel:${medical.familyDoctorPhone}`}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
-                    <Phone className="w-4 h-4" />
-                  </Button>
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Guardians list */}
-        <div className="space-y-2 mb-5">
+        {/* Recipients */}
+        <div className="mt-5 space-y-2">
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">
-              {guardians.length} Guardian(s) will receive your SOS via SMS & WhatsApp
+              Alert Recipients ({guardians.length})
             </h3>
           </div>
           {guardians.map((g, i) => (
@@ -241,66 +313,36 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
                 <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
+                {g.guardian_email && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Mail className="w-3 h-3" />{g.guardian_email}
+                  </p>
+                )}
               </div>
               <div className="flex gap-1 shrink-0">
-                <a href={getWhatsAppLink(g.guardian_phone)} target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
-                    <MessageCircle className="w-4 h-4" />
-                  </Button>
-                </a>
-                <a href={`tel:${g.guardian_phone}`}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary">
-                    <Phone className="w-4 h-4" />
-                  </Button>
-                </a>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MessageCircle className="w-3 h-3 text-success" />
+                  <Mail className="w-3 h-3 text-primary" />
+                </span>
               </div>
             </div>
           ))}
           {guardians.length === 0 && (
-            <p className="text-xs text-muted-foreground">No guardians added yet</p>
+            <p className="text-xs text-destructive font-medium">⚠️ No guardians configured. Add guardians in My Profile.</p>
           )}
         </div>
-
-        {/* Countdown or Send button */}
-        {counting ? (
-          <div className="border-2 border-sos rounded-xl p-4 space-y-3">
-            <div className="text-center">
-              <p className="text-sos font-bold text-lg">Sending SOS in {timeLeft}s</p>
-              <p className="text-xs text-muted-foreground">Tap cancel to stop</p>
-            </div>
-            <Progress value={((30 - timeLeft) / 30) * 100} className="h-2 [&>div]:bg-sos" />
-            <Button onClick={handleCancel} variant="outline" className="w-full border-sos text-sos hover:bg-sos/10">
-              <X className="w-4 h-4 mr-2" />
-              Cancel SOS
-            </Button>
-          </div>
-        ) : (
-          <Button
-            onClick={() => { vibrate(200); setCounting(true); }}
-            className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold"
-          >
-            Send SOS Alert
-          </Button>
-        )}
       </SheetContent>
     </Sheet>
   );
 };
 
-const InfoToggle = ({
-  icon, label, value, checked, onToggle,
-}: {
-  icon: React.ReactNode; label: string; value: string; checked: boolean; onToggle: () => void;
-}) => (
-  <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
-    <div className="flex items-center gap-3 min-w-0">
-      {icon}
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="text-xs text-muted-foreground truncate">{value}</p>
-      </div>
+const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
+  <div className="flex items-center gap-3 bg-secondary/50 rounded-lg p-2.5">
+    {icon}
+    <div className="min-w-0 flex-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium text-foreground truncate">{value}</p>
     </div>
-    <Switch checked={checked} onCheckedChange={onToggle} />
   </div>
 );
 
