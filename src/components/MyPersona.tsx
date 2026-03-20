@@ -412,4 +412,12 @@ const MyPersonaContent = () => {
   );
 };
 
+const MyPersona = () => {
+  return (
+    <VaultGate title="My Persona">
+      <MyPersonaContent />
+    </VaultGate>
+  );
+};
+
 export default MyPersona;
