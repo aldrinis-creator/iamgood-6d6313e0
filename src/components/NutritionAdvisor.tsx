@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload } from "lucide-react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,20 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 
 type ActionType = "meal_plan" | "analyze_meal" | "post_workout" | "feeling_unwell";
+
+interface NutritionItem {
+  name: string;
+  description: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fats_g: number;
+  fiber_g: number;
+  health_benefits: string[];
+  potential_issues: string[];
+  health_rating: number;
+  suggestions: string[];
+}
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
@@ -18,11 +32,121 @@ const actionCards = [
   { type: "feeling_unwell" as ActionType, icon: Thermometer, title: "I'm Not Feeling Well", desc: "Gentle meal plan for recovery", color: "bg-sos/10 text-sos" },
 ];
 
+const MacroBar = ({ protein, carbs, fats }: { protein: number; carbs: number; fats: number }) => {
+  const total = protein + carbs + fats;
+  if (total === 0) return null;
+  const pPct = (protein / total) * 100;
+  const cPct = (carbs / total) * 100;
+  const fPct = (fats / total) * 100;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex h-3 w-full rounded-full overflow-hidden">
+        <div className="bg-blue-500 transition-all" style={{ width: `${pPct}%` }} />
+        <div className="bg-amber-400 transition-all" style={{ width: `${cPct}%` }} />
+        <div className="bg-rose-400 transition-all" style={{ width: `${fPct}%` }} />
+      </div>
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Protein {protein}g</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Carbs {carbs}g</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> Fats {fats}g</span>
+      </div>
+    </div>
+  );
+};
+
+const NutritionCard = ({ item }: { item: NutritionItem }) => (
+  <div className="space-y-3">
+    {/* Header card with calories & macros */}
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Flame className="w-5 h-5 text-orange-500" />
+          <h3 className="font-bold text-base">{item.name}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{item.description}</p>
+
+        {/* Calorie badge */}
+        <div className="bg-muted rounded-xl py-4 text-center">
+          <span className="text-3xl font-bold text-success tabular-nums">{item.calories}</span>
+          <span className="text-sm text-muted-foreground ml-1">kcal</span>
+        </div>
+
+        <MacroBar protein={item.protein_g} carbs={item.carbs_g} fats={item.fats_g} />
+
+        {item.fiber_g > 0 && (
+          <p className="text-xs text-center text-muted-foreground">Fiber: {item.fiber_g}g</p>
+        )}
+      </CardContent>
+    </Card>
+
+    {/* Health Benefits */}
+    {item.health_benefits?.length > 0 && (
+      <Card className="border-success/20">
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center gap-2 text-success font-semibold text-sm">
+            <CheckCircle className="w-4 h-4" />
+            Health Benefits
+          </div>
+          <ul className="space-y-2">
+            {item.health_benefits.map((b, i) => (
+              <li key={i} className="text-sm text-muted-foreground">• {b}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Potential Issues */}
+    {item.potential_issues?.length > 0 && (
+      <Card className="border-sos/20">
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center gap-2 text-sos font-semibold text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            Potential Issues
+          </div>
+          <ul className="space-y-2">
+            {item.potential_issues.map((p, i) => (
+              <li key={i} className="text-sm text-muted-foreground">• {p}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Suggestions */}
+    {item.suggestions?.length > 0 && (
+      <Card className="border-primary/20">
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+            <Lightbulb className="w-4 h-4" />
+            Suggestions
+          </div>
+          <ul className="space-y-2">
+            {item.suggestions.map((s, i) => (
+              <li key={i} className="text-sm text-muted-foreground">• {s}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Health Rating */}
+    {item.health_rating > 0 && (
+      <div className="flex items-center justify-center gap-1 py-1">
+        <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+        <span className="text-xs text-muted-foreground">Health Rating: {item.health_rating}/10</span>
+      </div>
+    )}
+  </div>
+);
+
 const NutritionAdvisor = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [aiResponse, setAiResponse] = useState("");
+  const [structuredData, setStructuredData] = useState<NutritionItem[] | null>(null);
 
   // Meal photo state
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
@@ -47,13 +171,30 @@ const NutritionAdvisor = () => {
     if (mealFileRef.current) mealFileRef.current.value = "";
   };
 
+  const parseResponse = (raw: string): NutritionItem[] | null => {
+    try {
+      // Strip markdown code fences if present
+      let cleaned = raw.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+      }
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].calories === "number") {
+        return parsed;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleAction = async (type: ActionType, image?: string | null) => {
     setActiveAction(type);
     setAiResponse("");
+    setStructuredData(null);
     setLoading(true);
     setShowMealUpload(false);
     try {
-      // Fetch persona for AI context
       let persona = null;
       if (user) {
         const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).single();
@@ -64,7 +205,14 @@ const NutritionAdvisor = () => {
       if (image) body.image = image;
       const { data, error } = await supabase.functions.invoke("nutrition-advisor", { body });
       if (error) throw error;
-      setAiResponse(data?.response || "No response received.");
+
+      const raw = data?.response || "";
+      const structured = parseResponse(raw);
+      if (structured) {
+        setStructuredData(structured);
+      } else {
+        setAiResponse(raw || "No response received.");
+      }
     } catch (e: any) {
       if (e?.message?.includes("429")) toast.error("Rate limited. Try again shortly.");
       else if (e?.message?.includes("402")) toast.error("AI credits exhausted. Please top up.");
@@ -85,11 +233,19 @@ const NutritionAdvisor = () => {
     }
   };
 
+  const resetView = () => {
+    setActiveAction(null);
+    setAiResponse("");
+    setStructuredData(null);
+    clearMealImage();
+    setShowMealUpload(false);
+  };
+
   // Meal photo upload screen
   if (showMealUpload && activeAction === "analyze_meal") {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => { setShowMealUpload(false); setActiveAction(null); clearMealImage(); }}>
+        <Button variant="ghost" size="sm" onClick={resetView}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
         <div className="flex items-center gap-2">
@@ -126,20 +282,27 @@ const NutritionAdvisor = () => {
     );
   }
 
-  if (activeAction && (loading || aiResponse)) {
+  if (activeAction && (loading || aiResponse || structuredData)) {
     const card = actionCards.find(c => c.type === activeAction)!;
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => { setActiveAction(null); setAiResponse(""); clearMealImage(); }}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        <Button variant="ghost" size="sm" onClick={resetView}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Nutrition
         </Button>
         <div className="flex items-center gap-2">
           <card.icon className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">{card.title}</h2>
         </div>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-xs text-muted-foreground">Analyzing nutrition data...</p>
+          </div>
+        ) : structuredData ? (
+          <div className="space-y-6">
+            {structuredData.map((item, idx) => (
+              <NutritionCard key={idx} item={item} />
+            ))}
           </div>
         ) : (
           <Card>
@@ -164,7 +327,7 @@ const NutritionAdvisor = () => {
           <button
             key={card.type}
             onClick={() => handleCardClick(card.type)}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-center"
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all text-center active:scale-[0.97]"
           >
             <div className={`w-12 h-12 rounded-full ${card.color} flex items-center justify-center`}>
               <card.icon className="w-6 h-6" />
