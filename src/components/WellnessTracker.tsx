@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   HeartPulse, Smile, Frown, Meh, Laugh, Angry,
   Moon, Zap, Brain, Save, Wind, Flower2, Music, Eye,
-  TrendingUp, TrendingDown, Minus,
+  TrendingUp, TrendingDown, Minus, Volume2, VolumeX, Award,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
-
+import { startMindfulnessAudio, stopMindfulnessAudio } from "@/lib/mindfulnessAudio";
 const MOODS = [
   { key: "great", label: "Great", icon: Laugh, color: "text-success" },
   { key: "good", label: "Good", icon: Smile, color: "text-success" },
@@ -52,6 +52,7 @@ const WellnessTracker = () => {
   const [showForm, setShowForm] = useState(false);
   const [activeExercise, setActiveExercise] = useState<number | null>(null);
   const [exerciseTimer, setExerciseTimer] = useState(0);
+  const [audioMuted, setAudioMuted] = useState(false);
 
   const [form, setForm] = useState({
     mood: "okay",
@@ -102,6 +103,7 @@ const WellnessTracker = () => {
     if (exerciseTimer >= target) {
       setForm(f => ({ ...f, mindfulness_minutes: f.mindfulness_minutes + MINDFULNESS_EXERCISES[activeExercise!].duration }));
       toast({ title: "Exercise Complete! 🧘", description: `Great job completing ${MINDFULNESS_EXERCISES[activeExercise!].label}` });
+      stopMindfulnessAudio();
       setActiveExercise(null);
       setExerciseTimer(0);
       return;
@@ -109,6 +111,60 @@ const WellnessTracker = () => {
     const interval = setInterval(() => setExerciseTimer(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, [activeExercise, exerciseTimer]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => { stopMindfulnessAudio(); };
+  }, []);
+
+  const startExercise = (index: number) => {
+    setActiveExercise(index);
+    setExerciseTimer(0);
+    if (!audioMuted) startMindfulnessAudio(index);
+  };
+
+  const stopExercise = () => {
+    stopMindfulnessAudio();
+    setActiveExercise(null);
+    setExerciseTimer(0);
+  };
+
+  const toggleAudio = () => {
+    const newMuted = !audioMuted;
+    setAudioMuted(newMuted);
+    if (activeExercise !== null) {
+      if (newMuted) stopMindfulnessAudio();
+      else startMindfulnessAudio(activeExercise);
+    }
+  };
+
+  const saveWellnessScore = async () => {
+    if (!user || form.mindfulness_minutes <= 0) return;
+    setSaving(true);
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { error } = await supabase
+      .from("wellness_logs")
+      .upsert({
+        user_id: user.id,
+        log_date: today,
+        mood: form.mood,
+        mood_score: MOOD_SCORE[form.mood] || 3,
+        sleep_quality: form.sleep_quality,
+        sleep_hours: form.sleep_hours,
+        energy_level: form.energy_level,
+        stress_level: form.stress_level,
+        mindfulness_minutes: form.mindfulness_minutes,
+        notes: form.notes || null,
+      }, { onConflict: "user_id,log_date" });
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Wellness Score Updated! 🏆", description: `${form.mindfulness_minutes} min added to your Health Passport.` });
+      fetchData();
+    }
+    setSaving(false);
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -416,13 +472,22 @@ const WellnessTracker = () => {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-foreground">{ex.label}</p>
-                <Button
-                  size="sm" variant="outline"
-                  onClick={() => { setActiveExercise(null); setExerciseTimer(0); }}
-                  className="border-destructive text-destructive hover:bg-destructive/10"
-                >
-                  Stop
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={toggleAudio}
+                    className="border-muted-foreground/30"
+                  >
+                    {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={stopExercise}
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                  >
+                    Stop
+                  </Button>
+                </div>
               </div>
             );
           })()}
@@ -437,11 +502,9 @@ const WellnessTracker = () => {
                   disabled={isDimmed}
                   onClick={() => {
                     if (isActive) {
-                      setActiveExercise(null);
-                      setExerciseTimer(0);
+                      stopExercise();
                     } else {
-                      setActiveExercise(i);
-                      setExerciseTimer(0);
+                      startExercise(i);
                     }
                   }}
                   className={`p-3 rounded-lg border text-left transition-all ${
@@ -458,9 +521,20 @@ const WellnessTracker = () => {
             })}
           </div>
           {form.mindfulness_minutes > 0 && (
-            <p className="text-xs text-success text-center">
-              🧘 {form.mindfulness_minutes} min of mindfulness today
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-success text-center">
+                🧘 {form.mindfulness_minutes} min of mindfulness today
+              </p>
+              <Button
+                onClick={saveWellnessScore}
+                disabled={saving}
+                size="sm"
+                className="w-full bg-success hover:bg-success/90 text-white"
+              >
+                <Award className="w-4 h-4 mr-2" />
+                {saving ? "Saving…" : "Add to Wellness Score"}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
