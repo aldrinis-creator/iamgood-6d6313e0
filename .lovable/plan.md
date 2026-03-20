@@ -1,56 +1,39 @@
 
 
-# Fix Activity Tracker Data Logging
+# Fix Activity Tracker — RLS + Error Visibility
 
-## Problem
-The Activity Tracker's "Save Today's Log" button likely fails silently due to the `onConflict` parameter format in the upsert call. The composite unique constraint on `(user_id, log_date)` may not be matching correctly.
+## Root Cause
 
-## Root Cause Investigation
-After reviewing the code, two potential issues:
+The `activity_logs` table's INSERT, SELECT, UPDATE, and DELETE RLS policies are granted `TO public` (anon role). In Supabase, while `public` technically includes all roles, best practice is `TO authenticated` for logged-in user operations — and several other working tables in this project (e.g. `wellness_logs`, `face_scans`) use `TO authenticated`. The mismatch may cause silent failures depending on Supabase configuration.
 
-1. **Upsert `onConflict` format** — Supabase JS client sometimes needs the constraint name rather than column names for composite keys. The current code uses `{ onConflict: "user_id,log_date" }` which may not resolve correctly.
-
-2. **No error visibility** — If the upsert fails but doesn't throw (returns error in response), the toast shows the error, but if the user misses it, data silently doesn't persist.
+Additionally, the `maybeSingle()` query checking for existing rows doesn't capture errors — if it fails, the flow silently proceeds to an insert that may also fail.
 
 ## Changes
 
-### 1. `src/components/ActivityTracker.tsx`
-- Add `console.error` logging alongside the toast for debugging
-- Add an explicit check: try insert first, if conflict then update (two-step approach as fallback)
-- Alternatively, switch to a select-then-upsert pattern: check if today's entry exists, then use `insert` or `update` accordingly
-- Add a `console.log` before the upsert call to confirm `handleSave` is actually invoked with the correct payload
+### 1. Database Migration — Fix RLS policies on `activity_logs`
 
-### 2. Verification approach
-- After the fix, the save flow will: check for existing row → insert or update → refresh data → update UI
+Drop and recreate all four user policies with `TO authenticated` (matching the pattern used by `wellness_logs` and other working tables):
 
-## Specific code fix
-Replace the single `upsert` with:
-```typescript
-// Check if today's entry exists
-const { data: existing } = await supabase
-  .from("activity_logs")
-  .select("id")
-  .eq("user_id", user.id)
-  .eq("log_date", today)
-  .maybeSingle();
+```sql
+DROP POLICY IF EXISTS "Users can insert own activity_logs" ON activity_logs;
+DROP POLICY IF EXISTS "Users can select own activity_logs" ON activity_logs;
+DROP POLICY IF EXISTS "Users can update own activity_logs" ON activity_logs;
+DROP POLICY IF EXISTS "Users can delete own activity_logs" ON activity_logs;
 
-const payload = { user_id: user.id, log_date: today, ...formFields };
+CREATE POLICY "Users can insert own activity_logs" ON activity_logs
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
-if (existing) {
-  // Update existing
-  const { error } = await supabase
-    .from("activity_logs")
-    .update(formFields)
-    .eq("id", existing.id);
-} else {
-  // Insert new
-  const { error } = await supabase
-    .from("activity_logs")
-    .insert(payload);
-}
+CREATE POLICY "Users can select own activity_logs" ON activity_logs
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own activity_logs" ON activity_logs
+  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own activity_logs" ON activity_logs
+  FOR DELETE TO authenticated USING (auth.uid() = user_id);
 ```
 
-This avoids the `onConflict` issue entirely and is more reliable with composite unique constraints.
+### 2. `src/components/ActivityTracker.tsx` — Add error handling for the existence check
 
-No database changes needed.
+Capture the error from the `maybeSingle()` call. If it errors, log it and fall through to insert. Also add a `console.log` confirming save was triggered with the payload, so we have visibility if the issue persists.
 
