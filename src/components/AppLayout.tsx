@@ -8,6 +8,7 @@ import FallDetectionOverlay from "@/components/FallDetectionOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
+import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
 
@@ -63,6 +64,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && <SOSButton />}
         <EmergencyModeOverlay />
         {role === "user" && <FallDetectionOverlay />}
+        <BatteryWarning />
         <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
       </div>
     </div>
