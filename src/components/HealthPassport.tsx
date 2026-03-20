@@ -36,6 +36,8 @@ const getBarColor = (score: number) => {
 const HealthPassport = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useUserSettings();
+  const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Face Scan", score: 0, max: 100, action: "Start Scan" },
