@@ -188,10 +188,31 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           />
         </div>
 
-        {/* Guardian count */}
-        <p className="text-sm text-muted-foreground mb-4">
-          <span className="font-semibold text-foreground">{guardianCount}</span> guardian(s) will receive your SOS via SMS &amp; WhatsApp
-        </p>
+        {/* Guardians list */}
+        <div className="space-y-2 mb-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">
+              {guardians.length} Guardian(s) will receive your SOS
+            </h3>
+          </div>
+          {guardians.map((g, i) => (
+            <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
+              </div>
+              <a href={`tel:${g.guardian_phone}`}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-success">
+                  <Phone className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
+          ))}
+          {guardians.length === 0 && (
+            <p className="text-xs text-muted-foreground">No guardians added yet</p>
+          )}
+        </div>
 
         {/* Countdown or Send button */}
         {counting ? (
