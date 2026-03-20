@@ -35,6 +35,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
   const [medical, setMedical] = useState<MedicalInfo>({
     bloodGroup: null, allergies: [], conditions: [], medications: [], doctorName: null,
+    familyDoctorName: null, familyDoctorPhone: null,
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [toggles, setToggles] = useState({ blood: true, allergies: true, conditions: true, doctor: true });
