@@ -105,7 +105,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
             </div>
             <h2 className="text-xl font-bold text-foreground">SOS Alert Sent!</h2>
             <p className="text-muted-foreground text-sm">
-              Your {guardianCount} guardian(s) have been alerted with your location
+              Your {guardians.length} guardian(s) have been alerted with your location
               {toggles.blood && medical.bloodGroup ? " and medical info" : ""}.
             </p>
             <Button onClick={handleClose} variant="outline" className="mt-4">
