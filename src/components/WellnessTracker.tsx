@@ -52,6 +52,7 @@ const WellnessTracker = () => {
   const [showForm, setShowForm] = useState(false);
   const [activeExercise, setActiveExercise] = useState<number | null>(null);
   const [exerciseTimer, setExerciseTimer] = useState(0);
+  const [audioMuted, setAudioMuted] = useState(false);
 
   const [form, setForm] = useState({
     mood: "okay",
