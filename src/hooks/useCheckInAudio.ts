@@ -47,9 +47,11 @@ const useCheckInAudio = () => {
           if (!responded) {
             firedRef.current.add(dueKey);
             fireAlert("We hope you are well, Please Check-iN");
-            toast("Time for your Check-iN! 💓", {
-              description: "We hope you are well. Please tap the heart to check in.",
-              duration: 10000,
+            showReminderOverlay({
+              type: "checkin",
+              title: "Check-In Reminder",
+              message: "You haven't checked in yet. Please tap below to let us know you're okay.",
+              reminderCount: `Reminder — ${formatHour(h)}`,
             });
           }
         }
