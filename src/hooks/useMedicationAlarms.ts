@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { toast } from "sonner";
+import { showReminderOverlay } from "@/components/ReminderOverlay";
 
 const useMedicationAlarms = () => {
   const { session } = useAuth();
