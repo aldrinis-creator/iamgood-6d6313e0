@@ -1,6 +1,6 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, UserCog } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, UserCog, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/AppLayout";
@@ -30,6 +30,7 @@ const healthTools = [
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
   { icon: UserCog, label: "My Persona", color: "bg-success/10 text-success" },
+  { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
 ];
 
 const healthToolsSubItems = [
@@ -65,6 +66,7 @@ const toolComponents: Record<string, React.FC> = {
 
 const MyHealth = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
 
@@ -144,7 +146,7 @@ const MyHealth = () => {
           {healthTools.map((tool) => (
             <button
               key={tool.label}
-              onClick={() => setSelectedTool(tool.label)}
+              onClick={() => tool.label === "Vault" ? navigate("/medical-vault") : setSelectedTool(tool.label)}
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
             >
               <div className={`w-12 h-12 rounded-full ${tool.color} flex items-center justify-center`}>
