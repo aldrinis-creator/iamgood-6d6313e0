@@ -4,7 +4,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+
 
 const CHECK_IN_HOURS = [7, 12, 19];
 
