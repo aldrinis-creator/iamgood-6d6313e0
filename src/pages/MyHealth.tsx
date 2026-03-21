@@ -66,6 +66,7 @@ const toolComponents: Record<string, React.FC> = {
 
 const MyHealth = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
 
