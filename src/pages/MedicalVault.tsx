@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Eye, EyeOff, FileText, Shield, Heart, User, Upload, Trash2, Download,
-  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer
+  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer, Share2, Save, Pill, AlertTriangle
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -20,12 +20,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
-import GuardianTab from "@/components/GuardianTab";
-import PhoneInput from "@/components/PhoneInput";
 
 const RECORD_TYPES = [
   "Prescription", "Lab Report", "Discharge Summary",
-  "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Other",
+  "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Legal Will", "Other",
 ];
 
 interface MedicalRecord {
@@ -39,16 +37,6 @@ interface MedicalRecord {
   file_name: string | null;
   file_url: string | null;
   created_at: string;
-}
-
-interface HealthProfileData {
-  blood_group: string;
-  allergies: string[];
-  chronic_conditions: string[];
-  current_medications: string[];
-  emergency_notes: string;
-  family_doctor_name: string;
-  family_doctor_phone: string;
 }
 
 interface ProfileViewData {
@@ -70,7 +58,24 @@ interface ProfileViewData {
   family_doctor_name: string;
   family_doctor_phone: string;
   emergency_notes: string;
-  current_medications: string[];
+}
+
+interface MedicationView {
+  name: string;
+  dosage: string;
+  frequency: string;
+  schedule_times: string[];
+  remaining_quantity: number;
+  total_quantity: number;
+  low_stock_threshold: number;
+}
+
+interface GuardianView {
+  guardian_name: string;
+  guardian_phone: string;
+  guardian_email: string | null;
+  relation: string | null;
+  is_primary: boolean;
 }
 
 interface EncryptedDoc {
@@ -88,7 +93,15 @@ const DOC_TYPES = [
   { key: "driving_license", label: "Driving License", placeholder: "DL-1234567890" },
   { key: "health_insurance_id", label: "Health Insurance ID", placeholder: "Policy number" },
   { key: "life_insurance_id", label: "Life Insurance ID", placeholder: "Policy number" },
+  { key: "legal_will", label: "Legal Will", placeholder: "Will reference or details" },
 ];
+
+const FREQUENCIES: Record<string, string> = {
+  once_daily: "Once daily",
+  twice_daily: "Twice daily",
+  three_daily: "3× daily",
+  as_needed: "As needed",
+};
 
 const MedicalVaultContent = () => {
   const { session } = useAuth();
@@ -110,16 +123,11 @@ const MedicalVaultContent = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
 
-  // --- Profile Tab (read-only aggregated view) ---
+  // --- Profile Tab (fully read-only) ---
   const [profileView, setProfileView] = useState<ProfileViewData | null>(null);
+  const [profileMeds, setProfileMeds] = useState<MedicationView[]>([]);
+  const [profileGuardians, setProfileGuardians] = useState<GuardianView[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
-  // Editable fields in vault profile tab
-  const [emergencyNotes, setEmergencyNotes] = useState("");
-  const [currentMedications, setCurrentMedications] = useState<string[]>([]);
-  const [medicationInput, setMedicationInput] = useState("");
-  const [familyDoctorName, setFamilyDoctorName] = useState("");
-  const [familyDoctorPhone, setFamilyDoctorPhone] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
 
   // --- Secret Vault Tab ---
   const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);
@@ -130,7 +138,9 @@ const MedicalVaultContent = () => {
   const [addDocDialog, setAddDocDialog] = useState(false);
   const [addDocType, setAddDocType] = useState("");
   const [addDocValue, setAddDocValue] = useState("");
+  const [addDocFile, setAddDocFile] = useState<File | null>(null);
   const [addingDoc, setAddingDoc] = useState(false);
+  const vaultFileRef = useRef<HTMLInputElement>(null);
 
   // ===================== RECORDS =====================
 
@@ -208,21 +218,55 @@ const MedicalVaultContent = () => {
     a.click();
   };
 
+  const handleShare = async (r: MedicalRecord) => {
+    if (!r.file_url) {
+      // Share text-only record
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: r.title,
+            text: `${r.record_type} — ${r.title}${r.doctor_name ? ` (Dr. ${r.doctor_name})` : ""}`,
+          });
+        } catch { /* user cancelled */ }
+      } else {
+        toast.info("Sharing not supported on this browser");
+      }
+      return;
+    }
+    // Download file and share
+    const { data } = await supabase.storage.from("medical-documents").download(r.file_url);
+    if (!data) { toast.error("Failed to load file for sharing"); return; }
+    const file = new window.File([data], r.file_name || "document", { type: data.type });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ title: r.title, files: [file] });
+      } catch { /* user cancelled */ }
+    } else if (navigator.share) {
+      try {
+        await navigator.share({ title: r.title, text: `${r.record_type}: ${r.title}` });
+      } catch { /* user cancelled */ }
+    } else {
+      toast.info("Sharing not supported on this browser");
+    }
+  };
+
   const filteredRecords = records.filter((r) => {
     const matchSearch = !searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchType = !filterType || r.record_type === filterType;
     return matchSearch && matchType;
   });
 
-  // ===================== PROFILE (aggregated read-only) =====================
+  // ===================== PROFILE (fully read-only) =====================
 
   const fetchProfileView = useCallback(async () => {
     if (!userId) return;
     setProfileLoading(true);
-    const [{ data: prof }, { data: persona }, { data: hp }] = await Promise.all([
+    const [{ data: prof }, { data: persona }, { data: hp }, { data: meds }, { data: guards }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
       supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("health_profile").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("medications").select("name, dosage, frequency, schedule_times, remaining_quantity, total_quantity, low_stock_threshold").eq("user_id", userId).order("name"),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
     ]);
 
     setProfileView({
@@ -244,36 +288,14 @@ const MedicalVaultContent = () => {
       family_doctor_name: hp?.family_doctor_name || "",
       family_doctor_phone: hp?.family_doctor_phone || "",
       emergency_notes: hp?.emergency_notes || "",
-      current_medications: hp?.current_medications || [],
     });
 
-    setEmergencyNotes(hp?.emergency_notes || "");
-    setCurrentMedications(hp?.current_medications || []);
-    setFamilyDoctorName(hp?.family_doctor_name || "");
-    setFamilyDoctorPhone(hp?.family_doctor_phone || "");
+    setProfileMeds((meds as MedicationView[]) || []);
+    setProfileGuardians((guards as GuardianView[]) || []);
     setProfileLoading(false);
   }, [userId]);
 
   useEffect(() => { fetchProfileView(); }, [fetchProfileView]);
-
-  const saveHealthProfile = async () => {
-    if (!userId) return;
-    setProfileSaving(true);
-    const { error } = await supabase.from("health_profile").upsert({
-      user_id: userId,
-      emergency_notes: emergencyNotes || null,
-      current_medications: currentMedications,
-      family_doctor_name: familyDoctorName || null,
-      family_doctor_phone: familyDoctorPhone || null,
-    } as any, { onConflict: "user_id" });
-    if (error) {
-      toast.error("Failed to save");
-    } else {
-      toast.success("Health profile saved");
-      fetchProfileView();
-    }
-    setProfileSaving(false);
-  };
 
   // ===================== EMERGENCY PDF =====================
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -282,13 +304,6 @@ const MedicalVaultContent = () => {
     if (!userId || !profileView) return;
     setGeneratingPdf(true);
     try {
-      const [{ data: guardians }, { data: meds }] = await Promise.all([
-        supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary")
-          .eq("user_id", userId).order("is_primary", { ascending: false }),
-        supabase.from("medications").select("name, dosage, frequency, schedule_times, instructions")
-          .eq("user_id", userId),
-      ]);
-
       const pv = profileView;
       const userName = pv.full_name || "User";
       const now = new Date().toLocaleString("en-IN");
@@ -324,18 +339,17 @@ ${pv.blood_group ? `<div class="row"><span class="label">Blood Group</span><span
 </div></div>
 ${pv.allergies.length > 0 ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${pv.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
 ${pv.medical_conditions.length > 0 ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${pv.medical_conditions.map(c => `<span class="badge badge-blue">${c}</span>`).join(" ")}</div></div>` : ""}
-${pv.current_medications.length > 0 || (meds && meds.length > 0) ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body">
-${meds && meds.length > 0 ? `<table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g, " ")}</td><td>${(m.schedule_times || []).join(", ")}</td></tr>`).join("")}</table>` : ""}
-${pv.current_medications.length > 0 ? `<div style="margin-top:8px">${pv.current_medications.map(m => `<span class="badge badge-green">${m}</span>`).join(" ")}</div>` : ""}
+${profileMeds.length > 0 ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body">
+<table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${profileMeds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g, " ")}</td><td>${(m.schedule_times || []).join(", ")}</td></tr>`).join("")}</table>
 </div></div>` : ""}
 ${pv.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${pv.emergency_notes}</p></div></div>` : ""}
 ${pv.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${pv.family_doctor_name}</span></div>
 ${pv.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${pv.family_doctor_phone}</span></div>` : ""}
 </div></div>` : ""}
-${guardians && guardians.length > 0 ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body">
+${profileGuardians.length > 0 ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body">
 <table><tr><th>Name</th><th>Relation</th><th>Phone</th><th>Email</th></tr>
-${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td><td>${g.guardian_email || "—"}</td></tr>`).join("")}
+${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td><td>${g.guardian_email || "—"}</td></tr>`).join("")}
 </table></div></div>` : ""}
 <div class="footer"><p>Auto-generated by Check-iN Emergency Response System. Keep this card with you or share with caregivers.</p></div>
 </body></html>`;
@@ -412,10 +426,19 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
         });
       }
 
+      // Upload file attachment if provided
+      if (addDocFile) {
+        const ext = addDocFile.name.split(".").pop();
+        const path = `${userId}/vault_${addDocType}.${ext}`;
+        await supabase.storage.from("medical-documents").remove([path]);
+        await supabase.storage.from("medical-documents").upload(path, addDocFile, { upsert: true });
+      }
+
       toast.success("Document encrypted & saved");
       setAddDocDialog(false);
       setAddDocType("");
       setAddDocValue("");
+      setAddDocFile(null);
       setVaultUnlocked(false);
       setDecryptedValues({});
       fetchEncryptedDocs();
@@ -443,45 +466,26 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
     </div>
   );
 
-  const ChipInput = ({ label, items, onAdd, onRemove, inputValue, setInputValue, placeholder }: {
-    label: string; items: string[]; onAdd: () => void; onRemove: (i: number) => void;
-    inputValue: string; setInputValue: (v: string) => void; placeholder: string;
-  }) => (
-    <div>
-      <Label>{label}</Label>
-      <div className="flex gap-1 flex-wrap mb-2">
-        {items.map((item, i) => (
-          <Badge key={i} variant="secondary" className="text-xs cursor-pointer" onClick={() => onRemove(i)}>
-            {item} ✕
-          </Badge>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Input
-          placeholder={placeholder} value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onAdd(); setInputValue(""); } }}
-          className="text-base"
-        />
-        <Button variant="outline" size="sm" onClick={() => { onAdd(); setInputValue(""); }}>
-          <Plus className="w-3 h-3" />
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <Shield className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Medical Vault</h1>
+          <p className="text-xs text-muted-foreground">Your encrypted health records & documents</p>
+        </div>
+      </div>
+
       <Tabs defaultValue="records">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="records" className="text-xs gap-1">
             <FileText className="w-3 h-3" /> Records
           </TabsTrigger>
           <TabsTrigger value="profile" className="text-xs gap-1">
             <Heart className="w-3 h-3" /> Profile
-          </TabsTrigger>
-          <TabsTrigger value="guardian" className="text-xs gap-1">
-            <User className="w-3 h-3" /> Guardian
           </TabsTrigger>
           <TabsTrigger value="vault" className="text-xs gap-1">
             <Lock className="w-3 h-3" /> Vault
@@ -579,10 +583,13 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                   </div>
                   <div className="flex gap-1 shrink-0">
                     {r.file_url && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDownload(r)}>
-                        <Download className="w-3 h-3" />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDownload(r)} title="Save As">
+                        <Save className="w-3 h-3" />
                       </Button>
                     )}
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(r)} title="Share">
+                      <Share2 className="w-3 h-3" />
+                    </Button>
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(r)}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -593,7 +600,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
           )}
         </TabsContent>
 
-        {/* ========== PROFILE TAB (read-only + editable health fields) ========== */}
+        {/* ========== PROFILE TAB (fully read-only) ========== */}
         <TabsContent value="profile" className="space-y-4 mt-4">
           {profileLoading ? (
             <div className="flex justify-center py-8">
@@ -658,44 +665,81 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                 </CardContent>
               </Card>
 
+              {/* Family Doctor & Emergency — read-only */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Shield className="w-4 h-4 text-primary" /> Emergency & Doctor
                   </CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label>Family Doctor Name</Label>
-                    <Input value={familyDoctorName} onChange={(e) => setFamilyDoctorName(e.target.value)} placeholder="Dr. " className="text-base" />
-                  </div>
-                  <div>
-                    <Label>Family Doctor Phone</Label>
-                    <PhoneInput value={familyDoctorPhone} onChange={setFamilyDoctorPhone} />
-                  </div>
-                  <ChipInput
-                    label="Current Medications" items={currentMedications}
-                    onAdd={() => { if (medicationInput.trim()) { setCurrentMedications(prev => [...prev, medicationInput.trim()]); } }}
-                    onRemove={(i) => setCurrentMedications(prev => prev.filter((_, idx) => idx !== i))}
-                    inputValue={medicationInput} setInputValue={setMedicationInput}
-                    placeholder="e.g. Metformin 500mg"
-                  />
-                  <div>
-                    <Label>Emergency Notes</Label>
-                    <Textarea
-                      placeholder="Any critical info for responders..."
-                      value={emergencyNotes}
-                      onChange={(e) => setEmergencyNotes(e.target.value)}
-                      rows={2}
-                    />
-                  </div>
+                <CardContent className="space-y-1">
+                  <InfoRow label="Family Doctor" value={profileView.family_doctor_name} />
+                  <InfoRow label="Doctor Phone" value={profileView.family_doctor_phone} />
+                  {profileView.emergency_notes && (
+                    <div className="pt-1">
+                      <span className="text-muted-foreground text-sm">Emergency Notes</span>
+                      <p className="text-sm mt-1">{profileView.emergency_notes}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              <Button onClick={saveHealthProfile} disabled={profileSaving} className="w-full" size="lg">
-                {profileSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
-                  : <><ShieldCheck className="w-4 h-4 mr-2" /> Save Health Profile</>}
-              </Button>
+              {/* Medications — read-only */}
+              {profileMeds.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Pill className="w-4 h-4 text-primary" /> Current Medications
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {profileMeds.map((med, i) => {
+                      const isLow = med.remaining_quantity <= med.low_stock_threshold;
+                      return (
+                        <div key={i} className={`flex items-center gap-3 p-2 rounded-lg bg-muted/50 ${isLow ? "border border-destructive/30" : ""}`}>
+                          <Pill className="w-4 h-4 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{med.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {med.dosage} · {FREQUENCIES[med.frequency] || med.frequency}
+                            </p>
+                          </div>
+                          {isLow && (
+                            <Badge variant="destructive" className="text-[10px] shrink-0">
+                              <AlertTriangle className="w-3 h-3 mr-0.5" /> Low
+                            </Badge>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Guardians — read-only */}
+              {profileGuardians.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-primary" /> Guardians
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {profileGuardians.map((g, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                        <div>
+                          <p className="text-sm font-medium">{g.guardian_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
+                          </p>
+                        </div>
+                        {g.is_primary && <Badge className="text-xs">Primary</Badge>}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
               <Button onClick={generateEmergencyPdf} disabled={generatingPdf} variant="outline" className="w-full" size="lg">
                 {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
@@ -704,9 +748,6 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
             </>
           ) : null}
         </TabsContent>
-
-        {/* ========== GUARDIAN TAB ========== */}
-        <GuardianTab userId={userId} />
 
         {/* ========== SECRET VAULT TAB ========== */}
         <TabsContent value="vault" className="space-y-4 mt-4">
@@ -807,6 +848,16 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                 value={addDocValue} onChange={(e) => setAddDocValue(e.target.value)}
                 className="text-base"
               />
+            </div>
+            <div>
+              <Label>Upload Document (optional)</Label>
+              <Input
+                ref={vaultFileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                onChange={(e) => setAddDocFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Attach a scan or photo of the document</p>
             </div>
             <Button onClick={handleAddDoc} disabled={addingDoc || !addDocType || !addDocValue.trim()} className="w-full">
               {addingDoc ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Encrypting...</>

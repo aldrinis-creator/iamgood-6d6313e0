@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
@@ -13,22 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
-  User, Phone, Calendar, Scale, Ruler, Heart, Shield, Eye, EyeOff, Lock,
-  Save, Edit, ShieldCheck, Stethoscope, Camera, Upload, X, FileText, Image,
-  Trash2, Mail, Plus, Loader2, ChevronDown, Activity, Apple,
+  User, Phone, Calendar, Scale, Ruler, Heart, Shield,
+  Save, Edit, ShieldCheck, Stethoscope,
+  Trash2, Mail, Plus, Loader2, ChevronDown, Activity, Apple, Pill, AlertTriangle,
 } from "lucide-react";
-import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { differenceInYears, parse } from "date-fns";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import PhoneInput from "@/components/PhoneInput";
-
-interface EncryptedDoc {
-  id: string;
-  doc_type: string;
-  encrypted_value: string;
-  iv: string;
-  salt: string;
-}
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
@@ -52,7 +42,25 @@ const GOAL_OPTIONS = [
   "Energy Boost", "Immunity Boost",
 ];
 
+const FREQUENCIES: Record<string, string> = {
+  once_daily: "Once daily",
+  twice_daily: "Twice daily",
+  three_daily: "3× daily",
+  as_needed: "As needed",
+};
+
 const getBmiInfo = (bmi: number) => BMI_CATEGORIES.find((c) => bmi < c.max) ?? BMI_CATEGORIES[3];
+
+interface Medication {
+  id: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  schedule_times: string[];
+  remaining_quantity: number;
+  total_quantity: number;
+  low_stock_threshold: number;
+}
 
 const MyProfile = () => {
   return (
@@ -185,55 +193,25 @@ const ProfileContent = () => {
   const [dietaryPreferences, setDietaryPreferences] = useState<string[]>([]);
   const [healthGoals, setHealthGoals] = useState<string[]>([]);
 
-  // Encrypted docs
-  const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);
-  const [hasPin, setHasPin] = useState(false);
-  const [pinHash, setPinHash] = useState("");
-  const [currentPin, setCurrentPin] = useState("");
-
-  // Vault dialogs
-  const [showEnterPin, setShowEnterPin] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const [pendingAction, setPendingAction] = useState<"view" | "add" | null>(null);
-  const [pendingDocType, setPendingDocType] = useState("");
-
-  // Decrypted values
-  const [decryptedValues, setDecryptedValues] = useState<Record<string, string>>({});
-  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
-
-  // Add doc dialog
-  const [showAddDoc, setShowAddDoc] = useState(false);
-  const [newDocValue, setNewDocValue] = useState("");
-  const [addDocType, setAddDocType] = useState("aadhaar");
-
-  // Photo upload
-  const [idPhotos, setIdPhotos] = useState<Record<string, string>>({});
-  const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [photoUploadType, setPhotoUploadType] = useState("");
+  // Medications (read-only)
+  const [medications, setMedications] = useState<Medication[]>([]);
 
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!userId) return;
 
-    const [guardianRes, healthRes, docsRes, pinRes, personaRes] = await Promise.all([
+    const [guardianRes, healthRes, personaRes, medsRes] = await Promise.all([
       supabase.from("guardians").select("*").eq("user_id", userId).order("is_primary", { ascending: false }),
       supabase.from("health_profile").select("*").eq("user_id", userId).limit(1),
-      supabase.from("encrypted_documents").select("*").eq("user_id", userId),
-      supabase.from("vault_pins").select("*").eq("user_id", userId).limit(1),
       supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("medications").select("*").eq("user_id", userId).order("name"),
     ]);
 
     if (guardianRes.data) setGuardians(guardianRes.data);
     if (healthRes.data?.[0]) {
       setDoctorName((healthRes.data[0] as any).family_doctor_name || "");
       setDoctorPhone((healthRes.data[0] as any).family_doctor_phone || "");
-    }
-    if (docsRes.data) setEncDocs(docsRes.data as EncryptedDoc[]);
-    if (pinRes.data?.[0]) {
-      setHasPin(true);
-      setPinHash(pinRes.data[0].pin_hash);
     }
 
     // Load persona data
@@ -250,15 +228,7 @@ const ProfileContent = () => {
       setHealthGoals(p.health_goals || []);
     }
 
-    // Load photo URLs
-    for (const type of ["aadhaar", "pan"]) {
-      const { data } = await supabase.storage
-        .from("medical-documents")
-        .createSignedUrl(`${userId}/${type}_photo`, 3600);
-      if (data?.signedUrl) {
-        setIdPhotos((prev) => ({ ...prev, [type]: data.signedUrl }));
-      }
-    }
+    if (medsRes.data) setMedications(medsRes.data as Medication[]);
   }, [userId]);
 
   useEffect(() => {
@@ -321,125 +291,6 @@ const ProfileContent = () => {
     }
   };
 
-  // Encrypted doc PIN flow
-  const requestPin = (action: "view" | "add", docType: string = "") => {
-    setPendingAction(action);
-    setPendingDocType(docType);
-    if (!currentPin) {
-      setShowEnterPin(true);
-    } else if (action === "view") {
-      decryptDoc(docType, currentPin);
-    } else {
-      setShowAddDoc(true);
-    }
-  };
-
-  const handleVerifyPin = async () => {
-    const hash = await hashPin(pinInput);
-    if (hash !== pinHash) {
-      toast.error("Incorrect PIN");
-      return;
-    }
-    setCurrentPin(pinInput);
-    setShowEnterPin(false);
-    setPinInput("");
-    if (pendingAction === "view") {
-      await decryptDoc(pendingDocType, pinInput);
-    } else if (pendingAction === "add") {
-      setShowAddDoc(true);
-    }
-    setPendingAction(null);
-    setPendingDocType("");
-  };
-
-  const decryptDoc = async (docType: string, pin: string) => {
-    const doc = encDocs.find((d) => d.doc_type === docType);
-    if (!doc) return;
-    try {
-      const value = await decrypt(doc.encrypted_value, doc.iv, doc.salt, pin);
-      setDecryptedValues((prev) => ({ ...prev, [docType]: value }));
-      setShowValues((prev) => ({ ...prev, [docType]: true }));
-      setTimeout(() => {
-        setShowValues((prev) => ({ ...prev, [docType]: false }));
-        setDecryptedValues((prev) => { const c = { ...prev }; delete c[docType]; return c; });
-      }, 30000);
-    } catch {
-      toast.error("Decryption failed — wrong PIN?");
-      setCurrentPin("");
-    }
-  };
-
-  const handleAddDoc = async () => {
-    if (!newDocValue.trim() || !currentPin) return;
-    const encrypted = await encrypt(newDocValue.trim(), currentPin);
-    const { error } = await supabase.from("encrypted_documents").upsert({
-      user_id: userId!,
-      doc_type: addDocType,
-      encrypted_value: encrypted.ciphertext,
-      iv: encrypted.iv,
-      salt: encrypted.salt,
-      updated_at: new Date().toISOString(),
-    } as any, { onConflict: "user_id,doc_type" });
-    if (error) {
-      toast.error("Failed to save document");
-    } else {
-      toast.success(`${addDocType.toUpperCase()} saved securely`);
-      setShowAddDoc(false);
-      setNewDocValue("");
-      loadData();
-    }
-  };
-
-  const toggleShowDoc = (docType: string) => {
-    if (showValues[docType]) {
-      setShowValues((prev) => ({ ...prev, [docType]: false }));
-    } else {
-      requestPin("view", docType);
-    }
-  };
-
-  const hasDoc = (type: string) => encDocs.some((d) => d.doc_type === type);
-
-  // Photo upload handler
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !userId || !photoUploadType) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File must be under 5MB");
-      return;
-    }
-
-    setUploadingPhoto(photoUploadType);
-    const path = `${userId}/${photoUploadType}_photo`;
-
-    await supabase.storage.from("medical-documents").remove([path]);
-
-    const { error } = await supabase.storage
-      .from("medical-documents")
-      .upload(path, file, { upsert: true });
-
-    if (error) {
-      toast.error("Failed to upload photo");
-    } else {
-      toast.success(`${photoUploadType === "aadhaar" ? "Aadhaar" : "PAN"} photo uploaded`);
-      const { data } = await supabase.storage
-        .from("medical-documents")
-        .createSignedUrl(path, 3600);
-      if (data?.signedUrl) {
-        setIdPhotos((prev) => ({ ...prev, [photoUploadType]: data.signedUrl }));
-      }
-    }
-    setUploadingPhoto(null);
-    setPhotoUploadType("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const triggerPhotoUpload = (type: string) => {
-    setPhotoUploadType(type);
-    setTimeout(() => fileInputRef.current?.click(), 50);
-  };
-
   const addChip = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
     if (!value.trim()) return;
     setter((prev) => [...prev, value.trim()]);
@@ -451,16 +302,6 @@ const ProfileContent = () => {
 
   return (
     <div className="space-y-4">
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handlePhotoUpload}
-      />
-
       {/* Edit toggle */}
       <div className="flex justify-end">
         <Button
@@ -804,119 +645,56 @@ const ProfileContent = () => {
         </CardContent>
       </Card>
 
-      {/* Government ID Cards */}
+      {/* Current Medications (read-only from medications table) */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Lock className="w-4 h-4 text-primary" /> Government ID Cards
-            <Badge variant="secondary" className="text-xs ml-auto">AES-256-GCM</Badge>
+            <Pill className="w-4 h-4 text-primary" /> Current Medications
+            <span className="text-xs text-muted-foreground font-normal ml-auto">{medications.length} active</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {["aadhaar", "pan"].map((type) => (
-            <div key={type} className="rounded-lg bg-muted/50 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{type === "aadhaar" ? "Aadhaar Card" : "PAN Card"}</p>
-                  {hasDoc(type) ? (
-                    <p className="text-xs font-mono mt-0.5">
-                      {showValues[type] && decryptedValues[type] ? decryptedValues[type] : "●●●● ●●●● ●●●●"}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Not added</p>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  {hasDoc(type) ? (
-                    <Button size="icon" variant="ghost" onClick={() => toggleShowDoc(type)}>
-                      {showValues[type] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => { setAddDocType(type); requestPin("add"); }}>
-                      Add
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Photo section */}
-              <div className="flex items-center gap-3">
-                {idPhotos[type] ? (
-                  <div className="relative">
-                    <img
-                      src={idPhotos[type]}
-                      alt={`${type} photo`}
-                      className="w-20 h-14 object-cover rounded border"
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="absolute -top-1 -right-1 h-5 w-5 bg-background shadow rounded-full"
-                      onClick={() => triggerPhotoUpload(type)}
-                    >
-                      <Camera className="w-3 h-3" />
-                    </Button>
+        <CardContent className="space-y-2">
+          {medications.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No medications added yet. Add them from the Tablets tab.
+            </p>
+          ) : (
+            medications.map((med) => {
+              const isLowStock = med.remaining_quantity <= med.low_stock_threshold;
+              return (
+                <div key={med.id} className={`flex items-center gap-3 p-3 rounded-lg bg-muted/50 ${isLowStock ? "border border-destructive/30" : ""}`}>
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Pill className="w-4 h-4 text-primary" />
                   </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs gap-1"
-                    onClick={() => triggerPhotoUpload(type)}
-                    disabled={uploadingPhoto === type}
-                  >
-                    {uploadingPhoto === type ? (
-                      <><span className="animate-spin">⏳</span> Uploading...</>
-                    ) : (
-                      <><Camera className="w-3 h-3" /> Upload Photo</>
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <Shield className="w-3 h-3" /> End-to-end encrypted. Photos stored in your private vault.
-          </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{med.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {med.dosage} · {FREQUENCIES[med.frequency] || med.frequency}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {med.schedule_times.map((t) => {
+                        const [h, m] = t.split(":").map(Number);
+                        const d = new Date(); d.setHours(h, m);
+                        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                      }).join(", ")}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-muted-foreground">
+                        Stock: {med.remaining_quantity}/{med.total_quantity}
+                      </span>
+                      {isLowStock && (
+                        <Badge variant="destructive" className="text-[10px]">
+                          <AlertTriangle className="w-3 h-3 mr-0.5" /> Low
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
-
-      {/* Enter PIN Dialog */}
-      <Dialog open={showEnterPin} onOpenChange={setShowEnterPin}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Enter Vault PIN</DialogTitle></DialogHeader>
-          <div>
-            <Label>6-digit PIN</Label>
-            <Input type="password" maxLength={6} inputMode="numeric" value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="text-base" />
-          </div>
-          <DialogFooter>
-            <Button onClick={handleVerifyPin} disabled={pinInput.length !== 6}>Unlock</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Document Dialog */}
-      <Dialog open={showAddDoc} onOpenChange={setShowAddDoc}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add {addDocType === "aadhaar" ? "Aadhaar" : "PAN"} Number</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Encrypted with AES-256-GCM before storage.</p>
-          <div>
-            <Label>{addDocType === "aadhaar" ? "Aadhaar Number" : "PAN Number"}</Label>
-            <Input
-              value={newDocValue}
-              onChange={(e) => setNewDocValue(e.target.value)}
-              placeholder={addDocType === "aadhaar" ? "1234 5678 9012" : "ABCDE1234F"}
-              maxLength={addDocType === "aadhaar" ? 14 : 10}
-              className="text-base"
-            />
-          </div>
-          <DialogFooter>
-            <Button onClick={handleAddDoc} disabled={!newDocValue.trim()}>
-              <Lock className="w-4 h-4 mr-1" /> Encrypt & Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
