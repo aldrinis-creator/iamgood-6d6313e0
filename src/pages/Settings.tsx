@@ -626,10 +626,13 @@ const Settings = () => {
 
                 {showAddForm && (
                   <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
-                    <Input placeholder="Guardian Name *" value={newName} onChange={(e) => setNewName(e.target.value)} />
-                    <Input placeholder="Phone (+91...) *" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-                    <Input placeholder="Email (optional)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-                    <Input placeholder="Relation (optional)" value={newRelation} onChange={(e) => setNewRelation(e.target.value)} />
+                    <Input placeholder="Guardian Name *" value={newName} onChange={(e) => setNewName(e.target.value)} className="text-base" />
+                    <div>
+                      <Label className="text-xs">Phone *</Label>
+                      <PhoneInput value={newPhone} onChange={setNewPhone} />
+                    </div>
+                    <Input placeholder="Email (optional)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="text-base" />
+                    <Input placeholder="Relation (optional)" value={newRelation} onChange={(e) => setNewRelation(e.target.value)} className="text-base" />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={addGuardian} className="flex-1">Add Guardian</Button>
                       <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
