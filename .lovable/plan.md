@@ -1,77 +1,72 @@
 
 
-# Multi-part Update: Persona Migration, Vault Fix, Phone Formatting
+# Medical Vault & Profile Updates
 
 ## Summary
-Four changes: (1) fix Medical Vault screen jumping, (2) migrate My Persona fields into My Profile and Medical Vault, (3) remove My Persona from Health tools, (4) add country code prefix to all phone inputs.
+Six changes: (1) remove Govt ID Cards from My Profile and replace with Current Medications from the medications table, (2) remove Current Medications chip input and Guardian tab from Medical Vault, (3) add a "Medical Vault" header, (4) make Profile tab fully read-only pulling all My Profile data, (5) add "Legal Will" to vault document types + Upload button for vault docs, (6) add Save As & Share buttons to saved medical records.
 
 ---
 
-## 1. Fix Medical Vault Screen Jumping
+## 1. My Profile — Replace Govt ID Cards with Current Medications
 
-**Root cause**: Select dropdowns and input focus on mobile cause the page to scroll/jump. The form is conditionally rendered inside a scrollable tab, and Select `popper` positioning fights with mobile keyboards.
+**File: `src/pages/MyProfile.tsx`**
 
-**Fix in `src/pages/MedicalVault.tsx`**:
-- Wrap the upload form and profile tab inputs in a container with stable height
-- Add `autoFocus={false}` and use `onOpenChange` on Select to prevent scroll
-- Add `className="text-base"` to all Input fields (prevents iOS zoom on focus, which causes "jumping")
-- For the Health Profile tab inputs (allergies, conditions, medications), the ChipInput's onKeyDown Enter + state update may cause scroll — stabilize with `e.stopPropagation()`
+- Remove the entire "Government ID Cards" card (lines 807-882) including Aadhaar/PAN encrypted doc logic, photo upload logic, and related state/handlers
+- Replace with a "Current Medications" card that fetches from the `medications` table (same data as the Tablets tab)
+- Display each medication as a read-only card showing: name, dosage, frequency, schedule times, stock level
+- No editing here — just a view of what's in the medications table
 
----
+## 2. Medical Vault — Remove Current Medications & Guardian Tab
 
-## 2. Migrate My Persona into My Profile + Medical Vault
+**File: `src/pages/MedicalVault.tsx`**
 
-### A. My Profile (`src/pages/MyProfile.tsx`) — Add "My Persona" Card below Body Metrics
+- Remove the `ChipInput` for "Current Medications" and its state (`currentMedications`, `medicationInput`) from the Profile tab
+- Remove the Guardian tab entirely (remove `<GuardianTab>` and change tab grid from `grid-cols-4` to `grid-cols-3`)
+- Remove the `GuardianTab` import
+- Keep Emergency Notes and Family Doctor fields as editable in the Profile tab
 
-Add a new Card section after Body Metrics containing:
-- **Blood Group** (Select)
-- **Allergies** (comma-separated input)
-- **Medical Conditions** (comma-separated input)
-- **Activity Level** (Select)
-- **Smoking** (Select)
-- **Alcohol** (Select)
-- **Diet Type** → moved to a "Body & Health" grouping alongside Blood Group
-- **Dietary Preferences** (dropdown/popover with chip selection — same multi-select UX as current My Persona)
-- **Health Goals** (dropdown/popover with chip selection)
+## 3. Medical Vault — Add Header
 
-Data loads from `nutrition_personas` table (existing). Save upserts to `nutrition_personas`.
+**File: `src/pages/MedicalVault.tsx`**
 
-Fields **NOT** moved (stay in My Profile's existing cards): Date of Birth, Weight, Height.
+- Add a header section above the Tabs: `<h1>Medical Vault</h1>` with a Shield icon and subtitle, similar to how MyProfile has its header
+- Place inside `MedicalVaultContent` at the top of the returned JSX
 
-### B. Medical Vault Profile Tab (`src/pages/MedicalVault.tsx`)
+## 4. Medical Vault Profile Tab — Fully Read-Only from My Profile Data
 
-Replace the current manually-entered Health Profile tab with read-only data pulled from:
-- `profiles` table: full_name, date_of_birth, gender, phone, weight_kg, height_m
-- `nutrition_personas` table: blood_group, allergies, medical_conditions, diet_type, activity_level, smoking, alcohol, dietary_preferences, health_goals
-- `health_profile` table: family_doctor_name, family_doctor_phone, emergency_notes, current_medications
+**File: `src/pages/MedicalVault.tsx`**
 
-Display as read-only InfoRow cards. Keep the "Save Health Profile" for emergency_notes and current_medications (which aren't in persona). Keep the Emergency PDF generation.
+- Make the Profile tab fully read-only — remove the editable Family Doctor, Emergency Notes, and Current Medications inputs
+- Pull all data from `profiles`, `nutrition_personas`, `health_profile`, and `medications` tables
+- Display: Personal Info, Body Metrics (with BMI), Body & Health (blood group, diet, allergies, conditions, activity, smoking, alcohol, preferences, goals), Family Doctor, Emergency Notes, Current Medications (from medications table), Guardians list
+- Remove `saveHealthProfile` button and related state
+- Keep "Download Emergency PDF" button
 
-### C. Remove My Persona from Health Tools (`src/pages/MyHealth.tsx`)
+## 5. Vault Tab — Add "Legal Will" + Upload Button
 
-- Remove `{ icon: UserCog, label: "My Persona", ... }` from `healthTools` array
-- Remove `"My Persona": MyPersona` from `toolComponents`
-- Remove the import of `MyPersona`
+**File: `src/pages/MedicalVault.tsx`**
 
----
+- Add `"Legal Will"` to the `RECORD_TYPES` array
+- In the vault (encrypted documents) tab, each document entry currently has no file upload — add an Upload button alongside the existing fields in the "Add Encrypted Document" dialog (this is for encrypted ID docs, not medical records)
+- Actually, re-reading the request: the "Vault" tab contains encrypted IDs. The "Records" tab has medical documents. The user wants an Upload button for documents in the Vault tab. I'll add a file attachment option to the encrypted document flow in the Vault tab.
 
-## 3. Phone Number Country Code — Create `PhoneInput` Component
+Wait — let me reconsider. The Vault tab stores encrypted text (Aadhaar, PAN numbers). The Records tab stores medical documents with file uploads. The user says "for all documents being entered in the Vault tab, add an Upload button" — this likely means adding file upload capability to the Vault tab's encrypted documents so users can attach scans/photos of their IDs alongside the encrypted numbers.
 
-**New file: `src/components/PhoneInput.tsx`**
+And "Legal Will" should be added to the document types in the Vault tab's `DOC_TYPES` array.
 
-A reusable component with:
-- Country code dropdown (default `+91` India, with a few common options: +1, +44, +971, +65, +61)
-- Phone number input field
-- Props: `value`, `onChange`, `placeholder`
-- Stores full value as `+91 9876543210` format
+**Changes:**
+- Add `{ key: "legal_will", label: "Legal Will", placeholder: "Will reference or details" }` to `DOC_TYPES`
+- Add file upload option in the Add Encrypted Document dialog — allow attaching a file that gets stored in the `medical-documents` bucket
 
-**Files to update** (replace raw phone `<Input>` with `<PhoneInput>`):
-- `src/pages/MyProfile.tsx` — Mobile Number, Doctor Mobile, Guardian Phone
-- `src/pages/MedicalVault.tsx` — Family Doctor Phone
-- `src/pages/Settings.tsx` — Guardian phone
-- `src/components/GuardianTab.tsx` — Guardian phone
-- `src/pages/Register.tsx` — already has country code selector, keep as-is
-- `src/components/AmbulanceBooking.tsx` — Contact Number
+Actually, for simplicity and since the encrypted_documents table only stores encrypted text, I'll add file upload to the vault encrypted docs by storing the file in storage and keeping a reference. But the table doesn't have a file column. Let me keep it simpler: add a file upload button next to each encrypted doc entry (similar to the photo upload for Aadhaar/PAN that was in MyProfile). I'll store uploaded files in storage under `{userId}/vault_{doc_type}`.
+
+## 6. Medical Records — Save As & Share Buttons
+
+**File: `src/pages/MedicalVault.tsx`**
+
+- For each saved medical record in the Records tab, add:
+  - **Save As** button: downloads the file (reuses existing download logic but with "Save As" label)
+  - **Share** button: uses the Web Share API (`navigator.share()`) to share the document
 
 ---
 
@@ -79,14 +74,8 @@ A reusable component with:
 
 | File | Change |
 |------|--------|
-| `src/components/PhoneInput.tsx` | **New** — reusable phone input with country code |
-| `src/pages/MyProfile.tsx` | Add persona card, use PhoneInput |
-| `src/pages/MedicalVault.tsx` | Fix scroll jumping, pull profile data into Profile tab |
-| `src/pages/MyHealth.tsx` | Remove My Persona tool |
-| `src/components/MyPersona.tsx` | Keep file (no delete), just unreferenced |
-| `src/pages/Settings.tsx` | Use PhoneInput |
-| `src/components/GuardianTab.tsx` | Use PhoneInput |
-| `src/components/AmbulanceBooking.tsx` | Use PhoneInput |
+| `src/pages/MyProfile.tsx` | Remove Govt ID Cards, add Current Medications view |
+| `src/pages/MedicalVault.tsx` | Remove Guardian tab, remove editable profile fields, add header, make profile read-only, add Legal Will, add upload to vault docs, add Save As & Share to records |
 
-No database changes needed — all tables already exist with the right columns.
+No database changes needed.
 
