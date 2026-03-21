@@ -146,7 +146,7 @@ const MyHealth = () => {
           {healthTools.map((tool) => (
             <button
               key={tool.label}
-              onClick={() => setSelectedTool(tool.label)}
+              onClick={() => tool.label === "Vault" ? navigate("/medical-vault") : setSelectedTool(tool.label)}
               className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
             >
               <div className={`w-12 h-12 rounded-full ${tool.color} flex items-center justify-center`}>

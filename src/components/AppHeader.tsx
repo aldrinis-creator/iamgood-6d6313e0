@@ -46,6 +46,9 @@ const AppHeader = () => {
               <DropdownMenuItem onClick={() => navigate("/my-profile")}>
                 <UserCircle className="w-4 h-4 mr-2" /> My Profile
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/medical-vault")}>
+                <ShieldCheck className="w-4 h-4 mr-2" /> Medical Vault
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/settings")}>
                 <Settings className="w-4 h-4 mr-2" /> Settings
               </DropdownMenuItem>
