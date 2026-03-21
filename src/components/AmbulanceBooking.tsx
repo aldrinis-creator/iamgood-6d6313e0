@@ -9,6 +9,7 @@ import {
   Ambulance, AlertTriangle, CreditCard, Navigation, Phone,
   MessageCircle, MapPin, User, Info
 } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 type TabMode = "emergency" | "book";
 
@@ -20,17 +21,15 @@ const AmbulanceBooking = () => {
   const [locationDetected, setLocationDetected] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Form state
   const [patientName, setPatientName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [emergencyType, setEmergencyType] = useState("");
 
-  // Splash countdown
   useEffect(() => {
     if (showForm) return;
     const interval = setInterval(() => {
       setProgress((p) => {
-        const next = p + 100 / 30; // 30 ticks in 3 seconds
+        const next = p + 100 / 30;
         return next >= 100 ? 100 : next;
       });
       setCountdown((c) => {
@@ -42,7 +41,6 @@ const AmbulanceBooking = () => {
         return c;
       });
     }, 100);
-    // Decrement countdown each second
     const sec = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
     return () => { clearInterval(interval); clearInterval(sec); };
   }, [showForm]);
@@ -70,7 +68,6 @@ const AmbulanceBooking = () => {
     window.open("tel:18001021298", "_self");
   };
 
-  // Splash screen
   if (!showForm) {
     return (
       <Card className="border-sos/30 overflow-hidden">
@@ -101,7 +98,6 @@ const AmbulanceBooking = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="text-center space-y-1">
         <div className="w-12 h-12 rounded-full bg-sos mx-auto flex items-center justify-center">
           <Phone className="w-6 h-6 text-sos-foreground" />
@@ -110,7 +106,6 @@ const AmbulanceBooking = () => {
         <p className="text-sm text-muted-foreground">Emergency or scheduled ambulance service</p>
       </div>
 
-      {/* Tab switcher */}
       <div className="flex rounded-lg border border-border overflow-hidden">
         <button
           onClick={() => setMode("emergency")}
@@ -134,7 +129,6 @@ const AmbulanceBooking = () => {
         </button>
       </div>
 
-      {/* Emergency Mode */}
       {mode === "emergency" && (
         <Card className="border-sos/20">
           <CardHeader className="pb-2">
@@ -146,7 +140,6 @@ const AmbulanceBooking = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Location */}
             <div className="space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" /> Your Location
@@ -164,7 +157,6 @@ const AmbulanceBooking = () => {
               )}
             </div>
 
-            {/* Patient Details */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold">Patient Details</h3>
               <div className="space-y-1.5">
@@ -173,14 +165,14 @@ const AmbulanceBooking = () => {
                   placeholder="Enter patient name"
                   value={patientName}
                   onChange={(e) => setPatientName(e.target.value)}
+                  className="text-base"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Contact Number</Label>
-                <Input
-                  placeholder="Enter contact number"
+                <PhoneInput
                   value={contactNumber}
-                  onChange={(e) => setContactNumber(e.target.value)}
+                  onChange={setContactNumber}
                 />
               </div>
               <div className="space-y-1.5">
@@ -189,11 +181,11 @@ const AmbulanceBooking = () => {
                   placeholder="e.g., Chest pain, Accident"
                   value={emergencyType}
                   onChange={(e) => setEmergencyType(e.target.value)}
+                  className="text-base"
                 />
               </div>
             </div>
 
-            {/* Actions */}
             <Button
               onClick={sendWhatsApp}
               className="w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-5"
@@ -216,7 +208,6 @@ const AmbulanceBooking = () => {
               </Button>
             </div>
 
-            {/* How it works */}
             <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
               <p className="text-xs font-semibold">How it works:</p>
               <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
@@ -230,7 +221,6 @@ const AmbulanceBooking = () => {
         </Card>
       )}
 
-      {/* Book & Pay Mode */}
       {mode === "book" && (
         <Card>
           <CardHeader className="pb-2">
@@ -262,7 +252,7 @@ const AmbulanceBooking = () => {
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Pickup Location</Label>
                 <div className="flex gap-2">
-                  <Input placeholder="Enter pickup address" className="flex-1" />
+                  <Input placeholder="Enter pickup address" className="flex-1 text-base" />
                   <Button variant="outline" size="icon" onClick={detectLocation}>
                     <Navigation className="w-4 h-4" />
                   </Button>
@@ -270,11 +260,11 @@ const AmbulanceBooking = () => {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Drop Location (Hospital)</Label>
-                <Input placeholder="Enter hospital / destination" />
+                <Input placeholder="Enter hospital / destination" className="text-base" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Contact Number</Label>
-                <Input placeholder="+91" />
+                <PhoneInput value="" onChange={() => {}} />
               </div>
             </div>
 

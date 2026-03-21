@@ -21,13 +21,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import GuardianTab from "@/components/GuardianTab";
+import PhoneInput from "@/components/PhoneInput";
 
 const RECORD_TYPES = [
   "Prescription", "Lab Report", "Discharge Summary",
   "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Other",
 ];
-
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 interface MedicalRecord {
   id: string;
@@ -50,6 +49,28 @@ interface HealthProfileData {
   emergency_notes: string;
   family_doctor_name: string;
   family_doctor_phone: string;
+}
+
+interface ProfileViewData {
+  full_name: string;
+  date_of_birth: string;
+  gender: string;
+  phone: string;
+  weight_kg: string;
+  height_m: string;
+  blood_group: string;
+  diet_type: string;
+  allergies: string[];
+  medical_conditions: string[];
+  activity_level: string;
+  smoking: string;
+  alcohol: string;
+  dietary_preferences: string[];
+  health_goals: string[];
+  family_doctor_name: string;
+  family_doctor_phone: string;
+  emergency_notes: string;
+  current_medications: string[];
 }
 
 interface EncryptedDoc {
@@ -89,17 +110,16 @@ const MedicalVaultContent = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
 
-  // --- Profile Tab ---
-  const [healthProfile, setHealthProfile] = useState<HealthProfileData>({
-    blood_group: "", allergies: [], chronic_conditions: [],
-    current_medications: [], emergency_notes: "",
-    family_doctor_name: "", family_doctor_phone: "",
-  });
+  // --- Profile Tab (read-only aggregated view) ---
+  const [profileView, setProfileView] = useState<ProfileViewData | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [allergyInput, setAllergyInput] = useState("");
-  const [conditionInput, setConditionInput] = useState("");
+  // Editable fields in vault profile tab
+  const [emergencyNotes, setEmergencyNotes] = useState("");
+  const [currentMedications, setCurrentMedications] = useState<string[]>([]);
   const [medicationInput, setMedicationInput] = useState("");
+  const [familyDoctorName, setFamilyDoctorName] = useState("");
+  const [familyDoctorPhone, setFamilyDoctorPhone] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
 
   // --- Secret Vault Tab ---
   const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);
@@ -194,85 +214,83 @@ const MedicalVaultContent = () => {
     return matchSearch && matchType;
   });
 
-  // ===================== HEALTH PROFILE =====================
+  // ===================== PROFILE (aggregated read-only) =====================
 
-  const fetchHealthProfile = useCallback(async () => {
+  const fetchProfileView = useCallback(async () => {
     if (!userId) return;
     setProfileLoading(true);
-    const { data } = await supabase
-      .from("health_profile")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (data) {
-      setHealthProfile({
-        blood_group: data.blood_group || "",
-        allergies: data.allergies || [],
-        chronic_conditions: data.chronic_conditions || [],
-        current_medications: data.current_medications || [],
-        emergency_notes: data.emergency_notes || "",
-        family_doctor_name: data.family_doctor_name || "",
-        family_doctor_phone: data.family_doctor_phone || "",
-      });
-    }
+    const [{ data: prof }, { data: persona }, { data: hp }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("health_profile").select("*").eq("user_id", userId).maybeSingle(),
+    ]);
+
+    setProfileView({
+      full_name: prof?.full_name || "",
+      date_of_birth: prof?.date_of_birth || "",
+      gender: (prof as any)?.gender || "",
+      phone: prof?.phone || "",
+      weight_kg: (prof as any)?.weight_kg?.toString() || "",
+      height_m: (prof as any)?.height_m?.toString() || "",
+      blood_group: persona?.blood_group || hp?.blood_group || "",
+      diet_type: persona?.diet_type || "",
+      allergies: persona?.allergies || hp?.allergies || [],
+      medical_conditions: persona?.medical_conditions || hp?.chronic_conditions || [],
+      activity_level: persona?.activity_level || "",
+      smoking: persona?.smoking || "",
+      alcohol: persona?.alcohol || "",
+      dietary_preferences: persona?.dietary_preferences || [],
+      health_goals: persona?.health_goals || [],
+      family_doctor_name: hp?.family_doctor_name || "",
+      family_doctor_phone: hp?.family_doctor_phone || "",
+      emergency_notes: hp?.emergency_notes || "",
+      current_medications: hp?.current_medications || [],
+    });
+
+    setEmergencyNotes(hp?.emergency_notes || "");
+    setCurrentMedications(hp?.current_medications || []);
+    setFamilyDoctorName(hp?.family_doctor_name || "");
+    setFamilyDoctorPhone(hp?.family_doctor_phone || "");
     setProfileLoading(false);
   }, [userId]);
 
-  useEffect(() => { fetchHealthProfile(); }, [fetchHealthProfile]);
+  useEffect(() => { fetchProfileView(); }, [fetchProfileView]);
 
   const saveHealthProfile = async () => {
     if (!userId) return;
     setProfileSaving(true);
     const { error } = await supabase.from("health_profile").upsert({
       user_id: userId,
-      blood_group: healthProfile.blood_group || null,
-      allergies: healthProfile.allergies,
-      chronic_conditions: healthProfile.chronic_conditions,
-      current_medications: healthProfile.current_medications,
-      emergency_notes: healthProfile.emergency_notes || null,
-      family_doctor_name: healthProfile.family_doctor_name || null,
-      family_doctor_phone: healthProfile.family_doctor_phone || null,
-    }, { onConflict: "user_id" });
+      emergency_notes: emergencyNotes || null,
+      current_medications: currentMedications,
+      family_doctor_name: familyDoctorName || null,
+      family_doctor_phone: familyDoctorPhone || null,
+    } as any, { onConflict: "user_id" });
     if (error) {
-      toast.error("Failed to save profile");
+      toast.error("Failed to save");
     } else {
       toast.success("Health profile saved");
+      fetchProfileView();
     }
     setProfileSaving(false);
-  };
-
-  const addChip = (field: "allergies" | "chronic_conditions" | "current_medications", value: string) => {
-    if (!value.trim()) return;
-    setHealthProfile((p) => ({
-      ...p,
-      [field]: [...p[field], value.trim()],
-    }));
-  };
-
-  const removeChip = (field: "allergies" | "chronic_conditions" | "current_medications", idx: number) => {
-    setHealthProfile((p) => ({
-      ...p,
-      [field]: p[field].filter((_, i) => i !== idx),
-    }));
   };
 
   // ===================== EMERGENCY PDF =====================
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const generateEmergencyPdf = async () => {
-    if (!userId) return;
+    if (!userId || !profileView) return;
     setGeneratingPdf(true);
     try {
-      const [{ data: guardians }, { data: meds }, { data: profileData }] = await Promise.all([
+      const [{ data: guardians }, { data: meds }] = await Promise.all([
         supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary")
           .eq("user_id", userId).order("is_primary", { ascending: false }),
         supabase.from("medications").select("name, dosage, frequency, schedule_times, instructions")
           .eq("user_id", userId),
-        supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
       ]);
 
-      const hp = healthProfile;
-      const userName = profileData?.full_name || "User";
+      const pv = profileView;
+      const userName = pv.full_name || "User";
       const now = new Date().toLocaleString("en-IN");
 
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -299,21 +317,21 @@ td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
 <div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${userName}</span></div>
-${profileData?.date_of_birth ? `<div class="row"><span class="label">Date of Birth</span><span class="value">${new Date(profileData.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
-${profileData?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${profileData.gender}</span></div>` : ""}
-${profileData?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${profileData.phone}</span></div>` : ""}
-${hp.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${hp.blood_group}</span></span></div>` : ""}
+${pv.date_of_birth ? `<div class="row"><span class="label">Date of Birth</span><span class="value">${new Date(pv.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
+${pv.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${pv.gender}</span></div>` : ""}
+${pv.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${pv.phone}</span></div>` : ""}
+${pv.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${pv.blood_group}</span></span></div>` : ""}
 </div></div>
-${hp.allergies.length > 0 ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${hp.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
-${hp.chronic_conditions.length > 0 ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${hp.chronic_conditions.map(c => `<span class="badge badge-blue">${c}</span>`).join(" ")}</div></div>` : ""}
-${hp.current_medications.length > 0 || (meds && meds.length > 0) ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body">
+${pv.allergies.length > 0 ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${pv.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
+${pv.medical_conditions.length > 0 ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${pv.medical_conditions.map(c => `<span class="badge badge-blue">${c}</span>`).join(" ")}</div></div>` : ""}
+${pv.current_medications.length > 0 || (meds && meds.length > 0) ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body">
 ${meds && meds.length > 0 ? `<table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g, " ")}</td><td>${(m.schedule_times || []).join(", ")}</td></tr>`).join("")}</table>` : ""}
-${hp.current_medications.length > 0 ? `<div style="margin-top:8px">${hp.current_medications.map(m => `<span class="badge badge-green">${m}</span>`).join(" ")}</div>` : ""}
+${pv.current_medications.length > 0 ? `<div style="margin-top:8px">${pv.current_medications.map(m => `<span class="badge badge-green">${m}</span>`).join(" ")}</div>` : ""}
 </div></div>` : ""}
-${hp.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${hp.emergency_notes}</p></div></div>` : ""}
-${hp.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body">
-<div class="row"><span class="label">Name</span><span class="value">${hp.family_doctor_name}</span></div>
-${hp.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${hp.family_doctor_phone}</span></div>` : ""}
+${pv.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${pv.emergency_notes}</p></div></div>` : ""}
+${pv.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body">
+<div class="row"><span class="label">Name</span><span class="value">${pv.family_doctor_name}</span></div>
+${pv.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${pv.family_doctor_phone}</span></div>` : ""}
 </div></div>` : ""}
 ${guardians && guardians.length > 0 ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body">
 <table><tr><th>Name</th><th>Relation</th><th>Phone</th><th>Email</th></tr>
@@ -358,7 +376,6 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
     if (!pinForVault || pinForVault.length !== 6) { toast.error("Enter 6-digit PIN"); return; }
     const hash = await hashPin(pinForVault);
     if (hash !== storedPinHash) { toast.error("Incorrect PIN"); setPinForVault(""); return; }
-    // Decrypt all docs
     const decrypted: Record<string, string> = {};
     for (const doc of encDocs) {
       try {
@@ -376,8 +393,6 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
     if (!userId || !addDocType || !addDocValue.trim()) { toast.error("Fill all fields"); return; }
     setAddingDoc(true);
     try {
-      // Use the vault PIN (stored in storedPinHash means user must have a PIN)
-      // We need the raw PIN to encrypt — prompt for it
       const pin = prompt("Enter your 6-digit vault PIN to encrypt:");
       if (!pin || pin.length !== 6) { toast.error("Valid PIN required"); setAddingDoc(false); return; }
       const hash = await hashPin(pin);
@@ -385,7 +400,6 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
 
       const { ciphertext, iv, salt } = await encrypt(addDocValue.trim(), pin);
 
-      // Check if doc type already exists
       const existing = encDocs.find((d) => d.doc_type === addDocType);
       if (existing) {
         await supabase.from("encrypted_documents").update({
@@ -422,6 +436,13 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
 
   // ===================== RENDER =====================
 
+  const InfoRow = ({ label, value, capitalize }: { label: string; value: string; capitalize?: boolean }) => (
+    <div className="flex justify-between py-1">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={`font-medium text-sm ${capitalize ? "capitalize" : ""}`}>{value || "—"}</span>
+    </div>
+  );
+
   const ChipInput = ({ label, items, onAdd, onRemove, inputValue, setInputValue, placeholder }: {
     label: string; items: string[]; onAdd: () => void; onRemove: (i: number) => void;
     inputValue: string; setInputValue: (v: string) => void; placeholder: string;
@@ -439,7 +460,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
         <Input
           placeholder={placeholder} value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdd(); setInputValue(""); } }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onAdd(); setInputValue(""); } }}
           className="text-base"
         />
         <Button variant="outline" size="sm" onClick={() => { onAdd(); setInputValue(""); }}>
@@ -469,13 +490,12 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
 
         {/* ========== RECORDS TAB ========== */}
         <TabsContent value="records" className="space-y-3 mt-4">
-          {/* Search & Filter */}
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
               <Input
                 placeholder="Search records..." value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)} className="pl-9"
+                onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 text-base"
               />
             </div>
             <Button variant="outline" size="icon" onClick={() => setShowUploadForm(!showUploadForm)}>
@@ -492,25 +512,24 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
             ))}
           </div>
 
-          {/* Upload Form (collapsible) */}
           {showUploadForm && (
             <Card>
               <CardContent className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Upload className="w-4 h-4 text-primary" /> Upload Record
                 </h3>
-                <Input placeholder="Title *" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Input placeholder="Title *" value={title} onChange={(e) => setTitle(e.target.value)} className="text-base" />
                 <Select value={recordType} onValueChange={setRecordType}>
                   <SelectTrigger><SelectValue placeholder="Record type *" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="item-aligned">
                     {RECORD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} />
-                  <Input placeholder="Doctor" value={doctorName} onChange={(e) => setDoctorName(e.target.value)} />
+                  <Input type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} className="text-base" />
+                  <Input placeholder="Doctor" value={doctorName} onChange={(e) => setDoctorName(e.target.value)} className="text-base" />
                 </div>
-                <Input placeholder="Hospital / Clinic" value={hospitalName} onChange={(e) => setHospitalName(e.target.value)} />
+                <Input placeholder="Hospital / Clinic" value={hospitalName} onChange={(e) => setHospitalName(e.target.value)} className="text-base" />
                 <Textarea placeholder="Notes..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
                 <Input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
                   onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
@@ -532,7 +551,6 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
             </Card>
           )}
 
-          {/* Records List */}
           {loadingRecords ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -575,89 +593,100 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
           )}
         </TabsContent>
 
-        {/* ========== HEALTH PROFILE TAB ========== */}
+        {/* ========== PROFILE TAB (read-only + editable health fields) ========== */}
         <TabsContent value="profile" className="space-y-4 mt-4">
           {profileLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : (
+          ) : profileView ? (
             <>
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-destructive" /> Health Information
+                    <User className="w-4 h-4 text-primary" /> Personal Info
                   </CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label>Blood Group</Label>
-                    <Select value={healthProfile.blood_group}
-                      onValueChange={(v) => setHealthProfile((p) => ({ ...p, blood_group: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>
-                        {BLOOD_GROUPS.map((bg) => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <ChipInput
-                    label="Allergies" items={healthProfile.allergies}
-                    onAdd={() => addChip("allergies", allergyInput)}
-                    onRemove={(i) => removeChip("allergies", i)}
-                    inputValue={allergyInput} setInputValue={setAllergyInput}
-                    placeholder="e.g. Penicillin"
-                  />
-
-                  <ChipInput
-                    label="Medical Conditions" items={healthProfile.chronic_conditions}
-                    onAdd={() => addChip("chronic_conditions", conditionInput)}
-                    onRemove={(i) => removeChip("chronic_conditions", i)}
-                    inputValue={conditionInput} setInputValue={setConditionInput}
-                    placeholder="e.g. Diabetes"
-                  />
-
-                  <ChipInput
-                    label="Current Medications" items={healthProfile.current_medications}
-                    onAdd={() => addChip("current_medications", medicationInput)}
-                    onRemove={(i) => removeChip("current_medications", i)}
-                    inputValue={medicationInput} setInputValue={setMedicationInput}
-                    placeholder="e.g. Metformin 500mg"
-                  />
-
-                  <div>
-                    <Label>Emergency Notes</Label>
-                    <Textarea
-                      placeholder="Any critical info for responders..."
-                      value={healthProfile.emergency_notes}
-                      onChange={(e) => setHealthProfile((p) => ({ ...p, emergency_notes: e.target.value }))}
-                      rows={2}
-                    />
-                  </div>
+                <CardContent className="space-y-1">
+                  <InfoRow label="Name" value={profileView.full_name} />
+                  <InfoRow label="Date of Birth" value={profileView.date_of_birth ? new Date(profileView.date_of_birth).toLocaleDateString("en-IN") : ""} />
+                  <InfoRow label="Gender" value={profileView.gender} capitalize />
+                  <InfoRow label="Phone" value={profileView.phone} />
+                  <InfoRow label="Weight" value={profileView.weight_kg ? `${profileView.weight_kg} kg` : ""} />
+                  <InfoRow label="Height" value={profileView.height_m ? `${profileView.height_m} m` : ""} />
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <User className="w-4 h-4 text-primary" /> Family Doctor
+                    <Heart className="w-4 h-4 text-destructive" /> Health & Lifestyle
+                  </CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  <InfoRow label="Blood Group" value={profileView.blood_group} />
+                  <InfoRow label="Diet Type" value={profileView.diet_type} capitalize />
+                  <InfoRow label="Activity Level" value={profileView.activity_level} capitalize />
+                  <InfoRow label="Smoking" value={profileView.smoking} capitalize />
+                  <InfoRow label="Alcohol" value={profileView.alcohol} capitalize />
+                  {profileView.allergies.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-muted-foreground text-sm">Allergies</span>
+                      <div className="flex gap-1 flex-wrap mt-1">{profileView.allergies.map((a, i) => <Badge key={i} variant="destructive" className="text-xs">{a}</Badge>)}</div>
+                    </div>
+                  )}
+                  {profileView.medical_conditions.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-muted-foreground text-sm">Medical Conditions</span>
+                      <div className="flex gap-1 flex-wrap mt-1">{profileView.medical_conditions.map((c, i) => <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>)}</div>
+                    </div>
+                  )}
+                  {profileView.dietary_preferences.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-muted-foreground text-sm">Dietary Preferences</span>
+                      <div className="flex gap-1 flex-wrap mt-1">{profileView.dietary_preferences.map((d, i) => <Badge key={i} variant="outline" className="text-xs">{d}</Badge>)}</div>
+                    </div>
+                  )}
+                  {profileView.health_goals.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-muted-foreground text-sm">Health Goals</span>
+                      <div className="flex gap-1 flex-wrap mt-1">{profileView.health_goals.map((g, i) => <Badge key={i} variant="outline" className="text-xs">{g}</Badge>)}</div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" /> Emergency & Doctor
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <Label>Doctor's Name</Label>
-                    <Input
-                      placeholder="Dr. "
-                      value={healthProfile.family_doctor_name}
-                      onChange={(e) => setHealthProfile((p) => ({ ...p, family_doctor_name: e.target.value }))}
-                    />
+                    <Label>Family Doctor Name</Label>
+                    <Input value={familyDoctorName} onChange={(e) => setFamilyDoctorName(e.target.value)} placeholder="Dr. " className="text-base" />
                   </div>
                   <div>
-                    <Label>Phone Number</Label>
-                    <Input
-                      placeholder="+91 98765 43210"
-                      value={healthProfile.family_doctor_phone}
-                      onChange={(e) => setHealthProfile((p) => ({ ...p, family_doctor_phone: e.target.value }))}
+                    <Label>Family Doctor Phone</Label>
+                    <PhoneInput value={familyDoctorPhone} onChange={setFamilyDoctorPhone} />
+                  </div>
+                  <ChipInput
+                    label="Current Medications" items={currentMedications}
+                    onAdd={() => { if (medicationInput.trim()) { setCurrentMedications(prev => [...prev, medicationInput.trim()]); } }}
+                    onRemove={(i) => setCurrentMedications(prev => prev.filter((_, idx) => idx !== i))}
+                    inputValue={medicationInput} setInputValue={setMedicationInput}
+                    placeholder="e.g. Metformin 500mg"
+                  />
+                  <div>
+                    <Label>Emergency Notes</Label>
+                    <Textarea
+                      placeholder="Any critical info for responders..."
+                      value={emergencyNotes}
+                      onChange={(e) => setEmergencyNotes(e.target.value)}
+                      rows={2}
                     />
                   </div>
                 </CardContent>
@@ -673,7 +702,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                   : <><Printer className="w-4 h-4 mr-2" /> Download Emergency PDF</>}
               </Button>
             </>
-          )}
+          ) : null}
         </TabsContent>
 
         {/* ========== GUARDIAN TAB ========== */}
@@ -705,6 +734,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                     value={pinForVault} placeholder="● ● ● ● ● ●"
                     onChange={(e) => setPinForVault(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     onKeyDown={(e) => e.key === "Enter" && pinForVault.length === 6 && unlockVault()}
+                    className="text-base"
                   />
                   <Button onClick={unlockVault} disabled={pinForVault.length !== 6} className="w-full">
                     <Lock className="w-4 h-4 mr-2" /> Unlock Vault
@@ -763,7 +793,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
               <Label>Document Type</Label>
               <Select value={addDocType} onValueChange={setAddDocType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="item-aligned">
                   {DOC_TYPES.filter(({ key }) => !encDocs.find((d) => d.doc_type === key)).map(({ key, label }) => (
                     <SelectItem key={key} value={key}>{label}</SelectItem>
                   ))}
@@ -775,6 +805,7 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
               <Input
                 placeholder={DOC_TYPES.find((d) => d.key === addDocType)?.placeholder || "Enter value"}
                 value={addDocValue} onChange={(e) => setAddDocValue(e.target.value)}
+                className="text-base"
               />
             </div>
             <Button onClick={handleAddDoc} disabled={addingDoc || !addDocType || !addDocValue.trim()} className="w-full">

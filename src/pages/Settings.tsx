@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import PhoneInput from "@/components/PhoneInput";
 import usePushSubscription from "@/hooks/usePushSubscription";
 import { formatDistanceToNow, format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
