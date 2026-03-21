@@ -66,9 +66,11 @@ const useCheckInAudio = () => {
           if (!responded) {
             firedRef.current.add(missedKey);
             fireAlert(`You missed your ${formatHour(h)} Check-iN. Please check in now.`);
-            toast.warning(`Missed Check-iN: ${formatHour(h)}`, {
-              description: "You haven't checked in yet. Your guardians will be notified.",
-              duration: 15000,
+            showReminderOverlay({
+              type: "checkin",
+              title: "Missed Check-In",
+              message: `You missed your ${formatHour(h)} Check-iN. Please check in now. Your guardians will be notified.`,
+              reminderCount: `Missed — ${formatHour(h)}`,
             });
           }
         }

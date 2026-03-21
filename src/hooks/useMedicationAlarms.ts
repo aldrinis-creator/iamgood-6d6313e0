@@ -51,9 +51,11 @@ const useMedicationAlarms = () => {
               navigator.vibrate([200, 100, 200]);
             }
 
-            toast("Medication Reminder 💊", {
-              description: "Your medications are due. Remember to take your tablets.",
-              duration: 10000,
+            showReminderOverlay({
+              type: "medication",
+              title: "Medication Reminder",
+              message: "Your medications are due. Remember to take your tablets.",
+              reminderCount: `Scheduled — ${timeStr}`,
             });
           }
         }
