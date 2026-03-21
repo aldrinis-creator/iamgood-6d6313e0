@@ -80,7 +80,7 @@ const ReminderOverlay = () => {
         {/* Action Button */}
         <button
           onClick={handleAction}
-          className="w-full py-5 rounded-2xl bg-destructive text-destructive-foreground text-xl font-bold flex items-center justify-center gap-3 hover:bg-destructive/90 transition-colors active:scale-[0.98]"
+          className="w-full py-5 rounded-2xl bg-destructive text-destructive-foreground text-xl font-bold flex items-center justify-center gap-3 hover:bg-destructive/90 transition-colors active:scale-[0.98] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]"
         >
           <Icon className="w-6 h-6 fill-current" />
           {isCheckin ? "Check-In Now" : "View Medications"}
