@@ -76,9 +76,19 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
-    // 4. Wellness
-    const sleepHours = Number(wellnessRes.data?.sleep_hours) || 0;
-    const wellnessScore = Math.round(Math.min(sleepHours / 8, 1) * 100);
+    // 4. Wellness (composite: sleep + sleep quality + mood + energy + mindfulness)
+    const sleepHours = Number(wellnessSleepRes.data?.sleep_hours) || 0;
+    const sleepQuality = Number(wellnessSleepRes.data?.sleep_quality) || 0;
+    const moodScore = Number(wellnessTodayRes.data?.mood_score) || 0;
+    const energyLevel = Number(wellnessTodayRes.data?.energy_level) || 0;
+    const mindfulnessMin = Number(wellnessTodayRes.data?.mindfulness_minutes) || 0;
+    const wellnessScore = Math.round(
+      Math.min(sleepHours / 8, 1) * 20 +
+      Math.min(sleepQuality / 5, 1) * 20 +
+      Math.min(moodScore / 5, 1) * 20 +
+      Math.min(energyLevel / 5, 1) * 20 +
+      Math.min(mindfulnessMin / 15, 1) * 20
+    );
 
     // 5. Medications
     const meds = medsRes.data ?? [];
