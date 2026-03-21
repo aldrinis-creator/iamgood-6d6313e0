@@ -63,11 +63,12 @@ const HealthPassport = () => {
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
     // Fetch all data in parallel
-    const [checkInsRes, faceScansRes, activityRes, wellnessRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, faceScansRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("face_scans").select("id").eq("user_id", user.id).gte("scanned_at", `${today}T00:00:00`).lte("scanned_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
-      supabase.from("wellness_logs").select("sleep_hours").eq("user_id", user.id).eq("log_date", yesterdayStr).maybeSingle(),
+      supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", user.id).eq("log_date", yesterdayStr).maybeSingle(),
+      supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("medications").select("id, schedule_times").eq("user_id", user.id).lte("start_date", today),
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
     ]);
@@ -97,9 +98,19 @@ const HealthPassport = () => {
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
-    // 4. Wellness score (previous night sleep)
-    const sleepHours = Number(wellnessRes.data?.sleep_hours) || 0;
-    const wellnessScore = Math.round(Math.min(sleepHours / 8, 1) * 100);
+    // 4. Wellness score (composite: sleep + sleep quality + mood + energy + mindfulness)
+    const sleepHours = Number(wellnessSleepRes.data?.sleep_hours) || 0;
+    const sleepQuality = Number(wellnessSleepRes.data?.sleep_quality) || 0;
+    const moodScore = Number(wellnessTodayRes.data?.mood_score) || 0;
+    const energyLevel = Number(wellnessTodayRes.data?.energy_level) || 0;
+    const mindfulnessMin = Number(wellnessTodayRes.data?.mindfulness_minutes) || 0;
+    const wellnessScore = Math.round(
+      Math.min(sleepHours / 8, 1) * 20 +
+      Math.min(sleepQuality / 5, 1) * 20 +
+      Math.min(moodScore / 5, 1) * 20 +
+      Math.min(energyLevel / 5, 1) * 20 +
+      Math.min(mindfulnessMin / 15, 1) * 20
+    );
 
     // 5. Medications score
     const meds = medsRes.data ?? [];
