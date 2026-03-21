@@ -667,6 +667,11 @@ ${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</t
                 {profileSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                   : <><ShieldCheck className="w-4 h-4 mr-2" /> Save Health Profile</>}
               </Button>
+
+              <Button onClick={generateEmergencyPdf} disabled={generatingPdf} variant="outline" className="w-full" size="lg">
+                {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                  : <><Printer className="w-4 h-4 mr-2" /> Download Emergency PDF</>}
+              </Button>
             </>
           )}
         </TabsContent>
