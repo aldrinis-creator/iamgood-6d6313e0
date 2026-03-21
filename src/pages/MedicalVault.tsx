@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Eye, EyeOff, FileText, Shield, Heart, User, Upload, Trash2, Download,
-  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera
+  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
