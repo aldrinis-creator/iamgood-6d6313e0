@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { toast } from "sonner";
+import { showReminderOverlay } from "@/components/ReminderOverlay";
 
 const useMedicationAlarms = () => {
   const { session } = useAuth();
@@ -51,9 +51,11 @@ const useMedicationAlarms = () => {
               navigator.vibrate([200, 100, 200]);
             }
 
-            toast("Medication Reminder 💊", {
-              description: "Your medications are due. Remember to take your tablets.",
-              duration: 10000,
+            showReminderOverlay({
+              type: "medication",
+              title: "Medication Reminder",
+              message: "Your medications are due. Remember to take your tablets.",
+              reminderCount: `Scheduled — ${timeStr}`,
             });
           }
         }

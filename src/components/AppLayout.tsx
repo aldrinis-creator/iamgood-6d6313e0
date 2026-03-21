@@ -11,6 +11,7 @@ import CookieConsent from "@/components/CookieConsent";
 import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
+import ReminderOverlay from "@/components/ReminderOverlay";
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
@@ -66,6 +67,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && <FallDetectionOverlay />}
         <BatteryWarning />
         <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
+        <ReminderOverlay />
       </div>
     </div>
   );

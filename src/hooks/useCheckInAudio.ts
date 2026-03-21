@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+
 
 const CHECK_IN_HOURS = [7, 12, 19];
 
@@ -46,9 +47,11 @@ const useCheckInAudio = () => {
           if (!responded) {
             firedRef.current.add(dueKey);
             fireAlert("We hope you are well, Please Check-iN");
-            toast("Time for your Check-iN! 💓", {
-              description: "We hope you are well. Please tap the heart to check in.",
-              duration: 10000,
+            showReminderOverlay({
+              type: "checkin",
+              title: "Check-In Reminder",
+              message: "You haven't checked in yet. Please tap below to let us know you're okay.",
+              reminderCount: `Reminder — ${formatHour(h)}`,
             });
           }
         }
@@ -63,9 +66,11 @@ const useCheckInAudio = () => {
           if (!responded) {
             firedRef.current.add(missedKey);
             fireAlert(`You missed your ${formatHour(h)} Check-iN. Please check in now.`);
-            toast.warning(`Missed Check-iN: ${formatHour(h)}`, {
-              description: "You haven't checked in yet. Your guardians will be notified.",
-              duration: 15000,
+            showReminderOverlay({
+              type: "checkin",
+              title: "Missed Check-In",
+              message: `You missed your ${formatHour(h)} Check-iN. Please check in now. Your guardians will be notified.`,
+              reminderCount: `Missed — ${formatHour(h)}`,
             });
           }
         }
