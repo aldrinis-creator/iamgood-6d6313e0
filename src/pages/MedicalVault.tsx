@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Eye, EyeOff, FileText, Shield, Heart, User, Upload, Trash2, Download,
-  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera
+  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -254,6 +254,90 @@ const MedicalVaultContent = () => {
       ...p,
       [field]: p[field].filter((_, i) => i !== idx),
     }));
+  };
+
+  // ===================== EMERGENCY PDF =====================
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const generateEmergencyPdf = async () => {
+    if (!userId) return;
+    setGeneratingPdf(true);
+    try {
+      const [{ data: guardians }, { data: meds }, { data: profileData }] = await Promise.all([
+        supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary")
+          .eq("user_id", userId).order("is_primary", { ascending: false }),
+        supabase.from("medications").select("name, dosage, frequency, schedule_times, instructions")
+          .eq("user_id", userId),
+        supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
+      ]);
+
+      const hp = healthProfile;
+      const userName = profileData?.full_name || "User";
+      const now = new Date().toLocaleString("en-IN");
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;padding:32px;font-size:13px;line-height:1.5}
+.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:20px;text-align:center}
+.header h1{font-size:22px;margin-bottom:4px}.header p{font-size:11px;opacity:0.9}
+.section{margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+.section-title{background:#f3f4f6;padding:8px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb}
+.section-body{padding:12px 14px}
+.row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6}
+.row:last-child{border-bottom:none}
+.label{color:#6b7280;font-size:12px;min-width:140px}.value{font-weight:500;text-align:right}
+.badge{display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:11px;margin:2px;font-weight:600}
+.badge-blue{background:#eff6ff;color:#2563eb}.badge-green{background:#f0fdf4;color:#16a34a}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f3f4f6;text-align:left;padding:6px 10px;font-weight:600}
+td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
+.footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb}
+.alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.alert-box p{color:#dc2626;font-weight:600;font-size:12px}
+</style></head><body>
+<div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
+<div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
+<div class="row"><span class="label">Name</span><span class="value">${userName}</span></div>
+${profileData?.date_of_birth ? `<div class="row"><span class="label">Date of Birth</span><span class="value">${new Date(profileData.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
+${profileData?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${profileData.gender}</span></div>` : ""}
+${profileData?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${profileData.phone}</span></div>` : ""}
+${hp.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${hp.blood_group}</span></span></div>` : ""}
+</div></div>
+${hp.allergies.length > 0 ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${hp.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
+${hp.chronic_conditions.length > 0 ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${hp.chronic_conditions.map(c => `<span class="badge badge-blue">${c}</span>`).join(" ")}</div></div>` : ""}
+${hp.current_medications.length > 0 || (meds && meds.length > 0) ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body">
+${meds && meds.length > 0 ? `<table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g, " ")}</td><td>${(m.schedule_times || []).join(", ")}</td></tr>`).join("")}</table>` : ""}
+${hp.current_medications.length > 0 ? `<div style="margin-top:8px">${hp.current_medications.map(m => `<span class="badge badge-green">${m}</span>`).join(" ")}</div>` : ""}
+</div></div>` : ""}
+${hp.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${hp.emergency_notes}</p></div></div>` : ""}
+${hp.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body">
+<div class="row"><span class="label">Name</span><span class="value">${hp.family_doctor_name}</span></div>
+${hp.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${hp.family_doctor_phone}</span></div>` : ""}
+</div></div>` : ""}
+${guardians && guardians.length > 0 ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body">
+<table><tr><th>Name</th><th>Relation</th><th>Phone</th><th>Email</th></tr>
+${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td><td>${g.guardian_email || "—"}</td></tr>`).join("")}
+</table></div></div>` : ""}
+<div class="footer"><p>Auto-generated by Check-iN Emergency Response System. Keep this card with you or share with caregivers.</p></div>
+</body></html>`;
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast.error("Pop-up blocked. Please allow pop-ups.");
+        setGeneratingPdf(false);
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.onload = () => printWindow.print();
+      toast.success("Use 'Save as PDF' in the print dialog");
+    } catch (err: any) {
+      toast.error("Failed to generate PDF");
+      console.error(err);
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   // ===================== SECRET VAULT =====================
@@ -582,6 +666,11 @@ const MedicalVaultContent = () => {
               <Button onClick={saveHealthProfile} disabled={profileSaving} className="w-full" size="lg">
                 {profileSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                   : <><ShieldCheck className="w-4 h-4 mr-2" /> Save Health Profile</>}
+              </Button>
+
+              <Button onClick={generateEmergencyPdf} disabled={generatingPdf} variant="outline" className="w-full" size="lg">
+                {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                  : <><Printer className="w-4 h-4 mr-2" /> Download Emergency PDF</>}
               </Button>
             </>
           )}
