@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Hospital, Cross, Phone, MapPin, Shield, Flame, Baby, Brain, FlaskConical, Loader2, ExternalLink } from "lucide-react";
+import { Hospital, Cross, Phone, MapPin, Shield, Flame, Baby, Brain, FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import NearbyFacilities from "@/components/NearbyFacilities";
 
 const EMERGENCY_NUMBERS = [
   { label: "Police", phone: "100", icon: Shield },
@@ -18,7 +19,7 @@ const EMERGENCY_NUMBERS = [
 
 const HealthServices = () => {
   const { user } = useAuth();
-  const [locating, setLocating] = useState(false);
+  const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | null>(null);
 
   const { data: guardians = [] } = useQuery({
     queryKey: ["guardians", user?.id],
@@ -33,29 +34,10 @@ const HealthServices = () => {
     },
   });
 
-  const findNearby = (type: "hospitals" | "pharmacies") => {
-    setLocating(true);
-    if (!navigator.geolocation) {
-      window.open(`https://www.google.com/maps/search/${type}+near+me/`, "_blank");
-      setLocating(false);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        window.open(
-          `https://www.google.com/maps/search/${type}/@${latitude},${longitude},14z`,
-          "_blank"
-        );
-        setLocating(false);
-      },
-      () => {
-        window.open(`https://www.google.com/maps/search/${type}+near+me/`, "_blank");
-        setLocating(false);
-      },
-      { timeout: 5000 }
-    );
-  };
+  // Show in-app map view
+  if (facilityView) {
+    return <NearbyFacilities type={facilityView} onBack={() => setFacilityView(null)} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -66,22 +48,20 @@ const HealthServices = () => {
           <Button
             variant="outline"
             className="h-auto py-4 flex flex-col gap-2"
-            onClick={() => findNearby("hospitals")}
-            disabled={locating}
+            onClick={() => setFacilityView("hospitals")}
           >
-            {locating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Hospital className="w-6 h-6 text-primary" />}
+            <Hospital className="w-6 h-6 text-primary" />
             <span className="text-xs font-medium">Hospitals</span>
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+            <MapPin className="w-3 h-3 text-muted-foreground" />
           </Button>
           <Button
             variant="outline"
             className="h-auto py-4 flex flex-col gap-2"
-            onClick={() => findNearby("pharmacies")}
-            disabled={locating}
+            onClick={() => setFacilityView("pharmacies")}
           >
-            {locating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Cross className="w-6 h-6 text-success" />}
+            <Cross className="w-6 h-6 text-success" />
             <span className="text-xs font-medium">Pharmacies</span>
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+            <MapPin className="w-3 h-3 text-muted-foreground" />
           </Button>
         </div>
       </div>
