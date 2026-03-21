@@ -30,6 +30,7 @@ const healthTools = [
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
   { icon: UserCog, label: "My Persona", color: "bg-success/10 text-success" },
+  { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
 ];
 
 const healthToolsSubItems = [
