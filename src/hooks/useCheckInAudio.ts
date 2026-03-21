@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
