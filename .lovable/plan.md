@@ -1,27 +1,22 @@
 
 
-# Include Full Wellness Data in Health Passport Score
+# Make Medical Vault Accessible
 
-## Problem
-The Wellness category in the Health Passport only uses `sleep_hours` from `wellness_logs`. Mindfulness minutes, mood, energy, stress, and sleep quality are all tracked in the WellnessTracker but ignored by the Health Passport score.
+## What We'll Do
+Add Medical Vault access in two places:
+1. **My Health tools grid** — Add a "Vault" card with a Shield/Lock icon as the 10th tool
+2. **Profile dropdown** (AppHeader) — Add a "Medical Vault" menu item between "My Profile" and "Settings"
 
 ## Changes
 
-### 1. Update Wellness Score Calculation (`src/components/HealthPassport.tsx`)
-- Fetch today's wellness log (not yesterday's) in addition to yesterday's sleep data
-- Compute a composite Wellness score from 5 sub-metrics, each worth 20 points:
-  - **Sleep** (yesterday): `min(sleep_hours / 8, 1) * 20`
-  - **Sleep Quality** (yesterday): `min(sleep_quality / 5, 1) * 20`
-  - **Mood Score**: `min(mood_score / 5, 1) * 20`
-  - **Energy Level**: `min(energy_level / 5, 1) * 20`
-  - **Mindfulness**: `min(mindfulness_minutes / 15, 1) * 20` (15 min daily goal)
-- Use today's log for mood/energy/mindfulness, yesterday's for sleep
+### 1. `src/pages/MyHealth.tsx`
+- Add a new entry to `healthTools` array: `{ icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" }`
+- Add to `toolComponents`: map "Vault" to navigate to `/medical-vault` (since it's a full page, not an inline component)
+- Handle the special case: when "Vault" is clicked, navigate to `/medical-vault` instead of rendering inline
 
-### 2. Update Ward Health Passport (`src/components/WardHealthPassport.tsx`)
-- Apply the same composite wellness scoring for consistency
+### 2. `src/components/AppHeader.tsx`
+- Add a `DropdownMenuItem` for "Medical Vault" linking to `/medical-vault`
+- Place it after "My Profile" in the dropdown menu
 
-### Technical Details
-- No database changes needed -- all fields already exist in `wellness_logs`
-- Add a second parallel fetch for today's `wellness_logs` entry
-- Both files use the same scoring formula for parity
+No database or routing changes needed — the `/medical-vault` route already exists in `App.tsx`.
 
