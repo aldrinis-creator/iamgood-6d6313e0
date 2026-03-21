@@ -1,34 +1,27 @@
 
 
-# Fix Guardian Registration & Profile Management
+# Include Full Wellness Data in Health Passport Score
 
 ## Problem
-1. Registration Step 3 collects guardian details but does NOT require email (critical for emergency notifications via email)
-2. Registration does NOT enforce at least 1 guardian with valid email before account creation
-3. My Profile page only shows the primary guardian as read-only -- no way to add/manage up to 5 guardians
-4. The GuardianTab component exists but is only used in Settings, not in My Profile
+The Wellness category in the Health Passport only uses `sleep_hours` from `wellness_logs`. Mindfulness minutes, mood, energy, stress, and sleep quality are all tracked in the WellnessTracker but ignored by the Health Passport score.
 
 ## Changes
 
-### 1. Registration Step 3 (`src/pages/Register.tsx`)
-- Add **guardian email** field (required for primary guardian) to the guardian form
-- Add validation: primary guardian must have name, phone, AND email before submit
-- Store `guardian_email` in the guardians insert
+### 1. Update Wellness Score Calculation (`src/components/HealthPassport.tsx`)
+- Fetch today's wellness log (not yesterday's) in addition to yesterday's sleep data
+- Compute a composite Wellness score from 5 sub-metrics, each worth 20 points:
+  - **Sleep** (yesterday): `min(sleep_hours / 8, 1) * 20`
+  - **Sleep Quality** (yesterday): `min(sleep_quality / 5, 1) * 20`
+  - **Mood Score**: `min(mood_score / 5, 1) * 20`
+  - **Energy Level**: `min(energy_level / 5, 1) * 20`
+  - **Mindfulness**: `min(mindfulness_minutes / 15, 1) * 20` (15 min daily goal)
+- Use today's log for mood/energy/mindfulness, yesterday's for sleep
 
-### 2. My Profile Guardians Section (`src/pages/MyProfile.tsx`)
-- Replace the read-only "Primary Guardian" card with a full guardian management section
-- Show all guardians (not just primary), with add/edit/delete capability
-- Allow adding up to 5 guardians with name, phone, email, and relation
-- Reuse patterns from `GuardianTab.tsx` (inline form, delete, primary badge)
-- Include email field prominently since it's core to the notification USP
-
-### 3. Guardian Tab Update (`src/components/GuardianTab.tsx`)
-- Ensure the guardian add form also requires email for at least the primary guardian
-- Keep as-is for Settings page usage
+### 2. Update Ward Health Passport (`src/components/WardHealthPassport.tsx`)
+- Apply the same composite wellness scoring for consistency
 
 ### Technical Details
-- No database changes needed -- `guardians` table already has `guardian_email` column
-- Registration guardian state changes from `{ name, phone, relation }` to `{ name, phone, email, relation }`
-- MyProfile fetches ALL guardians (remove `is_primary` filter, remove `limit(1)`)
-- Max 5 guardians enforced in both Registration and My Profile
+- No database changes needed -- all fields already exist in `wellness_logs`
+- Add a second parallel fetch for today's `wellness_logs` entry
+- Both files use the same scoring formula for parity
 
