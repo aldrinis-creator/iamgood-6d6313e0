@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   Hospital, Cross, MapPin, Loader2, Navigation, Phone, Clock,
-  ExternalLink, ArrowLeft, Star
+  ArrowLeft, Search, SlidersHorizontal
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -53,6 +55,9 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [maxDistance, setMaxDistance] = useState(5);
+  const [showFilters, setShowFilters] = useState(false);
 
   const isHospital = type === "hospitals";
   const label = isHospital ? "Hospitals" : "Pharmacies";
@@ -107,7 +112,6 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
     const group = L.layerGroup().addTo(leafletMap.current);
     markersRef.current = group;
 
-    // user marker
     L.circleMarker([uLat, uLon], {
       radius: 8, fillColor: "#3b82f6", fillOpacity: 1, color: "#fff", weight: 2,
     }).addTo(group).bindPopup("You are here");
@@ -138,7 +142,6 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
     }).addTo(leafletMap.current);
     L.control.zoom({ position: "bottomright" }).addTo(leafletMap.current);
 
-    // get location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -174,6 +177,15 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
     leafletMap.current?.flyTo([f.lat, f.lon], 16, { duration: 0.8 });
   };
 
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return facilities.filter((f) => {
+      if (q && !f.name.toLowerCase().includes(q) && !(f.address || "").toLowerCase().includes(q)) return false;
+      if (f.distance != null && f.distance > maxDistance) return false;
+      return true;
+    });
+  }, [facilities, searchQuery, maxDistance]);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -184,7 +196,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         <h2 className="text-lg font-semibold">Nearby {label}</h2>
         {!loading && (
           <Badge variant="secondary" className="ml-auto text-xs">
-            {facilities.length} found
+            {filtered.length} found
           </Badge>
         )}
       </div>
@@ -195,6 +207,45 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         className="w-full h-48 rounded-lg border border-border overflow-hidden bg-muted"
         style={{ minHeight: 192 }}
       />
+
+      {/* Search & Filter Bar */}
+      {!loading && facilities.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder={`Search ${label.toLowerCase()}…`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
+              className="h-9 gap-1 px-2.5"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </Button>
+          </div>
+          {showFilters && (
+            <div className="flex items-center gap-3 px-1">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Max distance</span>
+              <Slider
+                value={[maxDistance]}
+                onValueChange={(v) => setMaxDistance(v[0])}
+                min={0.5}
+                max={5}
+                step={0.5}
+                className="flex-1"
+              />
+              <span className="text-xs font-medium w-12 text-right">{maxDistance} km</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading / Error */}
       {loading && (
@@ -217,9 +268,9 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       )}
 
       {/* Results List */}
-      {!loading && facilities.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <div className="space-y-2">
-          {facilities.map((f) => (
+          {filtered.map((f) => (
             <Card
               key={f.id}
               className="hover:shadow-md transition-shadow cursor-pointer"
@@ -273,6 +324,12 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
             </Card>
           ))}
         </div>
+      )}
+
+      {!loading && !error && facilities.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-center text-muted-foreground py-4">
+          No matches. Try adjusting your search or distance filter.
+        </p>
       )}
 
       {!loading && !error && facilities.length === 0 && (
