@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, UserCog, ShieldCheck } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import ActivityTracker from "@/components/ActivityTracker";
 import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
-import MyPersona from "@/components/MyPersona";
 import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
@@ -29,7 +28,6 @@ const healthTools = [
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
-  { icon: UserCog, label: "My Persona", color: "bg-success/10 text-success" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
 ];
 
@@ -61,7 +59,6 @@ const toolComponents: Record<string, React.FC> = {
   "Wellness": WellnessTracker,
   "Services": HealthServices,
   "Face Scan": FaceScan,
-  "My Persona": MyPersona,
 };
 
 const MyHealth = () => {
@@ -78,7 +75,6 @@ const MyHealth = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  // If a sub-tool is selected, render it
   if (selectedSubTool) {
     const SubToolComponent = subToolComponents[selectedSubTool];
     return (
@@ -93,7 +89,6 @@ const MyHealth = () => {
     );
   }
 
-  // If a tool is selected, render only that tool
   if (selectedTool && selectedTool !== "Health Tools") {
     const ToolComponent = toolComponents[selectedTool];
     return (
@@ -108,7 +103,6 @@ const MyHealth = () => {
     );
   }
 
-  // If Health Tools is selected, show sub-items only
   if (selectedTool === "Health Tools") {
     return (
       <AppLayout>
@@ -137,7 +131,6 @@ const MyHealth = () => {
     );
   }
 
-  // Default: show tools grid
   return (
     <AppLayout>
       <div className="p-4 space-y-4">

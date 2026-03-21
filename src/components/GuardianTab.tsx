@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Trash2, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import PhoneInput from "@/components/PhoneInput";
 
 interface Guardian {
   id: string;
@@ -27,7 +28,6 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  // Form state
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -145,19 +145,19 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
             <div className="space-y-3 p-3 rounded-lg border border-border">
               <div>
                 <Label className="text-xs">Name *</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guardian name" />
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guardian name" className="text-base" />
               </div>
               <div>
                 <Label className="text-xs">Phone *</Label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
+                <PhoneInput value={phone} onChange={setPhone} />
               </div>
               <div>
                 <Label className="text-xs">Email * (for emergency notifications)</Label>
-                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="guardian@email.com" type="email" />
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="guardian@email.com" type="email" className="text-base" />
               </div>
               <div>
                 <Label className="text-xs">Relation</Label>
-                <Input value={relation} onChange={(e) => setRelation(e.target.value)} placeholder="e.g. Daughter, Son" />
+                <Input value={relation} onChange={(e) => setRelation(e.target.value)} placeholder="e.g. Daughter, Son" className="text-base" />
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleAdd} disabled={adding} className="flex-1">

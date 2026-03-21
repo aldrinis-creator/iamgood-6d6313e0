@@ -9,15 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   User, Phone, Calendar, Scale, Ruler, Heart, Shield, Eye, EyeOff, Lock,
   Save, Edit, ShieldCheck, Stethoscope, Camera, Upload, X, FileText, Image,
-  Trash2, Mail, Plus, Loader2,
+  Trash2, Mail, Plus, Loader2, ChevronDown, Activity, Apple,
 } from "lucide-react";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { differenceInYears, parse } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import PhoneInput from "@/components/PhoneInput";
 
 interface EncryptedDoc {
   id: string;
@@ -32,6 +35,21 @@ const BMI_CATEGORIES = [
   { max: 25, label: "Normal", color: "text-success" },
   { max: 30, label: "Overweight", color: "text-yellow-500" },
   { max: Infinity, label: "Obese", color: "text-destructive" },
+];
+
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const ACTIVITY_LEVELS = ["Sedentary", "Light", "Moderate", "Active", "Very Active"];
+const DIET_TYPES = ["vegetarian", "non-vegetarian", "vegan", "eggetarian", "pescatarian", "other"];
+const PREFERENCE_OPTIONS = [
+  "No Sugar", "Low Salt", "Gluten Free", "Dairy Free", "Nut Free",
+  "Organic", "High Protein", "Low Carb", "Keto", "Paleo",
+  "Whole Foods", "Raw Food", "Intermittent Fasting",
+];
+const GOAL_OPTIONS = [
+  "Weight Loss", "Weight Gain", "Muscle Building", "Heart Health",
+  "Diabetes Management", "Blood Pressure Control", "Better Sleep",
+  "Stress Reduction", "Improved Digestion", "Bone Health",
+  "Energy Boost", "Immunity Boost",
 ];
 
 const getBmiInfo = (bmi: number) => BMI_CATEGORIES.find((c) => bmi < c.max) ?? BMI_CATEGORIES[3];
@@ -49,6 +67,83 @@ const MyProfile = () => {
         </VaultGate>
       </div>
     </AppLayout>
+  );
+};
+
+const MultiSelectDropdown = ({
+  label,
+  options,
+  selected,
+  onChange,
+  icon,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  icon?: React.ReactNode;
+}) => {
+  const [customInput, setCustomInput] = useState("");
+
+  const toggle = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((s) => s !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const addCustom = () => {
+    const val = customInput.trim();
+    if (val && !selected.includes(val)) {
+      onChange([...selected, val]);
+      setCustomInput("");
+    }
+  };
+
+  return (
+    <div>
+      <Label className="text-xs font-medium flex items-center gap-1.5 mb-1.5">
+        {icon} {label}
+      </Label>
+      {selected.length > 0 && (
+        <div className="flex gap-1 flex-wrap mb-2">
+          {selected.map((item) => (
+            <Badge key={item} variant="secondary" className="text-xs cursor-pointer" onClick={() => toggle(item)}>
+              {item} ✕
+            </Badge>
+          ))}
+        </div>
+      )}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="w-full justify-between text-sm font-normal">
+            {selected.length > 0 ? `${selected.length} selected` : `Select ${label.toLowerCase()}`}
+            <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 max-h-64 overflow-y-auto p-2" align="start">
+          {options.map((option) => (
+            <label key={option} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer">
+              <Checkbox checked={selected.includes(option)} onCheckedChange={() => toggle(option)} />
+              <span className="text-sm">{option}</span>
+            </label>
+          ))}
+          <div className="flex gap-1 mt-2 pt-2 border-t">
+            <Input
+              placeholder="Add custom..."
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+              className="text-sm h-8"
+            />
+            <Button size="sm" variant="ghost" className="h-8 px-2" onClick={addCustom}>
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 };
 
@@ -76,6 +171,19 @@ const ProfileContent = () => {
   const [gEmail, setGEmail] = useState("");
   const [gRelation, setGRelation] = useState("");
   const [addingGuardian, setAddingGuardian] = useState(false);
+
+  // Persona fields (from nutrition_personas)
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [allergyInput, setAllergyInput] = useState("");
+  const [medicalConditions, setMedicalConditions] = useState<string[]>([]);
+  const [conditionInput, setConditionInput] = useState("");
+  const [activityLevel, setActivityLevel] = useState("");
+  const [smoking, setSmoking] = useState("");
+  const [alcohol, setAlcohol] = useState("");
+  const [dietType, setDietType] = useState("vegetarian");
+  const [dietaryPreferences, setDietaryPreferences] = useState<string[]>([]);
+  const [healthGoals, setHealthGoals] = useState<string[]>([]);
 
   // Encrypted docs
   const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);
@@ -109,11 +217,12 @@ const ProfileContent = () => {
   const loadData = useCallback(async () => {
     if (!userId) return;
 
-    const [guardianRes, healthRes, docsRes, pinRes] = await Promise.all([
+    const [guardianRes, healthRes, docsRes, pinRes, personaRes] = await Promise.all([
       supabase.from("guardians").select("*").eq("user_id", userId).order("is_primary", { ascending: false }),
       supabase.from("health_profile").select("*").eq("user_id", userId).limit(1),
       supabase.from("encrypted_documents").select("*").eq("user_id", userId),
       supabase.from("vault_pins").select("*").eq("user_id", userId).limit(1),
+      supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
     ]);
 
     if (guardianRes.data) setGuardians(guardianRes.data);
@@ -125,6 +234,20 @@ const ProfileContent = () => {
     if (pinRes.data?.[0]) {
       setHasPin(true);
       setPinHash(pinRes.data[0].pin_hash);
+    }
+
+    // Load persona data
+    if (personaRes.data) {
+      const p = personaRes.data;
+      setBloodGroup(p.blood_group || "");
+      setAllergies(p.allergies || []);
+      setMedicalConditions(p.medical_conditions || []);
+      setActivityLevel(p.activity_level || "");
+      setSmoking(p.smoking || "");
+      setAlcohol(p.alcohol || "");
+      setDietType(p.diet_type || "vegetarian");
+      setDietaryPreferences(p.dietary_preferences || []);
+      setHealthGoals(p.health_goals || []);
     }
 
     // Load photo URLs
@@ -160,7 +283,7 @@ const ProfileContent = () => {
     if (!userId) return;
     setSaving(true);
 
-    const [profileRes, healthRes] = await Promise.all([
+    const [profileRes, healthRes, personaRes] = await Promise.all([
       supabase.from("profiles").update({
         full_name: fullName,
         date_of_birth: dob || null,
@@ -174,10 +297,22 @@ const ProfileContent = () => {
         family_doctor_name: doctorName || null,
         family_doctor_phone: doctorPhone || null,
       } as any, { onConflict: "user_id" }),
+      supabase.from("nutrition_personas").upsert({
+        user_id: userId,
+        blood_group: bloodGroup || null,
+        allergies,
+        medical_conditions: medicalConditions,
+        activity_level: activityLevel || null,
+        smoking: smoking || null,
+        alcohol: alcohol || null,
+        diet_type: dietType,
+        dietary_preferences: dietaryPreferences,
+        health_goals: healthGoals,
+      } as any, { onConflict: "user_id" }),
     ]);
 
     setSaving(false);
-    if (profileRes.error || healthRes.error) {
+    if (profileRes.error || healthRes.error || personaRes.error) {
       toast.error("Failed to save profile");
     } else {
       toast.success("Profile updated");
@@ -278,7 +413,6 @@ const ProfileContent = () => {
     setUploadingPhoto(photoUploadType);
     const path = `${userId}/${photoUploadType}_photo`;
 
-    // Delete existing first
     await supabase.storage.from("medical-documents").remove([path]);
 
     const { error } = await supabase.storage
@@ -304,6 +438,15 @@ const ProfileContent = () => {
   const triggerPhotoUpload = (type: string) => {
     setPhotoUploadType(type);
     setTimeout(() => fileInputRef.current?.click(), 50);
+  };
+
+  const addChip = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+    if (!value.trim()) return;
+    setter((prev) => [...prev, value.trim()]);
+  };
+
+  const removeChip = (setter: React.Dispatch<React.SetStateAction<string[]>>, idx: number) => {
+    setter((prev) => prev.filter((_, i) => i !== idx));
   };
 
   return (
@@ -344,9 +487,9 @@ const ProfileContent = () => {
         <CardContent className="space-y-3">
           {editing ? (
             <>
-              <div><Label>Full Name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-              <div><Label>Date of Birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
-              <div><Label>Mobile Number</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." /></div>
+              <div><Label>Full Name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="text-base" /></div>
+              <div><Label>Date of Birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="text-base" /></div>
+              <div><Label>Mobile Number</Label><PhoneInput value={phone} onChange={setPhone} /></div>
               <div>
                 <Label>Gender</Label>
                 <Select value={gender} onValueChange={setGender}>
@@ -380,8 +523,8 @@ const ProfileContent = () => {
         <CardContent>
           {editing ? (
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Weight (kg)</Label><Input type="number" step="0.1" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} /></div>
-              <div><Label>Height (m)</Label><Input type="number" step="0.01" value={heightM} onChange={(e) => setHeightM(e.target.value)} /></div>
+              <div><Label>Weight (kg)</Label><Input type="number" step="0.1" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} className="text-base" /></div>
+              <div><Label>Height (m)</Label><Input type="number" step="0.01" value={heightM} onChange={(e) => setHeightM(e.target.value)} className="text-base" /></div>
             </div>
           ) : (
             <div className="space-y-2 text-sm">
@@ -398,6 +541,126 @@ const ProfileContent = () => {
         </CardContent>
       </Card>
 
+      {/* My Persona — Body & Health */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Heart className="w-4 h-4 text-destructive" /> Body & Health
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {editing ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Blood Group</Label>
+                  <Select value={bloodGroup} onValueChange={setBloodGroup}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {BLOOD_GROUPS.map((bg) => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Diet Type</Label>
+                  <Select value={dietType} onValueChange={setDietType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DIET_TYPES.map((d) => <SelectItem key={d} value={d} className="capitalize">{d.replace("-", " ")}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Allergies</Label>
+                <div className="flex gap-1 flex-wrap mb-1">
+                  {allergies.map((a, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs cursor-pointer" onClick={() => removeChip(setAllergies, i)}>{a} ✕</Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input placeholder="e.g. Penicillin" value={allergyInput} onChange={(e) => setAllergyInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChip(setAllergies, allergyInput); setAllergyInput(""); } }} className="text-base" />
+                  <Button variant="outline" size="sm" onClick={() => { addChip(setAllergies, allergyInput); setAllergyInput(""); }}><Plus className="w-3 h-3" /></Button>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Medical Conditions</Label>
+                <div className="flex gap-1 flex-wrap mb-1">
+                  {medicalConditions.map((c, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs cursor-pointer" onClick={() => removeChip(setMedicalConditions, i)}>{c} ✕</Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input placeholder="e.g. Diabetes" value={conditionInput} onChange={(e) => setConditionInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChip(setMedicalConditions, conditionInput); setConditionInput(""); } }} className="text-base" />
+                  <Button variant="outline" size="sm" onClick={() => { addChip(setMedicalConditions, conditionInput); setConditionInput(""); }}><Plus className="w-3 h-3" /></Button>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Activity Level</Label>
+                <Select value={activityLevel} onValueChange={setActivityLevel}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_LEVELS.map((a) => <SelectItem key={a} value={a.toLowerCase()}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Smoking</Label>
+                  <Select value={smoking} onValueChange={setSmoking}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="former">Former</SelectItem>
+                      <SelectItem value="current">Current</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Alcohol</Label>
+                  <Select value={alcohol} onValueChange={setAlcohol}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="occasional">Occasional</SelectItem>
+                      <SelectItem value="regular">Regular</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <MultiSelectDropdown
+                label="Dietary Preferences"
+                options={PREFERENCE_OPTIONS}
+                selected={dietaryPreferences}
+                onChange={setDietaryPreferences}
+                icon={<Apple className="w-3.5 h-3.5" />}
+              />
+              <MultiSelectDropdown
+                label="Health Goals"
+                options={GOAL_OPTIONS}
+                selected={healthGoals}
+                onChange={setHealthGoals}
+                icon={<Activity className="w-3.5 h-3.5" />}
+              />
+            </>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <InfoRow label="Blood Group" value={bloodGroup} />
+              <InfoRow label="Diet Type" value={dietType} capitalize />
+              <InfoRow label="Allergies" value={allergies.length > 0 ? allergies.join(", ") : "—"} />
+              <InfoRow label="Medical Conditions" value={medicalConditions.length > 0 ? medicalConditions.join(", ") : "—"} />
+              <InfoRow label="Activity Level" value={activityLevel} capitalize />
+              <InfoRow label="Smoking" value={smoking} capitalize />
+              <InfoRow label="Alcohol" value={alcohol} capitalize />
+              <InfoRow label="Dietary Preferences" value={dietaryPreferences.length > 0 ? dietaryPreferences.join(", ") : "—"} />
+              <InfoRow label="Health Goals" value={healthGoals.length > 0 ? healthGoals.join(", ") : "—"} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Family Doctor */}
       <Card>
         <CardHeader className="pb-3">
@@ -408,8 +671,8 @@ const ProfileContent = () => {
         <CardContent className="space-y-3">
           {editing ? (
             <>
-              <div><Label>Doctor Name</Label><Input value={doctorName} onChange={(e) => setDoctorName(e.target.value)} placeholder="Dr. Sharma" /></div>
-              <div><Label>Doctor Mobile</Label><Input value={doctorPhone} onChange={(e) => setDoctorPhone(e.target.value)} placeholder="+91 ..." /></div>
+              <div><Label>Doctor Name</Label><Input value={doctorName} onChange={(e) => setDoctorName(e.target.value)} placeholder="Dr. Sharma" className="text-base" /></div>
+              <div><Label>Doctor Mobile</Label><PhoneInput value={doctorPhone} onChange={setDoctorPhone} /></div>
             </>
           ) : (
             <div className="space-y-2 text-sm">
@@ -481,9 +744,9 @@ const ProfileContent = () => {
 
           {showGuardianForm ? (
             <div className="space-y-3 p-3 rounded-lg border border-border">
-              <div><Label className="text-xs">Name *</Label><Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Guardian name" /></div>
-              <div><Label className="text-xs">Phone *</Label><Input value={gPhone} onChange={(e) => setGPhone(e.target.value)} placeholder="+91 98765 43210" /></div>
-              <div><Label className="text-xs">Email * (for emergency notifications)</Label><Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="guardian@email.com" type="email" /></div>
+              <div><Label className="text-xs">Name *</Label><Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Guardian name" className="text-base" /></div>
+              <div><Label className="text-xs">Phone *</Label><PhoneInput value={gPhone} onChange={setGPhone} /></div>
+              <div><Label className="text-xs">Email * (for emergency notifications)</Label><Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="guardian@email.com" type="email" className="text-base" /></div>
               <div>
                 <Label className="text-xs">Relation</Label>
                 <Select value={gRelation} onValueChange={setGRelation}>
@@ -624,7 +887,7 @@ const ProfileContent = () => {
           <DialogHeader><DialogTitle>Enter Vault PIN</DialogTitle></DialogHeader>
           <div>
             <Label>6-digit PIN</Label>
-            <Input type="password" maxLength={6} inputMode="numeric" value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+            <Input type="password" maxLength={6} inputMode="numeric" value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))} className="text-base" />
           </div>
           <DialogFooter>
             <Button onClick={handleVerifyPin} disabled={pinInput.length !== 6}>Unlock</Button>
@@ -644,6 +907,7 @@ const ProfileContent = () => {
               onChange={(e) => setNewDocValue(e.target.value)}
               placeholder={addDocType === "aadhaar" ? "1234 5678 9012" : "ABCDE1234F"}
               maxLength={addDocType === "aadhaar" ? 14 : 10}
+              className="text-base"
             />
           </div>
           <DialogFooter>
