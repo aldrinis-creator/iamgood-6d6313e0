@@ -93,29 +93,70 @@ const GuardianDashboard = () => {
     if (checkIns) setTodayCheckIns(checkIns);
   }, [session?.user?.id]);
 
+  const fetchWardSettings = useCallback(async (wId: string) => {
+    const { data } = await supabase
+      .from("user_settings" as any)
+      .select("settings")
+      .eq("user_id", wId)
+      .maybeSingle();
+    if (data) {
+      const s = (data as any).settings;
+      setWardPauseMode(s?.pauseMode || "active");
+      setWardPauseDetails({
+        sleepTo: s?.sleepSchedule?.to,
+        endsAt: s?.checkOutConfig?.endsAt,
+        reason: s?.checkOutConfig?.reason,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     fetchNotifications();
     fetchWardCheckIns();
+  }, [fetchNotifications, fetchWardCheckIns]);
 
-    // Realtime subscription for new notifications
-    const channel = supabase
+  // Fetch ward settings once we know the ward user id
+  useEffect(() => {
+    if (wardUserId) fetchWardSettings(wardUserId);
+  }, [wardUserId, fetchWardSettings]);
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const channels: any[] = [];
+
+    // Notifications realtime
+    const notifChannel = supabase
       .channel("guardian-notifications")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
         (payload: any) => {
           fetchNotifications();
-          // Play audio alert for missed check-in notifications
           if (payload?.new?.type === "missed_checkin") {
-            // Always play chime for missed check-in alerts on guardian dashboard
             playChime();
           }
         }
       )
       .subscribe();
+    channels.push(notifChannel);
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchNotifications, fetchWardCheckIns]);
+    // Ward settings realtime (for pause mode changes)
+    if (wardUserId) {
+      const settingsChannel = supabase
+        .channel("ward-settings")
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "user_settings", filter: `user_id=eq.${wardUserId}` },
+          () => {
+            fetchWardSettings(wardUserId);
+          }
+        )
+        .subscribe();
+      channels.push(settingsChannel);
+    }
+
+    return () => { channels.forEach(c => supabase.removeChannel(c)); };
+  }, [fetchNotifications, fetchWardCheckIns, wardUserId, fetchWardSettings]);
 
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);
