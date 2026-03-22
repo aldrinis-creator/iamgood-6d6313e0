@@ -309,11 +309,11 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
   const [saved, setSaved] = useState(false);
 
   const saveToVault = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Please log in to save"); return; }
+
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Please log in to save"); return; }
-
       const description = [
         result.summary,
         "",
