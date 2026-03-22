@@ -23,6 +23,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
+        <PwaInstallBanner />
         <AppHeader />
         <main className="flex-1 overflow-y-auto pb-24">
           {children}

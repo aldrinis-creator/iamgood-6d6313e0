@@ -496,6 +496,19 @@ ${qrSection}
                 </a>
               </div>
             )}
+
+            {/* QR Code */}
+            {emergencyProfileUrl && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5" /> Emergency Profile QR
+                </p>
+                <div className="flex flex-col items-center gap-2 bg-white rounded-lg p-4">
+                  <QRCodeSVG value={emergencyProfileUrl} size={140} />
+                  <p className="text-[10px] text-muted-foreground break-all text-center">{emergencyProfileUrl}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <Button onClick={handleClose} variant="outline" className="w-full mt-4">

@@ -275,6 +275,9 @@ ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Em
             {generatingPdf ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Printer className="w-4 h-4 mr-1" />}
             Print
           </Button>
+          <Button onClick={handleDownload} variant="outline" size="sm" className="flex-1">
+            <Download className="w-4 h-4 mr-1" /> Save
+          </Button>
         </div>
       </CardContent>
     </Card>
