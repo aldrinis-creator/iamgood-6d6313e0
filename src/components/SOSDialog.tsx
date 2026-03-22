@@ -64,7 +64,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes] = await Promise.all([
+    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
@@ -72,6 +72,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("wellness_logs").select("mood, stress_level, energy_level").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("medications").select("name, dosage").eq("user_id", uid),
+      supabase.from("emergency_share_tokens").select("token").eq("user_id", uid).eq("is_active", true).maybeSingle(),
     ]);
 
     setMedical({
@@ -89,6 +90,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setUserPhone(profileRes.data?.phone ?? "");
     setUserDob(profileRes.data?.date_of_birth ?? "");
     setUserGender(profileRes.data?.gender ?? "");
+    setEmergencyToken(tokenRes.data?.token ?? null);
 
     // Store latest health data for the SOS message
     (window as any).__sosHealthData = {
