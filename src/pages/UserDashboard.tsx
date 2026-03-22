@@ -9,6 +9,8 @@ import { useUserSettings, SleepSchedule, CheckOutConfig } from "@/hooks/useUserS
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 
