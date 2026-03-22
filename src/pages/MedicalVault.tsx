@@ -776,10 +776,15 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                 </Card>
               )}
 
-              <Button onClick={generateEmergencyPdf} disabled={generatingPdf} variant="outline" className="w-full" size="lg">
-                {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                  : <><Printer className="w-4 h-4 mr-2" /> Download Emergency PDF</>}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleShareCard} variant="outline" className="flex-1" size="lg">
+                  <Share2 className="w-4 h-4 mr-2" /> Share
+                </Button>
+                <Button onClick={handlePrintCard} disabled={generatingPdf} variant="outline" className="flex-1" size="lg">
+                  {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                    : <><Printer className="w-4 h-4 mr-2" /> Print / PDF</>}
+                </Button>
+              </div>
             </>
           ) : null}
         </TabsContent>
