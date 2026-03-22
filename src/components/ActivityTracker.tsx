@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { requestMotionPermission } from "@/hooks/useFallDetection";
 import {
   Heart, Footprints, MapPin, Activity, Flame, Timer, Wind, Building2, Droplets,
   TrendingUp, Save, Target, Play, Pause, Square, Watch, ChevronRight,
