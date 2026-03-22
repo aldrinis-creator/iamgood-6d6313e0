@@ -5,11 +5,12 @@ import HealthPassport from "@/components/HealthPassport";
 import AppLayout from "@/components/AppLayout";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useApp, PauseMode } from "@/contexts/AppContext";
-import { useUserSettings } from "@/hooks/useUserSettings";
+import { useUserSettings, SleepSchedule, CheckOutConfig } from "@/hooks/useUserSettings";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import SleepModeDialog from "@/components/SleepModeDialog";
+import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
   { mode: "active", icon: Sun, label: "Active", description: "Check-iNs running" },
@@ -17,42 +18,130 @@ const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; descript
   { mode: "checked-out", icon: DoorOpen, label: "Checked Out", description: "Away — guardians notified" },
 ];
 
+// Parse "HH:MM" into minutes since midnight
+const timeToMinutes = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+// Check if "now" is within a sleep window (handles overnight)
+const isInSleepWindow = (from: string, to: string): boolean => {
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const fromMin = timeToMinutes(from);
+  const toMin = timeToMinutes(to);
+
+  if (fromMin <= toMin) {
+    // Same-day window (e.g. 13:00-15:00)
+    return nowMin >= fromMin && nowMin < toMin;
+  }
+  // Overnight window (e.g. 22:00-06:00)
+  return nowMin >= fromMin || nowMin < toMin;
+};
+
+// Get ms until sleep window ends
+const msUntilSleepEnd = (to: string): number => {
+  const now = new Date();
+  const [h, m] = to.split(":").map(Number);
+  const end = new Date(now);
+  end.setHours(h, m, 0, 0);
+  if (end.getTime() <= now.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+  return end.getTime() - now.getTime();
+};
+
 const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
   const { settings, updateSetting } = useUserSettings();
-  const [expectedReturn, setExpectedReturn] = useState(settings.expectedReturn || "");
+
+  const [showSleepDialog, setShowSleepDialog] = useState(false);
+  const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
+  const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Auto-return logic
+  const returnToActive = useCallback(() => {
+    setPauseMode("active");
+    updateSetting("pauseMode", "active");
+    toast.success("Back to Active Mode — Check-iNs resumed ☀️");
+  }, [setPauseMode, updateSetting]);
+
+  // Schedule auto-return timers whenever pauseMode changes
+  useEffect(() => {
+    if (autoReturnTimer.current) clearTimeout(autoReturnTimer.current);
+
+    if (pauseMode === "sleep") {
+      const schedule = settings.sleepSchedule;
+      if (schedule && isInSleepWindow(schedule.from, schedule.to)) {
+        const ms = msUntilSleepEnd(schedule.to);
+        autoReturnTimer.current = setTimeout(returnToActive, ms);
+      }
+    } else if (pauseMode === "checked-out") {
+      const config = settings.checkOutConfig;
+      if (config?.endsAt) {
+        const ms = new Date(config.endsAt).getTime() - Date.now();
+        if (ms > 0) {
+          autoReturnTimer.current = setTimeout(returnToActive, ms);
+        } else {
+          // Already expired
+          returnToActive();
+        }
+      }
+    }
+
+    return () => {
+      if (autoReturnTimer.current) clearTimeout(autoReturnTimer.current);
+    };
+  }, [pauseMode, settings.sleepSchedule, settings.checkOutConfig, returnToActive]);
+
+  // Also check on load: if sleep window has passed, auto-return
+  useEffect(() => {
+    if (pauseMode === "sleep") {
+      const schedule = settings.sleepSchedule;
+      if (schedule && !isInSleepWindow(schedule.from, schedule.to)) {
+        returnToActive();
+      }
+    }
+    if (pauseMode === "checked-out") {
+      const config = settings.checkOutConfig;
+      if (config?.endsAt && new Date(config.endsAt).getTime() <= Date.now()) {
+        returnToActive();
+      }
+    }
+  }, []); // intentionally run once on mount
 
   const handleModeChange = (newMode: PauseMode) => {
     if (newMode === pauseMode) {
       // Tapping the active mode again → go back to active
       if (newMode !== "active") {
-        setPauseMode("active");
-        updateSetting("pauseMode", "active");
-        updateSetting("expectedReturn", null);
-        toast.success("Back to Active Mode — Check-iNs resumed");
+        returnToActive();
       }
       return;
     }
 
-    setPauseMode(newMode);
-    updateSetting("pauseMode", newMode);
-
     if (newMode === "active") {
-      updateSetting("expectedReturn", null);
-      toast.success("Active Mode — Check-iNs resumed");
+      returnToActive();
     } else if (newMode === "sleep") {
-      updateSetting("expectedReturn", null);
-      toast.success(`${userName} entered Sleep Mode 🌙`);
+      setShowSleepDialog(true);
     } else if (newMode === "checked-out") {
-      toast.success(`${userName} checked out 🚪`);
+      setShowCheckOutDialog(true);
     }
   };
 
-  const handleSetReturn = () => {
-    if (expectedReturn) {
-      updateSetting("expectedReturn", expectedReturn);
-      toast.success(`Expected return set to ${expectedReturn}`);
-    }
+  const handleSleepSave = (schedule: SleepSchedule) => {
+    updateSetting("sleepSchedule", schedule);
+    setPauseMode("sleep");
+    updateSetting("pauseMode", "sleep");
+    setShowSleepDialog(false);
+    toast.success(`${userName} entered Sleep Mode 🌙 (${schedule.from} – ${schedule.to})`);
+  };
+
+  const handleCheckOutSave = (config: CheckOutConfig) => {
+    updateSetting("checkOutConfig", config);
+    setPauseMode("checked-out");
+    updateSetting("pauseMode", "checked-out");
+    setShowCheckOutDialog(false);
+    toast.success(`${userName} checked out 🚪`);
   };
 
   return (
@@ -83,20 +172,19 @@ const UserDashboard = () => {
               {MODE_OPTIONS.find(o => o.mode === pauseMode)?.description}
             </p>
 
-            {/* Expected return time for Check-Out mode */}
-            {pauseMode === "checked-out" && (
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="time"
-                  value={expectedReturn}
-                  onChange={(e) => setExpectedReturn(e.target.value)}
-                  className="flex-1 text-sm"
-                  placeholder="Expected return"
-                />
-                <Button size="sm" variant="outline" onClick={handleSetReturn}>
-                  Set
-                </Button>
-              </div>
+            {/* Show active sleep schedule info */}
+            {pauseMode === "sleep" && settings.sleepSchedule && (
+              <p className="text-xs text-success text-center">
+                🌙 Sleep: {settings.sleepSchedule.from} – {settings.sleepSchedule.to} • Auto-resumes at {settings.sleepSchedule.to}
+              </p>
+            )}
+
+            {/* Show active checkout info */}
+            {pauseMode === "checked-out" && settings.checkOutConfig?.endsAt && (
+              <p className="text-xs text-success text-center">
+                🚪 Returns at {new Date(settings.checkOutConfig.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {settings.checkOutConfig.reason ? ` • ${settings.checkOutConfig.reason}` : ""}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -145,6 +233,21 @@ const UserDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialogs */}
+      <SleepModeDialog
+        open={showSleepDialog}
+        onClose={() => setShowSleepDialog(false)}
+        currentSchedule={settings.sleepSchedule}
+        isActive={pauseMode === "sleep"}
+        onSave={handleSleepSave}
+      />
+      <CheckOutSettingsDialog
+        open={showCheckOutDialog}
+        onClose={() => setShowCheckOutDialog(false)}
+        currentConfig={settings.checkOutConfig}
+        onSave={handleCheckOutSave}
+      />
     </AppLayout>
   );
 };
