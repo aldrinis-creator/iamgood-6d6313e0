@@ -325,19 +325,50 @@ const RefillOrder = () => {
           {/* WhatsApp to Pharmacy */}
           <Card>
             <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-foreground" />
-                <h4 className="text-sm font-semibold">Pharmacy WhatsApp Number</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-foreground" />
+                  <h4 className="text-sm font-semibold">Pharmacy WhatsApp Number</h4>
+                </div>
+                {!editingPharmacy && pharmacyNumber && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingPharmacy(true)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
-              <Input
-                placeholder="+91 98765 43210"
-                value={pharmacyNumber}
-                onChange={(e) => setPharmacyNumber(e.target.value)}
-                className="text-base"
-              />
-              <p className="text-xs text-muted-foreground">
-                Include country code (e.g., +91 for India). Saved for future orders.
-              </p>
+
+              {editingPharmacy ? (
+                <>
+                  <Input
+                    placeholder="+91 98765 43210"
+                    value={pharmacyNumber}
+                    onChange={(e) => setPharmacyNumber(e.target.value)}
+                    className="text-base"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Include country code (e.g., +91 for India).
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={!pharmacyNumber.trim()}
+                    onClick={() => {
+                      localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
+                      setEditingPharmacy(false);
+                      toast.success("Pharmacy number saved");
+                    }}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Save Number
+                  </Button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-2">
+                  <span className="text-base font-medium">{pharmacyNumber}</span>
+                  <Badge variant="secondary" className="text-[10px] ml-auto">Saved</Badge>
+                </div>
+              )}
+
               <Button
                 className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-white"
                 onClick={sendWhatsApp}
