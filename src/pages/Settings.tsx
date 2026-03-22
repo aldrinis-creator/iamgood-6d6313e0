@@ -85,6 +85,52 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
     onError: () => toast.error("Failed to submit request. Please try again."),
   });
 
+  const handleTogglePublicProfile = async (enabled: boolean) => {
+    updateSetting("publicEmergencyProfile", enabled);
+    if (enabled) {
+      // Create or activate token
+      const { data: existing } = await supabase
+        .from("emergency_share_tokens" as any)
+        .select("id")
+        .eq("user_id", session!.user.id)
+        .maybeSingle();
+      if (existing) {
+        await supabase.from("emergency_share_tokens" as any).update({ is_active: true, updated_at: new Date().toISOString() } as any).eq("user_id", session!.user.id);
+      } else {
+        await supabase.from("emergency_share_tokens" as any).insert({ user_id: session!.user.id, is_active: true } as any);
+      }
+      toast.success("Public emergency profile enabled");
+    } else {
+      await supabase.from("emergency_share_tokens" as any).update({ is_active: false, updated_at: new Date().toISOString() } as any).eq("user_id", session!.user.id);
+      toast.success("Public emergency profile disabled");
+    }
+    refetchToken();
+  };
+
+  const handleRegenerateToken = async () => {
+    // Delete old and create new
+    await supabase.from("emergency_share_tokens" as any).delete().eq("user_id", session!.user.id);
+    await supabase.from("emergency_share_tokens" as any).insert({ user_id: session!.user.id, is_active: true } as any);
+    toast.success("Emergency profile link regenerated");
+    updateSetting("publicEmergencyProfile", true);
+    refetchToken();
+  };
+
+  const { data: shareToken, refetch: refetchToken } = useQuery({
+    queryKey: ["emergency_token", session?.user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("emergency_share_tokens" as any)
+        .select("token, is_active")
+        .eq("user_id", session!.user.id)
+        .maybeSingle();
+      return data as { token: string; is_active: boolean } | null;
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const publicUrl = shareToken?.token ? `${window.location.origin}/e/${shareToken.token}` : null;
+
   return (
     <div className="space-y-4">
       <Card>
@@ -103,13 +149,36 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
             </div>
             <Switch checked={settings.shareLocation} onCheckedChange={(v) => updateSetting("shareLocation", v)} />
           </div>
-          <div className="flex items-center justify-between py-3">
+          <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium">Share Health Data</p>
               <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
             </div>
             <Switch checked={settings.shareHealthData} onCheckedChange={(v) => updateSetting("shareHealthData", v)} />
           </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <p className="text-sm font-medium">Share Emergency Health Card with Guardians</p>
+              <p className="text-xs text-muted-foreground">Allow guardians to view your Emergency Health Card on their dashboard</p>
+            </div>
+            <Switch checked={settings.shareEmergencyWithGuardians} onCheckedChange={(v) => updateSetting("shareEmergencyWithGuardians", v)} />
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <p className="text-sm font-medium">Public Emergency Profile (QR Code)</p>
+              <p className="text-xs text-muted-foreground">Allow first responders to access critical health info via QR scan — no login required</p>
+            </div>
+            <Switch checked={settings.publicEmergencyProfile} onCheckedChange={handleTogglePublicProfile} />
+          </div>
+          {settings.publicEmergencyProfile && publicUrl && (
+            <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+              <p className="text-xs text-muted-foreground">Your public emergency profile link:</p>
+              <p className="text-xs font-mono break-all text-primary">{publicUrl}</p>
+              <Button variant="outline" size="sm" onClick={handleRegenerateToken}>
+                🔄 Regenerate Link
+              </Button>
+            </div>
+          )}
           <div className="flex gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
             <Button variant="outline" size="sm">Manage Cookie Preferences</Button>

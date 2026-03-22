@@ -331,8 +331,10 @@ const MedicalVaultContent = () => {
     const emailBody = encodeURIComponent(shareText);
     const emailUrl = `mailto:?subject=${emailSubject}&body=${emailBody}`;
 
-    // QR code linking to the user's emergency profile on the published app
-    const profileUrl = `${window.location.origin}/medical-vault`;
+    // QR code linking to the user's public emergency profile
+    const profileUrl = emergencyToken
+      ? `${window.location.origin}/e/${emergencyToken}`
+      : `${window.location.origin}/medical-vault`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(profileUrl)}&margin=4`;
 
     const actionBar = includeActionBar ? `
