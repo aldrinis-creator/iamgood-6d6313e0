@@ -72,6 +72,18 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   useEffect(() => { load(); }, [load]);
 
+  // Handle selected alternative from Scan tab
+  useEffect(() => {
+    if (!selectedAlternative) return;
+    setOrderItems((prev) => prev.map((item) =>
+      item.med.id === selectedAlternative.forMedId
+        ? { ...item, med: { ...item.med, name: selectedAlternative.name, dosage: selectedAlternative.dosage } }
+        : item
+    ));
+    toast.success(`Replaced with ${selectedAlternative.name}`);
+    onClearSelectedAlternative?.();
+  }, [selectedAlternative, onClearSelectedAlternative]);
+
   const checkBannedMeds = useCallback(async (meds: Medication[]) => {
     if (meds.length === 0) return;
     setCheckingBanned(true);
