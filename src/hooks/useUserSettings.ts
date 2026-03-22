@@ -75,6 +75,9 @@ export interface UserSettings {
   publicEmergencyProfile: boolean;
   // Activity Goals
   activityGoals: ActivityGoals;
+  // Past Medical History toggles
+  hasHospitalizations: boolean;
+  hasSurgeries: boolean;
 }
 
 export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
@@ -116,6 +119,8 @@ const DEFAULTS: UserSettings = {
   shareHealthData: true,
   shareEmergencyWithGuardians: true,
   publicEmergencyProfile: false,
+  hasHospitalizations: false,
+  hasSurgeries: false,
 };
 
 export function useUserSettings() {

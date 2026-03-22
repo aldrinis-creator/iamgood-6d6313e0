@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
+import PastMedicalHistory from "@/components/PastMedicalHistory";
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
@@ -501,6 +502,9 @@ const ProfileContent = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Past Medical History */}
+      <PastMedicalHistory editing={editing} />
 
       {/* Family Doctor */}
       <Card>

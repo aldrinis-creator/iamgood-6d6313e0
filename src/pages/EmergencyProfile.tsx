@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope } from "lucide-react";
+import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -106,6 +107,16 @@ const EmergencyProfile = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = '/'}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to App
+        </Button>
+
         {/* Header */}
         <div className="bg-destructive text-destructive-foreground rounded-xl p-5 text-center">
           <h1 className="text-2xl font-bold">🚨 EMERGENCY HEALTH CARD</h1>
