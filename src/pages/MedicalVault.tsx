@@ -331,6 +331,10 @@ const MedicalVaultContent = () => {
     const emailBody = encodeURIComponent(shareText);
     const emailUrl = `mailto:?subject=${emailSubject}&body=${emailBody}`;
 
+    // QR code linking to the user's emergency profile on the published app
+    const profileUrl = `${window.location.origin}/medical-vault`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(profileUrl)}&margin=4`;
+
     const actionBar = includeActionBar ? `
 <div class="action-bar" id="actionBar">
   <button onclick="document.getElementById('actionBar').style.display='none';window.print();setTimeout(()=>document.getElementById('actionBar').style.display='flex',500)" class="btn btn-print">🖨️ Print / Save PDF</button>
@@ -349,7 +353,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;padding:16px;font-size
 .btn-whatsapp{background:#25d366;color:#fff}
 .btn-email{background:#2563eb;color:#fff}
 @media print{.action-bar{display:none!important}body{padding:32px}}
-.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:20px;text-align:center}
+.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:20px;text-align:center;position:relative}
 .header h1{font-size:22px;margin-bottom:4px}.header p{font-size:11px;opacity:0.9}
 .section{margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
 .section-title{background:#f3f4f6;padding:8px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb}
@@ -365,9 +369,17 @@ td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
 .footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb}
 .alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px}
 .alert-box p{color:#dc2626;font-weight:600;font-size:12px}
+.qr-section{display:flex;align-items:center;gap:14px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:16px}
+.qr-section img{border-radius:6px;border:2px solid #e5e7eb}
+.qr-section .qr-text{font-size:11px;color:#6b7280}
+.qr-section .qr-text strong{color:#1a1a1a;font-size:12px;display:block;margin-bottom:2px}
 </style></head><body>
 ${actionBar}
 <div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
+<div class="qr-section">
+  <img src="${qrUrl}" alt="QR Code" width="100" height="100" />
+  <div class="qr-text"><strong>📱 Scan for Emergency Profile</strong>First responders can scan this QR code to access the full emergency health profile quickly.</div>
+</div>
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${userName}</span></div>
 ${pv.date_of_birth ? `<div class="row"><span class="label">Date of Birth</span><span class="value">${new Date(pv.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
