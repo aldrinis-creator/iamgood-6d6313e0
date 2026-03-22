@@ -3,15 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 
 const useMedicationAlarms = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
+  const { pauseMode } = useApp();
   const firedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const check = async () => {
+      if (pauseMode !== "active") return;
       if (!session?.user?.id) return;
 
       const now = new Date();
@@ -70,7 +73,7 @@ const useMedicationAlarms = () => {
     check();
     const interval = setInterval(check, 30_000);
     return () => clearInterval(interval);
-  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration]);
+  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode]);
 };
 
 export default useMedicationAlarms;

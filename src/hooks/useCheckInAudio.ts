@@ -3,6 +3,7 @@ import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
+import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 
 
@@ -19,6 +20,7 @@ const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
+  const { pauseMode } = useApp();
 
   useEffect(() => {
     const fireAlert = (message: string) => {
@@ -33,6 +35,7 @@ const useCheckInAudio = () => {
     };
 
     const check = async () => {
+      if (pauseMode !== "active") return;
       const now = new Date();
       const hour = now.getHours();
       const minute = now.getMinutes();
@@ -109,7 +112,7 @@ const useCheckInAudio = () => {
     check();
     const interval = setInterval(check, 30_000);
     return () => clearInterval(interval);
-  }, [settings.audioAlerts, settings.voiceReminders, settings.vibration, session?.user?.id]);
+  }, [settings.audioAlerts, settings.voiceReminders, settings.vibration, session?.user?.id, pauseMode]);
 };
 
 export default useCheckInAudio;
