@@ -29,6 +29,23 @@ export const DEFAULT_ACTIVITY_GOALS: ActivityGoals = {
 
 export type PauseMode = "active" | "sleep" | "checked-out";
 
+export interface SleepSchedule {
+  from: string; // "22:00"
+  to: string;   // "06:00"
+}
+
+export interface CheckOutConfig {
+  durationType: "quick" | "date-range";
+  duration: string; // "30min" | "1h" | "2h" etc.
+  reason: string;
+  informGuardians: boolean;
+  notifyVia: "whatsapp" | "email" | "both";
+  selectedGuardianIds: string[];
+  endsAt: string | null; // ISO timestamp when checkout expires
+  startDate: string | null;
+  endDate: string | null;
+}
+
 export interface UserSettings {
   // Alerts
   audioAlerts: boolean;
@@ -45,6 +62,10 @@ export interface UserSettings {
   nudgeFrequency: string;
   fallDetection: boolean;
   fallSensitivity: string;
+  // Sleep schedule
+  sleepSchedule: SleepSchedule;
+  // Check-Out config
+  checkOutConfig: CheckOutConfig;
   // Appointments
   preAlert: string;
   // Privacy
@@ -53,6 +74,23 @@ export interface UserSettings {
   // Activity Goals
   activityGoals: ActivityGoals;
 }
+
+export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
+  from: "22:00",
+  to: "06:00",
+};
+
+export const DEFAULT_CHECKOUT_CONFIG: CheckOutConfig = {
+  durationType: "quick",
+  duration: "1h",
+  reason: "",
+  informGuardians: true,
+  notifyVia: "whatsapp",
+  selectedGuardianIds: [],
+  endsAt: null,
+  startDate: null,
+  endDate: null,
+};
 
 const DEFAULTS: UserSettings = {
   audioAlerts: true,
@@ -69,6 +107,8 @@ const DEFAULTS: UserSettings = {
   nudgeFrequency: "4",
   fallDetection: true,
   fallSensitivity: "medium",
+  sleepSchedule: DEFAULT_SLEEP_SCHEDULE,
+  checkOutConfig: DEFAULT_CHECKOUT_CONFIG,
   preAlert: "15min",
   shareLocation: true,
   shareHealthData: true,
