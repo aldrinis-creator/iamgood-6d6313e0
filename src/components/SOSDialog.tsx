@@ -360,6 +360,9 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrintCard}>
                   <Printer className="w-3.5 h-3.5" /> Print
                 </Button>
+                <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleDownloadPdf}>
+                  <Download className="w-3.5 h-3.5" /> Save
+                </Button>
               </div>
             </div>
 
