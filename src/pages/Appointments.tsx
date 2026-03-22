@@ -88,10 +88,10 @@ const Appointments = () => {
             variant={filter === "today" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(filter === "today" ? "all" : "today")}
-            className="gap-1"
+            className={`gap-1 ${todayCount > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 border-destructive" : ""}`}
           >
             <Clock className="w-3.5 h-3.5" />
-            Due Today {todayCount > 0 && <Badge variant="secondary" className="ml-1 text-xs">{todayCount}</Badge>}
+            Due Today {todayCount > 0 && <Badge variant="secondary" className="ml-1 text-xs bg-destructive-foreground text-destructive">{todayCount}</Badge>}
           </Button>
         </div>
 
@@ -104,8 +104,10 @@ const Appointments = () => {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {filtered.map((apt) => (
-              <Card key={apt.id} className="p-4 space-y-3">
+            {filtered.map((apt) => {
+              const isDueToday = isToday(parseISO(apt.start_date));
+              return (
+              <Card key={apt.id} className={`p-4 space-y-3 ${isDueToday ? "border-destructive border-2 shadow-[0_0_8px_hsl(var(--destructive)/0.3)]" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <h3 className="font-semibold text-base">{apt.title}</h3>
@@ -158,7 +160,8 @@ const Appointments = () => {
                   </p>
                 )}
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
