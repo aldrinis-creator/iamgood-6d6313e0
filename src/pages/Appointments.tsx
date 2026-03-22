@@ -88,10 +88,10 @@ const Appointments = () => {
             variant={filter === "today" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(filter === "today" ? "all" : "today")}
-            className="gap-1"
+            className={`gap-1 ${todayCount > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 border-destructive" : ""}`}
           >
             <Clock className="w-3.5 h-3.5" />
-            Due Today {todayCount > 0 && <Badge variant="secondary" className="ml-1 text-xs">{todayCount}</Badge>}
+            Due Today {todayCount > 0 && <Badge variant="secondary" className="ml-1 text-xs bg-destructive-foreground text-destructive">{todayCount}</Badge>}
           </Button>
         </div>
 
