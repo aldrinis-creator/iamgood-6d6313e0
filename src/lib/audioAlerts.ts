@@ -57,6 +57,3 @@ export const playVoiceReminder = (message = "It's time for your Check-iN") => {
   window.speechSynthesis.speak(utterance);
 };
 
-export const playMedicationVoice = (medName: string) => {
-  playVoiceReminder(`Time to take ${medName}`);
-};

@@ -112,7 +112,7 @@ const useCheckInAudio = () => {
     check();
     const interval = setInterval(check, 30_000);
     return () => clearInterval(interval);
-  }, [settings.audioAlerts, settings.voiceReminders, settings.vibration, session?.user?.id]);
+  }, [settings.audioAlerts, settings.voiceReminders, settings.vibration, session?.user?.id, pauseMode]);
 };
 
 export default useCheckInAudio;

@@ -73,7 +73,7 @@ const useMedicationAlarms = () => {
     check();
     const interval = setInterval(check, 30_000);
     return () => clearInterval(interval);
-  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration]);
+  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode]);
 };
 
 export default useMedicationAlarms;
