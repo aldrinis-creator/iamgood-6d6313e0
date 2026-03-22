@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star } from "lucide-react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
