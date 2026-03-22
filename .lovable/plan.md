@@ -1,46 +1,24 @@
 
 
-# Nutrition Advisor: Health Profile Fallback
+# Fix: Alternative Selection Not Returning to Order Basket
 
-## What
-When `nutrition_personas` has no row for the user, fall back to `health_profile` to still provide personalized AI recommendations using available data (blood group, allergies, chronic conditions, current medications).
+## Problem
+When the user clicks "Alt" on an order item, the flow switches to the Scan tab. The RefillOrder component **unmounts**, losing all `orderItems` state. When an alternative is selected and the tab switches back to Refill, the component remounts with an empty basket — so the `useEffect` that maps `selectedAlternative.forMedId` finds nothing to replace.
 
-## Changes
+## Solution
+Lift `orderItems` state up to `MedicationManager` so it persists across tab switches.
 
-### `src/components/NutritionAdvisor.tsx`
-In `handleAction`, after the `nutrition_personas` query returns null, query `health_profile` and map its fields to the persona shape the edge function expects:
+### `src/components/medications/MedicationManager.tsx`
+- Add `orderItems` state (`useState<OrderItem[]>([])`) at the manager level
+- Pass `orderItems` and `setOrderItems` as props to `RefillOrder`
 
-```typescript
-let persona = null;
-if (user) {
-  const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
-  if (data) {
-    persona = data;
-  } else {
-    // Fallback: build partial persona from health_profile
-    const { data: hp } = await supabase.from("health_profile").select("*").eq("user_id", user.id).maybeSingle();
-    if (hp) {
-      persona = {
-        blood_group: hp.blood_group,
-        allergies: hp.allergies || [],
-        medical_conditions: hp.chronic_conditions || [],
-        diet_type: "not specified",
-        health_goals: [],
-        dietary_preferences: [],
-      };
-    }
-  }
-}
-```
+### `src/components/medications/RefillOrder.tsx`
+- Accept `orderItems` and `setOrderItems` as props instead of managing them internally
+- Remove the local `useState<OrderItem[]>([])` 
+- Keep all other order logic (add/remove/confirm) unchanged — they already use `setOrderItems`
 
-Also add `weight_kg` and `height_m` from the `profiles` table (already available via `useAuth`) if persona is still sparse.
+### Types
+- Export `OrderItem` interface from `RefillOrder.tsx` (or move to `MedicationManager.tsx`) so both files can reference it
 
-### Additional: Show hint when no persona exists
-After results render, if fallback was used, show a small info banner: "For better recommendations, complete your Nutrition Persona in My Profile."
-
-### No edge function changes needed
-The edge function already handles partial/missing persona fields gracefully with fallback text like `"unknown"` and `"none"`.
-
-### Fix: `.single()` → `.maybeSingle()`
-The current code uses `.single()` which throws when no row exists. Switch to `.maybeSingle()` to prevent errors for new users.
+This ensures the order basket survives the Refill → Scan → Refill tab transition, and the alternative replacement `useEffect` finds the correct item to update.
 
