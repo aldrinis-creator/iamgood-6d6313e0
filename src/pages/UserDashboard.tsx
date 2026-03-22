@@ -57,9 +57,32 @@ const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
   const { settings, updateSetting } = useUserSettings();
 
+  const { session } = useAuth();
+
   const [showSleepDialog, setShowSleepDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Notify all guardians about mode change
+  const notifyGuardians = useCallback(async (title: string, message: string) => {
+    if (!session?.user?.id) return;
+    const { data: guardians } = await supabase
+      .from("guardians")
+      .select("id")
+      .eq("user_id", session.user.id);
+    if (!guardians?.length) return;
+
+    const notifications = guardians.map((g) => ({
+      user_id: session.user.id,
+      guardian_id: g.id,
+      title,
+      message,
+      type: "mode_change",
+    }));
+
+    const { error } = await supabase.from("notifications").insert(notifications);
+    if (error) console.error("Failed to notify guardians:", error);
+  }, [session?.user?.id]);
 
   // Auto-return logic
   const returnToActive = useCallback(() => {
