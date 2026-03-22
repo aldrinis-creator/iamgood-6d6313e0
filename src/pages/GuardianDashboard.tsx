@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell, Moon, LogOut } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
