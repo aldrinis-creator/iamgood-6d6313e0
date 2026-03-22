@@ -160,7 +160,8 @@ const Appointments = () => {
                   </p>
                 )}
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
