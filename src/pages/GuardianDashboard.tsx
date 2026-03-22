@@ -34,6 +34,8 @@ const GuardianDashboard = () => {
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("Ward");
   const [wardUserId, setWardUserId] = useState<string | null>(null);
+  const [wardPauseMode, setWardPauseMode] = useState<string>("active");
+  const [wardPauseDetails, setWardPauseDetails] = useState<{ sleepTo?: string; endsAt?: string; reason?: string }>({});
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
