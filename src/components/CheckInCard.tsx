@@ -70,7 +70,7 @@ const formatHour = (h: number) => {
 };
 
 const CheckInCard = () => {
-  const { userName } = useApp();
+  const { userName, pauseMode } = useApp();
   const { session } = useAuth();
   const [checkedIn, setCheckedIn] = useState(false);
   const [loading, setLoading] = useState(false);
