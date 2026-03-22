@@ -374,6 +374,11 @@ const GuardianDashboard = () => {
         {/* Ward Health Passport */}
         {wardUserId && <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />}
 
+        {/* Emergency Health Card (consent-gated) */}
+        {wardUserId && wardPauseDetails && (
+          <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
+        )}
+
         {/* Ward Activity */}
         {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
 
