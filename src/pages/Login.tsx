@@ -103,6 +103,11 @@ const Login = () => {
     if (error) {
       toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
     } else {
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_KEY, identifier.trim());
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
       navigate("/dashboard");
     }
   };
