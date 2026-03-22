@@ -241,7 +241,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         </CardContent>
       </Card>
 
-      {result && <PrescriptionResults result={result} />}
+      {result && <PrescriptionResults result={result} onSelectAlternative={alternativeMode ? onSelectAlternative : undefined} />}
 
       {result && <SaveToVaultButton result={result} />}
 
