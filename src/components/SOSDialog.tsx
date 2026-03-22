@@ -5,7 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar } from "lucide-react";
 
 interface SOSDialogProps {
   open: boolean;
@@ -20,6 +22,11 @@ interface MedicalInfo {
   doctorName: string | null;
   familyDoctorName: string | null;
   familyDoctorPhone: string | null;
+}
+
+interface MedicationDetail {
+  name: string;
+  dosage: string;
 }
 
 interface Guardian {
@@ -38,12 +45,14 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     familyDoctorName: null, familyDoctorPhone: null,
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [medicationDetails, setMedicationDetails] = useState<MedicationDetail[]>([]);
   const [timeLeft, setTimeLeft] = useState(30);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [userDob, setUserDob] = useState("");
+  const [userGender, setUserGender] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const countingRef = useRef(true);
   const hasSentRef = useRef(false);
@@ -52,13 +61,14 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes] = await Promise.all([
+    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", uid).maybeSingle(),
+      supabase.from("profiles").select("full_name, phone, date_of_birth, gender").eq("id", uid).maybeSingle(),
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("wellness_logs").select("mood, stress_level, energy_level").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("medications").select("name, dosage").eq("user_id", uid),
     ]);
 
     setMedical({
@@ -71,9 +81,11 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       familyDoctorPhone: (hpRes.data as any)?.family_doctor_phone ?? null,
     });
     setGuardians(gRes.data ?? []);
+    setMedicationDetails(medsRes.data ?? []);
     setUserName(profileRes.data?.full_name ?? "User");
     setUserPhone(profileRes.data?.phone ?? "");
     setUserDob(profileRes.data?.date_of_birth ?? "");
+    setUserGender(profileRes.data?.gender ?? "");
 
     // Store latest health data for the SOS message
     (window as any).__sosHealthData = {
@@ -131,7 +143,6 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       msg += `\n👨‍⚕️ Family Doctor: ${medical.familyDoctorName}`;
       if (medical.familyDoctorPhone) msg += ` (${medical.familyDoctorPhone})`;
     }
-    // Current health data
     if (healthData?.activity) {
       const a = healthData.activity;
       if (a.heart_rate) msg += `\n❤️ Last Heart Rate: ${a.heart_rate} bpm`;
@@ -159,19 +170,16 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setSending(true);
     vibrate([200, 100, 200, 100, 400]);
 
-    // Trigger SOS event in DB
     await triggerSOS();
 
     const message = buildSOSMessage();
 
-    // Open WhatsApp for each guardian
     guardians.forEach((g, i) => {
       setTimeout(() => {
         window.open(getWhatsAppLink(g.guardian_phone), "_blank");
       }, i * 500);
     });
 
-    // Send email alerts via edge function
     const guardianEmails = guardians
       .map((g) => g.guardian_email)
       .filter(Boolean) as string[];
@@ -182,7 +190,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           user_id: session?.user?.id,
           message,
           guardian_emails: guardianEmails,
-          doctor_email: null, // Doctor email not stored separately
+          doctor_email: null,
           doctor_name: medical.familyDoctorName,
           user_name: userName,
         },
@@ -195,7 +203,6 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setSent(true);
   }, [guardians, triggerSOS, buildSOSMessage, getWhatsAppLink, session?.user?.id, medical.familyDoctorName, userName]);
 
-  // Auto-send when countdown reaches 0
   useEffect(() => {
     if (timeLeft === 0 && countingRef.current && !hasSentRef.current) {
       countingRef.current = false;
@@ -218,8 +225,9 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   if (sent) {
     return (
       <Sheet open={open} onOpenChange={handleClose}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-10">
-          <div className="text-center space-y-4 py-6">
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
+          {/* Confirmation header */}
+          <div className="text-center space-y-3 py-4">
             <div className="w-16 h-16 rounded-full bg-sos/10 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8 text-sos" />
             </div>
@@ -227,24 +235,158 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
             <p className="text-muted-foreground text-sm">
               Emergency alerts sent to {guardians.length} guardian(s) via Email & WhatsApp with your profile, health data & location.
             </p>
+          </div>
+
+          {/* Call buttons */}
+          <div className="flex gap-2 mb-4">
             {medical.familyDoctorPhone && (
-              <a href={`tel:${medical.familyDoctorPhone}`}>
-                <Button className="bg-success text-success-foreground gap-2 mt-2">
-                  <Phone className="w-4 h-4" /> Call Family Doctor
+              <a href={`tel:${medical.familyDoctorPhone}`} className="flex-1">
+                <Button className="w-full bg-success text-success-foreground gap-2">
+                  <Phone className="w-4 h-4" /> Call Doctor
                 </Button>
               </a>
             )}
-            <div className="pt-2">
-              <a href="tel:112">
-                <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold gap-2">
-                  <Phone className="w-5 h-5" /> Call 112 Emergency
-                </Button>
-              </a>
-            </div>
-            <Button onClick={handleClose} variant="outline" className="mt-2">
-              Close
-            </Button>
+            <a href="tel:112" className={medical.familyDoctorPhone ? "flex-1" : "w-full"}>
+              <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold gap-2">
+                <Phone className="w-5 h-5" /> Call 112
+              </Button>
+            </a>
           </div>
+
+          <Separator className="my-3" />
+
+          {/* Emergency Health Card */}
+          <div className="border-2 border-sos/30 rounded-xl p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Heart className="w-5 h-5 text-sos" />
+              <h3 className="text-base font-bold text-foreground">Emergency Health Card</h3>
+            </div>
+
+            {/* Personal info */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Personal</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Name:</span> <span className="font-medium text-foreground">{userName}</span></div>
+                {userDob && <div><span className="text-muted-foreground">DOB:</span> <span className="font-medium text-foreground">{userDob}</span></div>}
+                {userPhone && <div><span className="text-muted-foreground">Phone:</span> <span className="font-medium text-foreground">{userPhone}</span></div>}
+                {userGender && <div><span className="text-muted-foreground">Gender:</span> <span className="font-medium text-foreground capitalize">{userGender}</span></div>}
+              </div>
+            </div>
+
+            {/* Blood type - prominent */}
+            {medical.bloodGroup && (
+              <div className="flex items-center gap-3">
+                <Badge className="bg-sos text-sos-foreground text-lg px-4 py-1.5 font-bold">
+                  <Droplets className="w-5 h-5 mr-1.5" />
+                  {medical.bloodGroup}
+                </Badge>
+                <span className="text-sm text-muted-foreground">Blood Type</span>
+              </div>
+            )}
+
+            {/* Allergies - warning style */}
+            {medical.allergies.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-1">
+                <p className="text-xs font-semibold text-destructive uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" /> Allergies
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {medical.allergies.map((a, i) => (
+                    <Badge key={i} variant="destructive" className="text-xs">{a}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Medical conditions */}
+            {medical.conditions.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medical Conditions</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {medical.conditions.map((c, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Medications */}
+            {medicationDetails.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Pill className="w-3.5 h-3.5" /> Current Medications
+                </p>
+                <div className="space-y-1">
+                  {medicationDetails.map((m, i) => (
+                    <div key={i} className="text-sm bg-secondary/50 rounded px-2.5 py-1.5 flex justify-between">
+                      <span className="font-medium text-foreground">{m.name}</span>
+                      <span className="text-muted-foreground">{m.dosage}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Family Doctor */}
+            {medical.familyDoctorName && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Stethoscope className="w-3.5 h-3.5" /> Family Doctor
+                </p>
+                <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-2.5">
+                  <span className="text-sm font-medium text-foreground">{medical.familyDoctorName}</span>
+                  {medical.familyDoctorPhone && (
+                    <a href={`tel:${medical.familyDoctorPhone}`} className="text-sm text-primary font-medium flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5" /> {medical.familyDoctorPhone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Emergency Contacts */}
+            {guardians.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5" /> Emergency Contacts ({guardians.length})
+                </p>
+                <div className="space-y-1.5">
+                  {guardians.map((g, i) => (
+                    <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                        <p className="text-xs text-muted-foreground">{g.relation || "Guardian"}</p>
+                      </div>
+                      <a href={`tel:${g.guardian_phone}`} className="text-sm text-primary font-medium flex items-center gap-1 shrink-0">
+                        <Phone className="w-3.5 h-3.5" /> {g.guardian_phone}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Location */}
+            {location && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" /> Location
+                </p>
+                <a
+                  href={`https://maps.google.com/?q=${location.lat},${location.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary underline"
+                >
+                  Open in Google Maps →
+                </a>
+              </div>
+            )}
+          </div>
+
+          <Button onClick={handleClose} variant="outline" className="w-full mt-4">
+            Close
+          </Button>
         </SheetContent>
       </Sheet>
     );
@@ -262,7 +404,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           </p>
         </SheetHeader>
 
-        {/* Countdown - prominent */}
+        {/* Countdown */}
         <div className="border-2 border-sos rounded-xl p-4 space-y-3 mt-4 animate-pulse">
           <div className="text-center">
             <p className="text-sos font-bold text-3xl tabular-nums">{timeLeft}s</p>
@@ -288,7 +430,6 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
         {/* What will be sent */}
         <div className="mt-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">What will be shared:</h3>
-
           <div className="space-y-2 text-sm">
             <InfoRow icon={<MapPin className="w-4 h-4 text-success" />} label="Live Location" value={location ? "✓ Captured" : "Acquiring..."} />
             <InfoRow icon={<Droplets className="w-4 h-4 text-sos" />} label="Blood Type" value={medical.bloodGroup || "Not set"} />
