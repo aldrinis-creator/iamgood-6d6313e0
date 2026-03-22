@@ -24,7 +24,7 @@ const useMedicationAlarms = () => {
 
       const { data: meds } = await supabase
         .from("medications")
-        .select("id, name, alarm_enabled, alarm_mode, schedule_times")
+        .select("id, name, dosage, alarm_enabled, alarm_mode, schedule_times")
         .eq("user_id", session.user.id)
         .eq("alarm_enabled", true);
 
@@ -32,6 +32,7 @@ const useMedicationAlarms = () => {
 
       // Group by time-slot so we only fire ONE alert per slot
       const slotsFired = new Set<string>();
+      const firedMedNames: string[] = [];
 
       for (const med of meds) {
         for (const timeStr of med.schedule_times) {
@@ -42,6 +43,7 @@ const useMedicationAlarms = () => {
           if (h === hour && (m === undefined ? minute < 2 : Math.abs(minute - (m || 0)) < 2) && !firedRef.current.has(slotKey) && !slotsFired.has(slotKey)) {
             slotsFired.add(slotKey);
             firedRef.current.add(slotKey);
+            firedMedNames.push(med.name);
 
             // Fire the consolidated voice/chime alert once per time-slot
             if (settings.voiceReminders) {
@@ -61,6 +63,27 @@ const useMedicationAlarms = () => {
               reminderCount: `Scheduled — ${timeStr}`,
             });
           }
+        }
+      }
+
+      // Notify guardians if any alarms fired
+      if (firedMedNames.length > 0) {
+        const { data: guardians } = await supabase
+          .from("guardians")
+          .select("id")
+          .eq("user_id", session.user.id);
+
+        if (guardians && guardians.length > 0) {
+          const message = `Medication reminder fired for: ${firedMedNames.join(", ")}`;
+          const notifications = guardians.map((g) => ({
+            user_id: session.user.id,
+            guardian_id: g.id,
+            title: "Medication Reminder",
+            message,
+            type: "medication_reminder",
+            read: false,
+          }));
+          await supabase.from("notifications").insert(notifications);
         }
       }
 
