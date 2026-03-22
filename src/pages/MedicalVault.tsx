@@ -298,6 +298,20 @@ const MedicalVaultContent = () => {
 
   useEffect(() => { fetchProfileView(); }, [fetchProfileView]);
 
+  // Fetch emergency share token for QR code
+  useEffect(() => {
+    if (!userId) return;
+    supabase
+      .from("emergency_share_tokens" as any)
+      .select("token")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setEmergencyToken((data as any).token);
+      });
+  }, [userId]);
+
   // ===================== EMERGENCY PDF =====================
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
