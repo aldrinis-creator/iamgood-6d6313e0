@@ -20,6 +20,7 @@ const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
+  const { pauseMode } = useApp();
 
   useEffect(() => {
     const fireAlert = (message: string) => {
