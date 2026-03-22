@@ -46,6 +46,7 @@ const RefillOrder = () => {
   const [pharmacyNumber, setPharmacyNumber] = useState(() =>
     localStorage.getItem(PHARMACY_STORAGE_KEY) || ""
   );
+  const [editingPharmacy, setEditingPharmacy] = useState(() => !localStorage.getItem(PHARMACY_STORAGE_KEY));
   const orderRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
