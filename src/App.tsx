@@ -23,6 +23,7 @@ import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
 import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
