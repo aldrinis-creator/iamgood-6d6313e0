@@ -503,6 +503,9 @@ const ProfileContent = () => {
         </CardContent>
       </Card>
 
+      {/* Past Medical History */}
+      <PastMedicalHistory editing={editing} />
+
       {/* Family Doctor */}
       <Card>
         <CardHeader className="pb-3">
