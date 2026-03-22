@@ -1,61 +1,46 @@
 
 
-# PWA Install Prompt + QR Code on Emergency Card + Download as PDF on Ward Card
+# Nutrition Advisor: Health Profile Fallback
 
-## Three Features
+## What
+When `nutrition_personas` has no row for the user, fall back to `health_profile` to still provide personalized AI recommendations using available data (blood group, allergies, chronic conditions, current medications).
 
-### 1. PWA Install Prompt
-The app already has `vite-plugin-pwa` configured with manifest, icons, and service worker. What's missing is a user-facing install prompt.
+## Changes
 
-**New file: `src/hooks/usePwaInstall.ts`**
-- Listen for `beforeinstallprompt` event, store the deferred prompt
-- Expose `canInstall`, `installApp()`, and `isInstalled` (check `display-mode: standalone`)
+### `src/components/NutritionAdvisor.tsx`
+In `handleAction`, after the `nutrition_personas` query returns null, query `health_profile` and map its fields to the persona shape the edge function expects:
 
-**New file: `src/components/PwaInstallBanner.tsx`**
-- Dismissible banner shown at top of the app when `canInstall` is true
-- "Install Check-iN" button that calls `installApp()`
-- Auto-hides if already installed or dismissed (persist in localStorage)
+```typescript
+let persona = null;
+if (user) {
+  const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
+  if (data) {
+    persona = data;
+  } else {
+    // Fallback: build partial persona from health_profile
+    const { data: hp } = await supabase.from("health_profile").select("*").eq("user_id", user.id).maybeSingle();
+    if (hp) {
+      persona = {
+        blood_group: hp.blood_group,
+        allergies: hp.allergies || [],
+        medical_conditions: hp.chronic_conditions || [],
+        diet_type: "not specified",
+        health_goals: [],
+        dietary_preferences: [],
+      };
+    }
+  }
+}
+```
 
-**Edit: `src/components/AppLayout.tsx`**
-- Render `<PwaInstallBanner />` above `<AppHeader />`
+Also add `weight_kg` and `height_m` from the `profiles` table (already available via `useAuth`) if persona is still sparse.
 
-**New page: `src/pages/Install.tsx`**
-- Dedicated `/install` route with instructions for iOS (Share → Add to Home Screen) and Android (auto-prompt)
-- Renders the install button when available
+### Additional: Show hint when no persona exists
+After results render, if fallback was used, show a small info banner: "For better recommendations, complete your Nutrition Persona in My Profile."
 
-**Edit: `src/App.tsx`**
-- Add `/install` route
+### No edge function changes needed
+The edge function already handles partial/missing persona fields gracefully with fallback text like `"unknown"` and `"none"`.
 
-### 2. QR Code on SOS Emergency Health Card
-**Edit: `src/components/SOSDialog.tsx`**
-- After SOS is sent, fetch the user's `emergency_share_tokens` token
-- Generate a QR code using a lightweight inline SVG QR generator (use `qrcode` npm package or a Google Charts QR API URL as `<img>`)
-- Display QR below the Emergency Health Card linking to `/e/{token}` (the public emergency profile page)
-- Also include QR in the print/download HTML output
-- Install `qrcode.react` package for rendering QR codes
-
-### 3. Download as PDF on WardEmergencyCard
-**Edit: `src/components/WardEmergencyCard.tsx`**
-- Add a "Save" button alongside existing Share/Print buttons
-- Reuse the existing `handlePrint` HTML template to create a downloadable `.html` file via Blob + anchor click (same pattern as SOSDialog's `handleDownloadPdf`)
-- Add `Download` icon from lucide
-
-## Technical Details
-
-- **QR library**: `qrcode.react` — renders SVG QR codes inline, no external API dependency
-- **PWA install**: Uses standard `beforeinstallprompt` Web API; iOS doesn't fire this event so the Install page shows manual instructions
-- **Download**: Uses Blob + `URL.createObjectURL` pattern already established in SOSDialog
-- No database changes needed
-
-### Files to create
-- `src/hooks/usePwaInstall.ts`
-- `src/components/PwaInstallBanner.tsx`
-- `src/pages/Install.tsx`
-
-### Files to edit
-- `src/components/AppLayout.tsx` — add install banner
-- `src/App.tsx` — add /install route
-- `src/components/SOSDialog.tsx` — add QR code section + fetch token
-- `src/components/WardEmergencyCard.tsx` — add Save/Download button
-- `package.json` — add `qrcode.react` dependency
+### Fix: `.single()` → `.maybeSingle()`
+The current code uses `.single()` which throws when no row exists. Switch to `.maybeSingle()` to prevent errors for new users.
 
