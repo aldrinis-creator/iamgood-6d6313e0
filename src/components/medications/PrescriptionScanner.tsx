@@ -167,7 +167,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
           </p>
         </CardContent>
       </Card>
-      )
+      )}
 
       {/* Mode toggle */}
       <div className="flex gap-2">
