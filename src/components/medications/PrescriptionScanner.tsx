@@ -44,7 +44,13 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 
 type InputMode = "photo" | "text";
 
-const PrescriptionScanner = () => {
+interface PrescriptionScannerProps {
+  alternativeMode?: AlternativeContext | null;
+  onSelectAlternative?: (alt: { name: string; dosage: string }) => void;
+  onCancelAltMode?: () => void;
+}
+
+const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAltMode }: PrescriptionScannerProps) => {
   const [inputMode, setInputMode] = useState<InputMode>("photo");
   const [prescriptionText, setPrescriptionText] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -52,6 +58,15 @@ const PrescriptionScanner = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // When entering alternative mode, pre-fill the medication name and switch to text mode
+  useEffect(() => {
+    if (alternativeMode) {
+      setInputMode("text");
+      setPrescriptionText(alternativeMode.medName);
+      setResult(null);
+    }
+  }, [alternativeMode]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
