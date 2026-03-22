@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type UserRole = "user" | "guardian";
+export type PauseMode = "active" | "sleep" | "checked-out";
 
 interface AppState {
   role: UserRole;
@@ -14,6 +15,8 @@ interface AppState {
   triggerSOS: () => void;
   cancelSOS: () => void;
   userName: string;
+  pauseMode: PauseMode;
+  setPauseMode: (mode: PauseMode) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -43,6 +46,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [emergencyMode, setEmergencyMode] = useState(false);
   const [activeSosId, setActiveSosId] = useState<string | null>(null);
   const [roleOverride, setRoleOverride] = useState<UserRole | null>(null);
+  const [pauseMode, setPauseMode] = useState<PauseMode>("active");
 
   const isLoggedIn = !!session;
   const userName = profile?.full_name || "User";
@@ -100,7 +104,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeSosId]);
 
   return (
-    <AppContext.Provider value={{ role, setRole, isLoggedIn, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName }}>
+    <AppContext.Provider value={{ role, setRole, isLoggedIn, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName, pauseMode, setPauseMode }}>
       {children}
     </AppContext.Provider>
   );

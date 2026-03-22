@@ -64,6 +64,8 @@ const DEFAULTS: UserSettings = {
   guardianPush: true,
   weeklyReport: true,
   sleepMode: true,
+  pauseMode: "active",
+  expectedReturn: null,
   nudgeFrequency: "4",
   fallDetection: true,
   fallSensitivity: "medium",
