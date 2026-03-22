@@ -193,13 +193,42 @@ const NutritionAdvisor = () => {
     setActiveAction(type);
     setAiResponse("");
     setStructuredData(null);
+    setUsedFallback(false);
     setLoading(true);
     setShowMealUpload(false);
     try {
-      let persona = null;
+      let persona: any = null;
       if (user) {
-        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).single();
-        if (data) persona = data;
+        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
+        if (data) {
+          persona = data;
+        } else {
+          // Fallback: build partial persona from health_profile
+          const { data: hp } = await supabase.from("health_profile").select("*").eq("user_id", user.id).maybeSingle();
+          if (hp) {
+            persona = {
+              blood_group: hp.blood_group,
+              allergies: hp.allergies || [],
+              medical_conditions: hp.chronic_conditions || [],
+              diet_type: "not specified",
+              health_goals: [],
+              dietary_preferences: [],
+              weight_kg: profile?.weight_kg ?? null,
+              height_m: profile?.height_m ?? null,
+            };
+          } else if (profile?.weight_kg || profile?.height_m) {
+            persona = {
+              weight_kg: profile.weight_kg,
+              height_m: profile.height_m,
+              diet_type: "not specified",
+              health_goals: [],
+              dietary_preferences: [],
+              allergies: [],
+              medical_conditions: [],
+            };
+          }
+          setUsedFallback(true);
+        }
       }
 
       const body: any = { type, persona };
