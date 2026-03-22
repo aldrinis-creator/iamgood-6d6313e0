@@ -22,6 +22,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
 import MyProfile from "./pages/MyProfile";
+import EmergencyProfile from "./pages/EmergencyProfile";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/medical-vault" element={<ProtectedRoute><MedicalVault /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+              <Route path="/e/:token" element={<EmergencyProfile />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />

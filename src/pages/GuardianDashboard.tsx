@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import CareJournal from "@/components/CareJournal";
+import WardEmergencyCard from "@/components/WardEmergencyCard";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
@@ -26,6 +27,24 @@ interface CheckIn {
   status: string;
   responded_at: string | null;
 }
+
+// Consent-gated wrapper for Emergency Health Card
+const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; wardName: string }) => {
+  const [consented, setConsented] = useState<boolean | null>(null);
+  useEffect(() => {
+    supabase
+      .from("user_settings" as any)
+      .select("settings")
+      .eq("user_id", wardUserId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const s = (data as any)?.settings;
+        setConsented(s?.shareEmergencyWithGuardians !== false);
+      });
+  }, [wardUserId]);
+  if (consented === null || consented === false) return null;
+  return <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />;
+};
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
@@ -372,6 +391,11 @@ const GuardianDashboard = () => {
 
         {/* Ward Health Passport */}
         {wardUserId && <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />}
+
+        {/* Emergency Health Card (consent-gated) */}
+        {wardUserId && wardPauseDetails && (
+          <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
+        )}
 
         {/* Ward Activity */}
         {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}

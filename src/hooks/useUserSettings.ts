@@ -71,6 +71,8 @@ export interface UserSettings {
   // Privacy
   shareLocation: boolean;
   shareHealthData: boolean;
+  shareEmergencyWithGuardians: boolean;
+  publicEmergencyProfile: boolean;
   // Activity Goals
   activityGoals: ActivityGoals;
 }
@@ -112,6 +114,8 @@ const DEFAULTS: UserSettings = {
   preAlert: "15min",
   shareLocation: true,
   shareHealthData: true,
+  shareEmergencyWithGuardians: true,
+  publicEmergencyProfile: false,
 };
 
 export function useUserSettings() {
