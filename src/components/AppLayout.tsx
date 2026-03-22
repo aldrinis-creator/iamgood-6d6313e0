@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
