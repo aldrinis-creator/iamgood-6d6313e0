@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell, Moon, LogOut } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,8 @@ const GuardianDashboard = () => {
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("Ward");
   const [wardUserId, setWardUserId] = useState<string | null>(null);
+  const [wardPauseMode, setWardPauseMode] = useState<string>("active");
+  const [wardPauseDetails, setWardPauseDetails] = useState<{ sleepTo?: string; endsAt?: string; reason?: string }>({});
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -91,29 +93,70 @@ const GuardianDashboard = () => {
     if (checkIns) setTodayCheckIns(checkIns);
   }, [session?.user?.id]);
 
+  const fetchWardSettings = useCallback(async (wId: string) => {
+    const { data } = await supabase
+      .from("user_settings" as any)
+      .select("settings")
+      .eq("user_id", wId)
+      .maybeSingle();
+    if (data) {
+      const s = (data as any).settings;
+      setWardPauseMode(s?.pauseMode || "active");
+      setWardPauseDetails({
+        sleepTo: s?.sleepSchedule?.to,
+        endsAt: s?.checkOutConfig?.endsAt,
+        reason: s?.checkOutConfig?.reason,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     fetchNotifications();
     fetchWardCheckIns();
+  }, [fetchNotifications, fetchWardCheckIns]);
 
-    // Realtime subscription for new notifications
-    const channel = supabase
+  // Fetch ward settings once we know the ward user id
+  useEffect(() => {
+    if (wardUserId) fetchWardSettings(wardUserId);
+  }, [wardUserId, fetchWardSettings]);
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const channels: any[] = [];
+
+    // Notifications realtime
+    const notifChannel = supabase
       .channel("guardian-notifications")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
         (payload: any) => {
           fetchNotifications();
-          // Play audio alert for missed check-in notifications
           if (payload?.new?.type === "missed_checkin") {
-            // Always play chime for missed check-in alerts on guardian dashboard
             playChime();
           }
         }
       )
       .subscribe();
+    channels.push(notifChannel);
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchNotifications, fetchWardCheckIns]);
+    // Ward settings realtime (for pause mode changes)
+    if (wardUserId) {
+      const settingsChannel = supabase
+        .channel("ward-settings")
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "user_settings", filter: `user_id=eq.${wardUserId}` },
+          () => {
+            fetchWardSettings(wardUserId);
+          }
+        )
+        .subscribe();
+      channels.push(settingsChannel);
+    }
+
+    return () => { channels.forEach(c => supabase.removeChannel(c)); };
+  }, [fetchNotifications, fetchWardCheckIns, wardUserId, fetchWardSettings]);
 
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -182,19 +225,44 @@ const GuardianDashboard = () => {
         )}
 
         {/* User Status */}
-        <Card className="border-success/30 bg-success/5">
+        <Card className={`border-${wardPauseMode === "active" ? "success" : wardPauseMode === "sleep" ? "primary" : "amber-500"}/30 bg-${wardPauseMode === "active" ? "success" : wardPauseMode === "sleep" ? "primary" : "amber-500"}/5`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-success flex items-center justify-center text-success-foreground font-bold">
-                  {wardName.charAt(0).toUpperCase()}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  wardPauseMode === "active" ? "bg-success text-success-foreground" :
+                  wardPauseMode === "sleep" ? "bg-primary text-primary-foreground" :
+                  "bg-amber-500 text-white"
+                }`}>
+                  {wardPauseMode === "sleep" ? <Moon className="w-5 h-5" /> :
+                   wardPauseMode === "checked-out" ? <LogOut className="w-5 h-5" /> :
+                   wardName.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <p className="font-semibold">{wardName}</p>
-                  <p className="text-xs text-success font-medium">● Online — Safe</p>
+                  {wardPauseMode === "active" && (
+                    <p className="text-xs text-success font-medium">● Online — Safe</p>
+                  )}
+                  {wardPauseMode === "sleep" && (
+                    <p className="text-xs text-primary font-medium">
+                      😴 Sleep Mode {wardPauseDetails.sleepTo ? `— until ${wardPauseDetails.sleepTo}` : ""}
+                    </p>
+                  )}
+                  {wardPauseMode === "checked-out" && (
+                    <p className="text-xs text-amber-600 font-medium">
+                      🧳 Checked Out {wardPauseDetails.reason ? `— ${wardPauseDetails.reason}` : ""}
+                      {wardPauseDetails.endsAt ? ` (back ${new Date(wardPauseDetails.endsAt).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, day: "numeric", month: "short" })})` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
-              <span className="text-xs bg-success/20 text-success px-2 py-1 rounded-full">Active</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                wardPauseMode === "active" ? "bg-success/20 text-success" :
+                wardPauseMode === "sleep" ? "bg-primary/20 text-primary" :
+                "bg-amber-500/20 text-amber-600"
+              }`}>
+                {wardPauseMode === "active" ? "Active" : wardPauseMode === "sleep" ? "Sleeping" : "Checked Out"}
+              </span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
