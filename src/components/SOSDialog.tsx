@@ -258,9 +258,19 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
           {/* Emergency Health Card */}
           <div className="border-2 border-sos/30 rounded-xl p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-sos" />
-              <h3 className="text-base font-bold text-foreground">Emergency Health Card</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-sos" />
+                <h3 className="text-base font-bold text-foreground">Emergency Health Card</h3>
+              </div>
+              <div className="flex gap-1.5">
+                <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handleShareCard}>
+                  <Share2 className="w-3.5 h-3.5" /> Share
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs gap-1" onClick={handlePrintCard}>
+                  <Printer className="w-3.5 h-3.5" /> Print
+                </Button>
+              </div>
             </div>
 
             {/* Personal info */}
