@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar } from "lucide-react";
+import { toast } from "sonner";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar, Share2, Printer } from "lucide-react";
 
 interface SOSDialogProps {
   open: boolean;
