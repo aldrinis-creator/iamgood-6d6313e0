@@ -119,6 +119,8 @@ const DEFAULTS: UserSettings = {
   shareHealthData: true,
   shareEmergencyWithGuardians: true,
   publicEmergencyProfile: false,
+  hasHospitalizations: false,
+  hasSurgeries: false,
 };
 
 export function useUserSettings() {

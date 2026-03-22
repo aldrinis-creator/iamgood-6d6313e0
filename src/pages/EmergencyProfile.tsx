@@ -107,6 +107,16 @@ const EmergencyProfile = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = '/'}
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to App
+        </Button>
+
         {/* Header */}
         <div className="bg-destructive text-destructive-foreground rounded-xl p-5 text-center">
           <h1 className="text-2xl font-bold">🚨 EMERGENCY HEALTH CARD</h1>
