@@ -35,6 +35,7 @@ const useCheckInAudio = () => {
     };
 
     const check = async () => {
+      if (pauseMode !== "active") return;
       const now = new Date();
       const hour = now.getHours();
       const minute = now.getMinutes();
