@@ -26,7 +26,7 @@ interface BannedStatus {
   details: string;
 }
 
-interface OrderItem {
+export interface OrderItem {
   med: Medication;
   qty: number;
 }
@@ -37,9 +37,11 @@ interface RefillOrderProps {
   onScanAlternative?: (medId: string, medName: string) => void;
   selectedAlternative?: SelectedAlternative | null;
   onClearSelectedAlternative?: () => void;
+  orderItems: OrderItem[];
+  setOrderItems: React.Dispatch<React.SetStateAction<OrderItem[]>>;
 }
 
-const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative }: RefillOrderProps) => {
+const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative, orderItems, setOrderItems }: RefillOrderProps) => {
   const { session } = useAuth();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
