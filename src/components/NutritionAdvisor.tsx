@@ -142,11 +142,12 @@ const NutritionCard = ({ item }: { item: NutritionItem }) => (
 );
 
 const NutritionAdvisor = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [structuredData, setStructuredData] = useState<NutritionItem[] | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   // Meal photo state
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
