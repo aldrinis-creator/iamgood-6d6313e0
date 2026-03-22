@@ -9,6 +9,8 @@ import { useUserSettings, SleepSchedule, CheckOutConfig } from "@/hooks/useUserS
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 
@@ -55,9 +57,32 @@ const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
   const { settings, updateSetting } = useUserSettings();
 
+  const { session } = useAuth();
+
   const [showSleepDialog, setShowSleepDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Notify all guardians about mode change
+  const notifyGuardians = useCallback(async (title: string, message: string) => {
+    if (!session?.user?.id) return;
+    const { data: guardians } = await supabase
+      .from("guardians")
+      .select("id")
+      .eq("user_id", session.user.id);
+    if (!guardians?.length) return;
+
+    const notifications = guardians.map((g) => ({
+      user_id: session.user.id,
+      guardian_id: g.id,
+      title,
+      message,
+      type: "mode_change",
+    }));
+
+    const { error } = await supabase.from("notifications").insert(notifications);
+    if (error) console.error("Failed to notify guardians:", error);
+  }, [session?.user?.id]);
 
   // Auto-return logic
   const returnToActive = useCallback(() => {
@@ -134,6 +159,11 @@ const UserDashboard = () => {
     updateSetting("pauseMode", "sleep");
     setShowSleepDialog(false);
     toast.success(`${userName} entered Sleep Mode 🌙 (${schedule.from} – ${schedule.to})`);
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    notifyGuardians(
+      "🌙 Sleep Mode Activated",
+      `${userName} entered Sleep Mode at ${now}. Check-iNs paused until ${schedule.to}.`
+    );
   };
 
   const handleCheckOutSave = (config: CheckOutConfig) => {
@@ -142,6 +172,14 @@ const UserDashboard = () => {
     updateSetting("pauseMode", "checked-out");
     setShowCheckOutDialog(false);
     toast.success(`${userName} checked out 🚪`);
+    const returnTime = config.endsAt
+      ? new Date(config.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "unknown";
+    const reasonText = config.reason ? ` Reason: ${config.reason}.` : "";
+    notifyGuardians(
+      "🚪 Checked Out",
+      `${userName} checked out.${reasonText} Expected back by ${returnTime}. Check-iNs paused.`
+    );
   };
 
   return (
