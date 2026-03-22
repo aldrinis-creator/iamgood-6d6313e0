@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   AlertTriangle, ShoppingCart, Package, ShieldAlert, Loader2,
-  CheckCircle, MessageCircle, FileText, Share2, Pencil, X
+  CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
 } from "lucide-react";
 import { toast } from "sonner";
+import type { SelectedAlternative } from "./MedicationManager";
 
 interface Medication {
   id: string;
@@ -32,7 +33,13 @@ interface OrderItem {
 
 const PHARMACY_STORAGE_KEY = "checkin_pharmacy_whatsapp";
 
-const RefillOrder = () => {
+interface RefillOrderProps {
+  onScanAlternative?: (medId: string, medName: string) => void;
+  selectedAlternative?: SelectedAlternative | null;
+  onClearSelectedAlternative?: () => void;
+}
+
+const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative }: RefillOrderProps) => {
   const { session } = useAuth();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);

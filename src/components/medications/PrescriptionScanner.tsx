@@ -252,7 +252,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
   );
 };
 
-const PrescriptionResults = ({ result }: { result: ScanResult }) => (
+const PrescriptionResults = ({ result, onSelectAlternative }: { result: ScanResult; onSelectAlternative?: (alt: { name: string; dosage: string }) => void }) => (
   <div className="space-y-3">
     {result.summary && (
       <Card className="border-primary/20">
@@ -298,12 +298,24 @@ const PrescriptionResults = ({ result }: { result: ScanResult }) => (
                   <IndianRupee className="w-3 h-3" /> Cheaper Alternatives
                 </p>
                 {med.alternatives.map((alt, ai) => (
-                  <div key={ai} className="flex items-center justify-between bg-success/5 rounded p-2 border border-success/20">
-                    <div>
-                      <p className="text-xs font-medium">{alt.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{alt.salt} · {alt.source}</p>
+                  <div key={ai} className="bg-success/5 rounded p-2 border border-success/20 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium">{alt.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{alt.salt} · {alt.source}</p>
+                      </div>
+                      <Badge variant="outline" className="text-success border-success/30 text-[10px]">{alt.price_approx}</Badge>
                     </div>
-                    <Badge variant="outline" className="text-success border-success/30 text-[10px]">{alt.price_approx}</Badge>
+                    {onSelectAlternative && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-7 text-xs border-primary text-primary hover:bg-primary/10"
+                        onClick={() => onSelectAlternative({ name: alt.name, dosage: med.dosage })}
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" /> Select this Medication
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
