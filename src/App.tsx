@@ -22,6 +22,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
 import MyProfile from "./pages/MyProfile";
+import EmergencyProfile from "./pages/EmergencyProfile";
 
 const queryClient = new QueryClient();
 
