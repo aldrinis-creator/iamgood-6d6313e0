@@ -14,6 +14,7 @@ const useMedicationAlarms = () => {
 
   useEffect(() => {
     const check = async () => {
+      if (pauseMode !== "active") return;
       if (!session?.user?.id) return;
 
       const now = new Date();
