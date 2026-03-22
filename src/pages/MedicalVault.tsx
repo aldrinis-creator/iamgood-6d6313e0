@@ -128,6 +128,7 @@ const MedicalVaultContent = () => {
   const [profileMeds, setProfileMeds] = useState<MedicationView[]>([]);
   const [profileGuardians, setProfileGuardians] = useState<GuardianView[]>([]);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [emergencyToken, setEmergencyToken] = useState<string | null>(null);
 
   // --- Secret Vault Tab ---
   const [encDocs, setEncDocs] = useState<EncryptedDoc[]>([]);

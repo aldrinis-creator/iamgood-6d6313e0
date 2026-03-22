@@ -124,7 +124,8 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
         .select("token, is_active")
         .eq("user_id", session!.user.id)
         .maybeSingle();
-      return data as { token: string; is_active: boolean } | null;
+      if (!data) return null;
+      return data as unknown as { token: string; is_active: boolean };
     },
     enabled: !!session?.user?.id,
   });
