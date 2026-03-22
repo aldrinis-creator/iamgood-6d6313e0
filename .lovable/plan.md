@@ -1,46 +1,53 @@
 
 
-# Fix Activity Tracker — Missing iOS Motion Permission
+# Sleep Mode & Check-Out Mode with Green Heart
 
-## Root Cause
+## Current State
 
-The Activity Tracker **never requests iOS DeviceMotionEvent permission**. On iOS 13+, the `devicemotion` event silently does nothing without explicit permission granted via a user gesture. The Fall Detection code has this permission flow (`requestMotionPermission()` in `useFallDetection.ts`), but the Activity Tracker's `useStepCounter` and `useMotionHeartRate` hooks skip it entirely. This is why:
+- **Sleep Mode** exists on UserDashboard but is local state only — it just hides the CheckInCard. No visual indicator persists elsewhere.
+- **Check-Out Mode** does not exist. This would signal "I'm going out / away" — guardians are informed, check-ins pause, but the user is explicitly accounted for.
+- The **red pulsing heart** on the CheckInCard pulses red (`text-sos`) when a check-in is pending.
+- Sleep mode state is not shared via AppContext, so the SOSButton and other components can't react to it.
 
-- No permission prompt ever appears before/after starting a session
-- All readings stay at zero
-- The other instance works because it may have granted permission through a different path (e.g. Fall Detection toggle)
+## Suggestion
 
-## Fix
+| Mode | Meaning | Heart | Check-ins | Guardian notification |
+|------|---------|-------|-----------|----------------------|
+| **Active** | Normal operation | Red pulsing | Running | On miss |
+| **Sleep** | User is sleeping | Green steady | Paused | "Entered Sleep Mode" |
+| **Checked Out** | User stepped out (errands, travel) | Green steady | Paused | "Checked Out" with optional return time |
 
-**File: `src/components/ActivityTracker.tsx`**
+Both modes share the same visual effect (green heart, no pulse) to signal "I'm okay, don't worry." The difference is semantic — Sleep is nighttime rest, Check-Out is daytime away.
 
-1. Import `requestMotionPermission` from `useFallDetection.ts` (already exported)
-2. In `handleStartSession`, call `await requestMotionPermission()` **before** activating the session — this runs inside a user gesture (button tap), which is required by iOS
-3. If permission is denied, show a toast explaining that motion sensors are needed and do not start the session
-4. Store permission state in component state so we can show a visual indicator if sensors are unavailable
+## Plan
 
-**Changes (~15 lines):**
+### 1. Add `pauseMode` to AppContext
 
-```typescript
-import { requestMotionPermission } from "@/hooks/useFallDetection";
+Add a shared state `pauseMode: "active" | "sleep" | "checked-out"` with `setPauseMode()` to `AppContext`. This lets CheckInCard, SOSButton, and the dashboard all react to the mode.
 
-// In handleStartSession:
-const handleStartSession = async () => {
-  // Request iOS motion permission (no-op on Android)
-  const perm = await requestMotionPermission();
-  if (perm === "denied") {
-    toast({
-      title: "Motion Sensors Blocked",
-      description: "Please allow motion sensor access in your browser settings to track activity.",
-      variant: "destructive",
-    });
-    return;
-  }
-  // ... existing session start logic
-};
-```
+### 2. Update UserDashboard — Replace Sleep toggle with mode selector
 
-Also add a small "Sensors active" / "No sensor" indicator below the session header so users know if data will flow.
+Replace the simple Sleep Mode switch with a card showing three states:
+- **Active Mode** (Sun icon) — default
+- **Sleep Mode** (Moon icon) — toggle on
+- **Check-Out Mode** (DoorOpen icon) — toggle on, with optional "Expected return" time picker
+
+Only one non-active mode can be on at a time. Activating one deactivates the other.
+
+### 3. Update CheckInCard — Green heart when paused
+
+When `pauseMode !== "active"`:
+- Show a **green, non-pulsing heart** instead of the red pulsing one
+- Display status text: "Sleep Mode — Check-iNs paused" or "Checked Out — Check-iNs paused"
+- Skip creating/checking pending check-in records
+
+### 4. Persist mode in user_settings
+
+Store the current mode in the existing `user_settings` table via `useUserSettings` so it survives page refreshes and is available to the guardian view.
+
+### 5. Notify guardians on mode change
+
+When entering Sleep or Check-Out mode, insert a record or trigger a toast/push so guardians see "User entered Sleep Mode at 10:30 PM" or "User checked out — expected back by 3:00 PM."
 
 ---
 
@@ -48,7 +55,8 @@ Also add a small "Sensors active" / "No sensor" indicator below the session head
 
 | File | Change |
 |------|--------|
-| `src/components/ActivityTracker.tsx` | Add motion permission request in `handleStartSession`, add sensor status indicator |
-
-No database or migration changes needed.
+| `src/contexts/AppContext.tsx` | Add `pauseMode` / `setPauseMode` state |
+| `src/pages/UserDashboard.tsx` | Replace sleep toggle with Active/Sleep/Check-Out selector |
+| `src/components/CheckInCard.tsx` | Green heart + paused message when `pauseMode !== "active"` |
+| `src/hooks/useUserSettings.ts` | Add `pauseMode` field to settings interface and defaults |
 
