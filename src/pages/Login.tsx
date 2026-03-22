@@ -66,11 +66,15 @@ const formatPhone = (value: string) => {
   return `+91${digits}`;
 };
 
+const REMEMBER_KEY = "checkin_remember_id";
+
 const Login = () => {
   const { signIn, resetPassword } = useAuth();
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(() => localStorage.getItem(REMEMBER_KEY) || "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem(REMEMBER_KEY));
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
