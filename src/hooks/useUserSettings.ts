@@ -27,6 +27,8 @@ export const DEFAULT_ACTIVITY_GOALS: ActivityGoals = {
   spo2: 98,
 };
 
+export type PauseMode = "active" | "sleep" | "checked-out";
+
 export interface UserSettings {
   // Alerts
   audioAlerts: boolean;
@@ -38,6 +40,8 @@ export interface UserSettings {
   weeklyReport: boolean;
   // Check-In
   sleepMode: boolean;
+  pauseMode: PauseMode;
+  expectedReturn: string | null;
   nudgeFrequency: string;
   fallDetection: boolean;
   fallSensitivity: string;
@@ -60,6 +64,8 @@ const DEFAULTS: UserSettings = {
   guardianPush: true,
   weeklyReport: true,
   sleepMode: true,
+  pauseMode: "active",
+  expectedReturn: null,
   nudgeFrequency: "4",
   fallDetection: true,
   fallSensitivity: "medium",
