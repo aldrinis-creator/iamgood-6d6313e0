@@ -1,65 +1,28 @@
 
 
-# Emergency Profile Back Button + Past Medical History
+# Add Push Notifications to SOS Alert Edge Function
+
+## Overview
+Add Web Push notification sending to the existing `send-sos-alert` edge function. When SOS is triggered, guardians will receive push notifications on their devices in addition to the existing email and in-app notifications.
 
 ## Changes
 
-### 1. Add Back Button to Emergency Profile (`src/pages/EmergencyProfile.tsx`)
-- Add a "Back to App" button at the top of the public emergency profile page
-- Uses `window.history.back()` or links to `/` so users who navigated from within the app can return
-- Styled as a subtle link/button above the emergency card header
+### `supabase/functions/send-sos-alert/index.ts`
+- Copy the Web Push utilities (VAPID key import, JWT creation, `sendPushNotification`) from the existing `send-medication-push` function — these are proven working
+- After the existing email-sending and DB notification logic, add a new section that:
+  1. Reads `VAPID_PRIVATE_KEY` and the hardcoded `VAPID_PUBLIC_KEY`
+  2. For each guardian, looks up their profile by `guardian_phone` in `profiles`, then queries `push_subscriptions` for that profile's `user_id`
+  3. Sends a push notification with title "🚨 EMERGENCY SOS", body containing the user's name, tag `sos-alert`, and URL `/guardian`
+  4. Cleans up expired subscriptions (410/404 responses)
+- Push failures are logged but don't block the response — email + DB notifications still succeed independently
+- Returns push send count alongside existing email results
 
-### 2. New Database Table: `medical_history`
-```sql
-CREATE TABLE public.medical_history (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  type text NOT NULL, -- 'hospitalization' or 'surgery'
-  reason text NOT NULL,
-  nature text,
-  start_date date,
-  end_date date,
-  treatment text,
-  medications text,
-  advice text,
-  hospital_name text,
-  doctor_name text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+### No other files change
+The client-side `SOSDialog.tsx` already invokes `send-sos-alert` — no frontend changes needed.
 
-ALTER TABLE public.medical_history ENABLE ROW LEVEL SECURITY;
--- Standard authenticated CRUD policies for own records
--- Guardian SELECT policy (same pattern as other health tables)
--- Anon SELECT policy scoped to active share tokens
-```
-
-### 3. Add Past Medical History Section to Profile (`src/pages/MyProfile.tsx`)
-Insert a new card **after the Body & Health card** (line ~503) with:
-
-- **Hospitalizations (Last 10 Years)**
-  - Toggle: "Any hospitalization in the last 10 years?" — Yes/No
-  - If Yes: show list of existing entries + "Add" button
-  - Add form collects: Reason, Nature of hospitalization, Start date, End date, Treatment given, Medications prescribed, Other advice, Hospital name, Doctor name
-  - Each entry is a row in `medical_history` with `type = 'hospitalization'`
-
-- **Surgeries (Last 10 Years)**
-  - Toggle: "Any surgeries in the last 10 years?" — Yes/No
-  - If Yes: show list of existing entries + "Add" button
-  - Same structured form as hospitalizations
-  - Each entry stored with `type = 'surgery'`
-
-- View mode: display entries as compact cards with key details
-- Edit mode: allow adding/removing entries via inline form with all fields
-- Data loads in `loadData()` alongside existing queries
-- Save handled alongside existing `handleSave()` flow (individual inserts/deletes for history entries)
-
-### 4. Settings fields for toggles
-The Yes/No toggles for "any hospitalization" and "any surgery" will be stored as part of `user_settings` JSON (`hasHospitalizations: boolean`, `hasSurgeries: boolean`) to remember the user's answer even if they haven't added entries yet.
-
-## Files Changed
-- `src/pages/EmergencyProfile.tsx` — add back button
-- `src/pages/MyProfile.tsx` — add Past Medical History section
-- `src/hooks/useUserSettings.ts` — add `hasHospitalizations`, `hasSurgeries` defaults
-- Database migration — create `medical_history` table with RLS
+## Technical Details
+- Reuses the same VAPID public key: `BJq2e6gs1zTIdmNLo6v4DWL4trzwEedK_ghxuB9wb63nlh_y1ShYf2RS_IKdDdPu59tQJ3pLk5XHed6pGZ141lw`
+- Same `VAPID_PRIVATE_KEY` secret already configured
+- Guardian phone → profile ID lookup pattern matches `notify-guardian-medication` function
+- Service worker `sw-push.js` already handles displaying push notifications with vibration and click-to-open
 
