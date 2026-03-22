@@ -330,16 +330,30 @@ const NutritionAdvisor = () => {
           </div>
         ) : structuredData ? (
           <div className="space-y-6">
+            {usedFallback && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+                <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
+              </div>
+            )}
             {structuredData.map((item, idx) => (
               <NutritionCard key={idx} item={item} />
             ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="p-4 prose prose-sm max-w-none">
-              <ReactMarkdown>{aiResponse}</ReactMarkdown>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {usedFallback && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+                <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
+              </div>
+            )}
+            <Card>
+              <CardContent className="p-4 prose prose-sm max-w-none">
+                <ReactMarkdown>{aiResponse}</ReactMarkdown>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     );
