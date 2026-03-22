@@ -45,6 +45,7 @@ const App = () => (
               <Route path="/medical-vault" element={<ProtectedRoute><MedicalVault /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+              <Route path="/e/:token" element={<EmergencyProfile />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />

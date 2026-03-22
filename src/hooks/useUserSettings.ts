@@ -114,6 +114,8 @@ const DEFAULTS: UserSettings = {
   preAlert: "15min",
   shareLocation: true,
   shareHealthData: true,
+  shareEmergencyWithGuardians: true,
+  publicEmergencyProfile: false,
 };
 
 export function useUserSettings() {
