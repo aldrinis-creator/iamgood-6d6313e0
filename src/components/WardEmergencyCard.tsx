@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2 } from "lucide-react";
+import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
