@@ -1,48 +1,61 @@
 
 
-# Medication Improvements: Taken Button, Save to Vault Fix, and Scan-to-Refill Alternative Flow
+# PWA Install Prompt + QR Code on Emergency Card + Download as PDF on Ward Card
 
-## Three Issues + One New Feature
+## Three Features
 
-### 1. "Taken" button style — outline until tapped
-**File:** `src/components/medications/TodaySchedule.tsx`
-- Change the Taken checkmark button from `variant="default"` (filled/blue) to `variant="outline"` so it appears neutral before tapping
-- Once tapped (`markTaken` runs), the schedule reloads and the slot shows "TAKEN" badge with green styling — no further button change needed
-- The button becomes visually distinct only on interaction, not before
+### 1. PWA Install Prompt
+The app already has `vite-plugin-pwa` configured with manifest, icons, and service worker. What's missing is a user-facing install prompt.
 
-### 2. "Save to Medical Vault" not saving — debug and fix
-**File:** `src/components/medications/PrescriptionScanner.tsx`
-- The `SaveToVaultButton` code looks correct — it inserts into `medical_records` with `user_id`, `title`, `record_type`, `description`, `record_date`
-- The issue is likely that the `finally` block sets `setSaving(false)` even when early-returning on `!session` (the `return` happens before `setSaving(false)` in `finally` is reached, but the button stays in saving state)
-- Fix: move the `setSaving(true)` after the session check, or restructure the error flow so early returns properly reset state
-- Also ensure the toast success is visible (not hidden behind overlay)
+**New file: `src/hooks/usePwaInstall.ts`**
+- Listen for `beforeinstallprompt` event, store the deferred prompt
+- Expose `canInstall`, `installApp()`, and `isInstalled` (check `display-mode: standalone`)
 
-### 3. "Scan for Alternative" flow: Refill → Scan → Select Alternative → Back to Refill
-**Files:** `src/components/medications/MedicationManager.tsx`, `src/components/medications/RefillOrder.tsx`, `src/components/medications/PrescriptionScanner.tsx`
+**New file: `src/components/PwaInstallBanner.tsx`**
+- Dismissible banner shown at top of the app when `canInstall` is true
+- "Install Check-iN" button that calls `installApp()`
+- Auto-hides if already installed or dismissed (persist in localStorage)
 
-This is the main new feature. The flow:
+**Edit: `src/components/AppLayout.tsx`**
+- Render `<PwaInstallBanner />` above `<AppHeader />`
 
-1. **MedicationManager** — lift tab state to a controlled `useState` so child components can programmatically switch tabs. Pass `setActiveTab` and a shared `alternativeSelection` state down to both `RefillOrder` and `PrescriptionScanner`.
+**New page: `src/pages/Install.tsx`**
+- Dedicated `/install` route with instructions for iOS (Share → Add to Home Screen) and Android (auto-prompt)
+- Renders the install button when available
 
-2. **RefillOrder** — add a "Scan for Alternative" button next to each medication in the Order list. When tapped, it sets the medication context (name) and calls `setActiveTab("scan")` to switch to Scan tab.
+**Edit: `src/App.tsx`**
+- Add `/install` route
 
-3. **PrescriptionScanner** — when opened via "Scan for Alternative" mode (detected via the shared context prop), show a "Select this Medication" button under each alternative in the results. When tapped, it sets the selected alternative (name + dosage) into shared state and switches back to `setActiveTab("refill")`.
+### 2. QR Code on SOS Emergency Health Card
+**Edit: `src/components/SOSDialog.tsx`**
+- After SOS is sent, fetch the user's `emergency_share_tokens` token
+- Generate a QR code using a lightweight inline SVG QR generator (use `qrcode` npm package or a Google Charts QR API URL as `<img>`)
+- Display QR below the Emergency Health Card linking to `/e/{token}` (the public emergency profile page)
+- Also include QR in the print/download HTML output
+- Install `qrcode.react` package for rendering QR codes
 
-4. **RefillOrder** — on receiving the selected alternative, replace the original medication in the order list with the alternative name/dosage. The rest of the order flow (confirm, WhatsApp, PDF) continues as normal.
-
-### State Flow
-```text
-MedicationManager (controls activeTab + alternativeContext)
-  ├── RefillOrder (receives setActiveTab, setAlternativeContext, alternativeSelection)
-  │     └── "Scan for Alternative" button → sets context → switches to scan tab
-  ├── PrescriptionScanner (receives alternativeMode, setActiveTab, onSelectAlternative)
-  │     └── "Select this Medication" button → calls onSelectAlternative → switches to refill tab
-```
+### 3. Download as PDF on WardEmergencyCard
+**Edit: `src/components/WardEmergencyCard.tsx`**
+- Add a "Save" button alongside existing Share/Print buttons
+- Reuse the existing `handlePrint` HTML template to create a downloadable `.html` file via Blob + anchor click (same pattern as SOSDialog's `handleDownloadPdf`)
+- Add `Download` icon from lucide
 
 ## Technical Details
 
-- `MedicationManager`: add `useState<string>("today")` for tab control, `useState<{medId, medName} | null>` for alternative context, `useState<{name, dosage} | null>` for selected alternative
-- `RefillOrder`: accept props `onScanAlternative?: (medId: string, medName: string) => void` and `selectedAlternative?: {name: string, dosage: string, forMedId: string} | null`; use `useEffect` to replace the order item when `selectedAlternative` arrives
-- `PrescriptionScanner`: accept props `alternativeMode?: {medName: string} | null` and `onSelectAlternative?: (alt: {name: string, dosage: string}) => void`; when in alternative mode, pre-fill the medication name and show "Select" buttons on alternatives
+- **QR library**: `qrcode.react` — renders SVG QR codes inline, no external API dependency
+- **PWA install**: Uses standard `beforeinstallprompt` Web API; iOS doesn't fire this event so the Install page shows manual instructions
+- **Download**: Uses Blob + `URL.createObjectURL` pattern already established in SOSDialog
 - No database changes needed
+
+### Files to create
+- `src/hooks/usePwaInstall.ts`
+- `src/components/PwaInstallBanner.tsx`
+- `src/pages/Install.tsx`
+
+### Files to edit
+- `src/components/AppLayout.tsx` — add install banner
+- `src/App.tsx` — add /install route
+- `src/components/SOSDialog.tsx` — add QR code section + fetch token
+- `src/components/WardEmergencyCard.tsx` — add Save/Download button
+- `package.json` — add `qrcode.react` dependency
 
