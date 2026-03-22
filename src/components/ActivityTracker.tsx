@@ -246,14 +246,24 @@ const ActivityTracker = () => {
     return `${m}:${s}`;
   };
 
-  const handleStartSession = () => {
+  const handleStartSession = async () => {
+    // Request iOS motion permission (no-op on Android/desktop)
+    const perm = await requestMotionPermission();
+    if (perm === "denied") {
+      toast({
+        title: "Motion Sensors Blocked",
+        description: "Please allow motion sensor access in your browser settings to track activity.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSessionActive(true);
     setSessionPaused(false);
     setSessionElapsed(0);
     liveRef.current = { ...INITIAL_LIVE };
     setLive({ ...INITIAL_LIVE });
     if (showGoals) setShowGoals(false);
-    toast({ title: "Session Started", description: "Your activity tracking has begun!" });
+    toast({ title: "Session Started", description: "Sensors active — tracking your activity!" });
   };
 
   const handleStopSession = async () => {
