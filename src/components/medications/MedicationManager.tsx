@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, Pill, Package, Bell, ShieldAlert, Camera } from "lucide-react";
 import TodaySchedule from "./TodaySchedule";
 import MedicationList from "./MedicationList";
-import RefillOrder from "./RefillOrder";
+import RefillOrder, { type OrderItem } from "./RefillOrder";
 import AlarmSettings from "./AlarmSettings";
 import BannedMedications from "./BannedMedications";
 import PrescriptionScanner from "./PrescriptionScanner";
@@ -23,6 +23,7 @@ const MedicationManager = () => {
   const [activeTab, setActiveTab] = useState("today");
   const [altContext, setAltContext] = useState<AlternativeContext | null>(null);
   const [selectedAlt, setSelectedAlt] = useState<SelectedAlternative | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   const handleScanAlternative = (medId: string, medName: string) => {
     setAltContext({ medId, medName });
@@ -83,6 +84,8 @@ const MedicationManager = () => {
             onScanAlternative={handleScanAlternative}
             selectedAlternative={selectedAlt}
             onClearSelectedAlternative={() => setSelectedAlt(null)}
+            orderItems={orderItems}
+            setOrderItems={setOrderItems}
           />
         </TabsContent>
         <TabsContent value="banned"><BannedMedications /></TabsContent>
