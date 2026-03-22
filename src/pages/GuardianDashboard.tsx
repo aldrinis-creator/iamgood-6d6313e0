@@ -225,19 +225,44 @@ const GuardianDashboard = () => {
         )}
 
         {/* User Status */}
-        <Card className="border-success/30 bg-success/5">
+        <Card className={`border-${wardPauseMode === "active" ? "success" : wardPauseMode === "sleep" ? "primary" : "amber-500"}/30 bg-${wardPauseMode === "active" ? "success" : wardPauseMode === "sleep" ? "primary" : "amber-500"}/5`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-success flex items-center justify-center text-success-foreground font-bold">
-                  {wardName.charAt(0).toUpperCase()}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  wardPauseMode === "active" ? "bg-success text-success-foreground" :
+                  wardPauseMode === "sleep" ? "bg-primary text-primary-foreground" :
+                  "bg-amber-500 text-white"
+                }`}>
+                  {wardPauseMode === "sleep" ? <Moon className="w-5 h-5" /> :
+                   wardPauseMode === "checked-out" ? <LogOut className="w-5 h-5" /> :
+                   wardName.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <p className="font-semibold">{wardName}</p>
-                  <p className="text-xs text-success font-medium">● Online — Safe</p>
+                  {wardPauseMode === "active" && (
+                    <p className="text-xs text-success font-medium">● Online — Safe</p>
+                  )}
+                  {wardPauseMode === "sleep" && (
+                    <p className="text-xs text-primary font-medium">
+                      😴 Sleep Mode {wardPauseDetails.sleepTo ? `— until ${wardPauseDetails.sleepTo}` : ""}
+                    </p>
+                  )}
+                  {wardPauseMode === "checked-out" && (
+                    <p className="text-xs text-amber-600 font-medium">
+                      🧳 Checked Out {wardPauseDetails.reason ? `— ${wardPauseDetails.reason}` : ""}
+                      {wardPauseDetails.endsAt ? ` (back ${new Date(wardPauseDetails.endsAt).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, day: "numeric", month: "short" })})` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
-              <span className="text-xs bg-success/20 text-success px-2 py-1 rounded-full">Active</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                wardPauseMode === "active" ? "bg-success/20 text-success" :
+                wardPauseMode === "sleep" ? "bg-primary/20 text-primary" :
+                "bg-amber-500/20 text-amber-600"
+              }`}>
+                {wardPauseMode === "active" ? "Active" : wardPauseMode === "sleep" ? "Sleeping" : "Checked Out"}
+              </span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
