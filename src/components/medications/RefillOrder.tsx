@@ -50,7 +50,6 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const [loading, setLoading] = useState(true);
 
   // Order flow state
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [pharmacyNumber, setPharmacyNumber] = useState(() =>
     localStorage.getItem(PHARMACY_STORAGE_KEY) || ""

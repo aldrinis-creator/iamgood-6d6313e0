@@ -84,6 +84,8 @@ const MedicationManager = () => {
             onScanAlternative={handleScanAlternative}
             selectedAlternative={selectedAlt}
             onClearSelectedAlternative={() => setSelectedAlt(null)}
+            orderItems={orderItems}
+            setOrderItems={setOrderItems}
           />
         </TabsContent>
         <TabsContent value="banned"><BannedMedications /></TabsContent>
