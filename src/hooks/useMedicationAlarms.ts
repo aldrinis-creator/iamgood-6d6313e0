@@ -9,6 +9,7 @@ import { showReminderOverlay } from "@/components/ReminderOverlay";
 const useMedicationAlarms = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
+  const { pauseMode } = useApp();
   const firedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
