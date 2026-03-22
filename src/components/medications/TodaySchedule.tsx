@@ -250,7 +250,7 @@ const TodaySchedule = () => {
               </div>
               {slot.status === "pending" && isCurrent && (
                 <div className="flex gap-1 shrink-0">
-                  <Button size="icon" variant="default" className="h-8 w-8" onClick={() => markTaken(slot)}>
+                  <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => markTaken(slot)}>
                     <Check className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => markSkipped(slot)}>

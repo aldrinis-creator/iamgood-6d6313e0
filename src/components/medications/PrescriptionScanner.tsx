@@ -1,11 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard, Save, Check } from "lucide-react";
+import { Loader2, ShieldAlert, IndianRupee, Pill, AlertTriangle, FileText, Camera, Upload, Keyboard, Save, Check, ArrowLeft, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
+import type { AlternativeContext } from "./MedicationManager";
 
 const MAX_INPUT_LENGTH = 5000;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
@@ -43,7 +44,13 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
 
 type InputMode = "photo" | "text";
 
-const PrescriptionScanner = () => {
+interface PrescriptionScannerProps {
+  alternativeMode?: AlternativeContext | null;
+  onSelectAlternative?: (alt: { name: string; dosage: string }) => void;
+  onCancelAltMode?: () => void;
+}
+
+const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAltMode }: PrescriptionScannerProps) => {
   const [inputMode, setInputMode] = useState<InputMode>("photo");
   const [prescriptionText, setPrescriptionText] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -51,6 +58,15 @@ const PrescriptionScanner = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // When entering alternative mode, pre-fill the medication name and switch to text mode
+  useEffect(() => {
+    if (alternativeMode) {
+      setInputMode("text");
+      setPrescriptionText(alternativeMode.medName);
+      setResult(null);
+    }
+  }, [alternativeMode]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,6 +142,23 @@ const PrescriptionScanner = () => {
 
   return (
     <div className="space-y-4">
+      {/* Alternative mode banner */}
+      {alternativeMode && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-2">
+            <Pill className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Finding alternatives for: <strong>{alternativeMode.medName}</strong></p>
+              <p className="text-xs text-muted-foreground">Analyze to see alternatives, then select one to replace in your order.</p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onCancelAltMode}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!alternativeMode && (
       <Card className="border-success/20 bg-success/5">
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
@@ -134,6 +167,7 @@ const PrescriptionScanner = () => {
           </p>
         </CardContent>
       </Card>
+      )}
 
       {/* Mode toggle */}
       <div className="flex gap-2">
@@ -207,7 +241,7 @@ const PrescriptionScanner = () => {
         </CardContent>
       </Card>
 
-      {result && <PrescriptionResults result={result} />}
+      {result && <PrescriptionResults result={result} onSelectAlternative={alternativeMode ? onSelectAlternative : undefined} />}
 
       {result && <SaveToVaultButton result={result} />}
 
@@ -218,7 +252,7 @@ const PrescriptionScanner = () => {
   );
 };
 
-const PrescriptionResults = ({ result }: { result: ScanResult }) => (
+const PrescriptionResults = ({ result, onSelectAlternative }: { result: ScanResult; onSelectAlternative?: (alt: { name: string; dosage: string }) => void }) => (
   <div className="space-y-3">
     {result.summary && (
       <Card className="border-primary/20">
@@ -264,12 +298,24 @@ const PrescriptionResults = ({ result }: { result: ScanResult }) => (
                   <IndianRupee className="w-3 h-3" /> Cheaper Alternatives
                 </p>
                 {med.alternatives.map((alt, ai) => (
-                  <div key={ai} className="flex items-center justify-between bg-success/5 rounded p-2 border border-success/20">
-                    <div>
-                      <p className="text-xs font-medium">{alt.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{alt.salt} · {alt.source}</p>
+                  <div key={ai} className="bg-success/5 rounded p-2 border border-success/20 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium">{alt.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{alt.salt} · {alt.source}</p>
+                      </div>
+                      <Badge variant="outline" className="text-success border-success/30 text-[10px]">{alt.price_approx}</Badge>
                     </div>
-                    <Badge variant="outline" className="text-success border-success/30 text-[10px]">{alt.price_approx}</Badge>
+                    {onSelectAlternative && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-7 text-xs border-primary text-primary hover:bg-primary/10"
+                        onClick={() => onSelectAlternative({ name: alt.name, dosage: med.dosage })}
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" /> Select this Medication
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -309,11 +355,11 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
   const [saved, setSaved] = useState(false);
 
   const saveToVault = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Please log in to save"); return; }
+
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Please log in to save"); return; }
-
       const description = [
         result.summary,
         "",

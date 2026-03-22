@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   AlertTriangle, ShoppingCart, Package, ShieldAlert, Loader2,
-  CheckCircle, MessageCircle, FileText, Share2, Pencil, X
+  CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
 } from "lucide-react";
 import { toast } from "sonner";
+import type { SelectedAlternative } from "./MedicationManager";
 
 interface Medication {
   id: string;
@@ -32,7 +33,13 @@ interface OrderItem {
 
 const PHARMACY_STORAGE_KEY = "checkin_pharmacy_whatsapp";
 
-const RefillOrder = () => {
+interface RefillOrderProps {
+  onScanAlternative?: (medId: string, medName: string) => void;
+  selectedAlternative?: SelectedAlternative | null;
+  onClearSelectedAlternative?: () => void;
+}
+
+const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative }: RefillOrderProps) => {
   const { session } = useAuth();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
@@ -64,6 +71,18 @@ const RefillOrder = () => {
   }, [session?.user?.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Handle selected alternative from Scan tab
+  useEffect(() => {
+    if (!selectedAlternative) return;
+    setOrderItems((prev) => prev.map((item) =>
+      item.med.id === selectedAlternative.forMedId
+        ? { ...item, med: { ...item.med, name: selectedAlternative.name, dosage: selectedAlternative.dosage } }
+        : item
+    ));
+    toast.success(`Replaced with ${selectedAlternative.name}`);
+    onClearSelectedAlternative?.();
+  }, [selectedAlternative, onClearSelectedAlternative]);
 
   const checkBannedMeds = useCallback(async (meds: Medication[]) => {
     if (meds.length === 0) return;
@@ -295,8 +314,13 @@ const RefillOrder = () => {
               <div className="pt-3 border-t border-border space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Order ({orderItems.length} items)</p>
                 {orderItems.map((item) => (
-                  <div key={item.med.id} className="flex items-center justify-between text-sm">
-                    <span>{item.med.name} — {item.med.dosage}</span>
+                  <div key={item.med.id} className="flex items-center justify-between text-sm gap-1">
+                    <span className="flex-1 truncate">{item.med.name} — {item.med.dosage}</span>
+                    {onScanAlternative && (
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-primary" onClick={() => onScanAlternative(item.med.id, item.med.name)}>
+                        <Camera className="w-3 h-3 mr-1" /> Alt
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => removeFromOrder(item.med.id)}>
                       <X className="w-3 h-3" />
                     </Button>
