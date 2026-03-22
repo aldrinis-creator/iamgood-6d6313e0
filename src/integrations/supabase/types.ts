@@ -392,6 +392,57 @@ export type Database = {
         }
         Relationships: []
       }
+      medical_history: {
+        Row: {
+          advice: string | null
+          created_at: string
+          doctor_name: string | null
+          end_date: string | null
+          hospital_name: string | null
+          id: string
+          medications: string | null
+          nature: string | null
+          reason: string
+          start_date: string | null
+          treatment: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          advice?: string | null
+          created_at?: string
+          doctor_name?: string | null
+          end_date?: string | null
+          hospital_name?: string | null
+          id?: string
+          medications?: string | null
+          nature?: string | null
+          reason: string
+          start_date?: string | null
+          treatment?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          advice?: string | null
+          created_at?: string
+          doctor_name?: string | null
+          end_date?: string | null
+          hospital_name?: string | null
+          id?: string
+          medications?: string | null
+          nature?: string | null
+          reason?: string
+          start_date?: string | null
+          treatment?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       medical_records: {
         Row: {
           created_at: string
