@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star } from "lucide-react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -142,11 +142,12 @@ const NutritionCard = ({ item }: { item: NutritionItem }) => (
 );
 
 const NutritionAdvisor = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [structuredData, setStructuredData] = useState<NutritionItem[] | null>(null);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   // Meal photo state
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
@@ -192,13 +193,42 @@ const NutritionAdvisor = () => {
     setActiveAction(type);
     setAiResponse("");
     setStructuredData(null);
+    setUsedFallback(false);
     setLoading(true);
     setShowMealUpload(false);
     try {
-      let persona = null;
+      let persona: any = null;
       if (user) {
-        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).single();
-        if (data) persona = data;
+        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
+        if (data) {
+          persona = data;
+        } else {
+          // Fallback: build partial persona from health_profile
+          const { data: hp } = await supabase.from("health_profile").select("*").eq("user_id", user.id).maybeSingle();
+          if (hp) {
+            persona = {
+              blood_group: hp.blood_group,
+              allergies: hp.allergies || [],
+              medical_conditions: hp.chronic_conditions || [],
+              diet_type: "not specified",
+              health_goals: [],
+              dietary_preferences: [],
+              weight_kg: profile?.weight_kg ?? null,
+              height_m: profile?.height_m ?? null,
+            };
+          } else if (profile?.weight_kg || profile?.height_m) {
+            persona = {
+              weight_kg: profile.weight_kg,
+              height_m: profile.height_m,
+              diet_type: "not specified",
+              health_goals: [],
+              dietary_preferences: [],
+              allergies: [],
+              medical_conditions: [],
+            };
+          }
+          setUsedFallback(true);
+        }
       }
 
       const body: any = { type, persona };
@@ -300,16 +330,30 @@ const NutritionAdvisor = () => {
           </div>
         ) : structuredData ? (
           <div className="space-y-6">
+            {usedFallback && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+                <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
+              </div>
+            )}
             {structuredData.map((item, idx) => (
               <NutritionCard key={idx} item={item} />
             ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="p-4 prose prose-sm max-w-none">
-              <ReactMarkdown>{aiResponse}</ReactMarkdown>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {usedFallback && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/50 border border-accent">
+                <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
+              </div>
+            )}
+            <Card>
+              <CardContent className="p-4 prose prose-sm max-w-none">
+                <ReactMarkdown>{aiResponse}</ReactMarkdown>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     );
