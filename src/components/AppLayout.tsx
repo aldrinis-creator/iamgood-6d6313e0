@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
@@ -22,6 +23,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
+        <PwaInstallBanner />
         <AppHeader />
         <main className="flex-1 overflow-y-auto pb-24">
           {children}

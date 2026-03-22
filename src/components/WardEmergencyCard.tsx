@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2 } from "lucide-react";
+import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -143,6 +143,53 @@ ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Em
     }
   };
 
+  const handleDownload = () => {
+    const now = new Date().toLocaleString("en-IN");
+    const h = health;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Emergency Health Card — ${wardName}</title><style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;font-size:13px;max-width:800px;margin:0 auto}
+.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:16px;text-align:center}
+.header h1{font-size:20px}.header p{font-size:11px;opacity:0.9}
+.section{margin-bottom:12px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+.section-title{background:#f3f4f6;padding:8px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb}
+.section-body{padding:10px 14px}
+.row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6}.row:last-child{border-bottom:none}
+.label{color:#6b7280;font-size:12px;min-width:140px}.value{font-weight:500;text-align:right}
+.badge{display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:11px;margin:2px;font-weight:600}
+.alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:12px}
+.alert-box p{color:#dc2626;font-weight:600;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}th{background:#f3f4f6;text-align:left;padding:6px 10px;font-weight:600}td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
+.footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb}
+@media print{body{padding:16px}}
+</style></head><body>
+<div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
+<div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
+<div class="row"><span class="label">Name</span><span class="value">${wardName}</span></div>
+${profile?.date_of_birth ? `<div class="row"><span class="label">DOB</span><span class="value">${new Date(profile.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
+${profile?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${profile.gender}</span></div>` : ""}
+${profile?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${profile.phone}</span></div>` : ""}
+${h?.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${h.blood_group}</span></span></div>` : ""}
+</div></div>
+${h?.allergies.length ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${h.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
+${h?.chronic_conditions.length ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${h.chronic_conditions.map(c => `<span class="badge" style="background:#eff6ff;color:#2563eb">${c}</span>`).join(" ")}</div></div>` : ""}
+${meds.length ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body"><table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g," ")}</td><td>${(m.schedule_times||[]).join(", ")}</td></tr>`).join("")}</table></div></div>` : ""}
+${h?.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${h.emergency_notes}</p></div></div>` : ""}
+${h?.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${h.family_doctor_name}</span></div>${h.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${h.family_doctor_phone}</span></div>` : ""}</div></div>` : ""}
+${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td></tr>`).join("")}</table></div></div>` : ""}
+<div class="footer"><p>Auto-generated by Check-iN Emergency Response System</p></div>
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Emergency-Health-Card-${wardName.replace(/\s+/g, "-")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Emergency card downloaded");
+  };
+
   if (loading) return null;
   if (!health && !profile) return null;
 
@@ -227,6 +274,9 @@ ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Em
           <Button onClick={handlePrint} disabled={generatingPdf} variant="outline" size="sm" className="flex-1">
             {generatingPdf ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Printer className="w-4 h-4 mr-1" />}
             Print
+          </Button>
+          <Button onClick={handleDownload} variant="outline" size="sm" className="flex-1">
+            <Download className="w-4 h-4 mr-1" /> Save
           </Button>
         </div>
       </CardContent>

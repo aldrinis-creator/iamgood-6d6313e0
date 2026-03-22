@@ -8,7 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar, Share2, Printer, Download } from "lucide-react";
+import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar, Share2, Printer, Download, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 interface SOSDialogProps {
   open: boolean;
@@ -55,6 +56,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [userDob, setUserDob] = useState("");
   const [userGender, setUserGender] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [emergencyToken, setEmergencyToken] = useState<string | null>(null);
   const countingRef = useRef(true);
   const hasSentRef = useRef(false);
 
@@ -62,7 +64,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes] = await Promise.all([
+    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
@@ -70,6 +72,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("wellness_logs").select("mood, stress_level, energy_level").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("medications").select("name, dosage").eq("user_id", uid),
+      supabase.from("emergency_share_tokens").select("token").eq("user_id", uid).eq("is_active", true).maybeSingle(),
     ]);
 
     setMedical({
@@ -87,6 +90,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setUserPhone(profileRes.data?.phone ?? "");
     setUserDob(profileRes.data?.date_of_birth ?? "");
     setUserGender(profileRes.data?.gender ?? "");
+    setEmergencyToken(tokenRes.data?.token ?? null);
 
     // Store latest health data for the SOS message
     (window as any).__sosHealthData = {
@@ -253,8 +257,13 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     }
   }, [buildShareText]);
 
+  const emergencyProfileUrl = emergencyToken ? `${window.location.origin}/e/${emergencyToken}` : null;
+
   const buildCardHtml = useCallback(() => {
     const now = new Date().toLocaleString("en-IN");
+    const qrSection = emergencyProfileUrl
+      ? `<div class="section"><div class="section-title">📱 QR Code — Scan for Full Profile</div><div class="section-body" style="text-align:center;padding:16px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(emergencyProfileUrl)}" alt="QR Code" style="width:180px;height:180px" /><p style="margin-top:8px;font-size:11px;color:#6b7280">${emergencyProfileUrl}</p></div></div>`
+      : "";
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Emergency Health Card — ${userName}</title><style>
 *{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;font-size:13px;max-width:800px;margin:0 auto}
 .header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:16px;text-align:center}
@@ -285,9 +294,10 @@ ${medicationDetails.length ? `<div class="section"><div class="section-title">�
 ${medical.familyDoctorName ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${medical.familyDoctorName}</span></div>${medical.familyDoctorPhone ? `<div class="row"><span class="label">Phone</span><span class="value">${medical.familyDoctorPhone}</span></div>` : ""}</div></div>` : ""}
 ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${g.guardian_name}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td></tr>`).join("")}</table></div></div>` : ""}
 ${location ? `<div class="section"><div class="section-title">📍 Location</div><div class="section-body"><a href="https://maps.google.com/?q=${location.lat},${location.lng}">Open in Google Maps</a></div></div>` : ""}
+${qrSection}
 <div class="footer"><p>Auto-generated by Check-iN Emergency Response System</p></div>
 </body></html>`;
-  }, [userName, userDob, userPhone, userGender, medical, medicationDetails, guardians, location]);
+  }, [userName, userDob, userPhone, userGender, medical, medicationDetails, guardians, location, emergencyProfileUrl]);
 
   const handlePrintCard = useCallback(() => {
     const html = buildCardHtml();
@@ -484,6 +494,19 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 >
                   Open in Google Maps →
                 </a>
+              </div>
+            )}
+
+            {/* QR Code */}
+            {emergencyProfileUrl && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5" /> Emergency Profile QR
+                </p>
+                <div className="flex flex-col items-center gap-2 bg-white rounded-lg p-4">
+                  <QRCodeSVG value={emergencyProfileUrl} size={140} />
+                  <p className="text-[10px] text-muted-foreground break-all text-center">{emergencyProfileUrl}</p>
+                </div>
               </div>
             )}
           </div>

@@ -23,6 +23,7 @@ import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
 import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
               <Route path="/e/:token" element={<EmergencyProfile />} />
+              <Route path="/install" element={<Install />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/appointments" element={<ProtectedRoute><Appointments /></ProtectedRoute>} />
