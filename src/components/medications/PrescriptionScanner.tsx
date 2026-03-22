@@ -142,6 +142,23 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
 
   return (
     <div className="space-y-4">
+      {/* Alternative mode banner */}
+      {alternativeMode && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-2">
+            <Pill className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Finding alternatives for: <strong>{alternativeMode.medName}</strong></p>
+              <p className="text-xs text-muted-foreground">Analyze to see alternatives, then select one to replace in your order.</p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onCancelAltMode}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!alternativeMode && (
       <Card className="border-success/20 bg-success/5">
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
@@ -150,6 +167,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
           </p>
         </CardContent>
       </Card>
+      )
 
       {/* Mode toggle */}
       <div className="flex gap-2">
