@@ -28,6 +28,24 @@ interface CheckIn {
   responded_at: string | null;
 }
 
+// Consent-gated wrapper for Emergency Health Card
+const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; wardName: string }) => {
+  const [consented, setConsented] = useState<boolean | null>(null);
+  useEffect(() => {
+    supabase
+      .from("user_settings" as any)
+      .select("settings")
+      .eq("user_id", wardUserId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const s = (data as any)?.settings;
+        setConsented(s?.shareEmergencyWithGuardians !== false);
+      });
+  }, [wardUserId]);
+  if (consented === null || consented === false) return null;
+  return <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />;
+};
+
 const GuardianDashboard = () => {
   const { session } = useAuth();
   const [showAmbulance, setShowAmbulance] = useState(false);
