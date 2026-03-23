@@ -6,13 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
   Hospital, Cross, MapPin, Loader2, Navigation, Phone, Clock,
-  ArrowLeft, Search, SlidersHorizontal
+  ArrowLeft, Search, SlidersHorizontal, Plus, Trash2, User
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import AddFacilityDialog from "@/components/facilities/AddFacilityDialog";
+import { toast } from "sonner";
 
 interface Facility {
-  id: number;
+  id: number | string;
   name: string;
   lat: number;
   lon: number;
@@ -21,6 +25,7 @@ interface Facility {
   openingHours?: string;
   distance?: number;
   address?: string;
+  isUserAdded?: boolean;
 }
 
 interface Props {
@@ -29,6 +34,7 @@ interface Props {
 }
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
 const buildQuery = (lat: number, lon: number, type: "hospitals" | "pharmacies", radius = 5000) => {
   const tag = type === "hospitals"
@@ -48,27 +54,58 @@ const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
 };
 
 const NearbyFacilities = ({ type, onBack }: Props) => {
+  const { user } = useAuth();
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [userFacilities, setUserFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userPos, setUserPos] = useState<{ lat: number; lon: number } | null>(null);
+  const [searchCenter, setSearchCenter] = useState<{ lat: number; lon: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressSearching, setAddressSearching] = useState(false);
   const [maxDistance, setMaxDistance] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const isHospital = type === "hospitals";
   const label = isHospital ? "Hospitals" : "Pharmacies";
   const Icon = isHospital ? Hospital : Cross;
   const accentClass = isHospital ? "text-primary" : "text-success";
+  const effectiveCenter = searchCenter || userPos;
+
+  const fetchUserFacilities = useCallback(async () => {
+    if (!user) return;
+    const facilityType = type === "hospitals" ? "hospital" : "pharmacy";
+    const { data } = await supabase
+      .from("user_facilities" as any)
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("facility_type", facilityType);
+    if (data) {
+      const mapped: Facility[] = (data as any[]).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        lat: f.lat,
+        lon: f.lon,
+        phone: f.phone,
+        address: f.address,
+        distance: effectiveCenter ? haversine(effectiveCenter.lat, effectiveCenter.lon, f.lat, f.lon) : undefined,
+        isUserAdded: true,
+      }));
+      setUserFacilities(mapped);
+    }
+  }, [user, type, effectiveCenter]);
 
   const fetchFacilities = useCallback(async (lat: number, lon: number) => {
     setLoading(true);
     setError(null);
     try {
-      const query = buildQuery(lat, lon, type);
+      const radiusM = maxDistance * 1000;
+      const query = buildQuery(lat, lon, type, radiusM);
       const res = await fetch(OVERPASS_URL, {
         method: "POST",
         body: `data=${encodeURIComponent(query)}`,
@@ -95,7 +132,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         })
         .filter(Boolean)
         .sort((a: Facility, b: Facility) => (a.distance ?? 99) - (b.distance ?? 99))
-        .slice(0, 30);
+        .slice(0, 50);
 
       setFacilities(results);
       addMarkers(results, lat, lon);
@@ -104,7 +141,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [type, isHospital]);
+  }, [type, isHospital, maxDistance]);
 
   const addMarkers = (items: Facility[], uLat: number, uLon: number) => {
     if (!leafletMap.current) return;
@@ -114,19 +151,57 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
 
     L.circleMarker([uLat, uLon], {
       radius: 8, fillColor: "#3b82f6", fillOpacity: 1, color: "#fff", weight: 2,
-    }).addTo(group).bindPopup("You are here");
+    }).addTo(group).bindPopup(searchCenter ? "Search location" : "You are here");
 
     const bounds = L.latLngBounds([[uLat, uLon]]);
-    items.forEach((f) => {
-      const color = isHospital ? "#1e3a5f" : "#0d9668";
+    const allItems = [...items, ...userFacilities];
+    allItems.forEach((f) => {
+      const color = f.isUserAdded ? "#f59e0b" : (isHospital ? "#1e3a5f" : "#0d9668");
       L.circleMarker([f.lat, f.lon], {
         radius: 7, fillColor: color, fillOpacity: 0.85, color: "#fff", weight: 1.5,
       })
         .addTo(group)
-        .bindPopup(`<strong>${f.name}</strong>${f.phone ? `<br/><a href="tel:${f.phone}">${f.phone}</a>` : ""}`);
+        .bindPopup(`<strong>${f.name}</strong>${f.isUserAdded ? "<br/><em>User added</em>" : ""}${f.phone ? `<br/><a href="tel:${f.phone}">${f.phone}</a>` : ""}`);
       bounds.extend([f.lat, f.lon]);
     });
-    leafletMap.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    if (allItems.length > 0) {
+      leafletMap.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    }
+  };
+
+  // Search by address using Nominatim
+  const searchByAddress = async () => {
+    if (!addressQuery.trim()) return;
+    setAddressSearching(true);
+    try {
+      const res = await fetch(
+        `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(addressQuery)}&limit=1`,
+        { headers: { "User-Agent": "CheckiN-App/1.0" } }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const newCenter = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        setSearchCenter(newCenter);
+        leafletMap.current?.flyTo([newCenter.lat, newCenter.lon], 13, { duration: 1 });
+        fetchFacilities(newCenter.lat, newCenter.lon);
+        toast.success(`Searching near: ${data[0].display_name?.split(",").slice(0, 2).join(",")}`);
+      } else {
+        toast.error("Location not found. Try a different address.");
+      }
+    } catch {
+      toast.error("Address search failed.");
+    } finally {
+      setAddressSearching(false);
+    }
+  };
+
+  const resetToCurrentLocation = () => {
+    if (userPos) {
+      setSearchCenter(null);
+      setAddressQuery("");
+      leafletMap.current?.flyTo([userPos.lat, userPos.lon], 13, { duration: 1 });
+      fetchFacilities(userPos.lat, userPos.lon);
+    }
   };
 
   useEffect(() => {
@@ -150,13 +225,13 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
           fetchFacilities(lat, lon);
         },
         () => {
-          setError("Location access denied. Please enable location services.");
+          setError("Location access denied. Please enable location services or search by address.");
           setLoading(false);
         },
         { timeout: 8000, enableHighAccuracy: true }
       );
     } else {
-      setError("Geolocation is not supported by your browser.");
+      setError("Geolocation is not supported. Use the address search instead.");
       setLoading(false);
     }
 
@@ -164,11 +239,31 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       leafletMap.current?.remove();
       leafletMap.current = null;
     };
-  }, [fetchFacilities]);
+  }, []);
+
+  // Fetch user facilities when user or center changes
+  useEffect(() => {
+    fetchUserFacilities();
+  }, [fetchUserFacilities]);
+
+  // Re-add markers when user facilities update
+  useEffect(() => {
+    if (effectiveCenter && facilities.length > 0) {
+      addMarkers(facilities, effectiveCenter.lat, effectiveCenter.lon);
+    }
+  }, [userFacilities]);
+
+  const deleteUserFacility = async (id: string) => {
+    const { error } = await supabase.from("user_facilities" as any).delete().eq("id", id);
+    if (error) { toast.error("Failed to delete"); return; }
+    toast.success("Facility removed");
+    fetchUserFacilities();
+  };
 
   const openDirections = (f: Facility) => {
-    const url = userPos
-      ? `https://www.google.com/maps/dir/${userPos.lat},${userPos.lon}/${f.lat},${f.lon}`
+    const origin = effectiveCenter || userPos;
+    const url = origin
+      ? `https://www.google.com/maps/dir/${origin.lat},${origin.lon}/${f.lat},${f.lon}`
       : `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lon}`;
     window.open(url, "_blank");
   };
@@ -177,14 +272,22 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
     leafletMap.current?.flyTo([f.lat, f.lon], 16, { duration: 0.8 });
   };
 
+  const allFacilities = useMemo(() => {
+    const center = effectiveCenter;
+    const userWithDist = center
+      ? userFacilities.map(f => ({ ...f, distance: haversine(center.lat, center.lon, f.lat, f.lon) }))
+      : userFacilities;
+    return [...facilities, ...userWithDist].sort((a, b) => (a.distance ?? 99) - (b.distance ?? 99));
+  }, [facilities, userFacilities, effectiveCenter]);
+
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return facilities.filter((f) => {
+    return allFacilities.filter((f) => {
       if (q && !f.name.toLowerCase().includes(q) && !(f.address || "").toLowerCase().includes(q)) return false;
       if (f.distance != null && f.distance > maxDistance) return false;
       return true;
     });
-  }, [facilities, searchQuery, maxDistance]);
+  }, [allFacilities, searchQuery, maxDistance]);
 
   return (
     <div className="space-y-3">
@@ -194,12 +297,39 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         </Button>
         <Icon className={`w-5 h-5 ${accentClass}`} />
         <h2 className="text-lg font-semibold">Nearby {label}</h2>
-        {!loading && (
-          <Badge variant="secondary" className="ml-auto text-xs">
-            {filtered.length} found
-          </Badge>
-        )}
+        <div className="ml-auto flex items-center gap-1">
+          {!loading && (
+            <Badge variant="secondary" className="text-xs">
+              {filtered.length} found
+            </Badge>
+          )}
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddDialogOpen(true)} title="Add facility">
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Address Search */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search any location worldwide…"
+            value={addressQuery}
+            onChange={(e) => setAddressQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && searchByAddress()}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <Button size="sm" className="h-9" onClick={searchByAddress} disabled={addressSearching || !addressQuery.trim()}>
+          {addressSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Go"}
+        </Button>
+      </div>
+      {searchCenter && (
+        <Button size="sm" variant="link" className="text-xs h-auto p-0" onClick={resetToCurrentLocation}>
+          ← Back to my location
+        </Button>
+      )}
 
       {/* Map */}
       <div
@@ -209,13 +339,13 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       />
 
       {/* Search & Filter Bar */}
-      {!loading && facilities.length > 0 && (
+      {!loading && allFacilities.length > 0 && (
         <div className="space-y-2">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder={`Search ${label.toLowerCase()}…`}
+                placeholder={`Filter ${label.toLowerCase()} by name…`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8 h-9 text-sm"
@@ -236,9 +366,9 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
               <Slider
                 value={[maxDistance]}
                 onValueChange={(v) => setMaxDistance(v[0])}
-                min={0.5}
-                max={5}
-                step={0.5}
+                min={1}
+                max={25}
+                step={1}
                 className="flex-1"
               />
               <span className="text-xs font-medium w-12 text-right">{maxDistance} km</span>
@@ -258,8 +388,8 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         <Card>
           <CardContent className="p-4 text-center text-sm text-destructive">
             {error}
-            {userPos && (
-              <Button size="sm" variant="outline" className="mt-2" onClick={() => fetchFacilities(userPos.lat, userPos.lon)}>
+            {effectiveCenter && (
+              <Button size="sm" variant="outline" className="mt-2" onClick={() => fetchFacilities(effectiveCenter.lat, effectiveCenter.lon)}>
                 Retry
               </Button>
             )}
@@ -272,16 +402,23 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         <div className="space-y-2">
           {filtered.map((f) => (
             <Card
-              key={f.id}
+              key={`${f.isUserAdded ? "u" : "o"}-${f.id}`}
               className="hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => focusOnMap(f)}
             >
               <CardContent className="p-3 flex items-start gap-3">
-                <div className={`w-9 h-9 rounded-full ${isHospital ? "bg-primary/10" : "bg-success/10"} flex items-center justify-center shrink-0 mt-0.5`}>
-                  <Icon className={`w-4 h-4 ${accentClass}`} />
+                <div className={`w-9 h-9 rounded-full ${f.isUserAdded ? "bg-amber-500/10" : (isHospital ? "bg-primary/10" : "bg-success/10")} flex items-center justify-center shrink-0 mt-0.5`}>
+                  {f.isUserAdded ? <User className="w-4 h-4 text-amber-600" /> : <Icon className={`w-4 h-4 ${accentClass}`} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{f.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium truncate">{f.name}</p>
+                    {f.isUserAdded && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0 border-amber-400 text-amber-600">
+                        Added
+                      </Badge>
+                    )}
+                  </div>
                   {f.address && (
                     <p className="text-xs text-muted-foreground truncate">{f.address}</p>
                   )}
@@ -319,6 +456,16 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
                   >
                     <Navigation className="w-4 h-4 text-primary" />
                   </Button>
+                  {f.isUserAdded && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={(e) => { e.stopPropagation(); deleteUserFacility(f.id as string); }}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -326,21 +473,29 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
         </div>
       )}
 
-      {!loading && !error && facilities.length > 0 && filtered.length === 0 && (
+      {!loading && !error && allFacilities.length > 0 && filtered.length === 0 && (
         <p className="text-sm text-center text-muted-foreground py-4">
           No matches. Try adjusting your search or distance filter.
         </p>
       )}
 
-      {!loading && !error && facilities.length === 0 && (
+      {!loading && !error && allFacilities.length === 0 && (
         <p className="text-sm text-center text-muted-foreground py-4">
-          No {label.toLowerCase()} found nearby. Try moving to a different area.
+          No {label.toLowerCase()} found nearby. Try searching a different location or add one manually.
         </p>
       )}
 
       <p className="text-[10px] text-center text-muted-foreground">
         Data from OpenStreetMap · Location used only for search
       </p>
+
+      <AddFacilityDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        type={type}
+        userPos={userPos}
+        onAdded={fetchUserFacilities}
+      />
     </div>
   );
 };
