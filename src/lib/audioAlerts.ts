@@ -7,9 +7,88 @@ const getAudioContext = (): AudioContext => {
   return audioContext;
 };
 
+// --- Audio unlock: resume AudioContext on first user gesture ---
+let audioUnlocked = false;
+
+const unlockAudio = async () => {
+  if (audioUnlocked) return;
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") await ctx.resume();
+    // Play a silent buffer to fully unlock
+    const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    audioUnlocked = true;
+  } catch {
+    // ignore
+  }
+};
+
+if (typeof document !== "undefined") {
+  const handler = () => {
+    unlockAudio();
+    document.removeEventListener("click", handler);
+    document.removeEventListener("touchstart", handler);
+  };
+  document.addEventListener("click", handler, { once: false, passive: true });
+  document.addEventListener("touchstart", handler, { once: false, passive: true });
+}
+
+// --- Fallback: HTML5 Audio from generated WAV blob ---
+const playFallbackBeep = () => {
+  try {
+    const sampleRate = 8000;
+    const duration = 0.3;
+    const numSamples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+    // WAV header
+    const writeStr = (offset: number, s: string) => {
+      for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+    };
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, numSamples * 2, true);
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const sample = Math.sin(2 * Math.PI * 660 * t) * 0.4;
+      view.setInt16(44 + i * 2, sample * 32767, true);
+    }
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+    audio.onended = () => URL.revokeObjectURL(url);
+  } catch {
+    // ignore
+  }
+};
+
 export const playChime = async () => {
   const ctx = getAudioContext();
-  if (ctx.state === "suspended") await ctx.resume();
+  if (ctx.state === "suspended") {
+    try { await ctx.resume(); } catch { /* ignore */ }
+  }
+
+  // If still suspended, use fallback
+  if (ctx.state === "suspended") {
+    playFallbackBeep();
+    return;
+  }
 
   const now = ctx.currentTime;
 
@@ -67,4 +146,3 @@ export const showBrowserNotification = (title: string, body: string) => {
     });
   }
 };
-

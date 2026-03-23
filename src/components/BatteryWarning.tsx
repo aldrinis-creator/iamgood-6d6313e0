@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { BatteryLow, BatteryWarning as BatteryWarnIcon, Zap, AlertTriangle } from "lucide-react";
+import { BatteryLow, Zap, AlertTriangle } from "lucide-react";
+import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 interface BatteryState {
   level: number;
@@ -13,6 +15,7 @@ const BatteryWarning: React.FC = () => {
   const lowShownCount = useRef(0);
   const criticalShownCount = useRef(0);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
+  const { settings } = useUserSettings();
 
   useEffect(() => {
     let batt: any;
@@ -34,12 +37,29 @@ const BatteryWarning: React.FC = () => {
     };
   }, []);
 
-  const show = useCallback((p: "low" | "critical") => {
+  const show = useCallback((p: "low" | "critical", level: number) => {
     setPhase(p);
     setVisible(true);
     clearTimeout(dismissTimer.current);
     dismissTimer.current = setTimeout(() => setVisible(false), 6000);
-  }, []);
+
+    // Audio alerts
+    const isCritical = p === "critical";
+    const message = isCritical
+      ? `Battery critically low at ${level} percent! Charge immediately to stay connected.`
+      : `Battery is getting low at ${level} percent. Please charge your phone soon.`;
+
+    if (settings.voiceReminders) {
+      playVoiceReminder(message);
+    } else if (settings.audioAlerts) {
+      playChime();
+    }
+
+    // Vibration
+    if (settings.vibration && navigator.vibrate) {
+      navigator.vibrate(isCritical ? [300, 150, 300, 150, 300] : [200, 100, 200]);
+    }
+  }, [settings.voiceReminders, settings.audioAlerts, settings.vibration]);
 
   useEffect(() => {
     if (battery.charging) {
@@ -50,10 +70,10 @@ const BatteryWarning: React.FC = () => {
     }
     if (battery.level <= 10 && criticalShownCount.current < 3) {
       criticalShownCount.current += 1;
-      show("critical");
+      show("critical", battery.level);
     } else if (battery.level <= 20 && battery.level > 10 && lowShownCount.current < 3) {
       lowShownCount.current += 1;
-      show("low");
+      show("low", battery.level);
     }
   }, [battery, show]);
 
