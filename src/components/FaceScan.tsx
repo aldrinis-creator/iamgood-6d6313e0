@@ -90,6 +90,16 @@ const FaceScan = () => {
     } else {
       toast.success("Scan saved to your history");
       queryClient.invalidateQueries({ queryKey: ["face-scans", user.id] });
+
+      // Check for vital anomalies and notify guardians
+      supabase.functions.invoke("notify-vital-anomaly", {
+        body: {
+          user_id: user.id,
+          heart_rate: scanResults.heartRate,
+          stress_score: scanResults.stressScore,
+          source: "Face Scan",
+        },
+      }).catch(() => {});
     }
   };
 
