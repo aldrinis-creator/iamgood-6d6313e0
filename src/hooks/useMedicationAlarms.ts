@@ -6,11 +6,25 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 
+const notifyGuardiansMissed = async (userId: string, medName: string, scheduledTime: string) => {
+  try {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+      body: JSON.stringify({ user_id: userId, medication_name: medName, status: "missed", scheduled_time: scheduledTime }),
+    });
+  } catch {
+    // best-effort
+  }
+};
+
 const useMedicationAlarms = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { pauseMode } = useApp();
   const firedRef = useRef<Set<string>>(new Set());
+  const missedFiredRef = useRef<Set<string>>(new Set());
 
   const check = useCallback(async () => {
     if (pauseMode !== "active") return;
@@ -37,6 +51,7 @@ const useMedicationAlarms = () => {
         const [h, m] = timeStr.split(":").map(Number);
         const slotKey = `med-slot-${dateKey}-${timeStr}`;
 
+        // --- Current-time alarm (fires once) ---
         if (h === hour && (m === undefined ? minute < 2 : Math.abs(minute - (m || 0)) < 2) && !firedRef.current.has(slotKey) && !slotsFired.has(slotKey)) {
           slotsFired.add(slotKey);
           firedRef.current.add(slotKey);
@@ -60,6 +75,38 @@ const useMedicationAlarms = () => {
             message: "Your medications are due. Remember to take your tablets.",
             reminderCount: `Scheduled — ${timeStr}`,
           });
+        }
+
+        // --- Missed-dose detection (60+ minutes past) ---
+        const scheduledAt = new Date(now);
+        scheduledAt.setHours(h, m || 0, 0, 0);
+        const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
+        const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
+
+        if (diffMin >= 60 && diffMin < 1440 && !missedFiredRef.current.has(missedKey)) {
+          missedFiredRef.current.add(missedKey);
+
+          // Check if a log already exists for this slot
+          const { data: existingLogs } = await supabase
+            .from("medication_logs")
+            .select("id")
+            .eq("medication_id", med.id)
+            .eq("user_id", session.user.id)
+            .eq("scheduled_at", scheduledAt.toISOString())
+            .limit(1);
+
+          if (!existingLogs || existingLogs.length === 0) {
+            // Write missed record
+            await supabase.from("medication_logs").insert({
+              medication_id: med.id,
+              user_id: session.user.id,
+              scheduled_at: scheduledAt.toISOString(),
+              status: "missed",
+            });
+
+            // Notify guardians
+            notifyGuardiansMissed(session.user.id, med.name, scheduledAt.toISOString());
+          }
         }
       }
     }
@@ -88,6 +135,9 @@ const useMedicationAlarms = () => {
     // Clean old keys
     firedRef.current.forEach((k) => {
       if (!k.includes(dateKey)) firedRef.current.delete(k);
+    });
+    missedFiredRef.current.forEach((k) => {
+      if (!k.includes(dateKey)) missedFiredRef.current.delete(k);
     });
   }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode]);
 

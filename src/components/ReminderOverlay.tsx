@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
 import { ensureAudioReady } from "@/lib/audioAlerts";
+import { toast } from "sonner";
 
 export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
 
@@ -19,17 +20,24 @@ export const showReminderOverlay = (data: ReminderData) => {
 };
 
 const SNOOZE_MS = 5 * 60_000; // 5 minutes
+const MAX_SNOOZES = 3;
+
+const getReminderKey = (data: ReminderData) => `${data.type}:${data.title}:${data.message}`;
 
 const ReminderOverlay = () => {
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
+  const [snoozesLeft, setSnoozesLeft] = useState(MAX_SNOOZES);
   const snoozeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const snoozeCountRef = useRef<Map<string, number>>(new Map());
 
   const handleEvent = useCallback((e: Event) => {
     const data = (e as CustomEvent<ReminderData>).detail;
+    const key = getReminderKey(data);
+    const used = snoozeCountRef.current.get(key) || 0;
+    setSnoozesLeft(MAX_SNOOZES - used);
     setReminder(data);
     setVisible(true);
-    // Re-prime audio when overlay appears (secondary attempt)
     ensureAudioReady();
   }, []);
 
@@ -48,6 +56,16 @@ const ReminderOverlay = () => {
 
   const handleSnooze = () => {
     if (!reminder) return;
+    const key = getReminderKey(reminder);
+    const used = (snoozeCountRef.current.get(key) || 0) + 1;
+    snoozeCountRef.current.set(key, used);
+
+    if (used >= MAX_SNOOZES) {
+      toast.info("Maximum snoozes reached. Please take action.");
+      dismiss();
+      return;
+    }
+
     const snoozedReminder = { ...reminder };
     dismiss();
     snoozeTimerRef.current = setTimeout(() => {
@@ -122,13 +140,15 @@ const ReminderOverlay = () => {
 
         {/* Snooze + Dismiss row */}
         <div className="flex items-center justify-center gap-6">
-          <button
-            onClick={handleSnooze}
-            className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            <AlarmClock className="w-5 h-5" />
-            Snooze 5 min
-          </button>
+          {snoozesLeft > 0 && (
+            <button
+              onClick={handleSnooze}
+              className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <AlarmClock className="w-5 h-5" />
+              Snooze 5 min ({snoozesLeft} left)
+            </button>
+          )}
           <span className="text-muted-foreground">·</span>
           <button
             onClick={dismiss}
