@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
+import { ensureAudioReady } from "@/lib/audioAlerts";
 
 export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
 
@@ -28,6 +29,8 @@ const ReminderOverlay = () => {
     const data = (e as CustomEvent<ReminderData>).detail;
     setReminder(data);
     setVisible(true);
+    // Re-prime audio when overlay appears (secondary attempt)
+    ensureAudioReady();
   }, []);
 
   useEffect(() => {
@@ -53,6 +56,7 @@ const ReminderOverlay = () => {
   };
 
   const handleAction = () => {
+    ensureAudioReady(); // Re-prime for future alerts
     if (reminder?.type === "checkin") {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {

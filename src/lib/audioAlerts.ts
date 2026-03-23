@@ -1,4 +1,8 @@
 let audioContext: AudioContext | null = null;
+let preCachedAudio: HTMLAudioElement | null = null;
+let speechPrimed = false;
+
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 
 const getAudioContext = (): AudioContext => {
   if (!audioContext || audioContext.state === "closed") {
@@ -7,23 +11,42 @@ const getAudioContext = (): AudioContext => {
   return audioContext;
 };
 
-// --- Audio unlock: resume AudioContext on first user gesture ---
-let audioUnlocked = false;
-
+// --- Re-unlock on EVERY user gesture (no single-fire guard) ---
 const unlockAudio = async () => {
-  if (audioUnlocked) return;
   try {
     const ctx = getAudioContext();
     if (ctx.state === "suspended") await ctx.resume();
-    // Play a silent buffer to fully unlock
+    // Play silent buffer to fully unlock
     const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(ctx.destination);
     src.start(0);
-    audioUnlocked = true;
   } catch {
     // ignore
+  }
+
+  // Pre-cache an Audio element on gesture so it can be reused programmatically
+  if (!preCachedAudio) {
+    try {
+      preCachedAudio = new Audio(SILENT_WAV);
+      preCachedAudio.volume = 0;
+      await preCachedAudio.play().catch(() => {});
+    } catch {
+      // ignore
+    }
+  }
+
+  // Prime speechSynthesis with a silent utterance
+  if (!speechPrimed && "speechSynthesis" in window) {
+    try {
+      const silent = new SpeechSynthesisUtterance("");
+      silent.volume = 0;
+      window.speechSynthesis.speak(silent);
+      speechPrimed = true;
+    } catch {
+      // ignore
+    }
   }
 };
 
@@ -33,19 +56,72 @@ if (typeof document !== "undefined") {
     document.removeEventListener("click", handler);
     document.removeEventListener("touchstart", handler);
   };
-  document.addEventListener("click", handler, { once: false, passive: true });
-  document.addEventListener("touchstart", handler, { once: false, passive: true });
+  document.addEventListener("click", handler, { passive: true });
+  document.addEventListener("touchstart", handler, { passive: true });
 }
+
+// --- Exported: re-resume context right before playing ---
+export const ensureAudioReady = async (): Promise<boolean> => {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") await ctx.resume();
+    return ctx.state === "running";
+  } catch {
+    return false;
+  }
+};
 
 // --- Fallback: HTML5 Audio from generated WAV blob ---
 const playFallbackBeep = () => {
+  // Try pre-cached element first
+  if (preCachedAudio) {
+    try {
+      preCachedAudio.src = "";
+      const sampleRate = 8000;
+      const duration = 0.3;
+      const numSamples = Math.floor(sampleRate * duration);
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
+      const writeStr = (offset: number, s: string) => {
+        for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+      };
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + numSamples * 2, true);
+      writeStr(8, "WAVE");
+      writeStr(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, numSamples * 2, true);
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const sample = Math.sin(2 * Math.PI * 660 * t) * 0.4;
+        view.setInt16(44 + i * 2, sample * 32767, true);
+      }
+      const blob = new Blob([buffer], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+      preCachedAudio.src = url;
+      preCachedAudio.volume = 0.5;
+      preCachedAudio.play().catch(() => {});
+      preCachedAudio.onended = () => URL.revokeObjectURL(url);
+      return;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Last resort: new Audio element
   try {
     const sampleRate = 8000;
     const duration = 0.3;
     const numSamples = Math.floor(sampleRate * duration);
     const buffer = new ArrayBuffer(44 + numSamples * 2);
     const view = new DataView(buffer);
-    // WAV header
     const writeStr = (offset: number, s: string) => {
       for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
     };
@@ -79,20 +155,17 @@ const playFallbackBeep = () => {
 };
 
 export const playChime = async () => {
+  await ensureAudioReady();
   const ctx = getAudioContext();
-  if (ctx.state === "suspended") {
-    try { await ctx.resume(); } catch { /* ignore */ }
-  }
 
   // If still suspended, use fallback
-  if (ctx.state === "suspended") {
+  if (ctx.state !== "running") {
     playFallbackBeep();
     return;
   }
 
   const now = ctx.currentTime;
 
-  // First note — C5 (523 Hz)
   const osc1 = ctx.createOscillator();
   const gain1 = ctx.createGain();
   osc1.type = "sine";
@@ -103,7 +176,6 @@ export const playChime = async () => {
   osc1.start(now);
   osc1.stop(now + 0.4);
 
-  // Second note — E5 (659 Hz)
   const osc2 = ctx.createOscillator();
   const gain2 = ctx.createGain();
   osc2.type = "sine";
@@ -114,7 +186,6 @@ export const playChime = async () => {
   osc2.start(now + 0.25);
   osc2.stop(now + 0.7);
 
-  // Third note — G5 (784 Hz)
   const osc3 = ctx.createOscillator();
   const gain3 = ctx.createGain();
   osc3.type = "sine";
@@ -127,8 +198,18 @@ export const playChime = async () => {
 };
 
 export const playVoiceReminder = (message = "It's time for your Check-iN") => {
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) {
+    // Fall back to chime if speech not available
+    playChime();
+    return;
+  }
   window.speechSynthesis.cancel();
+
+  // Re-prime with silent utterance before real message
+  const silent = new SpeechSynthesisUtterance("");
+  silent.volume = 0;
+  window.speechSynthesis.speak(silent);
+
   const utterance = new SpeechSynthesisUtterance(message);
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
