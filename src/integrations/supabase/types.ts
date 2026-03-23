@@ -687,6 +687,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ppg_sessions: {
+        Row: {
+          avg_heart_rate: number | null
+          created_at: string
+          duration_sec: number
+          id: string
+          notes: string | null
+          recorded_at: string
+          samples: Json
+          user_id: string
+        }
+        Insert: {
+          avg_heart_rate?: number | null
+          created_at?: string
+          duration_sec?: number
+          id?: string
+          notes?: string | null
+          recorded_at?: string
+          samples?: Json
+          user_id: string
+        }
+        Update: {
+          avg_heart_rate?: number | null
+          created_at?: string
+          duration_sec?: number
+          id?: string
+          notes?: string | null
+          recorded_at?: string
+          samples?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       privacy_requests: {
         Row: {
           created_at: string
