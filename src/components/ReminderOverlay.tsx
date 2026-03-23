@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { Heart, Pill, CalendarClock, X } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
 
-export type ReminderType = "checkin" | "medication" | "appointment";
+export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
 
 interface ReminderData {
   type: ReminderType;
@@ -17,9 +17,12 @@ export const showReminderOverlay = (data: ReminderData) => {
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
 
+const SNOOZE_MS = 5 * 60_000; // 5 minutes
+
 const ReminderOverlay = () => {
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
+  const snoozeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const handleEvent = useCallback((e: Event) => {
     const data = (e as CustomEvent<ReminderData>).detail;
@@ -29,12 +32,24 @@ const ReminderOverlay = () => {
 
   useEffect(() => {
     window.addEventListener(REMINDER_EVENT, handleEvent);
-    return () => window.removeEventListener(REMINDER_EVENT, handleEvent);
+    return () => {
+      window.removeEventListener(REMINDER_EVENT, handleEvent);
+      if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
+    };
   }, [handleEvent]);
 
   const dismiss = () => {
     setVisible(false);
     setTimeout(() => setReminder(null), 300);
+  };
+
+  const handleSnooze = () => {
+    if (!reminder) return;
+    const snoozedReminder = { ...reminder };
+    dismiss();
+    snoozeTimerRef.current = setTimeout(() => {
+      showReminderOverlay(snoozedReminder);
+    }, SNOOZE_MS);
   };
 
   const handleAction = () => {
@@ -44,6 +59,8 @@ const ReminderOverlay = () => {
       window.location.href = "/my-health";
     } else if (reminder?.type === "appointment") {
       window.location.href = "/appointments";
+    } else if (reminder?.type === "exercise") {
+      window.location.href = "/my-health";
     }
     dismiss();
   };
@@ -52,7 +69,16 @@ const ReminderOverlay = () => {
 
   const isCheckin = reminder.type === "checkin";
   const isAppointment = reminder.type === "appointment";
-  const Icon = isCheckin ? Heart : isAppointment ? CalendarClock : Pill;
+  const isExercise = reminder.type === "exercise";
+  const Icon = isCheckin ? Heart : isAppointment ? CalendarClock : isExercise ? Dumbbell : Pill;
+
+  const actionLabel = isCheckin
+    ? "Check-In Now"
+    : isAppointment
+    ? "View Appointment"
+    : isExercise
+    ? "Log Activity"
+    : "View Medications";
 
   return (
     <div
@@ -87,17 +113,27 @@ const ReminderOverlay = () => {
           className="w-full py-6 rounded-2xl bg-destructive text-destructive-foreground text-2xl font-bold flex items-center justify-center gap-3 hover:bg-destructive/90 transition-colors active:scale-[0.98] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]"
         >
           <Icon className="w-8 h-8 fill-current" />
-          {isCheckin ? "Check-In Now" : isAppointment ? "View Appointment" : "View Medications"}
+          {actionLabel}
         </button>
 
-        {/* Dismiss */}
-        <button
-          onClick={dismiss}
-          className="flex items-center justify-center gap-2 mx-auto text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="w-6 h-6" />
-          Dismiss
-        </button>
+        {/* Snooze + Dismiss row */}
+        <div className="flex items-center justify-center gap-6">
+          <button
+            onClick={handleSnooze}
+            className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            <AlarmClock className="w-5 h-5" />
+            Snooze 5 min
+          </button>
+          <span className="text-muted-foreground">·</span>
+          <button
+            onClick={dismiss}
+            className="flex items-center gap-2 text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-5 h-5" />
+            Dismiss
+          </button>
+        </div>
       </div>
     </div>
   );
