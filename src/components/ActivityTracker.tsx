@@ -659,6 +659,9 @@ const ActivityTracker = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Wearable Import Dialog */}
+      <WearableImport open={showImport} onOpenChange={setShowImport} onImported={fetchData} />
     </div>
   );
 };
