@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
 import { ensureAudioReady } from "@/lib/audioAlerts";
+import { toast } from "sonner";
 
 export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
 
@@ -19,17 +20,24 @@ export const showReminderOverlay = (data: ReminderData) => {
 };
 
 const SNOOZE_MS = 5 * 60_000; // 5 minutes
+const MAX_SNOOZES = 3;
+
+const getReminderKey = (data: ReminderData) => `${data.type}:${data.title}:${data.message}`;
 
 const ReminderOverlay = () => {
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
+  const [snoozesLeft, setSnoozesLeft] = useState(MAX_SNOOZES);
   const snoozeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const snoozeCountRef = useRef<Map<string, number>>(new Map());
 
   const handleEvent = useCallback((e: Event) => {
     const data = (e as CustomEvent<ReminderData>).detail;
+    const key = getReminderKey(data);
+    const used = snoozeCountRef.current.get(key) || 0;
+    setSnoozesLeft(MAX_SNOOZES - used);
     setReminder(data);
     setVisible(true);
-    // Re-prime audio when overlay appears (secondary attempt)
     ensureAudioReady();
   }, []);
 
