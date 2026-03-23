@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
 import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
+import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 import MedicalDocuments from "@/components/health-tools/MedicalDocuments";
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
@@ -26,6 +27,7 @@ const healthTools = [
   { icon: Activity, label: "Activity", color: "bg-primary/10 text-primary" },
   { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
+  { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
@@ -59,6 +61,7 @@ const toolComponents: Record<string, React.FC> = {
   "Wellness": WellnessTracker,
   "Services": HealthServices,
   "Face Scan": FaceScan,
+  "Vitals": VitalsMonitor,
 };
 
 const MyHealth = () => {
