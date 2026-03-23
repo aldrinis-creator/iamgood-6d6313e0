@@ -1,41 +1,45 @@
 
 
-# Fix Intermittent Audio Alerts
+# Fix Medication Reminder Flow
 
-## Root Cause
+## Current Behavior vs Target
 
-The audio fires inconsistently because of three issues:
+| Aspect | Current | Target |
+|--------|---------|--------|
+| Audio | Fires once with overlay | Same (correct) |
+| Snooze | Unlimited, overlay-only (no audio) | Max 3 snoozes, overlay-only after first |
+| Missed detection | Visual-only in TodaySchedule UI | Auto-write `medication_logs` record with `status: "missed"` after 1 hour |
+| Guardian notification on miss | None | Send notification to guardians when dose is auto-marked missed |
 
-1. **AudioContext re-suspends**: After a period of inactivity (tab backgrounded, no interaction), Chrome automatically suspends the AudioContext again. The current unlock only runs once (guarded by `audioUnlocked` flag), so subsequent alerts find it suspended with no recovery.
+## Changes
 
-2. **speechSynthesis requires recent gesture**: Chrome cancels `speechSynthesis.speak()` if there hasn't been a user gesture within ~5-10 seconds. Timer-based alarm hooks (30s intervals) always miss this window.
+### 1. ReminderOverlay — add snooze counter and max limit
+**File:** `src/components/ReminderOverlay.tsx`
 
-3. **Fallback beep also blocked**: `new Audio().play()` has the same autoplay restrictions, so the fallback path fails too.
+- Add a `snoozeCountRef` (Map keyed by reminder title+message) to track how many times each reminder has been snoozed.
+- On snooze: increment counter. If counter reaches 3, show a toast "Maximum snoozes reached" and dismiss without re-scheduling.
+- Display remaining snoozes in the snooze button label: "Snooze 5 min (2 left)".
+- After 3 snoozes are exhausted, hide the snooze button entirely.
 
-## Fix
+### 2. useMedicationAlarms — add missed-dose auto-logging
+**File:** `src/hooks/useMedicationAlarms.ts`
 
-### File: `src/lib/audioAlerts.ts`
+- In the `check()` callback, after processing current-time alarms, add a second pass that finds medication slots from the past hour (scheduled time is 60+ minutes ago).
+- For each such slot, check if a `medication_logs` record already exists for that `medication_id` + `scheduled_at`. If not:
+  - Insert a `medication_logs` record with `status: "missed"`, `scheduled_at` set to the computed time, no `taken_at`.
+  - Send guardian notifications via the existing `notify-guardian-medication` edge function with `status: "missed"`.
+- Use a separate `missedFiredRef` to avoid re-processing the same slot every 30 seconds.
 
-**A. Keep re-unlocking on every interaction** — remove the `audioUnlocked` early-return so every click/touch re-resumes the AudioContext. This is cheap and ensures the context stays alive.
+### 3. TodaySchedule — no changes needed
+The UI already reads from `medication_logs` and shows missed status. Once the hook writes the record, it will appear automatically.
 
-**B. Pre-cache an Audio element on user gesture** — on first interaction, create a reusable `Audio` element and call `.play()` with a silent data URI. Once an Audio element has played from a gesture, it can be reused programmatically. Store it for fallback use.
+## Technical Details
 
-**C. `playChime`: try AudioContext → fallback to pre-cached Audio → fallback to generated WAV blob** — three tiers of fallback.
+- The snooze counter uses a `useRef<Map<string, number>>` keyed by a composite of reminder type + title to persist across re-renders without causing re-render cycles.
+- The missed-dose check queries `medication_logs` for existing records before inserting, preventing duplicates.
+- Guardian notifications reuse the existing `notify-guardian-medication` edge function.
 
-**D. `playVoiceReminder`: queue a silent utterance on user gesture** — this "primes" the speech synthesis engine. On subsequent programmatic calls, first play a silent utterance, then the real message (workaround for Chrome's gesture requirement fading).
-
-**E. Add `ensureAudioReady()`** — exported function that alarm hooks call before attempting audio. It re-resumes the context and returns whether audio is likely to work, so hooks can prioritize fallback paths.
-
-### File: `src/components/ReminderOverlay.tsx`
-
-**F. Play audio when overlay appears** — since the overlay is visible and interactive, trigger audio playback from the overlay's mount/show effect as a secondary attempt. The overlay's action buttons (Check-In Now, etc.) also call `ensureAudioReady()` on click, re-priming for future alerts.
-
-### File: `src/components/BatteryWarning.tsx`
-
-**G. Same pattern** — call `ensureAudioReady()` before playing battery alerts.
-
-## Summary of Changes
-- `src/lib/audioAlerts.ts` — remove single-fire guard, add pre-cached Audio element, add `ensureAudioReady()`, prime speechSynthesis on gesture
-- `src/components/ReminderOverlay.tsx` — retry audio on overlay show, re-prime on button clicks
-- `src/components/BatteryWarning.tsx` — call `ensureAudioReady()` before alerts
+## Files Changed
+- `src/components/ReminderOverlay.tsx` — snooze limit (max 3), counter display
+- `src/hooks/useMedicationAlarms.ts` — auto-write missed logs after 1 hour, notify guardians
 
