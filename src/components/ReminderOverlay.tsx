@@ -56,6 +56,16 @@ const ReminderOverlay = () => {
 
   const handleSnooze = () => {
     if (!reminder) return;
+    const key = getReminderKey(reminder);
+    const used = (snoozeCountRef.current.get(key) || 0) + 1;
+    snoozeCountRef.current.set(key, used);
+
+    if (used >= MAX_SNOOZES) {
+      toast.info("Maximum snoozes reached. Please take action.");
+      dismiss();
+      return;
+    }
+
     const snoozedReminder = { ...reminder };
     dismiss();
     snoozeTimerRef.current = setTimeout(() => {
