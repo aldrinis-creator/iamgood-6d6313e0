@@ -140,13 +140,15 @@ const ReminderOverlay = () => {
 
         {/* Snooze + Dismiss row */}
         <div className="flex items-center justify-center gap-6">
-          <button
-            onClick={handleSnooze}
-            className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            <AlarmClock className="w-5 h-5" />
-            Snooze 5 min
-          </button>
+          {snoozesLeft > 0 && (
+            <button
+              onClick={handleSnooze}
+              className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <AlarmClock className="w-5 h-5" />
+              Snooze 5 min ({snoozesLeft} left)
+            </button>
+          )}
           <span className="text-muted-foreground">·</span>
           <button
             onClick={dismiss}
