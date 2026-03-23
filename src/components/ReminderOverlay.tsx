@@ -56,6 +56,7 @@ const ReminderOverlay = () => {
   };
 
   const handleAction = () => {
+    ensureAudioReady(); // Re-prime for future alerts
     if (reminder?.type === "checkin") {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {

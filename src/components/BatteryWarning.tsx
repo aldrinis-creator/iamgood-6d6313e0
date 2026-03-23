@@ -37,13 +37,15 @@ const BatteryWarning: React.FC = () => {
     };
   }, []);
 
-  const show = useCallback((p: "low" | "critical", level: number) => {
+  const show = useCallback(async (p: "low" | "critical", level: number) => {
     setPhase(p);
     setVisible(true);
     clearTimeout(dismissTimer.current);
     dismissTimer.current = setTimeout(() => setVisible(false), 6000);
 
-    // Audio alerts
+    // Re-prime audio before playing
+    await ensureAudioReady();
+
     const isCritical = p === "critical";
     const message = isCritical
       ? `Battery critically low at ${level} percent! Charge immediately to stay connected.`
