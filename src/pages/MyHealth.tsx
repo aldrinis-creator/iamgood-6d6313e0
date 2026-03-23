@@ -61,6 +61,7 @@ const toolComponents: Record<string, React.FC> = {
   "Wellness": WellnessTracker,
   "Services": HealthServices,
   "Face Scan": FaceScan,
+  "Vitals": VitalsMonitor,
 };
 
 const MyHealth = () => {
