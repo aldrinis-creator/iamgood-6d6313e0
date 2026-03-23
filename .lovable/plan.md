@@ -1,47 +1,35 @@
+# Add Exercise Reminder Toggle in Settings
 
+## What
 
-# Fix: Missing Notifications for Appointments, Check-Ins, and Medications
+Add a deafult on/off toggle for the exercise reminder (8 AM / 6 PM) in the Settings → Alerts tab, and a field to let users customize the two reminder times.
 
-## Root Causes
+## Changes
 
-1. **No appointment alarm hook exists.** Check-in and medication alarms have dedicated hooks (`useCheckInAudio`, `useMedicationAlarms`), but there is zero client-side alarm logic for appointments. The `first_alert` and `second_alert` fields are stored but never acted on.
+### 1. Add `exerciseReminder` to UserSettings
 
-2. **Browser throttles background tabs.** All alarm hooks use `setInterval(check, 30_000)`. When the app tab is in the background, browsers throttle intervals to 1 min or more — so the narrow 2-5 minute firing windows are easily missed entirely.
+**File**: `src/hooks/useUserSettings.ts`
 
-3. **AudioContext auto-suspend.** Web Audio requires a prior user gesture to play sound. If the user hasn't interacted with the page recently, `playChime()` silently fails.
+- Add `exerciseReminder: boolean` to the `UserSettings` interface
+- Default to `true` in `DEFAULTS`
 
-4. **No browser Notification API usage.** Even when sounds can't play (background tab, no gesture), the app could show a system notification via `new Notification()`, but it doesn't.
+### 2. Add toggle in Settings → Alerts tab
 
-## Plan
+**File**: `src/pages/Settings.tsx`
 
-### 1. Create `src/hooks/useAppointmentAlarms.ts`
-New hook that polls appointments due today and fires alerts based on `first_alert` / `second_alert` lead times:
-- Fetch today's appointments where `alarm_enabled = true`
-- For each, calculate alert times (e.g. "15min" before `start_date + start_time`)
-- When current time falls within 2 minutes of an alert time, fire chime/voice + show `ReminderOverlay` with type "appointment"
-- Track fired keys in a `useRef<Set>` to avoid repeats
-- Poll every 30 seconds
+- Add a new Switch row after the "Vibration & Notifications" toggle (around line 456)
+- Label: "Exercise Reminders" / "Audio reminders at 8 AM and 6 PM for exercise"
+- Icon: `Dumbbell` from lucide-react
+- Wired to `settings.exerciseReminder` via `updateSetting`
 
-### 2. Add `"appointment"` type to `ReminderOverlay`
-- Extend `ReminderType` to include `"appointment"`
-- Add an icon and action (navigate to `/appointments`) for appointment reminders
+### 3. Respect the toggle in the hook
 
-### 3. Add `useVisibilityResume` to all three alarm hooks
-When the tab regains focus (`document.visibilitychange`), immediately run the check function instead of waiting for the next interval tick. This eliminates the "missed because tab was background" problem.
+**File**: `src/hooks/useExerciseReminder.ts`
 
-### 4. Use browser Notification API as fallback
-In all three hooks, after playing chime/voice, also call `new Notification(title, { body })` if `Notification.permission === "granted"`. This ensures the user sees something even if:
-- The tab is in the background (browser notifications appear system-wide)
-- AudioContext is suspended
-
-### 5. Wire `useAppointmentAlarms` into `AppLayout.tsx`
-Add `useAppointmentAlarms()` call alongside existing `useCheckInAudio()` and `useMedicationAlarms()`.
+- Add early return in `check()` if `settings.exerciseReminder === false`
 
 ## Files Changed
-- **New**: `src/hooks/useAppointmentAlarms.ts` — appointment alarm polling hook
-- **Edit**: `src/components/ReminderOverlay.tsx` — add "appointment" reminder type
-- **Edit**: `src/components/AppLayout.tsx` — import and call `useAppointmentAlarms()`
-- **Edit**: `src/hooks/useCheckInAudio.ts` — add visibility resume + browser Notification fallback
-- **Edit**: `src/hooks/useMedicationAlarms.ts` — add visibility resume + browser Notification fallback
-- **Edit**: `src/lib/audioAlerts.ts` — add `showBrowserNotification()` helper
 
+- `src/hooks/useUserSettings.ts` — add `exerciseReminder` field
+- `src/pages/Settings.tsx` — add toggle row
+- `src/hooks/useExerciseReminder.ts` — gate on `settings.exerciseReminder`
