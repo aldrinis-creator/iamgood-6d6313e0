@@ -1,24 +1,47 @@
 
 
-# Fix: Alternative Selection Not Returning to Order Basket
+# Fix: Missing Notifications for Appointments, Check-Ins, and Medications
 
-## Problem
-When the user clicks "Alt" on an order item, the flow switches to the Scan tab. The RefillOrder component **unmounts**, losing all `orderItems` state. When an alternative is selected and the tab switches back to Refill, the component remounts with an empty basket — so the `useEffect` that maps `selectedAlternative.forMedId` finds nothing to replace.
+## Root Causes
 
-## Solution
-Lift `orderItems` state up to `MedicationManager` so it persists across tab switches.
+1. **No appointment alarm hook exists.** Check-in and medication alarms have dedicated hooks (`useCheckInAudio`, `useMedicationAlarms`), but there is zero client-side alarm logic for appointments. The `first_alert` and `second_alert` fields are stored but never acted on.
 
-### `src/components/medications/MedicationManager.tsx`
-- Add `orderItems` state (`useState<OrderItem[]>([])`) at the manager level
-- Pass `orderItems` and `setOrderItems` as props to `RefillOrder`
+2. **Browser throttles background tabs.** All alarm hooks use `setInterval(check, 30_000)`. When the app tab is in the background, browsers throttle intervals to 1 min or more — so the narrow 2-5 minute firing windows are easily missed entirely.
 
-### `src/components/medications/RefillOrder.tsx`
-- Accept `orderItems` and `setOrderItems` as props instead of managing them internally
-- Remove the local `useState<OrderItem[]>([])` 
-- Keep all other order logic (add/remove/confirm) unchanged — they already use `setOrderItems`
+3. **AudioContext auto-suspend.** Web Audio requires a prior user gesture to play sound. If the user hasn't interacted with the page recently, `playChime()` silently fails.
 
-### Types
-- Export `OrderItem` interface from `RefillOrder.tsx` (or move to `MedicationManager.tsx`) so both files can reference it
+4. **No browser Notification API usage.** Even when sounds can't play (background tab, no gesture), the app could show a system notification via `new Notification()`, but it doesn't.
 
-This ensures the order basket survives the Refill → Scan → Refill tab transition, and the alternative replacement `useEffect` finds the correct item to update.
+## Plan
+
+### 1. Create `src/hooks/useAppointmentAlarms.ts`
+New hook that polls appointments due today and fires alerts based on `first_alert` / `second_alert` lead times:
+- Fetch today's appointments where `alarm_enabled = true`
+- For each, calculate alert times (e.g. "15min" before `start_date + start_time`)
+- When current time falls within 2 minutes of an alert time, fire chime/voice + show `ReminderOverlay` with type "appointment"
+- Track fired keys in a `useRef<Set>` to avoid repeats
+- Poll every 30 seconds
+
+### 2. Add `"appointment"` type to `ReminderOverlay`
+- Extend `ReminderType` to include `"appointment"`
+- Add an icon and action (navigate to `/appointments`) for appointment reminders
+
+### 3. Add `useVisibilityResume` to all three alarm hooks
+When the tab regains focus (`document.visibilitychange`), immediately run the check function instead of waiting for the next interval tick. This eliminates the "missed because tab was background" problem.
+
+### 4. Use browser Notification API as fallback
+In all three hooks, after playing chime/voice, also call `new Notification(title, { body })` if `Notification.permission === "granted"`. This ensures the user sees something even if:
+- The tab is in the background (browser notifications appear system-wide)
+- AudioContext is suspended
+
+### 5. Wire `useAppointmentAlarms` into `AppLayout.tsx`
+Add `useAppointmentAlarms()` call alongside existing `useCheckInAudio()` and `useMedicationAlarms()`.
+
+## Files Changed
+- **New**: `src/hooks/useAppointmentAlarms.ts` — appointment alarm polling hook
+- **Edit**: `src/components/ReminderOverlay.tsx` — add "appointment" reminder type
+- **Edit**: `src/components/AppLayout.tsx` — import and call `useAppointmentAlarms()`
+- **Edit**: `src/hooks/useCheckInAudio.ts` — add visibility resume + browser Notification fallback
+- **Edit**: `src/hooks/useMedicationAlarms.ts` — add visibility resume + browser Notification fallback
+- **Edit**: `src/lib/audioAlerts.ts` — add `showBrowserNotification()` helper
 
