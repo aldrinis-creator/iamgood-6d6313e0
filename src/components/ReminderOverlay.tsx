@@ -51,7 +51,8 @@ const ReminderOverlay = () => {
   if (!reminder) return null;
 
   const isCheckin = reminder.type === "checkin";
-  const Icon = isCheckin ? Heart : Pill;
+  const isAppointment = reminder.type === "appointment";
+  const Icon = isCheckin ? Heart : isAppointment ? CalendarClock : Pill;
 
   return (
     <div
