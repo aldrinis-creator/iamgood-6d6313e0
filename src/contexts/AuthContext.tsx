@@ -53,6 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => fetchProfile(session.user.id), 0);
+          // Request notification permission on sign-in
+          if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+          }
         } else {
           setProfile(null);
         }
