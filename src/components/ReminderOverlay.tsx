@@ -42,6 +42,8 @@ const ReminderOverlay = () => {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {
       window.location.href = "/my-health";
+    } else if (reminder?.type === "appointment") {
+      window.location.href = "/appointments";
     }
     dismiss();
   };

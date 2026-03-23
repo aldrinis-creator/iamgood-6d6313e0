@@ -57,3 +57,14 @@ export const playVoiceReminder = (message = "It's time for your Check-iN") => {
   window.speechSynthesis.speak(utterance);
 };
 
+export const showBrowserNotification = (title: string, body: string) => {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/favicon.ico" });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((p) => {
+      if (p === "granted") new Notification(title, { body, icon: "/favicon.ico" });
+    });
+  }
+};
+
