@@ -1,40 +1,41 @@
 
 
-# Fix Battery Audio Alerts + Fix Audio Alerts Not Firing
+# Fix Intermittent Audio Alerts
 
-## Two Issues Found
+## Root Cause
 
-### Issue 1: Battery Warning has no audio
-`BatteryWarning.tsx` only shows a visual overlay — it never calls `playChime()`, `playVoiceReminder()`, or `navigator.vibrate()`. Need to add audio/vibration alerts when battery warnings trigger.
+The audio fires inconsistently because of three issues:
 
-### Issue 2: Audio alerts silently fail due to browser autoplay policy
-Browsers block `AudioContext.resume()` and `speechSynthesis.speak()` unless they originate from a **user gesture**. The alarm hooks call these from `setInterval` callbacks, which have no gesture context — so `ctx.resume()` returns a rejected promise (silently caught) and audio never plays.
+1. **AudioContext re-suspends**: After a period of inactivity (tab backgrounded, no interaction), Chrome automatically suspends the AudioContext again. The current unlock only runs once (guarded by `audioUnlocked` flag), so subsequent alerts find it suspended with no recovery.
 
-**Fix**: "Unlock" the AudioContext on the user's **first tap/click anywhere** in the app. Once unlocked, subsequent programmatic calls will work. This is the standard pattern used by web audio apps.
+2. **speechSynthesis requires recent gesture**: Chrome cancels `speechSynthesis.speak()` if there hasn't been a user gesture within ~5-10 seconds. Timer-based alarm hooks (30s intervals) always miss this window.
 
-## Changes
+3. **Fallback beep also blocked**: `new Audio().play()` has the same autoplay restrictions, so the fallback path fails too.
 
-### 1. Add audio unlock on first user interaction
-**File:** `src/lib/audioAlerts.ts`
+## Fix
 
-- Add an `unlockAudio()` function that creates/resumes the AudioContext and plays a silent buffer
-- Register a one-time `click`/`touchstart` listener on `document` to call it
-- Call `unlockAudio()` on module load so it auto-registers
+### File: `src/lib/audioAlerts.ts`
 
-### 2. Add audio + vibration to BatteryWarning
-**File:** `src/components/BatteryWarning.tsx`
+**A. Keep re-unlocking on every interaction** — remove the `audioUnlocked` early-return so every click/touch re-resumes the AudioContext. This is cheap and ensures the context stays alive.
 
-- Import `playChime`, `playVoiceReminder` from `audioAlerts`
-- Import `useUserSettings` to check audio/voice/vibration preferences
-- When `show()` fires, play voice ("Battery is getting low" / "Battery critically low") or chime based on settings
-- Add vibration pattern for critical alerts
+**B. Pre-cache an Audio element on user gesture** — on first interaction, create a reusable `Audio` element and call `.play()` with a silent data URI. Once an Audio element has played from a gesture, it can be reused programmatically. Store it for fallback use.
 
-### 3. Add fallback: use HTML5 Audio element
-**File:** `src/lib/audioAlerts.ts`
+**C. `playChime`: try AudioContext → fallback to pre-cached Audio → fallback to generated WAV blob** — three tiers of fallback.
 
-- If AudioContext is still suspended after resume attempt, fall back to playing a short generated audio blob via `new Audio(blobUrl)` which has slightly better autoplay support in some browsers
+**D. `playVoiceReminder`: queue a silent utterance on user gesture** — this "primes" the speech synthesis engine. On subsequent programmatic calls, first play a silent utterance, then the real message (workaround for Chrome's gesture requirement fading).
 
-## Files Changed
-- `src/lib/audioAlerts.ts` — add audio unlock + fallback
-- `src/components/BatteryWarning.tsx` — add audio/voice/vibration alerts
+**E. Add `ensureAudioReady()`** — exported function that alarm hooks call before attempting audio. It re-resumes the context and returns whether audio is likely to work, so hooks can prioritize fallback paths.
+
+### File: `src/components/ReminderOverlay.tsx`
+
+**F. Play audio when overlay appears** — since the overlay is visible and interactive, trigger audio playback from the overlay's mount/show effect as a secondary attempt. The overlay's action buttons (Check-In Now, etc.) also call `ensureAudioReady()` on click, re-priming for future alerts.
+
+### File: `src/components/BatteryWarning.tsx`
+
+**G. Same pattern** — call `ensureAudioReady()` before playing battery alerts.
+
+## Summary of Changes
+- `src/lib/audioAlerts.ts` — remove single-fire guard, add pre-cached Audio element, add `ensureAudioReady()`, prime speechSynthesis on gesture
+- `src/components/ReminderOverlay.tsx` — retry audio on overlay show, re-prime on button clicks
+- `src/components/BatteryWarning.tsx` — call `ensureAudioReady()` before alerts
 
