@@ -183,6 +183,7 @@ const ActivityTracker = () => {
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("daily");
   const [trendData, setTrendData] = useState<ActivityLog[]>([]);
   const [showGoals, setShowGoals] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionPaused, setSessionPaused] = useState(false);
