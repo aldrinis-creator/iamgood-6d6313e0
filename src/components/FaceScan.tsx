@@ -13,13 +13,20 @@ const SCAN_DURATION = 30;
 const SAMPLE_RATE = 15;
 const MIN_SAMPLES = SCAN_DURATION * SAMPLE_RATE * 0.6;
 
-type ScanPhase = "idle" | "starting" | "scanning" | "analyzing" | "results";
+// Validation thresholds
+const SKIN_GREEN_MIN = 60;
+const SKIN_GREEN_MAX = 210;
+const MIN_VALID_FRAME_RATIO = 0.6;
+const MIN_SIGNAL_STDDEV = 0.3;
+const MIN_SNR = 1.5;
+
+type ScanPhase = "idle" | "starting" | "scanning" | "analyzing" | "results" | "failed";
 
 interface ScanResults {
   heartRate: number;
   stressLevel: "Low" | "Moderate" | "High";
   stressScore: number;
-  confidence: string;
+  confidence: "Good" | "Fair" | "Poor";
 }
 
 const getStressFromHR = (hr: number): { level: "Low" | "Moderate" | "High"; score: number } => {
@@ -35,12 +42,16 @@ const FaceScan = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
   const greenSamples = useRef<number[]>([]);
+  const validFrameCount = useRef(0);
+  const totalFrameCount = useRef(0);
 
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState(0);
   const [timeLeft, setTimeLeft] = useState(SCAN_DURATION);
   const [results, setResults] = useState<ScanResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [failReason, setFailReason] = useState<string>("");
   const [showHistory, setShowHistory] = useState(false);
 
   const { user } = useAuth();
@@ -91,7 +102,6 @@ const FaceScan = () => {
       toast.success("Scan saved to your history");
       queryClient.invalidateQueries({ queryKey: ["face-scans", user.id] });
 
-      // Check for vital anomalies and notify guardians
       supabase.functions.invoke("notify-vital-anomaly", {
         body: {
           user_id: user.id,
@@ -112,10 +122,22 @@ const FaceScan = () => {
     }
   };
 
-  const analyzeSignal = (samples: number[]): ScanResults => {
-    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
-    const detrended = samples.map((s) => s - mean);
+  const isValidSkinTone = (greenMean: number): boolean => {
+    return greenMean >= SKIN_GREEN_MIN && greenMean <= SKIN_GREEN_MAX;
+  };
 
+  const analyzeSignal = (samples: number[]): ScanResults | null => {
+    // 1. Check signal variance — flat signal means no face / blank screen
+    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+    const variance = samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length;
+    const stdDev = Math.sqrt(variance);
+
+    if (stdDev < MIN_SIGNAL_STDDEV) {
+      return null; // flat signal
+    }
+
+    // 2. Detrend and smooth
+    const detrended = samples.map((s) => s - mean);
     const smoothed: number[] = [];
     const windowSize = 5;
     for (let i = 0; i < detrended.length; i++) {
@@ -128,25 +150,57 @@ const FaceScan = () => {
       smoothed.push(sum / count);
     }
 
+    // 3. SNR check
+    const signalPower = smoothed.reduce((a, b) => a + b * b, 0) / smoothed.length;
+    const noise = smoothed.map((s, i) => detrended[i] - s);
+    const noisePower = noise.reduce((a, b) => a + b * b, 0) / noise.length;
+    const snr = noisePower > 0 ? signalPower / noisePower : 0;
+
+    if (snr < MIN_SNR) {
+      return null; // too noisy
+    }
+
+    // 4. Count zero-crossings for HR
     let crossings = 0;
     for (let i = 1; i < smoothed.length; i++) {
       if (smoothed[i - 1] < 0 && smoothed[i] >= 0) crossings++;
     }
 
     const durationSec = samples.length / SAMPLE_RATE;
-    let heartRate = Math.round((crossings / durationSec) * 60);
-    heartRate = Math.max(50, Math.min(140, heartRate));
+    const heartRate = Math.round((crossings / durationSec) * 60);
+
+    // Reject implausible HR (no clamping — reject instead)
+    if (heartRate < 45 || heartRate > 180) {
+      return null;
+    }
 
     const { level, score } = getStressFromHR(heartRate);
-    const confidence = samples.length >= MIN_SAMPLES ? "Good" : "Fair";
+
+    // 5. Confidence from valid frame ratio + signal quality
+    const validRatio = totalFrameCount.current > 0
+      ? validFrameCount.current / totalFrameCount.current
+      : 0;
+
+    let confidence: "Good" | "Fair" | "Poor";
+    if (validRatio >= 0.8 && snr >= 3 && samples.length >= MIN_SAMPLES) {
+      confidence = "Good";
+    } else if (validRatio >= 0.6 && snr >= MIN_SNR) {
+      confidence = "Fair";
+    } else {
+      confidence = "Poor";
+    }
 
     return { heartRate, stressLevel: level, stressScore: score, confidence };
   };
 
   const startScan = async () => {
     setError(null);
+    setFailReason("");
     setPhase("starting");
     greenSamples.current = [];
+    validFrameCount.current = 0;
+    totalFrameCount.current = 0;
+    setFaceDetected(false);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -178,17 +232,52 @@ const FaceScan = () => {
               greenSum += imgData.data[i + 1];
             }
             const greenAvg = greenSum / (imgData.data.length / 4);
-            greenSamples.current.push(greenAvg);
+
+            totalFrameCount.current++;
+            const valid = isValidSkinTone(greenAvg);
+            if (valid) {
+              validFrameCount.current++;
+              greenSamples.current.push(greenAvg);
+            }
+            setFaceDetected(valid);
           }
         }
 
         if (elapsed >= SCAN_DURATION) {
           clearInterval(intervalRef.current!);
           intervalRef.current = null;
+
+          // Check valid frame ratio before analyzing
+          const validRatio = totalFrameCount.current > 0
+            ? validFrameCount.current / totalFrameCount.current
+            : 0;
+
+          if (validRatio < MIN_VALID_FRAME_RATIO) {
+            stopCamera();
+            setFailReason("No face detected. Please position your face within the oval and ensure good lighting.");
+            setPhase("failed");
+            return;
+          }
+
           setPhase("analyzing");
 
           setTimeout(() => {
             const scanResults = analyzeSignal(greenSamples.current);
+
+            if (!scanResults) {
+              stopCamera();
+              setFailReason("Could not detect a valid pulse signal. Please hold still, ensure good lighting, and try again.");
+              setPhase("failed");
+              return;
+            }
+
+            if (scanResults.confidence === "Poor") {
+              stopCamera();
+              setFailReason("Signal quality too low for reliable results. Try in better lighting and hold very still.");
+              setPhase("failed");
+              return;
+            }
+
             setResults(scanResults);
             saveResults(scanResults, greenSamples.current.length);
             stopCamera();
@@ -210,6 +299,8 @@ const FaceScan = () => {
     setTimeLeft(SCAN_DURATION);
     setResults(null);
     setError(null);
+    setFailReason("");
+    setFaceDetected(false);
   };
 
   const stressColor = (level: string) =>
@@ -286,7 +377,18 @@ const FaceScan = () => {
             />
             <canvas ref={canvasRef} width={320} height={240} className="hidden" />
             <div className="absolute inset-0 flex flex-col items-center justify-between p-4">
-              <div className="w-40 h-48 border-2 border-dashed border-success/60 rounded-[50%] mt-4" />
+              <div className="relative">
+                <div className="w-40 h-48 border-2 border-dashed border-success/60 rounded-[50%] mt-4" />
+                {/* Face detection indicator */}
+                {phase === "scanning" && (
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-background/80 backdrop-blur-sm rounded-full px-2.5 py-1">
+                    <div className={`w-2.5 h-2.5 rounded-full ${faceDetected ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
+                    <span className="text-[10px] font-medium">
+                      {faceDetected ? "Face detected" : "No face"}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="w-full space-y-2 bg-background/80 backdrop-blur-sm rounded-lg p-3">
                 {phase === "analyzing" ? (
                   <p className="text-sm text-center font-medium animate-pulse">Analyzing your vitals…</p>
@@ -301,6 +403,22 @@ const FaceScan = () => {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Failed State */}
+      {phase === "failed" && (
+        <Card className="border-destructive/30">
+          <CardContent className="p-6 text-center space-y-4">
+            <CameraOff className="w-12 h-12 text-destructive mx-auto" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-destructive">Scan Failed</p>
+              <p className="text-xs text-muted-foreground">{failReason}</p>
+            </div>
+            <Button onClick={resetScan} className="w-full" variant="outline">
+              <Camera className="w-4 h-4 mr-2" /> Try Again
+            </Button>
           </CardContent>
         </Card>
       )}
