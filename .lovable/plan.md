@@ -1,52 +1,70 @@
 
 
-# Face Scan: Add Photo Upload + Video Upload Modes
+# Wearable Data Integration — Feasibility & Plan
 
-## Overview
-Add two new input modes alongside the existing live camera scan:
-- **Upload Photo / Take Photo**: Sends image to AI for facial wellness analysis (skin tone, fatigue, stress signs). Clearly informs user that heart rate cannot be measured from a single photo.
-- **Upload Video (30s)**: Processes the video frame-by-frame for PPG heart rate estimation, same algorithm as live scan.
+## Current State
+Activity, Face Scan, and Vitals data is collected via:
+- Phone sensors (accelerometer for steps/HR estimation)
+- Camera PPG (face scan heart rate, stress)
+- Manual entry (activity logs)
 
-## Changes
+## Wearable Integration Options
 
-### 1. Edge Function: Add `face_analysis` prompt
-**File:** `supabase/functions/health-tools/index.ts`
+Since Check-iN is a **web app (PWA)**, direct Bluetooth/SDK access to wearables is limited. Here are the practical approaches:
 
-Add a new `face_analysis` system prompt that instructs the AI to analyze a face photo for:
-- Face detection confirmation
-- Skin tone / complexion observations
-- Signs of fatigue (dark circles, pallor, puffiness)
-- Apparent stress indicators (tension, expression)
-- General wellness observations
-- Return structured JSON with `face_detected`, `fatigue_level`, `stress_indicators`, `skin_observations`, `wellness_notes`
+### Option A: Google Fit / Apple Health via Edge Function (Recommended)
+- User authorizes Google Fit (OAuth) → edge function fetches steps, HR, SpO2, sleep via REST API
+- Works for Fitbit, Wear OS, Pixel Watch, Samsung (via Google Fit sync)
+- Apple Health has no REST API — would need a companion native app or manual CSV export
 
-### 2. Update FaceScan Component
-**File:** `src/components/FaceScan.tsx`
+### Option B: Manual CSV/JSON Import
+- Let users export data from their wearable app and upload it
+- Parse common formats (Fitbit CSV, Samsung Health export, Apple Health XML)
+- Map to existing `activity_logs` columns
 
-**New idle state UI** — three mode buttons:
-- 🎥 **Live Scan** (existing behavior)
-- 📷 **Upload Photo** — file input with `capture="user"` for mobile camera + gallery upload
-- 🎬 **Upload Video** — file input accepting video (max 30s)
+### Option C: Web Bluetooth API (Limited)
+- Connects to BLE heart rate monitors, pulse oximeters
+- Works only in Chrome/Edge desktop and Android Chrome
+- Not supported on iOS Safari at all
 
-**Photo flow:**
-1. User uploads/takes photo
-2. Show preview with "Analyzing…" state
-3. Send base64 image to `health-tools` edge function with `type: "face_analysis"`
-4. Display AI results: face detected ✓/✗, fatigue level, stress indicators, skin observations
-5. Show banner: "Photo analysis provides wellness indicators only. For heart rate estimation, use Live Scan or upload a 30-second video."
-6. Save to `face_scans` table with `heart_rate: null`, stress from AI analysis
+## Recommended Plan
 
-**Video flow:**
-1. User uploads video file (validate ≤ 60s duration, common formats)
-2. Draw video frames to canvas at ~15fps using `requestAnimationFrame` + `video.currentTime` stepping
-3. Extract green channel samples from forehead ROI (same as live scan)
-4. Run existing `analyzeSignal()` on collected samples
-5. Show results same as live scan
+### Phase 1: Google Fit Integration
+**Files:** New edge function `supabase/functions/sync-google-fit/index.ts`, new component `src/components/WearableSync.tsx`, settings UI update
 
-### 3. Database — No schema changes needed
-The existing `face_scans` table already has nullable `heart_rate` and `stress_level`/`stress_score` fields, which works for photo-only results where HR is null.
+1. **Google Fit connector** — use the OAuth flow via a backend edge function to fetch daily summaries (steps, HR, calories, sleep, SpO2)
+2. **Sync button** in Activity Tracker and Vitals Monitor — "Import from Google Fit"
+3. **Auto-merge** — upsert into `activity_logs` with `source: "google_fit"` column to distinguish from manual/sensor data
+4. **Settings toggle** — enable/disable daily auto-sync
+
+### Phase 2: Manual Wearable Data Import
+**File:** New component `src/components/WearableImport.tsx`
+
+1. Upload CSV/JSON from Fitbit, Samsung Health, or generic format
+2. Parse and preview data before importing
+3. Map columns to `activity_logs` fields
+4. Bulk insert with `source: "import"`
+
+### Database Change
+Add a `source` column to `activity_logs`:
+```sql
+ALTER TABLE activity_logs ADD COLUMN source text NOT NULL DEFAULT 'manual';
+```
+Values: `manual`, `sensor`, `google_fit`, `import`
+
+## Technical Constraints
+- **Apple Health**: No web API. Cannot integrate without a native iOS app. Best we can do is CSV import from the Health app's export feature.
+- **Web Bluetooth**: iOS doesn't support it at all. Android Chrome does but UX is clunky. Not recommended as primary path.
+- **Google Fit API**: Being deprecated in favor of Health Connect (Android-only SDK). The REST API still works but has a sunset timeline — worth monitoring.
+
+## Recommendation
+Start with **Phase 2 (Manual Import)** since it works universally and requires no OAuth setup. Then add **Google Fit** when you're ready to set up OAuth credentials. This gives users with any wearable brand a way to get their data in immediately.
 
 ## Files Changed
-- `supabase/functions/health-tools/index.ts` — add `face_analysis` prompt
-- `src/components/FaceScan.tsx` — add photo upload, video upload modes, AI analysis UI
+- `supabase/functions/sync-google-fit/index.ts` (Phase 1)
+- `src/components/WearableImport.tsx` (Phase 2)
+- `src/components/WearableSync.tsx` (Phase 1)
+- `src/components/ActivityTracker.tsx` — add import/sync buttons
+- `src/components/VitalsMonitor.tsx` — show wearable data source badge
+- Migration: add `source` column to `activity_logs`
 
