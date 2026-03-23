@@ -398,6 +398,9 @@ const GuardianDashboard = () => {
           <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
         )}
 
+        {/* Ward Vitals */}
+        {wardUserId && <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />}
+
         {/* Ward Activity */}
         {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
 
