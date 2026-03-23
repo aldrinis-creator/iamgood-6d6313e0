@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { requestMotionPermission } from "@/hooks/useFallDetection";
 import {
   Heart, Footprints, MapPin, Activity, Flame, Timer, Wind, Building2, Droplets,
-  TrendingUp, Save, Target, Play, Pause, Square, Watch, ChevronRight,
+  TrendingUp, Save, Target, Play, Pause, Square, Watch, ChevronRight, Upload,
 } from "lucide-react";
+import WearableImport from "@/components/WearableImport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
