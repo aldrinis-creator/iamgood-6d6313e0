@@ -121,6 +121,7 @@ const DEFAULTS: UserSettings = {
   shareHealthData: true,
   shareEmergencyWithGuardians: true,
   publicEmergencyProfile: false,
+  exerciseReminder: true,
   hasHospitalizations: false,
   hasSurgeries: false,
 };
