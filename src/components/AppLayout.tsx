@@ -20,6 +20,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   useCheckInAudio();
   useMedicationAlarms();
+  useAppointmentAlarms();
 
   return (
     <div className="min-h-screen bg-background">
