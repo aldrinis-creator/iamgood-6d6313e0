@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Heart, Pill, X } from "lucide-react";
+import { Heart, Pill, CalendarClock, X } from "lucide-react";
 
-export type ReminderType = "checkin" | "medication";
+export type ReminderType = "checkin" | "medication" | "appointment";
 
 interface ReminderData {
   type: ReminderType;
@@ -42,6 +42,8 @@ const ReminderOverlay = () => {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {
       window.location.href = "/my-health";
+    } else if (reminder?.type === "appointment") {
+      window.location.href = "/appointments";
     }
     dismiss();
   };
@@ -49,7 +51,8 @@ const ReminderOverlay = () => {
   if (!reminder) return null;
 
   const isCheckin = reminder.type === "checkin";
-  const Icon = isCheckin ? Heart : Pill;
+  const isAppointment = reminder.type === "appointment";
+  const Icon = isCheckin ? Heart : isAppointment ? CalendarClock : Pill;
 
   return (
     <div
@@ -84,7 +87,7 @@ const ReminderOverlay = () => {
           className="w-full py-6 rounded-2xl bg-destructive text-destructive-foreground text-2xl font-bold flex items-center justify-center gap-3 hover:bg-destructive/90 transition-colors active:scale-[0.98] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]"
         >
           <Icon className="w-8 h-8 fill-current" />
-          {isCheckin ? "Check-In Now" : "View Medications"}
+          {isCheckin ? "Check-In Now" : isAppointment ? "View Appointment" : "View Medications"}
         </button>
 
         {/* Dismiss */}
