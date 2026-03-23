@@ -321,6 +321,18 @@ const ActivityTracker = () => {
           description: `${formatTimer(sessionElapsed)} — ${snap.steps} steps, ~${snap.calories} kcal`,
         });
         fetchData();
+
+        // Check for vital anomalies and notify guardians
+        if (avgHr > 0 || snap.spo2 > 0) {
+          supabase.functions.invoke("notify-vital-anomaly", {
+            body: {
+              user_id: user.id,
+              heart_rate: avgHr,
+              spo2: snap.spo2,
+              source: "Activity Session",
+            },
+          }).catch(() => {});
+        }
       } catch {
         toast({ title: "Error", description: "Failed to save session.", variant: "destructive" });
       } finally {
