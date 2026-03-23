@@ -507,9 +507,9 @@ const ActivityTracker = () => {
                 </Select>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => toast({ title: "Wearable", description: "Connect your wearable device to sync data." })}>
-                  <Watch className="w-4 h-4" />
-                  Load from Wearable
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => setShowImport(true)}>
+                  <Upload className="w-4 h-4" />
+                  Import Wearable Data
                 </Button>
                 <Button className="flex-1 gap-2 bg-primary hover:bg-primary/90" onClick={handleStartSession}>
                   <Play className="w-4 h-4" />
