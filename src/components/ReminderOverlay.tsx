@@ -29,6 +29,8 @@ const ReminderOverlay = () => {
     const data = (e as CustomEvent<ReminderData>).detail;
     setReminder(data);
     setVisible(true);
+    // Re-prime audio when overlay appears (secondary attempt)
+    ensureAudioReady();
   }, []);
 
   useEffect(() => {
