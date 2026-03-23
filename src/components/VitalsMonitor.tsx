@@ -151,7 +151,17 @@ const ECG_LINE = "#00ff00";
 const BUFFER_SIZE = 300;
 const SAMPLE_INTERVAL = 33; // ~30fps sampling
 
+interface PpgSession {
+  id: string;
+  recorded_at: string;
+  duration_sec: number;
+  avg_heart_rate: number | null;
+  samples: number[];
+  notes: string | null;
+}
+
 const EcgTab = () => {
+  const { session } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [scanning, setScanning] = useState(false);
@@ -160,6 +170,25 @@ const EcgTab = () => {
   const rafRef = useRef<number>(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  // History
+  const [history, setHistory] = useState<PpgSession[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [replaySession, setReplaySession] = useState<PpgSession | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from("ppg_sessions" as any)
+      .select("id,recorded_at,duration_sec,avg_heart_rate,samples,notes")
+      .eq("user_id", session.user.id)
+      .order("recorded_at", { ascending: false })
+      .limit(20);
+    if (data) setHistory(data as any as PpgSession[]);
+  }, [session?.user?.id]);
+
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   const stopScan = useCallback(() => {
     setScanning(false);
@@ -171,7 +200,82 @@ const EcgTab = () => {
 
   useEffect(() => () => { stopScan(); }, [stopScan]);
 
+  const saveSession = async () => {
+    if (!session?.user?.id || bufferRef.current.length < 30) {
+      toast.error("Record at least 1 second before saving");
+      return;
+    }
+    setSaving(true);
+    const durationSec = Math.round((Date.now() - startTimeRef.current) / 1000);
+    // Downsample: keep every 3rd sample to reduce storage
+    const downsampled = bufferRef.current.filter((_, i) => i % 3 === 0).map(v => Math.round(v * 100) / 100);
+    try {
+      const { error } = await supabase.from("ppg_sessions" as any).insert({
+        user_id: session.user.id,
+        duration_sec: durationSec,
+        avg_heart_rate: hr,
+        samples: downsampled,
+      } as any);
+      if (error) throw error;
+      toast.success("ECG session saved");
+      fetchHistory();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSession = async (id: string) => {
+    await supabase.from("ppg_sessions" as any).delete().eq("id", id);
+    setHistory(prev => prev.filter(s => s.id !== id));
+    if (replaySession?.id === id) setReplaySession(null);
+    toast.success("Session deleted");
+  };
+
+  // Draw static waveform for replay
+  const drawStatic = useCallback((samples: number[]) => {
+    const canvas = canvasRef.current;
+    if (!canvas || samples.length < 2) return;
+    const ctx = canvas.getContext("2d")!;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.fillStyle = ECG_BG;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#1a3a1a";
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < w; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+    const min = Math.min(...samples);
+    const max = Math.max(...samples);
+    const range = max - min || 1;
+    const step = w / samples.length;
+
+    ctx.beginPath();
+    ctx.strokeStyle = ECG_LINE;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = ECG_LINE;
+    ctx.shadowBlur = 4;
+    samples.forEach((v, i) => {
+      const x = i * step;
+      const y = h - ((v - min) / range) * (h * 0.8) - h * 0.1;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }, []);
+
+  // When replay session changes, draw it
+  useEffect(() => {
+    if (replaySession && !scanning) {
+      drawStatic(replaySession.samples);
+    }
+  }, [replaySession, scanning, drawStatic]);
+
   const startScan = async () => {
+    setReplaySession(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 320, height: 240 } });
       streamRef.current = stream;
@@ -182,14 +286,13 @@ const EcgTab = () => {
       bufferRef.current = [];
       setHr(null);
       setScanning(true);
+      startTimeRef.current = Date.now();
 
-      // Hidden canvas for sampling
       const offscreen = document.createElement("canvas");
       offscreen.width = 64;
       offscreen.height = 48;
       const offCtx = offscreen.getContext("2d")!;
 
-      // Sample green channel
       intervalRef.current = setInterval(() => {
         if (!videoRef.current) return;
         offCtx.drawImage(videoRef.current, 0, 0, 64, 48);
@@ -200,7 +303,6 @@ const EcgTab = () => {
         bufferRef.current.push(avg);
         if (bufferRef.current.length > BUFFER_SIZE) bufferRef.current.shift();
 
-        // Estimate HR every 90 samples (~3s)
         if (bufferRef.current.length > 90 && bufferRef.current.length % 30 === 0) {
           const samples = bufferRef.current.slice(-90);
           const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
@@ -214,7 +316,6 @@ const EcgTab = () => {
         }
       }, SAMPLE_INTERVAL);
 
-      // Render loop
       const draw = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -224,7 +325,6 @@ const EcgTab = () => {
         ctx.fillStyle = ECG_BG;
         ctx.fillRect(0, 0, w, h);
 
-        // Draw grid
         ctx.strokeStyle = "#1a3a1a";
         ctx.lineWidth = 0.5;
         for (let x = 0; x < w; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
@@ -259,6 +359,10 @@ const EcgTab = () => {
     }
   };
 
+  const handleStop = () => {
+    stopScan();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs text-muted-foreground">
@@ -268,14 +372,13 @@ const EcgTab = () => {
 
       <div className="relative rounded-xl overflow-hidden border border-border bg-[#111]">
         <canvas ref={canvasRef} width={600} height={200} className="w-full h-[200px]" />
-        {hr !== null && (
+        {(hr !== null || replaySession?.avg_heart_rate) && (
           <div className="absolute top-2 right-3 bg-black/70 text-[#00ff00] px-3 py-1 rounded-full text-sm font-mono">
-            ♥ {hr} bpm
+            ♥ {scanning ? hr : replaySession?.avg_heart_rate} bpm
           </div>
         )}
       </div>
 
-      {/* Hidden video element */}
       <video ref={videoRef} className="hidden" playsInline muted />
 
       <div className="flex gap-2">
@@ -284,11 +387,50 @@ const EcgTab = () => {
             <Play className="w-4 h-4" /> Start ECG View
           </Button>
         ) : (
-          <Button onClick={stopScan} variant="destructive" className="flex-1 gap-2">
-            <Square className="w-4 h-4" /> Stop
-          </Button>
+          <>
+            <Button onClick={handleStop} variant="destructive" className="flex-1 gap-2">
+              <Square className="w-4 h-4" /> Stop
+            </Button>
+            <Button onClick={saveSession} disabled={saving} variant="outline" className="gap-2">
+              <Save className="w-4 h-4" /> {saving ? "…" : "Save"}
+            </Button>
+          </>
         )}
       </div>
+
+      {/* Saved sessions */}
+      {history.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">Saved Sessions</h3>
+          {history.map(s => (
+            <Card
+              key={s.id}
+              className={`cursor-pointer transition-shadow hover:shadow-md ${replaySession?.id === s.id ? "ring-2 ring-primary" : ""}`}
+              onClick={() => { if (!scanning) setReplaySession(s); }}
+            >
+              <CardContent className="p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    {new Date(s.recorded_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                    {new Date(s.recorded_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.duration_sec}s • {s.avg_heart_rate ? `${s.avg_heart_rate} bpm` : "No HR"} • {s.samples.length} samples
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive h-8 px-2"
+                  onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                >
+                  ✕
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
