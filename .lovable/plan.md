@@ -1,47 +1,37 @@
 
 
-# Fix Face Scan False Positives
+# Fix Face Scan — Too Strict, All Scans Failing
 
 ## Problem
-
-The face scan accepts any input (blank screen, objects, etc.) and always reports a valid result because:
-
-1. **Line 138**: `heartRate = Math.max(50, Math.min(140, heartRate))` — clamps minimum to 50 BPM, so even zero signal gives "50 BPM"
-2. **No signal quality check** — there's no validation that the green channel actually contains a pulsatile signal (variance check)
-3. **No face detection** — any input is accepted without verifying a face is present
-4. **Stress derived solely from HR** — so a fake 50 BPM always yields "Low Stress"
+After fixing false positives, the thresholds are now too aggressive. Real face scans fail because:
+- `MIN_SIGNAL_STDDEV = 0.3` may be too high for subtle PPG signals in normal lighting
+- `MIN_SNR = 1.5` is hard to achieve with phone cameras
+- `MIN_VALID_FRAME_RATIO = 0.6` rejects scans where the user repositions during the 30s window
+- The fixed skin-tone range (60–210) doesn't account for all lighting conditions
 
 ## Changes
 
-### 1. Add signal quality validation in `analyzeSignal`
+### 1. Relax thresholds
 **File:** `src/components/FaceScan.tsx`
 
-- Calculate signal variance (standard deviation of green channel samples)
-- If variance is below a threshold (flat/no-face signal), reject the scan with a "No valid signal detected" error instead of returning fake results
-- Calculate SNR (signal-to-noise ratio) from the smoothed signal — reject if too low
-- Remove the `Math.max(50, ...)` floor that masks bad data — instead, if HR falls outside 45–180, mark as invalid
+- Lower `MIN_SIGNAL_STDDEV` from 0.3 → 0.1
+- Lower `MIN_SNR` from 1.5 → 0.8
+- Lower `MIN_VALID_FRAME_RATIO` from 0.6 → 0.4
+- Widen skin-tone range: `SKIN_GREEN_MIN` from 60 → 30, `SKIN_GREEN_MAX` from 210 → 230
 
-### 2. Add face detection heuristic
-- During scanning, check that the green channel mean falls within a plausible skin-tone range (not too dark like a blank screen, not too bright)
-- Track how many frames have valid skin-tone range; require at least 60% of frames to be valid
-- If insufficient valid frames, abort with "No face detected — please position your face in the oval"
+### 2. Add 3-second calibration phase
+- First 3 seconds: collect baseline green channel values, don't count toward valid/invalid frames
+- Use the baseline mean ± 40% as the dynamic skin-tone range for the rest of the scan
+- This adapts to actual lighting and skin tone automatically
 
-### 3. Add real-time feedback during scan
-- Show a "Face detected" / "No face" indicator overlay on the camera view during scanning
-- Use green/red dot indicator so the user knows to reposition
+### 3. Allow "Fair" confidence results through
+- Currently "Poor" confidence triggers failure. Keep that.
+- But ensure "Fair" confidence scans are saved and shown — don't over-reject.
 
-### 4. Update confidence scoring
-- Map signal quality metrics (variance, SNR, valid-frame ratio) to confidence levels: "Good", "Fair", "Poor"
-- If confidence is "Poor", don't save results — show warning and ask user to retry
-
-## Technical Details
-
-- Skin detection: green channel mean typically 80–200 for face under normal lighting; blank screen is ~0–20, bright objects are 240+
-- Signal variance threshold: std deviation < 0.3 indicates no pulsatile signal
-- No external face detection library needed — the green channel heuristic is sufficient for filtering obvious false positives
-- The ECG tab in VitalsMonitor uses the same PPG technique but doesn't auto-save or report stress, so it's less affected
+### 4. Better failure guidance
+- Show which specific check failed (not enough face frames vs. weak signal vs. implausible HR)
+- Add tips: "Try in brighter lighting", "Hold phone 30cm from face", "Stay very still"
 
 ## Files Changed
-
-- `src/components/FaceScan.tsx` — add validation, face detection heuristic, real-time feedback, remove HR floor clamping
+- `src/components/FaceScan.tsx`
 
