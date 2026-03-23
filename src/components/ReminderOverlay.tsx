@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { Heart, Pill, X } from "lucide-react";
+import { Heart, Pill, CalendarClock, X } from "lucide-react";
 
-export type ReminderType = "checkin" | "medication";
+export type ReminderType = "checkin" | "medication" | "appointment";
 
 interface ReminderData {
   type: ReminderType;
