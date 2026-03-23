@@ -11,6 +11,7 @@ import WardEmergencyCard from "@/components/WardEmergencyCard";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
+import WardVitalsSummary from "@/components/WardVitalsSummary";
 import { playChime } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
@@ -396,6 +397,9 @@ const GuardianDashboard = () => {
         {wardUserId && wardPauseDetails && (
           <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
         )}
+
+        {/* Ward Vitals */}
+        {wardUserId && <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />}
 
         {/* Ward Activity */}
         {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
