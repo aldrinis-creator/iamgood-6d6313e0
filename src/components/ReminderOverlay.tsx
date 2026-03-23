@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
+import { ensureAudioReady } from "@/lib/audioAlerts";
 
 export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
 
