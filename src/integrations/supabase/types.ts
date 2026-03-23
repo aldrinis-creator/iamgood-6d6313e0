@@ -858,6 +858,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_facilities: {
+        Row: {
+          address: string | null
+          created_at: string
+          facility_type: string
+          id: string
+          lat: number
+          lon: number
+          name: string
+          phone: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          facility_type: string
+          id?: string
+          lat: number
+          lon: number
+          name: string
+          phone?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          facility_type?: string
+          id?: string
+          lat?: number
+          lon?: number
+          name?: string
+          phone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
