@@ -22,6 +22,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useCheckInAudio();
   useMedicationAlarms();
   useAppointmentAlarms();
+  useExerciseReminder();
 
   return (
     <div className="min-h-screen bg-background">
