@@ -1,56 +1,47 @@
 
 
-# Worldwide Hospital/Pharmacy Search + User-Added Facilities
+# Fix Face Scan False Positives
 
-## Current State
+## Problem
 
-The search **already works worldwide**. It uses the OpenStreetMap Overpass API with the user's GPS coordinates and a 5km radius. It works anywhere OSM has data — which is global, though coverage varies by region.
+The face scan accepts any input (blank screen, objects, etc.) and always reports a valid result because:
 
-The limitation is that the max distance slider only goes up to 5km. In areas with sparse OSM data, this may return zero results.
+1. **Line 138**: `heartRate = Math.max(50, Math.min(140, heartRate))` — clamps minimum to 50 BPM, so even zero signal gives "50 BPM"
+2. **No signal quality check** — there's no validation that the green channel actually contains a pulsatile signal (variance check)
+3. **No face detection** — any input is accepted without verifying a face is present
+4. **Stress derived solely from HR** — so a fake 50 BPM always yields "Low Stress"
 
 ## Changes
 
-### 1. Expand search radius and add manual location entry
-**File:** `src/components/NearbyFacilities.tsx`
+### 1. Add signal quality validation in `analyzeSignal`
+**File:** `src/components/FaceScan.tsx`
 
-- Increase max distance slider from 5km to 25km (step 1km after 5km)
-- Add a "Search by address" input that uses the free Nominatim geocoder API (`https://nominatim.openstreetmap.org/search`) to let users search any location worldwide, not just their current GPS position
-- When a user enters an address, geocode it and re-fetch facilities around that location
-- Update the map center and "You are here" marker to the searched location
+- Calculate signal variance (standard deviation of green channel samples)
+- If variance is below a threshold (flat/no-face signal), reject the scan with a "No valid signal detected" error instead of returning fake results
+- Calculate SNR (signal-to-noise ratio) from the smoothed signal — reject if too low
+- Remove the `Math.max(50, ...)` floor that masks bad data — instead, if HR falls outside 45–180, mark as invalid
 
-### 2. Add "Add a facility" feature
-**File:** `src/components/NearbyFacilities.tsx`
+### 2. Add face detection heuristic
+- During scanning, check that the green channel mean falls within a plausible skin-tone range (not too dark like a blank screen, not too bright)
+- Track how many frames have valid skin-tone range; require at least 60% of frames to be valid
+- If insufficient valid frames, abort with "No face detected — please position your face in the oval"
 
-- Add a "+" button in the header to open an "Add Facility" dialog
-- Dialog fields: Name, Phone (optional), Address or "Use current location" / "Pick on map"
-- For address input, geocode via Nominatim to get lat/lon
-- Save to a new `user_facilities` database table
-- User-added facilities appear in the list with a "User added" badge and are merged with Overpass results
+### 3. Add real-time feedback during scan
+- Show a "Face detected" / "No face" indicator overlay on the camera view during scanning
+- Use green/red dot indicator so the user knows to reposition
 
-### 3. Database: `user_facilities` table
-New migration with columns:
-- `id` (uuid, PK)
-- `user_id` (uuid, NOT NULL)
-- `facility_type` (text — "hospital" or "pharmacy")
-- `name` (text, NOT NULL)
-- `lat` (double precision, NOT NULL)
-- `lon` (double precision, NOT NULL)
-- `phone` (text, nullable)
-- `address` (text, nullable)
-- `created_at` (timestamptz)
-
-RLS: Users can CRUD own entries. Guardians can SELECT ward entries.
-
-### 4. Wire user facilities into search results
-- After fetching Overpass results, also fetch `user_facilities` for the current user filtered by type
-- Merge and sort by distance
-- User-added facilities show a distinct badge and can be edited/deleted
+### 4. Update confidence scoring
+- Map signal quality metrics (variance, SNR, valid-frame ratio) to confidence levels: "Good", "Fair", "Poor"
+- If confidence is "Poor", don't save results — show warning and ask user to retry
 
 ## Technical Details
-- Nominatim geocoder is free, no API key needed (respect usage policy with 1 req/sec)
-- No new edge functions needed
-- Dialog uses existing `Dialog` + `Form` UI components
+
+- Skin detection: green channel mean typically 80–200 for face under normal lighting; blank screen is ~0–20, bright objects are 240+
+- Signal variance threshold: std deviation < 0.3 indicates no pulsatile signal
+- No external face detection library needed — the green channel heuristic is sufficient for filtering obvious false positives
+- The ECG tab in VitalsMonitor uses the same PPG technique but doesn't auto-save or report stress, so it's less affected
 
 ## Files Changed
-- `src/components/NearbyFacilities.tsx` — expand radius, add address search, merge user facilities, add facility dialog
-- New migration SQL — `user_facilities` table + RLS
+
+- `src/components/FaceScan.tsx` — add validation, face detection heuristic, real-time feedback, remove HR floor clamping
+
