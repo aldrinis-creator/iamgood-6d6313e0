@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { BatteryLow, Zap, AlertTriangle } from "lucide-react";
-import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { playChime, playVoiceReminder, ensureAudioReady } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
 interface BatteryState {
