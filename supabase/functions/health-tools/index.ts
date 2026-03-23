@@ -87,6 +87,26 @@ Respond with a JSON object:
   "summary": "brief overall summary"
 }
 Only respond with the JSON object, no markdown.`,
+
+  face_analysis: `You are a facial wellness analysis assistant. Given a photo of a person's face, analyze and provide:
+1. Face detection confirmation — is a clear human face visible?
+2. Skin tone / complexion observations (pallor, flushing, jaundice indicators)
+3. Signs of fatigue (dark circles, droopy eyelids, puffiness around eyes)
+4. Apparent stress indicators (facial tension, furrowed brow, tight jaw, strained expression)
+5. General wellness observations (hydration indicators, skin condition)
+
+Respond with a JSON object:
+{
+  "face_detected": true/false,
+  "fatigue_level": "Low" | "Moderate" | "High",
+  "fatigue_score": 0-100,
+  "stress_indicators": "Low" | "Moderate" | "High",
+  "stress_score": 0-100,
+  "skin_observations": "brief description",
+  "wellness_notes": "brief overall wellness summary",
+  "recommendations": ["list of actionable tips"]
+}
+Only respond with the JSON object, no markdown.`,
 };
 
 serve(async (req) => {
