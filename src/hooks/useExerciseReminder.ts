@@ -20,6 +20,7 @@ const useExerciseReminder = () => {
 
   const check = useCallback(() => {
     if (pauseMode !== "active") return;
+    if (!settings.exerciseReminder) return;
 
     const now = new Date();
     const hour = now.getHours();

@@ -73,6 +73,8 @@ export interface UserSettings {
   shareHealthData: boolean;
   shareEmergencyWithGuardians: boolean;
   publicEmergencyProfile: boolean;
+  // Exercise
+  exerciseReminder: boolean;
   // Activity Goals
   activityGoals: ActivityGoals;
   // Past Medical History toggles
@@ -119,6 +121,7 @@ const DEFAULTS: UserSettings = {
   shareHealthData: true,
   shareEmergencyWithGuardians: true,
   publicEmergencyProfile: false,
+  exerciseReminder: true,
   hasHospitalizations: false,
   hasSurgeries: false,
 };

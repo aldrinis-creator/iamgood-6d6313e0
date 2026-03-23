@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -453,6 +453,16 @@ const Settings = () => {
                     </div>
                   </div>
                   <Switch checked={settings.vibration} onCheckedChange={(v) => updateSetting("vibration", v)} />
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <Dumbbell className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Exercise Reminders</p>
+                      <p className="text-xs text-muted-foreground">Audio reminders at 8 AM and 6 PM for exercise</p>
+                    </div>
+                  </div>
+                  <Switch checked={settings.exerciseReminder} onCheckedChange={(v) => updateSetting("exerciseReminder", v)} />
                 </div>
               </CardContent>
             </Card>
