@@ -1,69 +1,56 @@
-# Vitals Monitor — Combined ECG Waveform, Vitals Dashboard & Device Report Upload
 
-## What
 
-A new "Vitals Monitor" tool in the My Health grid with three tabs:
+# Worldwide Hospital/Pharmacy Search + User-Added Facilities
 
-1. **Dashboard** — Aggregated vitals (HR, SpO2, stress, steps, calories) with trend charts and AI-powered insights
-2. **ECG Waveform** — Animated real-time PPG-derived heart rate waveform rendered as an ECG-style line using camera (reuses FaceScan PPG logic)
-3. **Device Reports** — Upload ECG/medical device PDFs or images for AI-powered analysis and summary
+## Current State
+
+The search **already works worldwide**. It uses the OpenStreetMap Overpass API with the user's GPS coordinates and a 5km radius. It works anywhere OSM has data — which is global, though coverage varies by region.
+
+The limitation is that the max distance slider only goes up to 5km. In areas with sparse OSM data, this may return zero results.
 
 ## Changes
 
-### 1. New component: `src/components/VitalsMonitor.tsx`
+### 1. Expand search radius and add manual location entry
+**File:** `src/components/NearbyFacilities.tsx`
 
-Three-tab layout using existing `Tabs` component.
+- Increase max distance slider from 5km to 25km (step 1km after 5km)
+- Add a "Search by address" input that uses the free Nominatim geocoder API (`https://nominatim.openstreetmap.org/search`) to let users search any location worldwide, not just their current GPS position
+- When a user enters an address, geocode it and re-fetch facilities around that location
+- Update the map center and "You are here" marker to the searched location
 
-**Dashboard tab:**
+### 2. Add "Add a facility" feature
+**File:** `src/components/NearbyFacilities.tsx`
 
-- Fetch latest data from `face_scans`, `activity_logs`, `wellness_logs` for the current user
-- However, check face scans as the data is not reliable since it gives incorrect data as it also scans any object and displays that as hearrate of 50 BPM and Low Stress. 
-- Display metric cards: HR, SpO2, stress score, steps, calories, sleep hours
-- Trend chart (recharts `LineChart`) for HR and SpO2 over last 7 days
-- "Get AI Insights" button → calls `health-tools` edge function with a new `vitals_insights` type, passing aggregated data; renders markdown response
+- Add a "+" button in the header to open an "Add Facility" dialog
+- Dialog fields: Name, Phone (optional), Address or "Use current location" / "Pick on map"
+- For address input, geocode via Nominatim to get lat/lon
+- Save to a new `user_facilities` database table
+- User-added facilities appear in the list with a "User added" badge and are merged with Overpass results
 
-**ECG Waveform tab:**
+### 3. Database: `user_facilities` table
+New migration with columns:
+- `id` (uuid, PK)
+- `user_id` (uuid, NOT NULL)
+- `facility_type` (text — "hospital" or "pharmacy")
+- `name` (text, NOT NULL)
+- `lat` (double precision, NOT NULL)
+- `lon` (double precision, NOT NULL)
+- `phone` (text, nullable)
+- `address` (text, nullable)
+- `created_at` (timestamptz)
 
-- Uses camera PPG sampling (same green-channel technique as FaceScan)
-- Renders samples in real-time on a `<canvas>` element as a scrolling ECG-style waveform (green line on dark background)
-- Shows live estimated HR value
-- Start/Stop controls
+RLS: Users can CRUD own entries. Guardians can SELECT ward entries.
 
-**Device Reports tab:**
-
-- File upload (PDF/image) for ECG reports, Holter monitor printouts, etc.
-- Calls `health-tools` edge function with type `document_analysis` (already exists) with a medical device context
-- Renders AI summary as markdown
-- "Save to Medical Vault" button (same pattern as DocumentAnalyzer)
-
-### 2. Add `vitals_insights` prompt to edge function
-
-**File:** `supabase/functions/health-tools/index.ts`
-
-- Add a new `vitals_insights` system prompt that analyzes aggregated vitals data (HR trends, SpO2, stress, activity) and provides health insights, anomaly detection, and recommendations in the Indian healthcare context
-
-### 3. Wire into My Health grid
-
-**File:** `src/pages/MyHealth.tsx`
-
-- Add new grid item: `{ icon: HeartPulse, label: "Vitals", color: "bg-sos/10 text-sos" }` (replace existing "Wellness" entry or add alongside)
-- Map `"Vitals"` to `VitalsMonitor` in `toolComponents`
-
-### 4. Add route for direct navigation
-
-**File:** `src/App.tsx`
-
-- No new route needed; accessed via MyHealth tool selection
+### 4. Wire user facilities into search results
+- After fetching Overpass results, also fetch `user_facilities` for the current user filtered by type
+- Merge and sort by distance
+- User-added facilities show a distinct badge and can be edited/deleted
 
 ## Technical Details
-
-- ECG waveform canvas: 60fps `requestAnimationFrame` loop, ring buffer of ~300 samples, green line (#00ff00) on #111 background, auto-scaling Y axis
-- AI insights reuse the existing `health-tools` edge function pattern (non-streaming invoke)
-- No new database tables required — reads from existing `face_scans`, `activity_logs`, `wellness_logs`
-- Device report upload reuses `document_analysis` type already in the edge function
+- Nominatim geocoder is free, no API key needed (respect usage policy with 1 req/sec)
+- No new edge functions needed
+- Dialog uses existing `Dialog` + `Form` UI components
 
 ## Files Changed
-
-- `src/components/VitalsMonitor.tsx` — new (~400 lines)
-- `supabase/functions/health-tools/index.ts` — add `vitals_insights` prompt
-- `src/pages/MyHealth.tsx` — add grid entry + tool mapping
+- `src/components/NearbyFacilities.tsx` — expand radius, add address search, merge user facilities, add facility dialog
+- New migration SQL — `user_facilities` table + RLS
