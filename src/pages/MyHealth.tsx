@@ -11,6 +11,7 @@ import NutritionAdvisor from "@/components/NutritionAdvisor";
 import WellnessTracker from "@/components/WellnessTracker";
 import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
+import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 import MedicalDocuments from "@/components/health-tools/MedicalDocuments";
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";

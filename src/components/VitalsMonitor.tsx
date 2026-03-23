@@ -8,8 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianArea, Tooltip, ResponsiveContainer,
-  CartesianGrid,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
 /* ───────── types ───────── */
