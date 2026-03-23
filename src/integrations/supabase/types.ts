@@ -30,6 +30,7 @@ export type Database = {
           log_date: string
           notes: string | null
           sleep_hours: number
+          source: string
           spo2: number | null
           steps: number
           user_id: string
@@ -49,6 +50,7 @@ export type Database = {
           log_date?: string
           notes?: string | null
           sleep_hours?: number
+          source?: string
           spo2?: number | null
           steps?: number
           user_id: string
@@ -68,6 +70,7 @@ export type Database = {
           log_date?: string
           notes?: string | null
           sleep_hours?: number
+          source?: string
           spo2?: number | null
           steps?: number
           user_id?: string

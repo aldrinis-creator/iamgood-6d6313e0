@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { requestMotionPermission } from "@/hooks/useFallDetection";
 import {
   Heart, Footprints, MapPin, Activity, Flame, Timer, Wind, Building2, Droplets,
-  TrendingUp, Save, Target, Play, Pause, Square, Watch, ChevronRight,
+  TrendingUp, Save, Target, Play, Pause, Square, Watch, ChevronRight, Upload,
 } from "lucide-react";
+import WearableImport from "@/components/WearableImport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,6 +183,7 @@ const ActivityTracker = () => {
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("daily");
   const [trendData, setTrendData] = useState<ActivityLog[]>([]);
   const [showGoals, setShowGoals] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [goalDraft, setGoalDraft] = useState<ActivityGoals>(goals);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionPaused, setSessionPaused] = useState(false);
@@ -505,9 +507,9 @@ const ActivityTracker = () => {
                 </Select>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => toast({ title: "Wearable", description: "Connect your wearable device to sync data." })}>
-                  <Watch className="w-4 h-4" />
-                  Load from Wearable
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => setShowImport(true)}>
+                  <Upload className="w-4 h-4" />
+                  Import Wearable Data
                 </Button>
                 <Button className="flex-1 gap-2 bg-primary hover:bg-primary/90" onClick={handleStartSession}>
                   <Play className="w-4 h-4" />
@@ -657,6 +659,9 @@ const ActivityTracker = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Wearable Import Dialog */}
+      <WearableImport open={showImport} onOpenChange={setShowImport} onImported={fetchData} />
     </div>
   );
 };
