@@ -36,7 +36,10 @@ interface Props {
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
-const buildQuery = (lat: number, lon: number, type: "hospitals" | "pharmacies", radius = 5000) => {
+const buildQuery = (lat: number, lon: number, type: "hospitals" | "pharmacies" | "janaushadhi", radius = 5000) => {
+  if (type === "janaushadhi") {
+    return `[out:json][timeout:15];(node["name"~"Jan Aushadhi|Janaushadhi|PMBJP",i](around:${radius},${lat},${lon});way["name"~"Jan Aushadhi|Janaushadhi|PMBJP",i](around:${radius},${lat},${lon});node["operator"~"PMBJP|Jan Aushadhi",i](around:${radius},${lat},${lon}););out center body;`;
+  }
   const tag = type === "hospitals"
     ? '["amenity"="hospital"]'
     : '["amenity"="pharmacy"]';
