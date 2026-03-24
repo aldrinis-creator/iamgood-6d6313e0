@@ -19,7 +19,7 @@ const EMERGENCY_NUMBERS = [
 
 const HealthServices = () => {
   const { user } = useAuth();
-  const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | null>(null);
+  const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | "janaushadhi" | null>(null);
 
   const { data: guardians = [] } = useQuery({
     queryKey: ["guardians", user?.id],
