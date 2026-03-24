@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Check, Clock, X, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
+import { Clock, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 
