@@ -150,6 +150,38 @@ const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
             {i < rows.length - 1 && <Separator className="bg-primary/20" />}
           </div>
         ))}
+        {/* Macro Pie Chart */}
+        {(() => {
+          const protein = sum(i => i.protein_g);
+          const carbs = sum(i => i.carbs_g);
+          const fats = sum(i => i.fats_g);
+          const total = protein + carbs + fats;
+          if (total === 0) return null;
+          const data = [
+            { name: "Protein", value: protein, color: "hsl(var(--primary))" },
+            { name: "Carbs", value: carbs, color: "hsl(45 93% 58%)" },
+            { name: "Fats", value: fats, color: "hsl(0 84% 60%)" },
+          ];
+          return (
+            <div className="flex items-center justify-center gap-4 pt-2">
+              <ResponsiveContainer width={100} height={100}>
+                <PieChart>
+                  <Pie data={data} dataKey="value" cx="50%" cy="50%" innerRadius={25} outerRadius={45} strokeWidth={0}>
+                    {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1.5">
+                {data.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-muted-foreground">{d.name} {Math.round((d.value / total) * 100)}% ({d.value}g)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         <MacroBar protein={sum(i => i.protein_g)} carbs={sum(i => i.carbs_g)} fats={sum(i => i.fats_g)} />
         {avgRating > 0 && (
           <div className="flex items-center justify-center gap-1 pt-3">
