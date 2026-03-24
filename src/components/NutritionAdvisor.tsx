@@ -119,6 +119,47 @@ const DetailedNutritionList = ({ item }: { item: NutritionItem }) => {
   );
 };
 
+const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
+  const sum = (fn: (i: NutritionItem) => number | undefined) =>
+    items.reduce((acc, i) => acc + (fn(i) || 0), 0);
+  const avgRating = Math.round(sum(i => i.health_rating) / items.length);
+
+  const rows: { label: string; value: string }[] = [
+    { label: "Calories", value: `${sum(i => i.calories)} kcal` },
+    { label: "Carbohydrates", value: `${sum(i => i.carbs_g)} g` },
+    { label: "Protein", value: `${sum(i => i.protein_g)} g` },
+    { label: "Fat", value: `${sum(i => i.fats_g)} g` },
+    { label: "Fiber", value: `${sum(i => i.fiber_g)} g` },
+    { label: "Cholesterol", value: `${sum(i => i.cholesterol_mg)} mg` },
+    { label: "Sodium", value: `${sum(i => i.sodium_mg)} mg` },
+    { label: "Potassium", value: `${sum(i => i.potassium_mg)} mg` },
+    { label: "Sugar", value: `${sum(i => i.sugar_g)} g` },
+  ].filter(r => r.value !== "0 g" && r.value !== "0 mg" && r.value !== "0 kcal");
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-4 space-y-1">
+        <h3 className="font-bold text-base text-primary mb-3">🍽️ Meal Total ({items.length} items)</h3>
+        {rows.map((row, i) => (
+          <div key={i}>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-sm font-medium text-foreground">{row.label}</span>
+              <span className="text-sm font-bold text-primary">{row.value}</span>
+            </div>
+            {i < rows.length - 1 && <Separator className="bg-primary/20" />}
+          </div>
+        ))}
+        <MacroBar protein={sum(i => i.protein_g)} carbs={sum(i => i.carbs_g)} fats={sum(i => i.fats_g)} />
+        {avgRating > 0 && (
+          <div className="flex items-center justify-center gap-1 pt-3">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <span className="text-xs text-muted-foreground">Avg Health Rating: {avgRating}/10</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
 const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; hideNutrition?: boolean }) => (
   <div className="space-y-3">
     {/* Header card with calories & macros — hidden when table is shown */}
