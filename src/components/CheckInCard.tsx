@@ -349,15 +349,44 @@ const CheckInCard = () => {
         )}
 
         <div className="mt-4 flex gap-2 justify-center">
-          {checkInTimes.map((time) => (
-            <span
-              key={time}
-              className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium"
-            >
-              {time}
-            </span>
-          ))}
+          {CHECK_IN_HOURS.map((h, i) => {
+            const status = slotStatuses[h];
+            const now = new Date();
+            const isPast = now.getHours() >= h;
+            const isCurrent = getCurrentWindow() === h;
+
+            let badgeClass = "bg-primary/10 text-primary"; // upcoming
+            let icon = "";
+            if (status === "responded") {
+              badgeClass = "bg-success/15 text-success border border-success/30";
+              icon = "✓ ";
+            } else if (status === "missed") {
+              badgeClass = "bg-destructive/15 text-destructive border border-destructive/30";
+              icon = "✗ ";
+            } else if (isCurrent && isPast) {
+              badgeClass = "bg-amber-500/15 text-amber-600 border border-amber-500/30 animate-pulse";
+              icon = "● ";
+            }
+
+            return (
+              <span
+                key={h}
+                className={`text-xs px-2 py-1 rounded-full font-medium ${badgeClass}`}
+              >
+                {icon}{checkInTimes[i]}
+              </span>
+            );
+          })}
         </div>
+
+        {/* Missed check-ins summary */}
+        {Object.values(slotStatuses).filter(s => s === "missed").length > 0 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-destructive">
+            <span className="font-semibold">
+              ⚠ {Object.values(slotStatuses).filter(s => s === "missed").length} missed check-in{Object.values(slotStatuses).filter(s => s === "missed").length > 1 ? "s" : ""} today
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
 
