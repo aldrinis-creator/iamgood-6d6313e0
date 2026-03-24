@@ -25,7 +25,6 @@ interface WardHealthPassportProps {
 const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) => {
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
-    { name: "Face Scan", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
     { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
@@ -41,9 +40,8 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    const [checkInsRes, faceScansRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      supabase.from("face_scans").select("id").eq("user_id", wardUserId).gte("scanned_at", `${today}T00:00:00`).lte("scanned_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
       supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", wardUserId).eq("log_date", yesterdayStr).maybeSingle(),
       supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
@@ -61,10 +59,7 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
-    // 2. Face Scan
-    const faceScanScore = (faceScansRes.data ?? []).length > 0 ? 100 : 0;
-
-    // 3. Activity
+    // 2. Activity
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
@@ -101,13 +96,12 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
 
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
-      { name: "Face Scan", score: faceScanScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
       { name: "Wellness", score: wellnessScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 5);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 4);
     setCategories(newCategories);
     setOverallScore(overall);
   }, [wardUserId]);

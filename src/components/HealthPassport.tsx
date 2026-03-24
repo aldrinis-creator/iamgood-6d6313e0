@@ -40,7 +40,6 @@ const HealthPassport = () => {
   const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
-    { name: "Face Scan", score: 0, max: 100, action: "Start Scan" },
     { name: "Activity", score: 0, max: 100 },
     { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
@@ -63,9 +62,9 @@ const HealthPassport = () => {
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
     // Fetch all data in parallel
-    const [checkInsRes, faceScansRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      supabase.from("face_scans").select("id").eq("user_id", user.id).gte("scanned_at", `${today}T00:00:00`).lte("scanned_at", `${today}T23:59:59`),
+      
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", user.id).eq("log_date", yesterdayStr).maybeSingle(),
       supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
@@ -83,11 +82,7 @@ const HealthPassport = () => {
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
-    // 2. Face Scan score
-    const hasScanToday = (faceScansRes.data ?? []).length > 0;
-    const faceScanScore = hasScanToday ? 100 : 0;
-
-    // 3. Activity score
+    // 2. Activity score
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
@@ -128,13 +123,12 @@ const HealthPassport = () => {
 
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
-      { name: "Face Scan", score: faceScanScore, max: 100, action: hasScanToday ? undefined : "Start Scan" },
       { name: "Activity", score: activityScore, max: 100 },
       { name: "Wellness", score: wellnessScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 5);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 4);
 
     setCategories(newCategories);
     setOverallScore(overall);
@@ -162,7 +156,7 @@ const HealthPassport = () => {
 
   const categoryRoutes: Record<string, string> = {
     "Check-iN": "/dashboard",
-    "Face Scan": "/my-health?tool=Face Scan",
+    
     "Activity": "/my-health?tool=Activity",
     "Wellness": "/my-health?tool=Wellness",
     "Medications": "/my-health?tool=Tablets",
