@@ -51,11 +51,7 @@ const unlockAudio = async () => {
 };
 
 if (typeof document !== "undefined") {
-  const handler = () => {
-    unlockAudio();
-    document.removeEventListener("click", handler);
-    document.removeEventListener("touchstart", handler);
-  };
+  const handler = () => { unlockAudio(); };
   document.addEventListener("click", handler, { passive: true });
   document.addEventListener("touchstart", handler, { passive: true });
 }
