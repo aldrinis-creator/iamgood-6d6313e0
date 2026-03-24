@@ -615,6 +615,12 @@ const NutritionAdvisor = () => {
           </button>
         ))}
       </div>
+
+      {/* Calorie Tracker Button */}
+      <Button variant="outline" className="w-full" onClick={() => setShowTracker(true)}>
+        <BarChart3 className="w-4 h-4 mr-2" />
+        Calorie Tracker
+      </Button>
     </div>
   );
 };
