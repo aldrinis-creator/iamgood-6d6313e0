@@ -83,7 +83,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
 
   const fetchUserFacilities = useCallback(async () => {
     if (!user) return;
-    const facilityType = type === "hospitals" ? "hospital" : "pharmacy";
+    const facilityType = type === "hospitals" ? "hospital" : type === "janaushadhi" ? "janaushadhi" : "pharmacy";
     const { data } = await supabase
       .from("user_facilities" as any)
       .select("*")
