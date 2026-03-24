@@ -60,7 +60,7 @@ const toolComponents: Record<string, React.FC> = {
   "Nutrition": NutritionAdvisor,
   "Wellness": WellnessTracker,
   "Services": HealthServices,
-  "Face Scan": FaceScan,
+  
   "Vitals": VitalsMonitor,
 };
 

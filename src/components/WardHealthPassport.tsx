@@ -96,13 +96,12 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
 
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
-      { name: "Face Scan", score: faceScanScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
       { name: "Wellness", score: wellnessScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 5);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 4);
     setCategories(newCategories);
     setOverallScore(overall);
   }, [wardUserId]);

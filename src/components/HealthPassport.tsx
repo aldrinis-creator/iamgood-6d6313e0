@@ -156,7 +156,7 @@ const HealthPassport = () => {
 
   const categoryRoutes: Record<string, string> = {
     "Check-iN": "/dashboard",
-    "Face Scan": "/my-health?tool=Face Scan",
+    
     "Activity": "/my-health?tool=Activity",
     "Wellness": "/my-health?tool=Wellness",
     "Medications": "/my-health?tool=Tablets",
