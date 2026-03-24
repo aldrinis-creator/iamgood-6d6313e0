@@ -1,45 +1,65 @@
+# Nutrition Meal Analysis — Detailed Parameter List View
 
+## What Changes
 
-# Fix Medication Reminder Flow
+When "Analyze this Meal" returns results, show each ingredient's nutrition as a **detailed parameter list** (like the screenshot) instead of the current compact calorie badge + macro bar. The screenshot shows a clean vertical list: parameter label on the left, colored value on the right, with divider lines between rows.
 
-## Current Behavior vs Target
+## Approach
 
-| Aspect | Current | Target |
-|--------|---------|--------|
-| Audio | Fires once with overlay | Same (correct) |
-| Snooze | Unlimited, overlay-only (no audio) | Max 3 snoozes, overlay-only after first |
-| Missed detection | Visual-only in TodaySchedule UI | Auto-write `medication_logs` record with `status: "missed"` after 1 hour |
-| Guardian notification on miss | None | Send notification to guardians when dose is auto-marked missed |
+### 1. Expand the AI response schema
 
-## Changes
+**File:** `supabase/functions/nutrition-advisor/index.ts`
 
-### 1. ReminderOverlay — add snooze counter and max limit
-**File:** `src/components/ReminderOverlay.tsx`
+Add more fields to the `analyze_meal` JSON format only:
 
-- Add a `snoozeCountRef` (Map keyed by reminder title+message) to track how many times each reminder has been snoozed.
-- On snooze: increment counter. If counter reaches 3, show a toast "Maximum snoozes reached" and dismiss without re-scheduling.
-- Display remaining snoozes in the snooze button label: "Snooze 5 min (2 left)".
-- After 3 snoozes are exhausted, hide the snooze button entirely.
+- `saturated_fat_g`, `polyunsaturated_fat_g`, `monounsaturated_fat_g`, `trans_fat_g`
+- `cholesterol_mg`, `sodium_mg`, `potassium_mg`, `sugar_g`
+- `vitamin_a_iu`, `vitamin_c_mg`, `calcium_mg`, `iron_mg`
 
-### 2. useMedicationAlarms — add missed-dose auto-logging
-**File:** `src/hooks/useMedicationAlarms.ts`
+These fields are optional (AI best-effort estimates). Other action types (`meal_plan`, `post_workout`, `feeling_unwell`) keep the current compact format.
 
-- In the `check()` callback, after processing current-time alarms, add a second pass that finds medication slots from the past hour (scheduled time is 60+ minutes ago).
-- For each such slot, check if a `medication_logs` record already exists for that `medication_id` + `scheduled_at`. If not:
-  - Insert a `medication_logs` record with `status: "missed"`, `scheduled_at` set to the computed time, no `taken_at`.
-  - Send guardian notifications via the existing `notify-guardian-medication` edge function with `status: "missed"`.
-- Use a separate `missedFiredRef` to avoid re-processing the same slot every 30 seconds.
+### 2. Add `DetailedNutritionList` component
 
-### 3. TodaySchedule — no changes needed
-The UI already reads from `medication_logs` and shows missed status. Once the hook writes the record, it will appear automatically.
+**File:** `src/components/NutritionAdvisor.tsx`
 
-## Technical Details
+A new component matching the screenshot style:
 
-- The snooze counter uses a `useRef<Map<string, number>>` keyed by a composite of reminder type + title to persist across re-renders without causing re-render cycles.
-- The missed-dose check queries `medication_logs` for existing records before inserting, preventing duplicates.
-- Guardian notifications reuse the existing `notify-guardian-medication` edge function.
+- Each row: parameter name (dark text) + value (colored, e.g. amber/orange) separated by a pink/accent divider line
+- Rows: Calories, Carbohydrates, Protein, Fat, Saturated Fat, Polyunsaturated Fat, Monounsaturated Fat, Trans Fat, Cholesterol, Sodium, Potassium, Fiber, Sugar, Vitamin A, Vitamin C, Calcium, Iron 
+- Skips rows where value is 0 or not provided
+- One such list per ingredient, with the ingredient name as header
+- Use color to differentiate
+
+### 3. Conditional rendering in results
+
+**File:** `src/components/NutritionAdvisor.tsx`
+
+- When `activeAction === "analyze_meal"` and structured data exists: render `DetailedNutritionList` per item instead of the calorie badge + MacroBar
+- Benefits, issues, suggestions, and health rating cards continue to render below each item's nutrition list — no change there
+- For all other action types: keep current compact card layout
+
+### 4. Update `NutritionItem` interface
+
+**File:** `src/components/NutritionAdvisor.tsx`
+
+Add optional fields to match the expanded schema:
+
+```
+saturated_fat_g?: number;
+polyunsaturated_fat_g?: number;
+monounsaturated_fat_g?: number;
+trans_fat_g?: number;
+cholesterol_mg?: number;
+sodium_mg?: number;
+potassium_mg?: number;
+sugar_g?: number;
+vitamin_a_iu?: number;
+vitamin_c_mg?: number;
+calcium_mg?: number;
+iron_mg?: number;
+```
 
 ## Files Changed
-- `src/components/ReminderOverlay.tsx` — snooze limit (max 3), counter display
-- `src/hooks/useMedicationAlarms.ts` — auto-write missed logs after 1 hour, notify guardians
 
+- `supabase/functions/nutrition-advisor/index.ts` — expand `analyze_meal` JSON schema with micronutrients
+- `src/components/NutritionAdvisor.tsx` — add `DetailedNutritionList`, update interface, conditional rendering
