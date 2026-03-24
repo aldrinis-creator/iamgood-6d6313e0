@@ -36,6 +36,8 @@ const CalorieTracker = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState<MealLog[]>([]);
   const [calorieGoal, setCalorieGoal] = useState(2000);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
   const [chartRange, setChartRange] = useState<"week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [allLogs, setAllLogs] = useState<MealLog[]>([]);
