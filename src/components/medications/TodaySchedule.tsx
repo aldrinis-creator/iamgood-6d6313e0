@@ -162,22 +162,6 @@ const TodaySchedule = () => {
     } catch { toast.error("Failed to update"); }
   };
 
-  const markSkipped = async (slot: DoseSlot) => {
-    if (!session?.user?.id) return;
-    try {
-      if (slot.logId) {
-        await supabase.from("medication_logs").update({ status: "skipped" }).eq("id", slot.logId);
-      } else {
-        await supabase.from("medication_logs").insert({
-          medication_id: slot.medication.id, user_id: session.user.id,
-          scheduled_at: slot.scheduledAt.toISOString(), status: "skipped",
-        });
-      }
-      toast.info(`${slot.medication.name} skipped`);
-      notifyGuardians(session.user.id, slot.medication.name, "skipped", slot.scheduledAt.toISOString());
-      loadSchedule();
-    } catch { toast.error("Failed to update"); }
-  };
 
   // Summary stats
   const takenCount = doses.filter(d => d.status === "taken").length;
