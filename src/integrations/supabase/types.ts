@@ -410,6 +410,78 @@ export type Database = {
         }
         Relationships: []
       }
+      jan_aushadhi_products: {
+        Row: {
+          category: string | null
+          created_at: string
+          drug_code: string | null
+          generic_name: string
+          id: string
+          mrp: number
+          salt_composition: string | null
+          unit_size: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          drug_code?: string | null
+          generic_name: string
+          id?: string
+          mrp?: number
+          salt_composition?: string | null
+          unit_size?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          drug_code?: string | null
+          generic_name?: string
+          id?: string
+          mrp?: number
+          salt_composition?: string | null
+          unit_size?: string | null
+        }
+        Relationships: []
+      }
+      jan_aushadhi_stores: {
+        Row: {
+          address: string | null
+          created_at: string
+          district: string | null
+          id: string
+          lat: number | null
+          lon: number | null
+          phone: string | null
+          pincode: string | null
+          state: string | null
+          store_name: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          district?: string | null
+          id?: string
+          lat?: number | null
+          lon?: number | null
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          store_name: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          district?: string | null
+          id?: string
+          lat?: number | null
+          lon?: number | null
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          store_name?: string
+        }
+        Relationships: []
+      }
       meal_logs: {
         Row: {
           created_at: string
