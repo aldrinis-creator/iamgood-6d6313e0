@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info } from "lucide-react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info, Save, BarChart3 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import CalorieTracker from "./CalorieTracker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -294,6 +296,10 @@ const NutritionAdvisor = () => {
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
   const [mealImageBase64, setMealImageBase64] = useState<string | null>(null);
   const [showMealUpload, setShowMealUpload] = useState(false);
+  const [showTracker, setShowTracker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [mealType, setMealType] = useState<string>("other");
   const mealFileRef = useRef<HTMLInputElement>(null);
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -335,6 +341,7 @@ const NutritionAdvisor = () => {
     setAiResponse("");
     setStructuredData(null);
     setUsedFallback(false);
+    setSaved(false);
     setLoading(true);
     setShowMealUpload(false);
     try {
@@ -408,9 +415,54 @@ const NutritionAdvisor = () => {
     setActiveAction(null);
     setAiResponse("");
     setStructuredData(null);
+    setSaved(false);
     clearMealImage();
     setShowMealUpload(false);
+    setShowTracker(false);
   };
+
+  const saveMealLog = async () => {
+    if (!user || !structuredData || structuredData.length === 0) return;
+    setSaving(true);
+    try {
+      const totalCal = structuredData.reduce((s, i) => s + i.calories, 0);
+      const totalProtein = structuredData.reduce((s, i) => s + i.protein_g, 0);
+      const totalCarbs = structuredData.reduce((s, i) => s + i.carbs_g, 0);
+      const totalFats = structuredData.reduce((s, i) => s + i.fats_g, 0);
+      const totalFiber = structuredData.reduce((s, i) => s + i.fiber_g, 0);
+      const mealName = structuredData.map(i => i.name).join(", ");
+
+      const { error } = await supabase.from("meal_logs").insert({
+        user_id: user.id,
+        meal_type: mealType,
+        meal_name: mealName,
+        items: structuredData as any,
+        total_calories: totalCal,
+        total_protein_g: totalProtein,
+        total_carbs_g: totalCarbs,
+        total_fats_g: totalFats,
+        total_fiber_g: totalFiber,
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Meal saved to your calorie tracker!");
+    } catch {
+      toast.error("Failed to save meal");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (showTracker) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={resetView}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Nutrition
+        </Button>
+        <CalorieTracker />
+      </div>
+    );
+  }
 
   // Meal photo upload screen
   if (showMealUpload && activeAction === "analyze_meal") {
@@ -486,6 +538,35 @@ const NutritionAdvisor = () => {
                   </div>
                 ))}
                 {structuredData.length >= 2 && <TotalSummaryCard items={structuredData} />}
+                {/* Save meal to tracker */}
+                <Card className="border-success/20">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                      <Save className="w-4 h-4" />
+                      Save to Calorie Tracker
+                    </div>
+                    <Select value={mealType} onValueChange={setMealType}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Meal type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="breakfast">🌅 Breakfast</SelectItem>
+                        <SelectItem value="lunch">☀️ Lunch</SelectItem>
+                        <SelectItem value="dinner">🌙 Dinner</SelectItem>
+                        <SelectItem value="snack">🍿 Snack</SelectItem>
+                        <SelectItem value="other">🍽️ Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      className="w-full"
+                      onClick={saveMealLog}
+                      disabled={saving || saved}
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+                      {saving ? "Saving..." : saved ? "Saved!" : "Save Meal"}
+                    </Button>
+                  </CardContent>
+                </Card>
               </>
             ) : (
               structuredData.map((item, idx) => (
@@ -534,6 +615,12 @@ const NutritionAdvisor = () => {
           </button>
         ))}
       </div>
+
+      {/* Calorie Tracker Button */}
+      <Button variant="outline" className="w-full" onClick={() => setShowTracker(true)}>
+        <BarChart3 className="w-4 h-4 mr-2" />
+        Calorie Tracker
+      </Button>
     </div>
   );
 };

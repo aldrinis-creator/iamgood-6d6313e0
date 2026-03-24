@@ -395,6 +395,54 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_logs: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          log_date: string
+          logged_at: string
+          meal_name: string
+          meal_type: string
+          total_calories: number
+          total_carbs_g: number
+          total_fats_g: number
+          total_fiber_g: number
+          total_protein_g: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items?: Json
+          log_date?: string
+          logged_at?: string
+          meal_name: string
+          meal_type?: string
+          total_calories?: number
+          total_carbs_g?: number
+          total_fats_g?: number
+          total_fiber_g?: number
+          total_protein_g?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          log_date?: string
+          logged_at?: string
+          meal_name?: string
+          meal_type?: string
+          total_calories?: number
+          total_carbs_g?: number
+          total_fats_g?: number
+          total_fiber_g?: number
+          total_protein_g?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       medical_history: {
         Row: {
           advice: string | null
@@ -638,6 +686,7 @@ export type Database = {
           allergies: string[] | null
           blood_group: string | null
           created_at: string
+          daily_calorie_goal: number | null
           date_of_birth: string | null
           diet_type: string
           dietary_preferences: string[] | null
@@ -657,6 +706,7 @@ export type Database = {
           allergies?: string[] | null
           blood_group?: string | null
           created_at?: string
+          daily_calorie_goal?: number | null
           date_of_birth?: string | null
           diet_type?: string
           dietary_preferences?: string[] | null
@@ -676,6 +726,7 @@ export type Database = {
           allergies?: string[] | null
           blood_group?: string | null
           created_at?: string
+          daily_calorie_goal?: number | null
           date_of_birth?: string | null
           diet_type?: string
           dietary_preferences?: string[] | null
