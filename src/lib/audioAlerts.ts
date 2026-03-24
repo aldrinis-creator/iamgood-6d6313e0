@@ -193,9 +193,9 @@ export const playChime = async () => {
   osc3.stop(now + 1.0);
 };
 
-export const playVoiceReminder = (message = "It's time for your Check-iN") => {
+export const playVoiceReminder = async (message = "It's time for your Check-iN") => {
+  await ensureAudioReady();
   if (!("speechSynthesis" in window)) {
-    // Fall back to chime if speech not available
     playChime();
     return;
   }

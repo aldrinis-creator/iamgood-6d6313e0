@@ -52,7 +52,7 @@ const useMedicationAlarms = () => {
         const slotKey = `med-slot-${dateKey}-${timeStr}`;
 
         // --- Current-time alarm (fires once) ---
-        if (h === hour && (m === undefined ? minute < 2 : Math.abs(minute - (m || 0)) < 2) && !firedRef.current.has(slotKey) && !slotsFired.has(slotKey)) {
+        if (h === hour && (m === undefined ? minute < 10 : Math.abs(minute - (m || 0)) < 10) && !firedRef.current.has(slotKey) && !slotsFired.has(slotKey)) {
           slotsFired.add(slotKey);
           firedRef.current.add(slotKey);
           firedMedNames.push(med.name);
