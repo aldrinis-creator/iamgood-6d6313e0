@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Flame, Target, TrendingUp, Calendar, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
