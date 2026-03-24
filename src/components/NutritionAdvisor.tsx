@@ -402,9 +402,20 @@ const NutritionAdvisor = () => {
                 <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
               </div>
             )}
-            {structuredData.map((item, idx) => (
-              <NutritionCard key={idx} item={item} />
-            ))}
+            {activeAction === "analyze_meal" ? (
+              <>
+                {structuredData.map((item, idx) => (
+                  <div key={idx} className="space-y-4">
+                    <DetailedNutritionList item={item} />
+                    <NutritionCard item={item} hideNutrition />
+                  </div>
+                ))}
+              </>
+            ) : (
+              structuredData.map((item, idx) => (
+                <NutritionCard key={idx} item={item} />
+              ))
+            )}
           </div>
         ) : (
           <div className="space-y-4">
