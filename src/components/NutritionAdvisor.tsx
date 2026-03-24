@@ -426,6 +426,39 @@ const NutritionAdvisor = () => {
     clearMealImage();
     setShowMealUpload(false);
     setShowTracker(false);
+    setShowManualEntry(false);
+    setManualMeal({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
+  };
+
+  const handleManualMealSave = async () => {
+    const name = manualMeal.meal_name.trim();
+    if (!name) { toast.error("Enter a meal name"); return; }
+    if (name.length > 200) { toast.error("Meal name too long (max 200 chars)"); return; }
+    const cal = parseInt(manualMeal.calories) || 0;
+    if (cal < 0 || cal > 50000) { toast.error("Calories must be 0–50,000"); return; }
+    const protein = parseFloat(manualMeal.protein) || 0;
+    const carbs = parseFloat(manualMeal.carbs) || 0;
+    const fats = parseFloat(manualMeal.fats) || 0;
+    const fiber = parseFloat(manualMeal.fiber) || 0;
+    if ([protein, carbs, fats, fiber].some(v => v < 0 || v > 5000)) { toast.error("Macro values must be 0–5,000g"); return; }
+    if (!user) return;
+    setSavingManual(true);
+    const { error } = await supabase.from("meal_logs").insert({
+      user_id: user.id,
+      meal_type: manualMeal.meal_type,
+      meal_name: name,
+      items: [] as any,
+      total_calories: cal,
+      total_protein_g: protein,
+      total_carbs_g: carbs,
+      total_fats_g: fats,
+      total_fiber_g: fiber,
+    });
+    setSavingManual(false);
+    if (error) { toast.error("Failed to save meal"); return; }
+    setManualMeal({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
+    setShowManualEntry(false);
+    toast.success("Meal logged!");
   };
 
   const saveMealLog = async () => {
