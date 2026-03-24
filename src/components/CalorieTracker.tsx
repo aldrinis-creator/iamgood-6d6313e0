@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Flame, Target, TrendingUp, Calendar, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X, Plus } from "lucide-react";
+import { Target, TrendingUp, ChevronLeft, ChevronRight, Pencil, Check, X, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -34,8 +32,6 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   other: "🍽️ Other",
 };
 
-const EMPTY_MANUAL = { meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" };
-
 const CalorieTracker = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState<MealLog[]>([]);
@@ -46,9 +42,6 @@ const CalorieTracker = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [allLogs, setAllLogs] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showManual, setShowManual] = useState(false);
-  const [manual, setManual] = useState(EMPTY_MANUAL);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -140,42 +133,6 @@ const CalorieTracker = () => {
     else toast.success("Calorie goal updated");
   };
 
-  const handleManualSave = async () => {
-    const name = manual.meal_name.trim();
-    if (!name) { toast.error("Enter a meal name"); return; }
-    if (name.length > 200) { toast.error("Meal name too long (max 200 chars)"); return; }
-    const cal = parseInt(manual.calories) || 0;
-    if (cal < 0 || cal > 50000) { toast.error("Calories must be 0–50,000"); return; }
-    const protein = parseFloat(manual.protein) || 0;
-    const carbs = parseFloat(manual.carbs) || 0;
-    const fats = parseFloat(manual.fats) || 0;
-    const fiber = parseFloat(manual.fiber) || 0;
-    if ([protein, carbs, fats, fiber].some(v => v < 0 || v > 5000)) { toast.error("Macro values must be 0–5,000g"); return; }
-    if (!user) return;
-    setSaving(true);
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    const { data, error } = await supabase.from("meal_logs").insert({
-      user_id: user.id,
-      meal_type: manual.meal_type,
-      meal_name: name,
-      items: [] as any,
-      total_calories: cal,
-      total_protein_g: protein,
-      total_carbs_g: carbs,
-      total_fats_g: fats,
-      total_fiber_g: fiber,
-      log_date: dateStr,
-    }).select().single();
-    setSaving(false);
-    if (error) { toast.error("Failed to save meal"); return; }
-    const newLog = data as MealLog;
-    setLogs((prev) => [...prev, newLog]);
-    setAllLogs((prev) => [...prev, newLog]);
-    setManual(EMPTY_MANUAL);
-    setShowManual(false);
-    toast.success("Meal logged!");
-  };
-
   const navigateDate = (dir: number) => setSelectedDate((prev) => addDays(prev, dir));
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
@@ -235,62 +192,6 @@ const CalorieTracker = () => {
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
-
-      {/* Add Meal Button */}
-      <Button variant="outline" className="w-full gap-2 border-dashed border-primary/30 text-primary" onClick={() => setShowManual(!showManual)}>
-        <Plus className="w-4 h-4" />
-        {showManual ? "Cancel" : "Log Meal Manually"}
-      </Button>
-
-      {/* Manual Meal Entry Form */}
-      {showManual && (
-        <Card className="border-primary/20">
-          <CardContent className="p-4 space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Meal Name *</Label>
-              <Input placeholder="e.g. Rice and dal" value={manual.meal_name} onChange={(e) => setManual(p => ({ ...p, meal_name: e.target.value }))} maxLength={200} className="h-9 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Meal Type</Label>
-              <Select value={manual.meal_type} onValueChange={(v) => setManual(p => ({ ...p, meal_type: v }))}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(MEAL_TYPE_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Calories (kcal)</Label>
-                <Input type="number" placeholder="0" value={manual.calories} onChange={(e) => setManual(p => ({ ...p, calories: e.target.value }))} min={0} max={50000} className="h-9 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Protein (g)</Label>
-                <Input type="number" placeholder="0" value={manual.protein} onChange={(e) => setManual(p => ({ ...p, protein: e.target.value }))} min={0} max={5000} className="h-9 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Carbs (g)</Label>
-                <Input type="number" placeholder="0" value={manual.carbs} onChange={(e) => setManual(p => ({ ...p, carbs: e.target.value }))} min={0} max={5000} className="h-9 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Fats (g)</Label>
-                <Input type="number" placeholder="0" value={manual.fats} onChange={(e) => setManual(p => ({ ...p, fats: e.target.value }))} min={0} max={5000} className="h-9 text-sm" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Fiber (g)</Label>
-                <Input type="number" placeholder="0" value={manual.fiber} onChange={(e) => setManual(p => ({ ...p, fiber: e.target.value }))} min={0} max={5000} className="h-9 text-sm" />
-              </div>
-            </div>
-            <Button className="w-full" onClick={handleManualSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Meal"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Meal Log List */}
       <div className="space-y-2">

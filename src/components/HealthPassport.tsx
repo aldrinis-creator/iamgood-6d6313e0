@@ -43,6 +43,8 @@ const HealthPassport = () => {
     { name: "Activity", score: 0, max: 100 },
     { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
+    { name: "Vitals", score: 0, max: 100 },
+    { name: "Nutrition", score: 0, max: 100 },
   ]);
   const [overallScore, setOverallScore] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState<MilestoneConfig | null>(null);
@@ -56,20 +58,19 @@ const HealthPassport = () => {
     const now = new Date();
     const currentHour = now.getHours();
 
-    // Yesterday for wellness/sleep
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    // Fetch all data in parallel
-    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes, mealLogsRes, nutritionPersonaRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      
-      supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
+      supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes, heart_rate, spo2, bp_systolic, bp_diastolic, temperature_c, glucose_mg_dl").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", user.id).eq("log_date", yesterdayStr).maybeSingle(),
       supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("medications").select("id, schedule_times").eq("user_id", user.id).lte("start_date", today),
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
+      supabase.from("meal_logs").select("total_calories, total_protein_g").eq("user_id", user.id).eq("log_date", today),
+      supabase.from("nutrition_personas").select("daily_calorie_goal").eq("user_id", user.id).maybeSingle(),
     ]);
 
     // 1. Check-iN score
@@ -93,7 +94,7 @@ const HealthPassport = () => {
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
-    // 4. Wellness score (composite: sleep + sleep quality + mood + energy + mindfulness)
+    // 3. Wellness score
     const sleepHours = Number(wellnessSleepRes.data?.sleep_hours) || 0;
     const sleepQuality = Number(wellnessSleepRes.data?.sleep_quality) || 0;
     const moodScore = Number(wellnessTodayRes.data?.mood_score) || 0;
@@ -107,33 +108,64 @@ const HealthPassport = () => {
       Math.min(mindfulnessMin / 15, 1) * 20
     );
 
-    // 5. Medications score
+    // 4. Medications score
     const meds = medsRes.data ?? [];
     const logs = medLogsRes.data ?? [];
     let medScore = 0;
-    // Count total scheduled doses today
     let totalDoses = 0;
     meds.forEach(m => { totalDoses += (m.schedule_times?.length ?? 0); });
     if (totalDoses > 0) {
       const takenCount = logs.filter(l => l.status === "taken").length;
       medScore = Math.round(Math.min(takenCount / totalDoses, 1) * 100);
     } else {
-      medScore = 100; // No medications = full score
+      medScore = 100;
     }
+
+    // 5. Vitals Score (out of 100)
+    let vitalsScore = 0;
+    if (act) {
+      const hr = act.heart_rate ?? 0;
+      if (hr > 0) vitalsScore += (hr >= 50 && hr <= 100) ? 20 : 10;
+
+      const spo2 = Number(act.spo2) || 0;
+      if (spo2 > 0) vitalsScore += spo2 > 95 ? 20 : spo2 > 90 ? 10 : 5;
+
+      const sys = act.bp_systolic; const dia = act.bp_diastolic;
+      if (sys && dia) vitalsScore += (sys >= 90 && sys <= 140 && dia >= 60 && dia <= 90) ? 20 : 10;
+
+      const temp = Number(act.temperature_c);
+      if (temp > 0) vitalsScore += (temp >= 36 && temp <= 37.5) ? 20 : 10;
+
+      const glu = act.glucose_mg_dl;
+      if (glu && glu > 0) vitalsScore += (glu >= 70 && glu <= 140) ? 20 : 10;
+    }
+
+    // 6. Nutrition Score (out of 100)
+    const meals = mealLogsRes.data ?? [];
+    let nutritionScore = 0;
+    if (meals.length >= 1) nutritionScore += 30;
+    if (meals.length >= 2) nutritionScore += 20;
+    const totalCalToday = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
+    const calGoal = nutritionPersonaRes.data?.daily_calorie_goal || 2000;
+    if (totalCalToday > 0 && Math.abs(totalCalToday - calGoal) <= calGoal * 0.2) nutritionScore += 25;
+    const totalProteinToday = meals.reduce((s, m) => s + (Number(m.total_protein_g) || 0), 0);
+    const proteinCalPct = totalCalToday > 0 ? (totalProteinToday * 4 / totalCalToday) * 100 : 0;
+    if (proteinCalPct >= 10) nutritionScore += 25;
 
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
       { name: "Wellness", score: wellnessScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
+      { name: "Vitals", score: vitalsScore, max: 100 },
+      { name: "Nutrition", score: nutritionScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 4);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 6);
 
     setCategories(newCategories);
     setOverallScore(overall);
 
-    // Check milestones
     for (const ms of MILESTONES) {
       if (overall >= ms.threshold && !shownMilestones.current.has(ms.threshold)) {
         shownMilestones.current.add(ms.threshold);
@@ -156,10 +188,11 @@ const HealthPassport = () => {
 
   const categoryRoutes: Record<string, string> = {
     "Check-iN": "/dashboard",
-    
     "Activity": "/my-health?tool=Activity",
     "Wellness": "/my-health?tool=Wellness",
     "Medications": "/my-health?tool=Tablets",
+    "Vitals": "/my-health?tool=Vitals",
+    "Nutrition": "/my-health?tool=Nutrition",
   };
 
   const handleCategoryTap = (cat: CategoryScore) => {
@@ -169,7 +202,6 @@ const HealthPassport = () => {
 
   return (
     <Card className="relative overflow-hidden">
-      {/* Milestone Celebration Overlay */}
       {activeMilestone && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="text-center space-y-2 animate-in zoom-in-50 duration-500">
@@ -187,7 +219,6 @@ const HealthPassport = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Score Ring */}
         <div className="flex items-center gap-4">
           <div className="relative w-20 h-20">
             <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
@@ -215,7 +246,6 @@ const HealthPassport = () => {
           </div>
         </div>
 
-        {/* Category Rows */}
         <div className="space-y-2">
           {categories.map((cat) => (
             <div key={cat.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -231,15 +261,9 @@ const HealthPassport = () => {
                   />
                 </div>
               </div>
-              {cat.action ? (
-                <button onClick={() => handleCategoryTap(cat)} className="ml-3 text-xs text-primary font-medium flex items-center">
-                  {cat.action} <ChevronRight className="w-3 h-3" />
-                </button>
-              ) : (
-                <button onClick={() => handleCategoryTap(cat)} className="ml-3">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              )}
+              <button onClick={() => handleCategoryTap(cat)} className="ml-3">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
           ))}
         </div>
