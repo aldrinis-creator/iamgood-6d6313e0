@@ -48,9 +48,43 @@ Deno.serve(async (req) => {
     const title = `Medication ${status === "taken" ? "Taken" : "Missed"}`;
     const message = `${userName} has ${statusLabel} their ${medication_name}${timeLabel ? ` (${timeLabel})` : ""}.`;
     const notificationType = status === "taken" ? "medication_taken" : "medication_missed";
+    const isMissed = status !== "taken";
 
-    // Insert notifications for each guardian
-    const notifications = guardians.map((g) => ({
+    // For missed notifications, check each guardian's preference
+    const eligibleGuardians = [];
+    for (const g of guardians) {
+      if (isMissed) {
+        // Find guardian's user ID via phone match
+        const { data: guardianProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("phone", g.guardian_phone)
+          .maybeSingle();
+
+        if (guardianProfile) {
+          // Check guardian's settings for medicationMissedNotify
+          const { data: settingsRow } = await supabase
+            .from("user_settings")
+            .select("settings")
+            .eq("user_id", guardianProfile.id)
+            .maybeSingle();
+
+          const guardianSettings = settingsRow?.settings as Record<string, unknown> | null;
+          // Default is true if not set
+          if (guardianSettings?.medicationMissedNotify === false) {
+            continue; // Skip this guardian
+          }
+        }
+      }
+      eligibleGuardians.push(g);
+    }
+
+    if (eligibleGuardians.length === 0) {
+      return new Response(JSON.stringify({ message: "All guardians opted out" }), { headers: corsHeaders });
+    }
+
+    // Insert notifications for eligible guardians
+    const notifications = eligibleGuardians.map((g) => ({
       user_id,
       guardian_id: g.id,
       title,
@@ -62,12 +96,10 @@ Deno.serve(async (req) => {
     await supabase.from("notifications").insert(notifications);
 
     // Send push notifications to guardian devices
-    const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "BJq2e6gs1zTIdmNLo6v4DWL4trzwEedK_ghxuB9wb63nlh_y1ShYf2RS_IKdDdPu59tQJ3pLk5XHed6pGZ141lw";
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
 
     if (vapidPrivateKey) {
-      // Find guardian user IDs by matching phone to profiles
-      for (const g of guardians) {
+      for (const g of eligibleGuardians) {
         const { data: guardianProfile } = await supabase
           .from("profiles")
           .select("id")
@@ -85,10 +117,8 @@ Deno.serve(async (req) => {
 
         for (const sub of subs) {
           try {
-            // Simple push — reuse web-push pattern
             const payload = JSON.stringify({ title, body: message, icon: "/placeholder.svg" });
             // Note: Full VAPID push implementation would go here
-            // For now, notifications are created in DB and shown via realtime
           } catch {
             // push failed, continue
           }
@@ -96,7 +126,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ sent: guardians.length }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ sent: eligibleGuardians.length }), { headers: corsHeaders });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
   }
