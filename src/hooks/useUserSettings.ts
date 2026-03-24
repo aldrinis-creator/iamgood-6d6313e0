@@ -109,6 +109,7 @@ const DEFAULTS: UserSettings = {
   activityGoals: DEFAULT_ACTIVITY_GOALS,
   guardianPush: true,
   weeklyReport: true,
+  medicationMissedNotify: true,
   sleepMode: true,
   pauseMode: "active",
   expectedReturn: null,
