@@ -159,6 +159,7 @@ const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
       </CardContent>
     </Card>
   );
+};
 
 const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; hideNutrition?: boolean }) => (
   <div className="space-y-3">
