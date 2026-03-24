@@ -141,10 +141,37 @@ const CheckInCard = () => {
     }
   }, [session?.user?.id]);
 
+  // Fetch statuses for all today's check-in slots
+  const loadSlotStatuses = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const today = new Date();
+    const dayStart = new Date(today);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(today);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const { data } = await supabase
+      .from("check_ins")
+      .select("scheduled_at, status")
+      .eq("user_id", session.user.id)
+      .gte("scheduled_at", dayStart.toISOString())
+      .lte("scheduled_at", dayEnd.toISOString());
+
+    if (data) {
+      const statuses: Record<number, string> = {};
+      for (const ci of data) {
+        const h = new Date(ci.scheduled_at).getHours();
+        statuses[h] = ci.status;
+      }
+      setSlotStatuses(statuses);
+    }
+  }, [session?.user?.id]);
+
   const prevWindowRef = useRef<number | null>(undefined);
 
   useEffect(() => {
     loadCurrentCheckIn();
+    loadSlotStatuses();
     const interval = setInterval(() => {
       const newWindow = getCurrentWindow();
       if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
@@ -152,10 +179,11 @@ const CheckInCard = () => {
       }
       prevWindowRef.current = newWindow;
       loadCurrentCheckIn();
+      loadSlotStatuses();
     }, 30000);
     prevWindowRef.current = getCurrentWindow();
     return () => clearInterval(interval);
-  }, [loadCurrentCheckIn]);
+  }, [loadCurrentCheckIn, loadSlotStatuses]);
 
   // Countdown timer + approaching detection
   useEffect(() => {
