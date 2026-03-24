@@ -538,6 +538,35 @@ const NutritionAdvisor = () => {
                   </div>
                 ))}
                 {structuredData.length >= 2 && <TotalSummaryCard items={structuredData} />}
+                {/* Save meal to tracker */}
+                <Card className="border-success/20">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                      <Save className="w-4 h-4" />
+                      Save to Calorie Tracker
+                    </div>
+                    <Select value={mealType} onValueChange={setMealType}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Meal type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="breakfast">🌅 Breakfast</SelectItem>
+                        <SelectItem value="lunch">☀️ Lunch</SelectItem>
+                        <SelectItem value="dinner">🌙 Dinner</SelectItem>
+                        <SelectItem value="snack">🍿 Snack</SelectItem>
+                        <SelectItem value="other">🍽️ Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      className="w-full"
+                      onClick={saveMealLog}
+                      disabled={saving || saved}
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+                      {saving ? "Saving..." : saved ? "Saved!" : "Save Meal"}
+                    </Button>
+                  </CardContent>
+                </Card>
               </>
             ) : (
               structuredData.map((item, idx) => (
