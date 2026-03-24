@@ -25,7 +25,6 @@ interface WardHealthPassportProps {
 const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) => {
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
-    { name: "Face Scan", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
     { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
