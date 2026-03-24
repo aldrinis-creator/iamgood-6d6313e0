@@ -12,6 +12,7 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
 import WardVitalsSummary from "@/components/WardVitalsSummary";
+import WardMedicationStatus from "@/components/WardMedicationStatus";
 import { playChime } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
