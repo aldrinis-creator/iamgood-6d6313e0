@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { Flame, Target, TrendingUp, Calendar, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flame, Target, TrendingUp, Calendar, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +36,8 @@ const CalorieTracker = () => {
   const { user } = useAuth();
   const [logs, setLogs] = useState<MealLog[]>([]);
   const [calorieGoal, setCalorieGoal] = useState(2000);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
   const [chartRange, setChartRange] = useState<"week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [allLogs, setAllLogs] = useState<MealLog[]>([]);
@@ -125,6 +128,22 @@ const CalorieTracker = () => {
     toast.success("Meal removed");
   };
 
+  const handleSaveGoal = async () => {
+    const val = parseInt(goalInput);
+    if (!val || val < 500 || val > 10000) {
+      toast.error("Enter a value between 500–10,000 kcal");
+      return;
+    }
+    setCalorieGoal(val);
+    setEditingGoal(false);
+    if (!user) return;
+    const { error } = await supabase
+      .from("nutrition_personas")
+      .upsert({ user_id: user.id, daily_calorie_goal: val, updated_at: new Date().toISOString() } as any, { onConflict: "user_id" });
+    if (error) toast.error("Failed to save goal");
+    else toast.success("Calorie goal updated");
+  };
+
   const navigateDate = (dir: number) => {
     setSelectedDate((prev) => addDays(prev, dir));
   };
@@ -141,7 +160,26 @@ const CalorieTracker = () => {
               <Target className="w-5 h-5 text-primary" />
               <h3 className="font-bold text-sm">Daily Calorie Goal</h3>
             </div>
-            <span className="text-xs text-muted-foreground">{calorieGoal} kcal target</span>
+            {editingGoal ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  className="h-7 w-20 text-xs"
+                  min={500}
+                  max={10000}
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveGoal()}
+                />
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSaveGoal}><Check className="w-3.5 h-3.5 text-primary" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingGoal(false)}><X className="w-3.5 h-3.5 text-muted-foreground" /></Button>
+              </div>
+            ) : (
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => { setGoalInput(String(calorieGoal)); setEditingGoal(true); }}>
+                {calorieGoal} kcal <Pencil className="w-3 h-3" />
+              </Button>
+            )}
           </div>
           <Progress value={progress} className="h-3" />
           <div className="flex justify-between text-xs text-muted-foreground">
