@@ -124,7 +124,7 @@ const DetailedNutritionList = ({ item }: { item: NutritionItem }) => {
 
 const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
   const sum = (fn: (i: NutritionItem) => number | undefined) =>
-    items.reduce((acc, i) => acc + (fn(i) || 0), 0);
+    parseFloat(items.reduce((acc, i) => acc + (fn(i) || 0), 0).toFixed(2));
   const avgRating = Math.round(sum(i => i.health_rating) / items.length);
 
   const rows: { label: string; value: string }[] = [
