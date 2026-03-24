@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type: "hospitals" | "pharmacies";
+  type: "hospitals" | "pharmacies" | "janaushadhi";
   userPos: { lat: number; lon: number } | null;
   onAdded: () => void;
 }
