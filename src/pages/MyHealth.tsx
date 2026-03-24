@@ -25,7 +25,7 @@ const healthTools = [
   { icon: Stethoscope, label: "Health Tools", color: "bg-success/10 text-success" },
   { icon: Ambulance, label: "Ambulance", color: "bg-sos/10 text-sos" },
   { icon: Activity, label: "Activity", color: "bg-primary/10 text-primary" },
-  { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
+  
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
