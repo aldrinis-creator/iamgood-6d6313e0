@@ -128,6 +128,22 @@ const CalorieTracker = () => {
     toast.success("Meal removed");
   };
 
+  const handleSaveGoal = async () => {
+    const val = parseInt(goalInput);
+    if (!val || val < 500 || val > 10000) {
+      toast.error("Enter a value between 500–10,000 kcal");
+      return;
+    }
+    setCalorieGoal(val);
+    setEditingGoal(false);
+    if (!user) return;
+    const { error } = await supabase
+      .from("nutrition_personas")
+      .upsert({ user_id: user.id, daily_calorie_goal: val, updated_at: new Date().toISOString() } as any, { onConflict: "user_id" });
+    if (error) toast.error("Failed to save goal");
+    else toast.success("Calorie goal updated");
+  };
+
   const navigateDate = (dir: number) => {
     setSelectedDate((prev) => addDays(prev, dir));
   };
