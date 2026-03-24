@@ -27,7 +27,7 @@ const AddFacilityDialog = ({ open, onOpenChange, type, userPos, onAdded }: Props
   const [geocoding, setGeocoding] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
 
-  const facilityType = type === "hospitals" ? "hospital" : "pharmacy";
+  const facilityType = type === "hospitals" ? "hospital" : type === "janaushadhi" ? "janaushadhi" : "pharmacy";
 
   const geocodeAddress = async () => {
     if (!address.trim()) return;
