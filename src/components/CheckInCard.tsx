@@ -79,6 +79,7 @@ const CheckInCard = () => {
   const [isApproaching, setIsApproaching] = useState(false);
   const [approachingMinutes, setApproachingMinutes] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
+  const [slotStatuses, setSlotStatuses] = useState<Record<number, string>>({});
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
