@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Heart, Clock } from "lucide-react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
@@ -79,6 +79,7 @@ const CheckInCard = () => {
   const [isApproaching, setIsApproaching] = useState(false);
   const [approachingMinutes, setApproachingMinutes] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
+  const [slotStatuses, setSlotStatuses] = useState<Record<number, string>>({});
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
@@ -140,10 +141,37 @@ const CheckInCard = () => {
     }
   }, [session?.user?.id]);
 
+  // Fetch statuses for all today's check-in slots
+  const loadSlotStatuses = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const today = new Date();
+    const dayStart = new Date(today);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(today);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const { data } = await supabase
+      .from("check_ins")
+      .select("scheduled_at, status")
+      .eq("user_id", session.user.id)
+      .gte("scheduled_at", dayStart.toISOString())
+      .lte("scheduled_at", dayEnd.toISOString());
+
+    if (data) {
+      const statuses: Record<number, string> = {};
+      for (const ci of data) {
+        const h = new Date(ci.scheduled_at).getHours();
+        statuses[h] = ci.status;
+      }
+      setSlotStatuses(statuses);
+    }
+  }, [session?.user?.id]);
+
   const prevWindowRef = useRef<number | null>(undefined);
 
   useEffect(() => {
     loadCurrentCheckIn();
+    loadSlotStatuses();
     const interval = setInterval(() => {
       const newWindow = getCurrentWindow();
       if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
@@ -151,10 +179,11 @@ const CheckInCard = () => {
       }
       prevWindowRef.current = newWindow;
       loadCurrentCheckIn();
+      loadSlotStatuses();
     }, 30000);
     prevWindowRef.current = getCurrentWindow();
     return () => clearInterval(interval);
-  }, [loadCurrentCheckIn]);
+  }, [loadCurrentCheckIn, loadSlotStatuses]);
 
   // Countdown timer + approaching detection
   useEffect(() => {
@@ -320,15 +349,44 @@ const CheckInCard = () => {
         )}
 
         <div className="mt-4 flex gap-2 justify-center">
-          {checkInTimes.map((time) => (
-            <span
-              key={time}
-              className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium"
-            >
-              {time}
-            </span>
-          ))}
+          {CHECK_IN_HOURS.map((h, i) => {
+            const status = slotStatuses[h];
+            const now = new Date();
+            const isPast = now.getHours() >= h;
+            const isCurrent = getCurrentWindow() === h;
+
+            let badgeClass = "bg-primary/10 text-primary"; // upcoming
+            let icon = "";
+            if (status === "responded") {
+              badgeClass = "bg-success/15 text-success border border-success/30";
+              icon = "✓ ";
+            } else if (status === "missed") {
+              badgeClass = "bg-destructive/15 text-destructive border border-destructive/30";
+              icon = "✗ ";
+            } else if (isCurrent && isPast) {
+              badgeClass = "bg-amber-500/15 text-amber-600 border border-amber-500/30 animate-pulse";
+              icon = "● ";
+            }
+
+            return (
+              <span
+                key={h}
+                className={`text-xs px-2 py-1 rounded-full font-medium ${badgeClass}`}
+              >
+                {icon}{checkInTimes[i]}
+              </span>
+            );
+          })}
         </div>
+
+        {/* Missed check-ins summary */}
+        {Object.values(slotStatuses).filter(s => s === "missed").length > 0 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-destructive">
+            <span className="font-semibold">
+              ⚠ {Object.values(slotStatuses).filter(s => s === "missed").length} missed check-in{Object.values(slotStatuses).filter(s => s === "missed").length > 1 ? "s" : ""} today
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
 
