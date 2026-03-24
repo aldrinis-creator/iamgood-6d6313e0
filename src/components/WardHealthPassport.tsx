@@ -59,10 +59,7 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
-    // 2. Face Scan
-    const faceScanScore = (faceScansRes.data ?? []).length > 0 ? 100 : 0;
-
-    // 3. Activity
+    // 2. Activity
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
