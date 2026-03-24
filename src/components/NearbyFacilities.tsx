@@ -75,9 +75,10 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const isHospital = type === "hospitals";
-  const label = isHospital ? "Hospitals" : "Pharmacies";
-  const Icon = isHospital ? Hospital : Cross;
-  const accentClass = isHospital ? "text-primary" : "text-success";
+  const isJanAushadhi = type === "janaushadhi";
+  const label = isJanAushadhi ? "Jan Aushadhi Kendras" : isHospital ? "Hospitals" : "Pharmacies";
+  const Icon = isJanAushadhi ? Cross : isHospital ? Hospital : Cross;
+  const accentClass = isJanAushadhi ? "text-[hsl(142,70%,45%)]" : isHospital ? "text-primary" : "text-success";
   const effectiveCenter = searchCenter || userPos;
 
   const fetchUserFacilities = useCallback(async () => {
