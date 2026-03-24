@@ -117,14 +117,14 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       });
       if (!res.ok) throw new Error("Search failed");
       const json = await res.json();
-      const results: Facility[] = (json.elements || [])
+      let results: Facility[] = (json.elements || [])
         .map((el: any) => {
           const elLat = el.lat ?? el.center?.lat;
           const elLon = el.lon ?? el.center?.lon;
           if (!elLat || !elLon) return null;
           return {
             id: el.id,
-            name: el.tags?.name || (isHospital ? "Hospital" : "Pharmacy"),
+            name: el.tags?.name || (isHospital ? "Hospital" : isJanAushadhi ? "Jan Aushadhi Kendra" : "Pharmacy"),
             lat: elLat,
             lon: elLon,
             phone: el.tags?.phone || el.tags?.["contact:phone"],
@@ -134,7 +134,38 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
             address: [el.tags?.["addr:street"], el.tags?.["addr:city"]].filter(Boolean).join(", "),
           };
         })
-        .filter(Boolean)
+        .filter(Boolean);
+
+      // For Jan Aushadhi, also fetch from our database
+      if (isJanAushadhi) {
+        try {
+          const { data } = await supabase.functions.invoke("jan-aushadhi-search", {
+            body: { type: "store_search", lat, lon },
+          });
+          if (data?.stores?.length) {
+            const dbStores: Facility[] = data.stores.map((s: any) => ({
+              id: `db-${s.id}`,
+              name: s.store_name,
+              lat: s.lat,
+              lon: s.lon,
+              phone: s.phone,
+              address: [s.address, s.district, s.state].filter(Boolean).join(", "),
+              distance: s.distance_km ?? haversine(lat, lon, s.lat, s.lon),
+            }));
+            // Merge and deduplicate by proximity (within 100m)
+            for (const dbStore of dbStores) {
+              const isDuplicate = results.some(
+                (r: Facility) => haversine(r.lat, r.lon, dbStore.lat, dbStore.lon) < 0.1
+              );
+              if (!isDuplicate) results.push(dbStore);
+            }
+          }
+        } catch (e) {
+          console.error("Jan Aushadhi store search error:", e);
+        }
+      }
+
+      results = results
         .sort((a: Facility, b: Facility) => (a.distance ?? 99) - (b.distance ?? 99))
         .slice(0, 50);
 
