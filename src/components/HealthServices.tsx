@@ -20,8 +20,17 @@ const EMERGENCY_NUMBERS = [
 
 const HealthServices = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | "janaushadhi" | null>(null);
 
+  useEffect(() => {
+    const facility = searchParams.get("facility");
+    if (facility === "janaushadhi") {
+      setFacilityView("janaushadhi");
+      searchParams.delete("facility");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const { data: guardians = [] } = useQuery({
     queryKey: ["guardians", user?.id],
     enabled: !!user?.id,
