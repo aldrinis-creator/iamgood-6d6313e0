@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Clock, X, AlertTriangle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Check, Clock, X, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 
@@ -26,6 +27,20 @@ interface DoseSlot {
   takenAt: string | null;
 }
 
+type TimePeriod = "Morning" | "Afternoon" | "Evening";
+
+const getTimePeriod = (hour: number): TimePeriod => {
+  if (hour < 12) return "Morning";
+  if (hour < 17) return "Afternoon";
+  return "Evening";
+};
+
+const periodIcon: Record<TimePeriod, React.ReactNode> = {
+  Morning: <Sun className="w-3.5 h-3.5 text-amber-500" />,
+  Afternoon: <CloudSun className="w-3.5 h-3.5 text-orange-500" />,
+  Evening: <Moon className="w-3.5 h-3.5 text-indigo-400" />,
+};
+
 const notifyGuardians = async (userId: string, medicationName: string, status: string, scheduledTime: string) => {
   try {
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -35,7 +50,7 @@ const notifyGuardians = async (userId: string, medicationName: string, status: s
       body: JSON.stringify({ user_id: userId, medication_name: medicationName, status, scheduled_time: scheduledTime }),
     });
   } catch {
-    // silent fail — guardian notification is best-effort
+    // silent fail
   }
 };
 
@@ -57,10 +72,7 @@ const TodaySchedule = () => {
       .eq("user_id", userId)
       .lte("start_date", format(now, "yyyy-MM-dd"));
 
-    if (medErr || !meds) {
-      setLoading(false);
-      return;
-    }
+    if (medErr || !meds) { setLoading(false); return; }
 
     const { data: logs } = await supabase
       .from("medication_logs")
@@ -96,18 +108,14 @@ const TodaySchedule = () => {
           takenAt = log.taken_at;
         } else {
           const diffMin = differenceInMinutes(now, scheduledAt);
-          if (diffMin > 60) {
-            status = "missed";
-          }
+          if (diffMin > 60) status = "missed";
         }
 
         slots.push({
           medication: med as Medication,
           scheduledAt,
           timeLabel: format(scheduledAt, "h:mm a"),
-          logId,
-          status,
-          takenAt,
+          logId, status, takenAt,
         });
       }
     }
@@ -118,9 +126,7 @@ const TodaySchedule = () => {
       const bIsCurrent = Math.abs(differenceInMinutes(now, b.scheduledAt)) <= 60;
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
-      const aDiff = Math.abs(a.scheduledAt.getTime() - nowMs);
-      const bDiff = Math.abs(b.scheduledAt.getTime() - nowMs);
-      return aDiff - bDiff;
+      return Math.abs(a.scheduledAt.getTime() - nowMs) - Math.abs(b.scheduledAt.getTime() - nowMs);
     });
 
     setDoses(slots);
@@ -137,36 +143,22 @@ const TodaySchedule = () => {
     if (!session?.user?.id) return;
     const now = new Date();
     const diffMin = Math.abs(differenceInMinutes(now, slot.scheduledAt));
-
-    if (diffMin > 60) {
-      toast.error("This dose window has passed (±1 hour).");
-      return;
-    }
+    if (diffMin > 60) { toast.error("This dose window has passed (±1 hour)."); return; }
 
     try {
       if (slot.logId) {
         await supabase.from("medication_logs").update({ status: "taken", taken_at: now.toISOString() }).eq("id", slot.logId);
       } else {
         await supabase.from("medication_logs").insert({
-          medication_id: slot.medication.id,
-          user_id: session.user.id,
-          scheduled_at: slot.scheduledAt.toISOString(),
-          taken_at: now.toISOString(),
-          status: "taken",
+          medication_id: slot.medication.id, user_id: session.user.id,
+          scheduled_at: slot.scheduledAt.toISOString(), taken_at: now.toISOString(), status: "taken",
         });
       }
-
-      await supabase
-        .from("medications")
-        .update({ remaining_quantity: Math.max(0, slot.medication.remaining_quantity - 1) })
-        .eq("id", slot.medication.id);
-
+      await supabase.from("medications").update({ remaining_quantity: Math.max(0, slot.medication.remaining_quantity - 1) }).eq("id", slot.medication.id);
       toast.success(`${slot.medication.name} marked as taken`);
       notifyGuardians(session.user.id, slot.medication.name, "taken", slot.scheduledAt.toISOString());
       loadSchedule();
-    } catch {
-      toast.error("Failed to update");
-    }
+    } catch { toast.error("Failed to update"); }
   };
 
   const markSkipped = async (slot: DoseSlot) => {
@@ -176,19 +168,30 @@ const TodaySchedule = () => {
         await supabase.from("medication_logs").update({ status: "skipped" }).eq("id", slot.logId);
       } else {
         await supabase.from("medication_logs").insert({
-          medication_id: slot.medication.id,
-          user_id: session.user.id,
-          scheduled_at: slot.scheduledAt.toISOString(),
-          status: "skipped",
+          medication_id: slot.medication.id, user_id: session.user.id,
+          scheduled_at: slot.scheduledAt.toISOString(), status: "skipped",
         });
       }
       toast.info(`${slot.medication.name} skipped`);
       notifyGuardians(session.user.id, slot.medication.name, "skipped", slot.scheduledAt.toISOString());
       loadSchedule();
-    } catch {
-      toast.error("Failed to update");
-    }
+    } catch { toast.error("Failed to update"); }
   };
+
+  // Summary stats
+  const takenCount = doses.filter(d => d.status === "taken").length;
+  const totalCount = doses.length;
+  const progressPct = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
+
+  // Group by time period
+  const grouped = useMemo(() => {
+    const groups: Record<TimePeriod, DoseSlot[]> = { Morning: [], Afternoon: [], Evening: [] };
+    doses.forEach(d => {
+      const period = getTimePeriod(d.scheduledAt.getHours());
+      groups[period].push(d);
+    });
+    return groups;
+  }, [doses]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground text-center py-8">Loading schedule...</p>;
@@ -199,73 +202,97 @@ const TodaySchedule = () => {
       <div className="text-center py-8 space-y-2">
         <Clock className="w-10 h-10 text-muted-foreground mx-auto" />
         <p className="text-sm text-muted-foreground">No medications scheduled today.</p>
-        <p className="text-xs text-muted-foreground">Add medications in the "My Meds" tab.</p>
+        <p className="text-xs text-muted-foreground">Add medications in "Manage Medications" below.</p>
       </div>
     );
   }
 
   const now = new Date();
+  const periods: TimePeriod[] = ["Morning", "Afternoon", "Evening"];
 
   return (
-    <div className="space-y-2">
-      {doses.map((slot, i) => {
-        const isCurrent = Math.abs(differenceInMinutes(now, slot.scheduledAt)) <= 60;
-        const isPast = slot.scheduledAt < now && !isCurrent;
+    <div className="space-y-3">
+      {/* Summary header */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">{takenCount} of {totalCount} doses taken</span>
+          <span className="text-muted-foreground">{progressPct}%</span>
+        </div>
+        <Progress value={progressPct} className="h-2" />
+      </div>
+
+      {/* Grouped doses */}
+      {periods.map(period => {
+        const slots = grouped[period];
+        if (slots.length === 0) return null;
 
         return (
-          <Card
-            key={`${slot.medication.id}-${slot.timeLabel}-${i}`}
-            className={`transition-all ${
-              isCurrent && slot.status === "pending"
-                ? "border-primary bg-primary/5 shadow-md"
-                : slot.status === "missed"
-                ? "border-destructive/30 bg-destructive/5"
-                : slot.status === "taken"
-                ? "border-success/30 bg-success/5"
-                : ""
-            }`}
-          >
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="text-center min-w-[60px]">
-                <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
-                {isCurrent && slot.status === "pending" && (
-                  <Badge variant="default" className="text-[10px] mt-1">NOW</Badge>
-                )}
-                {slot.status === "missed" && (
-                  <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
-                )}
-                {slot.status === "taken" && (
-                  <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
-                )}
-                {slot.status === "skipped" && (
-                  <Badge variant="secondary" className="text-[10px] mt-1">SKIPPED</Badge>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{slot.medication.name}</p>
-                <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
-                {slot.medication.instructions && (
-                  <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
-                )}
-              </div>
-              {slot.status === "pending" && isCurrent && (
-                <div className="flex gap-1 shrink-0">
-                  <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => markTaken(slot)}>
-                    <Check className="w-4 h-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => markSkipped(slot)}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-              {slot.status === "pending" && !isCurrent && isPast && (
-                <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-              )}
-              {slot.status === "missed" && (
-                <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-              )}
-            </CardContent>
-          </Card>
+          <div key={period} className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
+              {periodIcon[period]}
+              {period}
+            </div>
+            {slots.map((slot, i) => {
+              const isCurrent = Math.abs(differenceInMinutes(now, slot.scheduledAt)) <= 60;
+              const isPast = slot.scheduledAt < now && !isCurrent;
+
+              return (
+                <Card
+                  key={`${slot.medication.id}-${slot.timeLabel}-${i}`}
+                  className={`transition-all ${
+                    isCurrent && slot.status === "pending"
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : slot.status === "missed"
+                      ? "border-destructive/30 bg-destructive/5"
+                      : slot.status === "taken"
+                      ? "border-success/30 bg-success/5"
+                      : ""
+                  }`}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="text-center min-w-[60px]">
+                      <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
+                      {isCurrent && slot.status === "pending" && (
+                        <Badge variant="default" className="text-[10px] mt-1">NOW</Badge>
+                      )}
+                      {slot.status === "missed" && (
+                        <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
+                      )}
+                      {slot.status === "taken" && (
+                        <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
+                      )}
+                      {slot.status === "skipped" && (
+                        <Badge variant="secondary" className="text-[10px] mt-1">SKIPPED</Badge>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{slot.medication.name}</p>
+                      <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
+                      {slot.medication.instructions && (
+                        <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
+                      )}
+                    </div>
+                    {slot.status === "pending" && isCurrent && (
+                      <div className="flex gap-1 shrink-0">
+                        <Button size="icon" variant="outline" className="h-10 w-10" onClick={() => markTaken(slot)}>
+                          <Check className="w-5 h-5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => markSkipped(slot)}>
+                          <X className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    )}
+                    {slot.status === "pending" && !isCurrent && isPast && (
+                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                    )}
+                    {slot.status === "missed" && (
+                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         );
       })}
     </div>
