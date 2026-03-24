@@ -21,6 +21,18 @@ interface NutritionItem {
   potential_issues: string[];
   health_rating: number;
   suggestions: string[];
+  saturated_fat_g?: number;
+  polyunsaturated_fat_g?: number;
+  monounsaturated_fat_g?: number;
+  trans_fat_g?: number;
+  cholesterol_mg?: number;
+  sodium_mg?: number;
+  potassium_mg?: number;
+  sugar_g?: number;
+  vitamin_a_iu?: number;
+  vitamin_c_mg?: number;
+  calcium_mg?: number;
+  iron_mg?: number;
 }
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
