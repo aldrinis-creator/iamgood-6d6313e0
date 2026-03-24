@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Heart, Clock } from "lucide-react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
