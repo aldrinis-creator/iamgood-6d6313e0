@@ -1,65 +1,34 @@
-# Nutrition Meal Analysis — Detailed Parameter List View
 
-## What Changes
 
-When "Analyze this Meal" returns results, show each ingredient's nutrition as a **detailed parameter list** (like the screenshot) instead of the current compact calorie badge + macro bar. The screenshot shows a clean vertical list: parameter label on the left, colored value on the right, with divider lines between rows.
+# Fix: Check-In and Medication Audio Alerts Not Firing
 
-## Approach
+## Root Causes Found
 
-### 1. Expand the AI response schema
+### 1. Audio unlock listeners are removed after first click
+In `src/lib/audioAlerts.ts` lines 53-61, the click/touchstart handlers call `removeEventListener` after the first interaction. This means after a period of inactivity the AudioContext re-suspends and never gets unlocked again.
 
-**File:** `supabase/functions/nutrition-advisor/index.ts`
+### 2. Check-in "missed" alerts only fire during the same hour
+`useCheckInAudio.ts` line 88: `hour === h && minute >= 30` means the missed alert for 7AM only fires between 7:30-7:59. If the user opens the app at 8:15, no missed alert fires for the 7AM check-in.
 
-Add more fields to the `analyze_meal` JSON format only:
+### 3. Medication alarm window is too narrow (2 minutes)
+`useMedicationAlarms.ts` line 55: `Math.abs(minute - (m || 0)) < 2` means the alarm only fires if the 30-second check loop happens to run within a 2-minute window of the scheduled time. Easy to miss entirely.
 
-- `saturated_fat_g`, `polyunsaturated_fat_g`, `monounsaturated_fat_g`, `trans_fat_g`
-- `cholesterol_mg`, `sodium_mg`, `potassium_mg`, `sugar_g`
-- `vitamin_a_iu`, `vitamin_c_mg`, `calcium_mg`, `iron_mg`
+## Changes
 
-These fields are optional (AI best-effort estimates). Other action types (`meal_plan`, `post_workout`, `feeling_unwell`) keep the current compact format.
+### File: `src/lib/audioAlerts.ts`
+- Keep click/touchstart listeners permanently (remove `removeEventListener` calls) so AudioContext gets re-unlocked on every user interaction
+- Call `ensureAudioReady()` inside `playChime()` and `playVoiceReminder()` as a last-chance resume attempt
 
-### 2. Add `DetailedNutritionList` component
+### File: `src/hooks/useCheckInAudio.ts`
+- **DUE alerts**: Expand window from 5 minutes to the full check-in period (e.g., 7:00-11:59 for the 7AM slot) — fire once if not responded
+- **MISSED alerts**: Check all past check-in hours for today (not just current hour). If a check-in hour has passed and no response exists, fire the missed alert. This handles the user opening the app hours after a missed check-in.
 
-**File:** `src/components/NutritionAdvisor.tsx`
-
-A new component matching the screenshot style:
-
-- Each row: parameter name (dark text) + value (colored, e.g. amber/orange) separated by a pink/accent divider line
-- Rows: Calories, Carbohydrates, Protein, Fat, Saturated Fat, Polyunsaturated Fat, Monounsaturated Fat, Trans Fat, Cholesterol, Sodium, Potassium, Fiber, Sugar, Vitamin A, Vitamin C, Calcium, Iron 
-- Skips rows where value is 0 or not provided
-- One such list per ingredient, with the ingredient name as header
-- Use color to differentiate
-
-### 3. Conditional rendering in results
-
-**File:** `src/components/NutritionAdvisor.tsx`
-
-- When `activeAction === "analyze_meal"` and structured data exists: render `DetailedNutritionList` per item instead of the calorie badge + MacroBar
-- Benefits, issues, suggestions, and health rating cards continue to render below each item's nutrition list — no change there
-- For all other action types: keep current compact card layout
-
-### 4. Update `NutritionItem` interface
-
-**File:** `src/components/NutritionAdvisor.tsx`
-
-Add optional fields to match the expanded schema:
-
-```
-saturated_fat_g?: number;
-polyunsaturated_fat_g?: number;
-monounsaturated_fat_g?: number;
-trans_fat_g?: number;
-cholesterol_mg?: number;
-sodium_mg?: number;
-potassium_mg?: number;
-sugar_g?: number;
-vitamin_a_iu?: number;
-vitamin_c_mg?: number;
-calcium_mg?: number;
-iron_mg?: number;
-```
+### File: `src/hooks/useMedicationAlarms.ts`
+- Widen the current-time alarm window from 2 minutes to 10 minutes (`Math.abs(minute - m) < 10`) to account for the 30-second polling interval and minor timing mismatches
+- This doesn't affect the missed-dose 60-minute logic which is already correct
 
 ## Files Changed
+- `src/lib/audioAlerts.ts` — persistent unlock listeners
+- `src/hooks/useCheckInAudio.ts` — wider alert windows for due and missed
+- `src/hooks/useMedicationAlarms.ts` — wider current-time alarm window
 
-- `supabase/functions/nutrition-advisor/index.ts` — expand `analyze_meal` JSON schema with micronutrients
-- `src/components/NutritionAdvisor.tsx` — add `DetailedNutritionList`, update interface, conditional rendering
