@@ -29,7 +29,7 @@ interface Facility {
 }
 
 interface Props {
-  type: "hospitals" | "pharmacies";
+  type: "hospitals" | "pharmacies" | "janaushadhi";
   onBack: () => void;
 }
 
