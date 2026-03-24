@@ -296,6 +296,10 @@ const NutritionAdvisor = () => {
   const [mealImagePreview, setMealImagePreview] = useState<string | null>(null);
   const [mealImageBase64, setMealImageBase64] = useState<string | null>(null);
   const [showMealUpload, setShowMealUpload] = useState(false);
+  const [showTracker, setShowTracker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [mealType, setMealType] = useState<string>("other");
   const mealFileRef = useRef<HTMLInputElement>(null);
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
