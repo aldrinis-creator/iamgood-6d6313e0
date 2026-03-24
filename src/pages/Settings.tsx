@@ -490,12 +490,19 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.medPush} onCheckedChange={(v) => updateSetting("medPush", v)} />
                 </div>
-                <div className="flex items-center justify-between py-3">
+                <div className="flex items-center justify-between py-3 border-b border-border">
                   <div>
                     <p className="text-sm font-medium">Guardian Updates</p>
                     <p className="text-xs text-muted-foreground">Receive updates when guardians respond</p>
                   </div>
                   <Switch checked={settings.guardianPush} onCheckedChange={(v) => updateSetting("guardianPush", v)} />
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">Medication Missed Alerts</p>
+                    <p className="text-xs text-muted-foreground">Get notified when your ward misses a medication dose</p>
+                  </div>
+                  <Switch checked={settings.medicationMissedNotify} onCheckedChange={(v) => updateSetting("medicationMissedNotify", v)} />
                 </div>
               </CardContent>
             </Card>
