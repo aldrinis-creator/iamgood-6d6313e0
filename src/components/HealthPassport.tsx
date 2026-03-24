@@ -82,11 +82,7 @@ const HealthPassport = () => {
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
-    // 2. Face Scan score
-    const hasScanToday = (faceScansRes.data ?? []).length > 0;
-    const faceScanScore = hasScanToday ? 100 : 0;
-
-    // 3. Activity score
+    // 2. Activity score
     const act = activityRes.data;
     let activityScore = 0;
     if (act) {
