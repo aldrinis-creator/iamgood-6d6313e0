@@ -415,9 +415,54 @@ const NutritionAdvisor = () => {
     setActiveAction(null);
     setAiResponse("");
     setStructuredData(null);
+    setSaved(false);
     clearMealImage();
     setShowMealUpload(false);
+    setShowTracker(false);
   };
+
+  const saveMealLog = async () => {
+    if (!user || !structuredData || structuredData.length === 0) return;
+    setSaving(true);
+    try {
+      const totalCal = structuredData.reduce((s, i) => s + i.calories, 0);
+      const totalProtein = structuredData.reduce((s, i) => s + i.protein_g, 0);
+      const totalCarbs = structuredData.reduce((s, i) => s + i.carbs_g, 0);
+      const totalFats = structuredData.reduce((s, i) => s + i.fats_g, 0);
+      const totalFiber = structuredData.reduce((s, i) => s + i.fiber_g, 0);
+      const mealName = structuredData.map(i => i.name).join(", ");
+
+      const { error } = await supabase.from("meal_logs").insert({
+        user_id: user.id,
+        meal_type: mealType,
+        meal_name: mealName,
+        items: structuredData as any,
+        total_calories: totalCal,
+        total_protein_g: totalProtein,
+        total_carbs_g: totalCarbs,
+        total_fats_g: totalFats,
+        total_fiber_g: totalFiber,
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Meal saved to your calorie tracker!");
+    } catch {
+      toast.error("Failed to save meal");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (showTracker) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={resetView}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back to Nutrition
+        </Button>
+        <CalorieTracker />
+      </div>
+    );
+  }
 
   // Meal photo upload screen
   if (showMealUpload && activeAction === "analyze_meal") {
