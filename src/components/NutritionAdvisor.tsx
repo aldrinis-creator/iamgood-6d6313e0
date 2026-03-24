@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +22,18 @@ interface NutritionItem {
   potential_issues: string[];
   health_rating: number;
   suggestions: string[];
+  saturated_fat_g?: number;
+  polyunsaturated_fat_g?: number;
+  monounsaturated_fat_g?: number;
+  trans_fat_g?: number;
+  cholesterol_mg?: number;
+  sodium_mg?: number;
+  potassium_mg?: number;
+  sugar_g?: number;
+  vitamin_a_iu?: number;
+  vitamin_c_mg?: number;
+  calcium_mg?: number;
+  iron_mg?: number;
 }
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
@@ -55,30 +68,83 @@ const MacroBar = ({ protein, carbs, fats }: { protein: number; carbs: number; fa
   );
 };
 
-const NutritionCard = ({ item }: { item: NutritionItem }) => (
-  <div className="space-y-3">
-    {/* Header card with calories & macros */}
+const DetailedNutritionList = ({ item }: { item: NutritionItem }) => {
+  const rows: { label: string; value: string }[] = [
+    { label: "Calories", value: `${item.calories} kcal` },
+    { label: "Carbohydrates", value: `${item.carbs_g} g` },
+    { label: "Protein", value: `${item.protein_g} g` },
+    { label: "Fat", value: `${item.fats_g} g` },
+    ...(item.saturated_fat_g ? [{ label: "  Saturated Fat", value: `${item.saturated_fat_g} g` }] : []),
+    ...(item.polyunsaturated_fat_g ? [{ label: "  Polyunsaturated Fat", value: `${item.polyunsaturated_fat_g} g` }] : []),
+    ...(item.monounsaturated_fat_g ? [{ label: "  Monounsaturated Fat", value: `${item.monounsaturated_fat_g} g` }] : []),
+    ...(item.trans_fat_g ? [{ label: "  Trans Fat", value: `${item.trans_fat_g} g` }] : []),
+    ...(item.cholesterol_mg ? [{ label: "Cholesterol", value: `${item.cholesterol_mg} mg` }] : []),
+    ...(item.sodium_mg ? [{ label: "Sodium", value: `${item.sodium_mg} mg` }] : []),
+    ...(item.potassium_mg ? [{ label: "Potassium", value: `${item.potassium_mg} mg` }] : []),
+    { label: "Fiber", value: `${item.fiber_g} g` },
+    ...(item.sugar_g ? [{ label: "Sugar", value: `${item.sugar_g} g` }] : []),
+    ...(item.vitamin_a_iu ? [{ label: "Vitamin A", value: `${item.vitamin_a_iu} IU` }] : []),
+    ...(item.vitamin_c_mg ? [{ label: "Vitamin C", value: `${item.vitamin_c_mg} mg` }] : []),
+    ...(item.calcium_mg ? [{ label: "Calcium", value: `${item.calcium_mg} mg` }] : []),
+    ...(item.iron_mg ? [{ label: "Iron", value: `${item.iron_mg} mg` }] : []),
+  ].filter(r => r.value !== "0 g" && r.value !== "0 mg" && r.value !== "0 IU" && r.value !== "0 kcal");
+
+  return (
     <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Flame className="w-5 h-5 text-orange-500" />
+      <CardContent className="p-4 space-y-1">
+        <div className="flex items-center gap-2 mb-3">
+          <Flame className="w-5 h-5 text-destructive" />
           <h3 className="font-bold text-base">{item.name}</h3>
         </div>
-        <p className="text-sm text-muted-foreground">{item.description}</p>
-
-        {/* Calorie badge */}
-        <div className="bg-muted rounded-xl py-4 text-center">
-          <span className="text-3xl font-bold text-success tabular-nums">{item.calories}</span>
-          <span className="text-sm text-muted-foreground ml-1">kcal</span>
-        </div>
-
-        <MacroBar protein={item.protein_g} carbs={item.carbs_g} fats={item.fats_g} />
-
-        {item.fiber_g > 0 && (
-          <p className="text-xs text-center text-muted-foreground">Fiber: {item.fiber_g}g</p>
+        <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
+        {rows.map((row, i) => (
+          <div key={i}>
+            <div className="flex justify-between items-center py-2">
+              <span className={`text-sm ${row.label.startsWith("  ") ? "pl-4 text-muted-foreground" : "font-medium text-foreground"}`}>
+                {row.label.trim()}
+              </span>
+              <span className="text-sm font-semibold text-primary">{row.value}</span>
+            </div>
+            {i < rows.length - 1 && <Separator className="bg-accent" />}
+          </div>
+        ))}
+        {item.health_rating > 0 && (
+          <div className="flex items-center justify-center gap-1 pt-3">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <span className="text-xs text-muted-foreground">Health Rating: {item.health_rating}/10</span>
+          </div>
         )}
       </CardContent>
     </Card>
+  );
+};
+
+const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; hideNutrition?: boolean }) => (
+  <div className="space-y-3">
+    {/* Header card with calories & macros — hidden when table is shown */}
+    {!hideNutrition && (
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Flame className="w-5 h-5 text-destructive" />
+            <h3 className="font-bold text-base">{item.name}</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">{item.description}</p>
+
+          {/* Calorie badge */}
+          <div className="bg-muted rounded-xl py-4 text-center">
+            <span className="text-3xl font-bold text-success tabular-nums">{item.calories}</span>
+            <span className="text-sm text-muted-foreground ml-1">kcal</span>
+          </div>
+
+          <MacroBar protein={item.protein_g} carbs={item.carbs_g} fats={item.fats_g} />
+
+          {item.fiber_g > 0 && (
+            <p className="text-xs text-center text-muted-foreground">Fiber: {item.fiber_g}g</p>
+          )}
+        </CardContent>
+      </Card>
+    )}
 
     {/* Health Benefits */}
     {item.health_benefits?.length > 0 && (
@@ -99,9 +165,9 @@ const NutritionCard = ({ item }: { item: NutritionItem }) => (
 
     {/* Potential Issues */}
     {item.potential_issues?.length > 0 && (
-      <Card className="border-sos/20">
+      <Card className="border-destructive/20">
         <CardContent className="p-4 space-y-2">
-          <div className="flex items-center gap-2 text-sos font-semibold text-sm">
+          <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
             <AlertTriangle className="w-4 h-4" />
             Potential Issues
           </div>
@@ -131,8 +197,8 @@ const NutritionCard = ({ item }: { item: NutritionItem }) => (
       </Card>
     )}
 
-    {/* Health Rating */}
-    {item.health_rating > 0 && (
+    {/* Health Rating — only show if nutrition card is visible (otherwise it's in DetailedNutritionList) */}
+    {!hideNutrition && item.health_rating > 0 && (
       <div className="flex items-center justify-center gap-1 py-1">
         <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
         <span className="text-xs text-muted-foreground">Health Rating: {item.health_rating}/10</span>
@@ -336,9 +402,20 @@ const NutritionAdvisor = () => {
                 <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
               </div>
             )}
-            {structuredData.map((item, idx) => (
-              <NutritionCard key={idx} item={item} />
-            ))}
+            {activeAction === "analyze_meal" ? (
+              <>
+                {structuredData.map((item, idx) => (
+                  <div key={idx} className="space-y-4">
+                    <DetailedNutritionList item={item} />
+                    <NutritionCard item={item} hideNutrition />
+                  </div>
+                ))}
+              </>
+            ) : (
+              structuredData.map((item, idx) => (
+                <NutritionCard key={idx} item={item} />
+              ))
+            )}
           </div>
         ) : (
           <div className="space-y-4">

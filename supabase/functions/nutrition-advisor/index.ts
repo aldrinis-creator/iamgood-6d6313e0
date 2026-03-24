@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const jsonFormat = `IMPORTANT: You MUST respond ONLY with a valid JSON array. No markdown, no code fences, no extra text. Each item in the array is a meal/food object with these fields:
+const jsonFormatBase = `IMPORTANT: You MUST respond ONLY with a valid JSON array. No markdown, no code fences, no extra text. Each item in the array is a meal/food object with these fields:
 - name (string): meal/food name
 - description (string): brief description
 - calories (number): total kcal
@@ -20,11 +20,39 @@ const jsonFormat = `IMPORTANT: You MUST respond ONLY with a valid JSON array. No
 
 Example: [{"name":"Oats Porridge","description":"Steel-cut oats with milk","calories":220,"protein_g":8,"carbs_g":38,"fats_g":4,"fiber_g":5,"health_benefits":["High fiber aids digestion"],"potential_issues":["Add protein source"],"health_rating":7,"suggestions":["Top with nuts"]}]`;
 
+const jsonFormatAnalyze = `IMPORTANT: You MUST respond ONLY with a valid JSON array. No markdown, no code fences, no extra text. Each item in the array is a meal/food ingredient object with ALL of these fields:
+- name (string): ingredient/food name
+- description (string): brief description
+- calories (number): total kcal
+- protein_g (number): grams of protein
+- carbs_g (number): grams of carbs
+- fats_g (number): grams of total fat
+- saturated_fat_g (number): grams of saturated fat
+- polyunsaturated_fat_g (number): grams of polyunsaturated fat
+- monounsaturated_fat_g (number): grams of monounsaturated fat
+- trans_fat_g (number): grams of trans fat
+- cholesterol_mg (number): milligrams of cholesterol
+- sodium_mg (number): milligrams of sodium
+- potassium_mg (number): milligrams of potassium
+- fiber_g (number): grams of fiber
+- sugar_g (number): grams of sugar
+- vitamin_a_iu (number): IU of Vitamin A
+- vitamin_c_mg (number): mg of Vitamin C
+- calcium_mg (number): mg of Calcium
+- iron_mg (number): mg of Iron
+- health_benefits (string[]): list of health benefit bullet points personalized to user
+- potential_issues (string[]): list of potential concerns personalized to user
+- health_rating (number 1-10): overall health rating for this user
+- suggestions (string[]): improvement tips
+
+Use 0 for any field you cannot estimate. Return each distinct ingredient/food item separately.
+Example: [{"name":"Dal Tadka","description":"Yellow lentils tempered with spices","calories":180,"protein_g":12,"carbs_g":22,"fats_g":6,"saturated_fat_g":1,"polyunsaturated_fat_g":1,"monounsaturated_fat_g":3,"trans_fat_g":0,"cholesterol_mg":0,"sodium_mg":400,"potassium_mg":350,"fiber_g":4,"sugar_g":2,"vitamin_a_iu":50,"vitamin_c_mg":3,"calcium_mg":30,"iron_mg":3,"health_benefits":["High protein"],"potential_issues":["Sodium from salt"],"health_rating":7,"suggestions":["Use less oil"]}]`;
+
 const systemPrompts: Record<string, string> = {
-  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals. Suggest 2-4 food items. ${jsonFormat}`,
-  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a detailed calorie breakdown. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions. Return each distinct food item as a separate object. ${jsonFormat}`,
-  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals. Suggest 2-3 food items. ${jsonFormat}`,
-  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully. Suggest 2-3 food items. ${jsonFormat}`,
+  meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals. Suggest 2-4 food items. ${jsonFormatBase}`,
+  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a comprehensive nutritional breakdown including all macronutrients, micronutrients, vitamins and minerals. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions. Return each distinct food item/ingredient as a separate object. ${jsonFormatAnalyze}`,
+  post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals. Suggest 2-3 food items. ${jsonFormatBase}`,
+  feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully. Suggest 2-3 food items. ${jsonFormatBase}`,
 };
 
 serve(async (req) => {
