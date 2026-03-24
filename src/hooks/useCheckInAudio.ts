@@ -64,10 +64,12 @@ const useCheckInAudio = () => {
     const minute = now.getMinutes();
     const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-    // --- DUE alerts: fire within first 5 minutes of check-in hour ---
-    for (const h of CHECK_IN_HOURS) {
+    // --- DUE alerts: fire during the check-in window (from h until next slot) ---
+    for (let i = 0; i < CHECK_IN_HOURS.length; i++) {
+      const h = CHECK_IN_HOURS[i];
+      const nextH = i + 1 < CHECK_IN_HOURS.length ? CHECK_IN_HOURS[i + 1] : 24;
       const dueKey = `due-${dateKey}-${h}`;
-      if (hour === h && minute < 5 && !firedRef.current.has(dueKey)) {
+      if (hour >= h && hour < nextH && !firedRef.current.has(dueKey)) {
         const responded = await isCheckInResponded(h, now);
         if (!responded) {
           firedRef.current.add(dueKey);
@@ -82,10 +84,10 @@ const useCheckInAudio = () => {
       }
     }
 
-    // --- MISSED alerts: 30+ min past check-in hour with no response ---
+    // --- MISSED alerts: any past check-in hour with no response ---
     for (const h of CHECK_IN_HOURS) {
       const missedKey = `missed-${dateKey}-${h}`;
-      if (hour === h && minute >= 30 && !firedRef.current.has(missedKey)) {
+      if (hour > h && !firedRef.current.has(missedKey)) {
         const responded = await isCheckInResponded(h, now);
         if (!responded) {
           firedRef.current.add(missedKey);
