@@ -533,14 +533,72 @@ const NutritionAdvisor = () => {
           </label>
         )}
 
-        <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => handleAction("analyze_meal", mealImageBase64)} disabled={!mealImageBase64}>
-            <Camera className="w-4 h-4 mr-1" /> Analyze Meal
-          </Button>
-          <Button variant="outline" className="flex-1" onClick={() => handleAction("analyze_meal")}>
-            Skip Photo
-          </Button>
-        </div>
+        <Separator className="my-2" />
+
+        <Button variant="outline" className="w-full gap-2 border-dashed border-primary/30 text-primary" onClick={() => setShowManualEntry(!showManualEntry)}>
+          <Plus className="w-4 h-4" />
+          {showManualEntry ? "Cancel Manual Entry" : "Log Meal Manually"}
+        </Button>
+
+        {showManualEntry ? (
+          <Card className="border-primary/20">
+            <CardContent className="p-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Meal Name *</Label>
+                <Input placeholder="e.g. Rice and dal" value={manualMeal.meal_name} onChange={(e) => setManualMeal(p => ({ ...p, meal_name: e.target.value }))} maxLength={200} className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Meal Type</Label>
+                <Select value={manualMeal.meal_type} onValueChange={(v) => setManualMeal(p => ({ ...p, meal_type: v }))}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="breakfast">🌅 Breakfast</SelectItem>
+                    <SelectItem value="lunch">☀️ Lunch</SelectItem>
+                    <SelectItem value="dinner">🌙 Dinner</SelectItem>
+                    <SelectItem value="snack">🍿 Snack</SelectItem>
+                    <SelectItem value="other">🍽️ Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Calories (kcal)</Label>
+                  <Input type="number" placeholder="0" value={manualMeal.calories} onChange={(e) => setManualMeal(p => ({ ...p, calories: e.target.value }))} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Protein (g)</Label>
+                  <Input type="number" placeholder="0" value={manualMeal.protein} onChange={(e) => setManualMeal(p => ({ ...p, protein: e.target.value }))} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Carbs (g)</Label>
+                  <Input type="number" placeholder="0" value={manualMeal.carbs} onChange={(e) => setManualMeal(p => ({ ...p, carbs: e.target.value }))} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Fats (g)</Label>
+                  <Input type="number" placeholder="0" value={manualMeal.fats} onChange={(e) => setManualMeal(p => ({ ...p, fats: e.target.value }))} className="h-9 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fiber (g)</Label>
+                  <Input type="number" placeholder="0" value={manualMeal.fiber} onChange={(e) => setManualMeal(p => ({ ...p, fiber: e.target.value }))} className="h-9 text-sm" />
+                </div>
+              </div>
+              <Button className="w-full" onClick={handleManualMealSave} disabled={savingManual}>
+                {savingManual ? "Saving..." : "Save Meal"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={() => handleAction("analyze_meal", mealImageBase64)} disabled={!mealImageBase64}>
+              <Camera className="w-4 h-4 mr-1" /> Analyze Meal
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => handleAction("analyze_meal")}>
+              Skip Photo
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
