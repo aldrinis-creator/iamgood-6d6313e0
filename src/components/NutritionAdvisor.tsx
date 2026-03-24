@@ -341,6 +341,7 @@ const NutritionAdvisor = () => {
     setAiResponse("");
     setStructuredData(null);
     setUsedFallback(false);
+    setSaved(false);
     setLoading(true);
     setShowMealUpload(false);
     try {
