@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Hospital, Cross, Phone, MapPin, Shield, Flame, Baby, Brain, FlaskConical } from "lucide-react";
