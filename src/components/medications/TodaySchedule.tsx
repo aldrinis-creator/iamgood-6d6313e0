@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Check, Clock, X, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
+import { Clock, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 
@@ -161,22 +162,6 @@ const TodaySchedule = () => {
     } catch { toast.error("Failed to update"); }
   };
 
-  const markSkipped = async (slot: DoseSlot) => {
-    if (!session?.user?.id) return;
-    try {
-      if (slot.logId) {
-        await supabase.from("medication_logs").update({ status: "skipped" }).eq("id", slot.logId);
-      } else {
-        await supabase.from("medication_logs").insert({
-          medication_id: slot.medication.id, user_id: session.user.id,
-          scheduled_at: slot.scheduledAt.toISOString(), status: "skipped",
-        });
-      }
-      toast.info(`${slot.medication.name} skipped`);
-      notifyGuardians(session.user.id, slot.medication.name, "skipped", slot.scheduledAt.toISOString());
-      loadSchedule();
-    } catch { toast.error("Failed to update"); }
-  };
 
   // Summary stats
   const takenCount = doses.filter(d => d.status === "taken").length;
@@ -272,22 +257,21 @@ const TodaySchedule = () => {
                         <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
                       )}
                     </div>
-                    {slot.status === "pending" && isCurrent && (
-                      <div className="flex gap-1 shrink-0">
-                        <Button size="icon" variant="outline" className="h-10 w-10" onClick={() => markTaken(slot)}>
-                          <Check className="w-5 h-5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => markSkipped(slot)}>
-                          <X className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    )}
-                    {slot.status === "pending" && !isCurrent && isPast && (
-                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-                    )}
-                    {slot.status === "missed" && (
-                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(slot.status === "missed" || (slot.status === "pending" && !isCurrent && isPast)) && (
+                        <AlertTriangle className="w-5 h-5 text-destructive" />
+                      )}
+                      <Checkbox
+                        checked={slot.status === "taken"}
+                        disabled={slot.status !== "pending" || !isCurrent}
+                        onCheckedChange={() => markTaken(slot)}
+                        className={`h-6 w-6 rounded-md ${
+                          slot.status === "taken"
+                            ? "border-success data-[state=checked]:bg-success data-[state=checked]:text-success-foreground"
+                            : ""
+                        }`}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               );
