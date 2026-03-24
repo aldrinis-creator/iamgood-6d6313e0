@@ -240,6 +240,21 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         </div>
       )}
 
+      {/* Jan Aushadhi Alternatives */}
+      {allMeds.length > 0 && (
+        <JanAushadhiAlternatives
+          medicationNames={allMeds.map((m) => m.name)}
+          onFindKendra={() => navigate("/my-health?tool=Services&facility=janaushadhi")}
+          onOrderFromKendra={(medName, genericName) => {
+            const med = allMeds.find((m) => m.name === medName);
+            if (med) {
+              addToOrder({ ...med, name: genericName });
+            }
+            toast.success(`Added ${genericName} to order`);
+          }}
+        />
+      )}
+
       {/* Low Stock Alerts */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold flex items-center gap-2">
