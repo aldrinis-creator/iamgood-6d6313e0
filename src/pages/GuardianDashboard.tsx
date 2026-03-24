@@ -13,6 +13,7 @@ import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
 import WardVitalsSummary from "@/components/WardVitalsSummary";
 import WardMedicationStatus from "@/components/WardMedicationStatus";
+import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import { playChime } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
