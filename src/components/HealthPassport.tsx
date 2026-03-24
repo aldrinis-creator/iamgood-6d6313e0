@@ -62,7 +62,7 @@ const HealthPassport = () => {
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
     // Fetch all data in parallel
-    const [checkInsRes, faceScansRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
