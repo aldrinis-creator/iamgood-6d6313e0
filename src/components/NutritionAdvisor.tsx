@@ -304,6 +304,11 @@ const NutritionAdvisor = () => {
   const [mealType, setMealType] = useState<string>("other");
   const mealFileRef = useRef<HTMLInputElement>(null);
 
+  // Manual meal entry state
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualMeal, setManualMeal] = useState({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
+  const [savingManual, setSavingManual] = useState(false);
+
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
