@@ -1,103 +1,56 @@
-# Vitals Monitor Overhaul + Vitals & Nutrition Scores in Health Passport
 
-## Overview
 
-Four interconnected changes: revamp Vitals Monitor fields, add Vitals Score and Nutrition Score to the Health Passport, and move manual meal entry from Calorie Tracker to the Nutrition Advisor's "Analyze this Meal" section.
+# Simplify Medication Manager — Focus on Tablet-Taking Activity
 
----
+## Current Problem
 
-## 1. Database Migration — Add new vitals columns to `activity_logs`
+The Medication Manager has 6 tabs (Today, Meds, Scan, Refill, Banned, Alarms) all crammed into a single view. For the primary daily task — marking tablets as taken — the user must navigate to the "Today" tab among 5 other options. The tab labels are tiny and the layout is cluttered.
 
-Add columns to `activity_logs` table:
+## Suggestion: Two-Level Layout
 
-- `respiration_rate` (integer, nullable, default 0) — breaths/min
-- `bp_systolic` (integer, nullable, default null) — mmHg
-- `bp_diastolic` (integer, nullable, default null) — mmHg
-- `temperature_c` (numeric, nullable, default null) — °C
-- `glucose_mg_dl` (integer, nullable, default null) — mg/dL
+Restructure so the **Today Schedule is always visible first** (no tab needed), and secondary features are grouped behind a single "Manage" expandable section.
 
-These columns allow manula and wearable entry of vitals data with a tab that says, "Load data from Wearable"
+### Layout
 
----
+```text
++----------------------------------+
+|  Medication Manager              |
+|                                  |
+|  Today's Schedule (always shown) |
+|  ┌────────────────────────────┐  |
+|  │ 8:00 AM  Aspirin  [✓] [✗] │  |
+|  │ 12:00 PM Metformin         │  |
+|  │ 8:00 PM  Vitamin D         │  |
+|  └────────────────────────────┘  |
+|                                  |
+|  ▸ Manage Medications            |
+|    (Meds | Scan | Refill |       |
+|     Banned | Alarms)             |
++----------------------------------+
+```
 
-## 2. Vitals Monitor Dashboard — Update metrics and chart
+### Changes
 
-**File:** `src/components/VitalsMonitor.tsx`
+**File:** `src/components/medications/MedicationManager.tsx`
 
-**Remove:** Stress, Steps, Calories metric cards.
+- Remove the 6-tab layout entirely
+- Render `<TodaySchedule />` directly at the top — always visible, zero taps
+- Add a `<Collapsible>` section labeled "Manage Medications" below
+- Inside the collapsible, keep the existing 5 tabs (Meds, Scan, Refill, Banned, Alarms) as a smaller tab group
+- Add a daily summary line above the schedule: "3 of 5 doses taken today" with a progress indicator
 
-**Replace with new metrics (9 total, grid-cols-3):**
+**File:** `src/components/medications/TodaySchedule.tsx`
 
-- Heart Rate (bpm) — from activity_logs
-- SpO2 (%) — from activity_logs
-- Respiration Rate (breaths/min) — new column
-- Blood Pressure (mmHg) — shows "Sys/Dia" format
-- Temperature (°C) — new column
-- Glucose (mg/dL) — new column
-- Activity Duration (min) — pulled from `active_minutes` in activity_logs
-- Calories Burnt (kcal) — pulled from `calories` in activity_logs
-- Steps / Distance — pulled from activity_logs (steps + distance_km)
-- Sleep (hrs) — from wellness_logs
+- Add a compact summary header: taken/total count + progress bar
+- Group doses by time period (Morning / Afternoon / Evening) with small headers for clarity
+- Make the Take/Skip buttons slightly larger (h-10 instead of h-8) for elderly-friendly tapping
 
-**Add manual entry form** for vitals that can't come from wearables (BP, temperature, glucose, respiration rate) — small inline form with Save button that updates today's `activity_logs` row.
+### No other files changed
 
-**Update chart:** Add respiration rate line to the 7-day trend chart alongside HR and SpO2.
-
-**Update AI Insights payload:** Include all new fields (respiration_rate, bp, temperature, glucose) so the AI considers them.
-
----
-
-## 3. Health Passport — Add Vitals Score and Nutrition Score
-
-**File:** `src/components/HealthPassport.tsx`
-
-Currently 4 categories (Check-iN, Activity, Wellness, Medications) averaged over 4. Add two more:
-
-**Vitals Score (out of 100):**
-
-- 20 pts: Heart Rate logged today (in normal range 50-100 = full, else partial)
-- 20 pts: SpO2 logged (>95 = full, >90 = partial)
-- 20 pts: BP logged (sys 90-140 & dia 60-90 = full)
-- 20 pts: Temperature logged (36-37.5°C = full)
-- 20 pts: Glucose logged (70-140 mg/dL = full)
-- If a metric has no data, that 20-pt bucket scores 0 (encourages logging)
-
-**Nutrition Score (out of 100):**
-
-- Fetch today's `meal_logs` (from either AI analysis or manual entry)
-- 30 pts: At least one meal logged
-- 20 pts: 2+ meals logged
-- 25 pts: Calories within ±20% of daily goal (from `nutrition_personas.daily_calorie_goal`)
-- 25 pts: Protein > 10% of calories (basic macro balance check)
-
-**Overall score** now averages over 6 categories instead of 4.
-
-Add route mappings: Vitals → `/my-health?tool=Vitals`, Nutrition → `/my-health?tool=Nutrition`.
-
-**File:** `src/components/WardHealthPassport.tsx` — Mirror the same Vitals Score and Nutrition Score logic for the guardian view.
-
----
-
-## 4. Move Manual Meal Entry to Nutrition Advisor
-
-**File:** `src/components/NutritionAdvisor.tsx`
-
-- Add a "Log Meal Manually" button alongside the "Take Photo" / "Upload" options in the "Analyze this Meal" view.
-- When tapped, show the manual entry form (meal name, type, calories, protein, carbs, fats, fiber) inline.
-- Save to `meal_logs` table (same logic currently in CalorieTracker).
-
-**File:** `src/components/CalorieTracker.tsx`
-
-- Remove the manual meal entry form and "Log Meal Manually" button.
-- CalorieTracker becomes read-only display: goal setting, date navigation, daily log list, and chart.
-
----
+The sub-components (MedicationList, PrescriptionScanner, RefillOrder, BannedMedications, AlarmSettings) remain as-is — they just live inside the collapsible section now.
 
 ## Files Changed
 
-- **Migration SQL** — add 5 columns to `activity_logs`
-- `src/components/VitalsMonitor.tsx` — new metrics, manual vitals entry form, updated AI payload
-- `src/components/HealthPassport.tsx` — add Vitals Score + Nutrition Score (6 categories)
-- `src/components/WardHealthPassport.tsx` — mirror Vitals + Nutrition scores
-- `src/components/NutritionAdvisor.tsx` — add manual meal entry form
-- `src/components/CalorieTracker.tsx` — remove manual entry form
+- `src/components/medications/MedicationManager.tsx` — replace tabs with always-visible schedule + collapsible manage section
+- `src/components/medications/TodaySchedule.tsx` — add summary header, time-period grouping, larger action buttons
+
