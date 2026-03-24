@@ -452,6 +452,7 @@ const NutritionAdvisor = () => {
                     <NutritionCard item={item} hideNutrition />
                   </div>
                 ))}
+                {structuredData.length >= 2 && <TotalSummaryCard items={structuredData} />}
               </>
             ) : (
               structuredData.map((item, idx) => (
