@@ -45,6 +45,7 @@ interface RefillOrderProps {
 
 const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative, orderItems, setOrderItems }: RefillOrderProps) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
   const [bannedMap, setBannedMap] = useState<Record<string, BannedStatus>>({});
