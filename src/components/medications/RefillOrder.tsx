@@ -10,7 +10,9 @@ import {
   CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import type { SelectedAlternative } from "./MedicationManager";
+import JanAushadhiAlternatives from "./JanAushadhiAlternatives";
 
 interface Medication {
   id: string;
