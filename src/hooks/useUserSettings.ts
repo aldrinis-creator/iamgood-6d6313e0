@@ -55,6 +55,7 @@ export interface UserSettings {
   medPush: boolean;
   guardianPush: boolean;
   weeklyReport: boolean;
+  medicationMissedNotify: boolean;
   // Check-In
   sleepMode: boolean;
   pauseMode: PauseMode;
