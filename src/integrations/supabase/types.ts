@@ -17,6 +17,8 @@ export type Database = {
       activity_logs: {
         Row: {
           active_minutes: number | null
+          bp_diastolic: number | null
+          bp_systolic: number | null
           breaths_per_min: number | null
           cadence: number | null
           calories: number | null
@@ -25,18 +27,23 @@ export type Database = {
           exercise_minutes: number
           exercise_type: string | null
           floors_climbed: number | null
+          glucose_mg_dl: number | null
           heart_rate: number | null
           id: string
           log_date: string
           notes: string | null
+          respiration_rate: number | null
           sleep_hours: number
           source: string
           spo2: number | null
           steps: number
+          temperature_c: number | null
           user_id: string
         }
         Insert: {
           active_minutes?: number | null
+          bp_diastolic?: number | null
+          bp_systolic?: number | null
           breaths_per_min?: number | null
           cadence?: number | null
           calories?: number | null
@@ -45,18 +52,23 @@ export type Database = {
           exercise_minutes?: number
           exercise_type?: string | null
           floors_climbed?: number | null
+          glucose_mg_dl?: number | null
           heart_rate?: number | null
           id?: string
           log_date?: string
           notes?: string | null
+          respiration_rate?: number | null
           sleep_hours?: number
           source?: string
           spo2?: number | null
           steps?: number
+          temperature_c?: number | null
           user_id: string
         }
         Update: {
           active_minutes?: number | null
+          bp_diastolic?: number | null
+          bp_systolic?: number | null
           breaths_per_min?: number | null
           cadence?: number | null
           calories?: number | null
@@ -65,14 +77,17 @@ export type Database = {
           exercise_minutes?: number
           exercise_type?: string | null
           floors_climbed?: number | null
+          glucose_mg_dl?: number | null
           heart_rate?: number | null
           id?: string
           log_date?: string
           notes?: string | null
+          respiration_rate?: number | null
           sleep_hours?: number
           source?: string
           spo2?: number | null
           steps?: number
+          temperature_c?: number | null
           user_id?: string
         }
         Relationships: []
