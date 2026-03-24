@@ -40,7 +40,6 @@ const HealthPassport = () => {
   const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
-    { name: "Face Scan", score: 0, max: 100, action: "Start Scan" },
     { name: "Activity", score: 0, max: 100 },
     { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
