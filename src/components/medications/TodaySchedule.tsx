@@ -257,22 +257,21 @@ const TodaySchedule = () => {
                         <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
                       )}
                     </div>
-                    {slot.status === "pending" && isCurrent && (
-                      <div className="flex gap-1 shrink-0">
-                        <Button size="icon" variant="outline" className="h-10 w-10" onClick={() => markTaken(slot)}>
-                          <Check className="w-5 h-5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => markSkipped(slot)}>
-                          <X className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    )}
-                    {slot.status === "pending" && !isCurrent && isPast && (
-                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-                    )}
-                    {slot.status === "missed" && (
-                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(slot.status === "missed" || (slot.status === "pending" && !isCurrent && isPast)) && (
+                        <AlertTriangle className="w-5 h-5 text-destructive" />
+                      )}
+                      <Checkbox
+                        checked={slot.status === "taken"}
+                        disabled={slot.status !== "pending" || !isCurrent}
+                        onCheckedChange={() => markTaken(slot)}
+                        className={`h-6 w-6 rounded-md ${
+                          slot.status === "taken"
+                            ? "border-success data-[state=checked]:bg-success data-[state=checked]:text-success-foreground"
+                            : ""
+                        }`}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               );
