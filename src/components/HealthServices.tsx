@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Hospital, Cross, Phone, MapPin, Shield, Flame, Baby, Brain, FlaskConical } from "lucide-react";
@@ -19,8 +20,17 @@ const EMERGENCY_NUMBERS = [
 
 const HealthServices = () => {
   const { user } = useAuth();
-  const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [facilityView, setFacilityView] = useState<"hospitals" | "pharmacies" | "janaushadhi" | null>(null);
 
+  useEffect(() => {
+    const facility = searchParams.get("facility");
+    if (facility === "janaushadhi") {
+      setFacilityView("janaushadhi");
+      searchParams.delete("facility");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const { data: guardians = [] } = useQuery({
     queryKey: ["guardians", user?.id],
     enabled: !!user?.id,
@@ -44,7 +54,7 @@ const HealthServices = () => {
       {/* Nearby Facilities */}
       <div>
         <h2 className="text-lg font-semibold mb-2">Find Nearby</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Button
             variant="outline"
             className="h-auto py-4 flex flex-col gap-2"
@@ -61,6 +71,15 @@ const HealthServices = () => {
           >
             <Cross className="w-6 h-6 text-success" />
             <span className="text-xs font-medium">Pharmacies</span>
+            <MapPin className="w-3 h-3 text-muted-foreground" />
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col gap-2 border-[hsl(142,70%,45%)]/30"
+            onClick={() => setFacilityView("janaushadhi")}
+          >
+            <Cross className="w-6 h-6 text-[hsl(142,70%,45%)]" />
+            <span className="text-xs font-medium text-center leading-tight">Jan Aushadhi</span>
             <MapPin className="w-3 h-3 text-muted-foreground" />
           </Button>
         </div>

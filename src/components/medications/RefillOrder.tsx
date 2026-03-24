@@ -10,7 +10,9 @@ import {
   CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import type { SelectedAlternative } from "./MedicationManager";
+import JanAushadhiAlternatives from "./JanAushadhiAlternatives";
 
 interface Medication {
   id: string;
@@ -43,6 +45,7 @@ interface RefillOrderProps {
 
 const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative, orderItems, setOrderItems }: RefillOrderProps) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
   const [bannedMap, setBannedMap] = useState<Record<string, BannedStatus>>({});
@@ -235,6 +238,21 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2">
           <Loader2 className="w-3 h-3 animate-spin" /> Checking medications against banned list...
         </div>
+      )}
+
+      {/* Jan Aushadhi Alternatives */}
+      {allMeds.length > 0 && (
+        <JanAushadhiAlternatives
+          medicationNames={allMeds.map((m) => m.name)}
+          onFindKendra={() => navigate("/my-health?tool=Services&facility=janaushadhi")}
+          onOrderFromKendra={(medName, genericName) => {
+            const med = allMeds.find((m) => m.name === medName);
+            if (med) {
+              addToOrder({ ...med, name: genericName });
+            }
+            toast.success(`Added ${genericName} to order`);
+          }}
+        />
       )}
 
       {/* Low Stock Alerts */}

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type: "hospitals" | "pharmacies";
+  type: "hospitals" | "pharmacies" | "janaushadhi";
   userPos: { lat: number; lon: number } | null;
   onAdded: () => void;
 }
@@ -27,7 +27,7 @@ const AddFacilityDialog = ({ open, onOpenChange, type, userPos, onAdded }: Props
   const [geocoding, setGeocoding] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
 
-  const facilityType = type === "hospitals" ? "hospital" : "pharmacy";
+  const facilityType = type === "hospitals" ? "hospital" : type === "janaushadhi" ? "janaushadhi" : "pharmacy";
 
   const geocodeAddress = async () => {
     if (!address.trim()) return;

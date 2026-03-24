@@ -29,14 +29,17 @@ interface Facility {
 }
 
 interface Props {
-  type: "hospitals" | "pharmacies";
+  type: "hospitals" | "pharmacies" | "janaushadhi";
   onBack: () => void;
 }
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
-const buildQuery = (lat: number, lon: number, type: "hospitals" | "pharmacies", radius = 5000) => {
+const buildQuery = (lat: number, lon: number, type: "hospitals" | "pharmacies" | "janaushadhi", radius = 5000) => {
+  if (type === "janaushadhi") {
+    return `[out:json][timeout:15];(node["name"~"Jan Aushadhi|Janaushadhi|PMBJP",i](around:${radius},${lat},${lon});way["name"~"Jan Aushadhi|Janaushadhi|PMBJP",i](around:${radius},${lat},${lon});node["operator"~"PMBJP|Jan Aushadhi",i](around:${radius},${lat},${lon}););out center body;`;
+  }
   const tag = type === "hospitals"
     ? '["amenity"="hospital"]'
     : '["amenity"="pharmacy"]';
@@ -72,14 +75,15 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const isHospital = type === "hospitals";
-  const label = isHospital ? "Hospitals" : "Pharmacies";
-  const Icon = isHospital ? Hospital : Cross;
-  const accentClass = isHospital ? "text-primary" : "text-success";
+  const isJanAushadhi = type === "janaushadhi";
+  const label = isJanAushadhi ? "Jan Aushadhi Kendras" : isHospital ? "Hospitals" : "Pharmacies";
+  const Icon = isJanAushadhi ? Cross : isHospital ? Hospital : Cross;
+  const accentClass = isJanAushadhi ? "text-[hsl(142,70%,45%)]" : isHospital ? "text-primary" : "text-success";
   const effectiveCenter = searchCenter || userPos;
 
   const fetchUserFacilities = useCallback(async () => {
     if (!user) return;
-    const facilityType = type === "hospitals" ? "hospital" : "pharmacy";
+    const facilityType = type === "hospitals" ? "hospital" : type === "janaushadhi" ? "janaushadhi" : "pharmacy";
     const { data } = await supabase
       .from("user_facilities" as any)
       .select("*")
@@ -113,14 +117,14 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       });
       if (!res.ok) throw new Error("Search failed");
       const json = await res.json();
-      const results: Facility[] = (json.elements || [])
+      let results: Facility[] = (json.elements || [])
         .map((el: any) => {
           const elLat = el.lat ?? el.center?.lat;
           const elLon = el.lon ?? el.center?.lon;
           if (!elLat || !elLon) return null;
           return {
             id: el.id,
-            name: el.tags?.name || (isHospital ? "Hospital" : "Pharmacy"),
+            name: el.tags?.name || (isHospital ? "Hospital" : isJanAushadhi ? "Jan Aushadhi Kendra" : "Pharmacy"),
             lat: elLat,
             lon: elLon,
             phone: el.tags?.phone || el.tags?.["contact:phone"],
@@ -130,7 +134,38 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
             address: [el.tags?.["addr:street"], el.tags?.["addr:city"]].filter(Boolean).join(", "),
           };
         })
-        .filter(Boolean)
+        .filter(Boolean);
+
+      // For Jan Aushadhi, also fetch from our database
+      if (isJanAushadhi) {
+        try {
+          const { data } = await supabase.functions.invoke("jan-aushadhi-search", {
+            body: { type: "store_search", lat, lon },
+          });
+          if (data?.stores?.length) {
+            const dbStores: Facility[] = data.stores.map((s: any) => ({
+              id: `db-${s.id}`,
+              name: s.store_name,
+              lat: s.lat,
+              lon: s.lon,
+              phone: s.phone,
+              address: [s.address, s.district, s.state].filter(Boolean).join(", "),
+              distance: s.distance_km ?? haversine(lat, lon, s.lat, s.lon),
+            }));
+            // Merge and deduplicate by proximity (within 100m)
+            for (const dbStore of dbStores) {
+              const isDuplicate = results.some(
+                (r: Facility) => haversine(r.lat, r.lon, dbStore.lat, dbStore.lon) < 0.1
+              );
+              if (!isDuplicate) results.push(dbStore);
+            }
+          }
+        } catch (e) {
+          console.error("Jan Aushadhi store search error:", e);
+        }
+      }
+
+      results = results
         .sort((a: Facility, b: Facility) => (a.distance ?? 99) - (b.distance ?? 99))
         .slice(0, 50);
 
