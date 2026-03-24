@@ -55,6 +55,7 @@ export interface UserSettings {
   medPush: boolean;
   guardianPush: boolean;
   weeklyReport: boolean;
+  medicationMissedNotify: boolean;
   // Check-In
   sleepMode: boolean;
   pauseMode: PauseMode;
@@ -108,6 +109,7 @@ const DEFAULTS: UserSettings = {
   activityGoals: DEFAULT_ACTIVITY_GOALS,
   guardianPush: true,
   weeklyReport: true,
+  medicationMissedNotify: true,
   sleepMode: true,
   pauseMode: "active",
   expectedReturn: null,
