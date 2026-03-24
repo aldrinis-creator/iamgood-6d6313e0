@@ -13,6 +13,7 @@ import WardActivitySummary from "@/components/WardActivitySummary";
 import WardHealthPassport from "@/components/WardHealthPassport";
 import WardVitalsSummary from "@/components/WardVitalsSummary";
 import WardMedicationStatus from "@/components/WardMedicationStatus";
+import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import { playChime } from "@/lib/audioAlerts";
 interface Notification {
   id: string;
@@ -393,6 +394,9 @@ const GuardianDashboard = () => {
 
         {/* Ward Medication Status */}
         {wardUserId && <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />}
+
+        {/* Weekly Medication Adherence Chart */}
+        {wardUserId && <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />}
 
         {/* Ward Health Passport */}
         {wardUserId && <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />}
