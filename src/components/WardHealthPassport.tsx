@@ -40,9 +40,8 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    const [checkInsRes, faceScansRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      supabase.from("face_scans").select("id").eq("user_id", wardUserId).gte("scanned_at", `${today}T00:00:00`).lte("scanned_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
       supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", wardUserId).eq("log_date", yesterdayStr).maybeSingle(),
       supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
