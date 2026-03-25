@@ -316,14 +316,14 @@ const Settings = () => {
       guardian_email: newEmail || null,
       relation: newRelation || null,
       is_primary: guardians.length === 0,
-      status: "accepted",
+      status: "pending",
       nominated_at: new Date().toISOString(),
       is_vault_nominee: false,
     } as any);
     if (error) {
       toast.error("Failed to add guardian");
     } else {
-      toast.success(`${newName} added as Guardian (auto-accepted, 24hr rejection window)`);
+      toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
       // Send invite email if email provided
