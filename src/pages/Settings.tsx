@@ -152,6 +152,13 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
           </div>
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
+              <p className="text-sm font-medium">Live Location for Guardians</p>
+              <p className="text-xs text-muted-foreground">Allow guardians to see your location anytime (always shared during SOS/Fall)</p>
+            </div>
+            <Switch checked={(settings as any).shareLocationWithGuardian !== false} onCheckedChange={(v) => updateSetting("shareLocationWithGuardian" as any, v)} />
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
               <p className="text-sm font-medium">Share Health Data</p>
               <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
             </div>
