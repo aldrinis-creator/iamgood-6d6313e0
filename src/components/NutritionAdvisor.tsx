@@ -775,7 +775,7 @@ const NutritionAdvisor = () => {
                       );
                     })}
                   </div>
-                  <Button className="w-full" onClick={confirmIdentification}>
+                  <Button className="w-full" onClick={confirmIdentification} disabled={reanalyzingIdx !== null}>
                     <CheckCircle className="w-4 h-4 mr-1" /> Confirm & Continue
                   </Button>
                 </CardContent>
