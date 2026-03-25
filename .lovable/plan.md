@@ -1,53 +1,34 @@
 
 
-# Improve Meal Image Recognition Accuracy
+# Re-analyze Corrected Food Items for Accurate Nutrition Data
 
 ## Problem
 
-The AI model (Gemini 2.5 Flash) misidentifies visually similar foods — brinjal slices as banana, avocado as cucumber. This leads to incorrect nutritional data being logged.
+When a user corrects a misidentified food (e.g., changes "Banana" to "Brinjal"), the current code only updates the display name and sets confidence to 100. The nutritional values (calories, protein, carbs, etc.) remain from the original wrong identification. This gives users a false sense of accuracy.
 
-## Root Cause
+## Solution
 
-1. **Weaker vision model**: Using `gemini-2.5-flash` for image analysis — a cost-optimized model with lower visual accuracy
-2. **No confirmation step**: Results are shown as final with no way for the user to correct misidentified items before saving
-3. **Generic prompt**: The system prompt doesn't instruct the model to express uncertainty or consider Indian cuisine context for ambiguous items
+When a user edits a food name or selects an alternative, call the edge function to get correct nutritional data for the corrected item, then update that item's full data in the results.
 
-## Solution — Three Changes
+## Changes
 
-### 1. Upgrade Vision Model (Edge Function)
+### 1. Edge Function — Add single-item re-analysis type (`nutrition-advisor/index.ts`)
 
-**File:** `supabase/functions/nutrition-advisor/index.ts`
+Add a new `type: "reanalyze_item"` handler that accepts a food name and user persona, then returns nutritional data for that specific item. This uses a simple text prompt (no image) since the user has already identified the food.
 
-Switch image analysis from `google/gemini-2.5-flash` to `google/gemini-2.5-pro` — the strongest multimodal model available. This alone significantly reduces misidentification.
+Add a new system prompt:
+- "Given this food item name, return its detailed nutritional breakdown as a single-item JSON array."
+- Uses the same `jsonFormatAnalyze` schema so the response structure is consistent.
 
-### 2. Enhance System Prompt for Accuracy
+### 2. UI — Re-fetch nutrition on name change (`NutritionAdvisor.tsx`)
 
-**File:** `supabase/functions/nutrition-advisor/index.ts`
+- When `handleSelectAlternative` or `handleSaveEditName` is called, show a small loading spinner on that item
+- Call the edge function with `type: "reanalyze_item"` and the corrected food name
+- On success, replace the entire item object (all nutritional fields) with the new data, keeping `confidence: 100`
+- On failure, keep the old data but show a toast warning that nutrition values may be inaccurate
 
-Add to the `analyze_meal` system prompt:
-- Explicit instruction to consider Indian cuisine context (brinjal/baingan, bitter gourd, etc.)
-- Instruction to add a `confidence` field (0-100) per item indicating how certain the model is about the identification
-- Instruction to include an `alternatives` field listing other foods it could be if confidence is below 80%
-- Remind the model to distinguish visually similar foods (brinjal vs banana, avocado vs cucumber, etc.)
+### Files Changed
 
-### 3. Add User Confirmation/Edit Step (UI)
-
-**File:** `src/components/NutritionAdvisor.tsx`
-
-After AI returns results but before saving to the calorie tracker:
-- Show each identified food item with its `confidence` score
-- Items with confidence < 80% are highlighted in amber with the `alternatives` list shown as selectable chips
-- User can tap an alternative to **re-query** that single item with a corrected name, or manually edit the food name
-- An "Confirm & Save" button replaces the current auto-display, so the user explicitly approves the identification
-
-### Updated Fields in Response Schema
-
-Add two new fields to `jsonFormatAnalyze`:
-- `confidence` (number 0-100): how certain the model is about the food identification
-- `alternatives` (string[]): other possible foods if confidence is below 80%
-
-## Files Changed
-
-- `supabase/functions/nutrition-advisor/index.ts` — upgrade model, enhance prompt, add confidence/alternatives fields
-- `src/components/NutritionAdvisor.tsx` — add confirmation step with edit capability for low-confidence items
+- `supabase/functions/nutrition-advisor/index.ts` — add `reanalyze_item` type and system prompt
+- `src/components/NutritionAdvisor.tsx` — add re-analysis call when food name is corrected, with per-item loading state
 
