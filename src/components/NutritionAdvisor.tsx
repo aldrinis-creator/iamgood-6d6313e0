@@ -715,52 +715,61 @@ const NutritionAdvisor = () => {
                       return (
                         <div
                           key={idx}
-                          className={`p-3 rounded-lg border ${isLowConfidence ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background"}`}
+                          className={`p-3 rounded-lg border ${isLowConfidence ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background"} ${reanalyzingIdx === idx ? "opacity-70" : ""}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            {editingItemIdx === idx ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <Input
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="h-8 text-sm flex-1"
-                                  autoFocus
-                                  onKeyDown={(e) => e.key === "Enter" && handleSaveEditName(idx)}
-                                />
-                                <Button size="sm" className="h-8 px-2" onClick={() => handleSaveEditName(idx)}>
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingItemIdx(null)}>
-                                  <X className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm">{item.name}</span>
-                                  <ConfidenceBadge confidence={confidence} />
-                                </div>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditItemName(idx)}>
-                                  <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                          {isLowConfidence && alternatives.length > 0 && editingItemIdx !== idx && (
-                            <div className="mt-2 space-y-1.5">
-                              <span className="text-xs text-amber-600 font-medium">Could also be:</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {alternatives.map((alt, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => handleSelectAlternative(idx, alt)}
-                                    className="px-2.5 py-1 text-xs rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
-                                  >
-                                    {alt}
-                                  </button>
-                                ))}
-                              </div>
+                          {reanalyzingIdx === idx ? (
+                            <div className="flex items-center gap-2 py-1">
+                              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              <span className="text-sm text-muted-foreground">Fetching nutrition data...</span>
                             </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between gap-2">
+                                {editingItemIdx === idx ? (
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <Input
+                                      value={editName}
+                                      onChange={(e) => setEditName(e.target.value)}
+                                      className="h-8 text-sm flex-1"
+                                      autoFocus
+                                      onKeyDown={(e) => e.key === "Enter" && handleSaveEditName(idx)}
+                                    />
+                                    <Button size="sm" className="h-8 px-2" onClick={() => handleSaveEditName(idx)}>
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingItemIdx(null)}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{item.name}</span>
+                                      <ConfidenceBadge confidence={confidence} />
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditItemName(idx)}>
+                                      <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                              {isLowConfidence && alternatives.length > 0 && editingItemIdx !== idx && (
+                                <div className="mt-2 space-y-1.5">
+                                  <span className="text-xs text-amber-600 font-medium">Could also be:</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {alternatives.map((alt, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => handleSelectAlternative(idx, alt)}
+                                        className="px-2.5 py-1 text-xs rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
+                                      >
+                                        {alt}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       );
