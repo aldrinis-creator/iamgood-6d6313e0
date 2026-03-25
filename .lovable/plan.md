@@ -1,112 +1,172 @@
 
 
-# Fix User-Guardian Workflow & Guardian Role Restrictions
+# Guardian Dashboard — Full Feature Build
 
-## Problems Identified
+This is a comprehensive overhaul of the Guardian experience covering 17 requirements. Due to scope, this will be implemented in phases.
 
-After investigating the database and codebase, here are the root causes:
+## Phase 1: Nomination Flow & Consent (Items 1, 2)
 
-1. **Guardian role never saves correctly**: When someone registers as a "guardian", the database trigger `handle_new_user()` always sets `role: 'user'` in both `profiles` and `user_roles`. The Register page tries to update `profiles.role` afterward, but this fails silently because the `app_role` enum includes 'guardian' but the `user_roles` insert is hardcoded to 'user'. Both accounts currently show `role: user` in the database.
+### 1. Guardian Nomination with Accept/Reject
+**Current state**: Guardian is auto-accepted. No invite sent.
+**Change**:
+- Set `status: "pending"` when User adds a guardian (Settings.tsx, Register.tsx)
+- Update `send-guardian-invite` edge function to send WhatsApp link + email with Accept/Reject deep links
+- Create new edge function `guardian-nomination-response` to handle accept/reject via token
+- Add a `nomination_token` column to `guardians` table + `nomination_expires_at` (24h window)
+- Auto-accept after 24h: check on guardian login via `link_guardian_user_id()` function
+- On rejection: notify User via email/WhatsApp/in-app notification, set status to `"rejected"`
 
-2. **Guardian can't find their ward**: The Guardian Dashboard matches wards by checking if the logged-in user's `profiles.phone` matches any `guardians.guardian_phone`. But the guardian's own phone number is `null` in their profile — the registration process stored it with a format like `+917045868482` but the DB shows null, likely because the profile update failed or the phone wasn't saved correctly during guardian registration.
+### 2. Location Consent Toggle
+- Add `shareLocationWithGuardian` boolean to `user_settings`
+- Add toggle in User's Settings → Privacy section
+- Guardian dashboard checks this setting before showing location
 
-3. **No nomination notification sent**: When a User adds a guardian, it's hardcoded to `status: "accepted"` with no email, SMS, or in-app notification sent to the nominated guardian. The FAQ describes an invitation flow that doesn't exist in code.
+## Phase 2: Guardian Dashboard Enhancements (Items 3-6, 10-12)
 
-4. **SOS alerts don't reach the guardian app**: The SOS edge function creates a `notifications` row with `guardian_id`, but the guardian can't see it because the RLS policy on `notifications` requires matching `guardians.guardian_phone` against the guardian's `profiles.phone` — which is null.
+### 3. SOS/Fall Alerts with Timestamp + Emergency Health Card
+- SOS/fall notifications already include `created_at` — display formatted date/time in alerts
+- When SOS alert is shown, auto-expand the Emergency Health Card + Profile data (read-only)
 
-5. **Guardian has full access to User features**: There's no route protection or feature gating. A guardian can navigate to `/dashboard`, `/my-health`, `/appointments`, `/medical-vault`, etc. and use everything a paying User can.
+### 4. Replace "Ward" with User's Name
+- Replace all hardcoded "Ward" labels in `GuardianDashboard.tsx` and child components with `wardName`
+- Update component props/titles: "Ward's Vitals" → "{name}'s Vitals"
 
-## Solution — Six Changes
+### 5. Status Block: Timestamp + Refresh Button
+- Add `lastActiveAt` timestamp (fetched from latest `check_ins` or `activity_logs` entry)
+- Add date/time display below the status block
+- Add a Refresh button that re-fetches all ward data on tap
+- Replace hardcoded "78%", "2m ago", "4G" with real data where possible (last active from DB; battery/network are device-only, show "N/A" or remove)
 
-### 1. Fix Guardian Role on Registration
+### 6. Live Location Map (Consent-Gated)
+- If User consented to location sharing: show embedded map (Google Maps static API or OpenStreetMap iframe) with last known coordinates from `activity_logs` or `sos_events`
+- In SOS/Fall: show continuous location (poll every 30s from `sos_events` table)
+- If consented but not SOS: show Refresh button to fetch current location on demand
+- If not consented: display "User has not permitted their location to be displayed"
 
-**Files:** `supabase/migrations/` (new), `src/pages/Register.tsx`
+### 10. Auto-refresh Check-iNs
+- Add realtime subscription on `check_ins` table filtered by `user_id = wardUserId`
+- On INSERT/UPDATE, re-fetch today's check-ins automatically
+- Show "Missed" label for overdue pending check-ins
 
-- Update `handle_new_user()` trigger to accept the role from `raw_user_meta_data` so it correctly sets 'guardian' in both `profiles` and `user_roles` when someone registers as guardian.
-- Update Register.tsx to pass the selected role in signup metadata so the trigger picks it up.
-- Run a data fix to correct Don Carlos's profile: set `role: 'guardian'` in both `profiles` and `user_roles`, and ensure phone is saved.
+### 11. Health Passport Auto-refresh
+- Add realtime subscription for ward health data tables
+- Re-compute `WardHealthPassport` on data changes
 
-### 2. Fix Guardian Phone Storage During Registration
+### 12. Keep existing displays as-is
 
-**File:** `src/pages/Register.tsx`
+## Phase 3: Communication Features (Items 7, 17)
 
-The guardian registration flow calls `handleDetailsNext()` → `handleSubmit()` which updates `profiles.phone` with `${phoneCode}${phone}`. Verify this actually saves. The current guardian account has `phone: null` — this may be because the profile update runs before the profile row exists (race condition with the trigger). Add a retry/delay or use upsert to ensure the phone is saved.
+### 7. Call User Options
+- Replace single "Call User" button with a dropdown/dialog offering:
+  - WhatsApp Call: `https://wa.me/{phone}`
+  - Mobile Call: `tel:{phone}`
+  - WhatsApp Video: WhatsApp doesn't support direct video call links from web — note this limitation; offer WhatsApp chat link instead
 
-### 3. Send Nomination Notification to Guardian
+### 17. Ping User with Animated Messages
+- Create `guardian_pings` table: `id, guardian_id, user_id, message, created_at, read`
+- Guardian selects from preset phrases ("How are you?", "I Love You") or types custom text
+- User receives an animated overlay/toast with the message
+- User app subscribes to realtime on `guardian_pings` table
 
-**Files:** `supabase/functions/` (new edge function `send-guardian-invite`), `src/pages/Register.tsx`, `src/pages/Settings.tsx`
+## Phase 4: Route & Ambulance (Items 8, 9)
 
-When a User adds a guardian (during registration or in Settings):
-- Send an email to the guardian's email address notifying them they've been nominated
-- Include the User's name, relation, and a message explaining Check-iN
-- Set initial status to `"pending"` instead of `"accepted"`
-- Auto-accept after 24 hours (silent consent) via a scheduled check or on guardian's first login
-- If the guardian is already registered, create an in-app notification too
+### 8. Build Route
+- "Route" button opens Google Maps directions: `https://www.google.com/maps/dir/?api=1&destination={wardLat},{wardLng}`
+- Requires ward's last known location (from consent-gated location data)
 
-### 4. Fix Notification Visibility for Guardians
+### 9. Ambulance Booking with Health Data
+- When Guardian books ambulance for User, auto-attach:
+  - User's location (lat/lng)
+  - Emergency Health Card data (blood group, allergies, conditions, meds)
+  - User's profile (name, age, phone)
+- Include this in the WhatsApp message sent to ambulance provider
+- Keep existing Green/Red tab UI
 
-**File:** Database RLS or notification query logic
+## Phase 5: Reports & Alerts Tabs (Items 13, 15)
 
-The current RLS on `notifications` for guardians uses:
-```
-guardian_id IN (SELECT g.id FROM guardians g WHERE g.guardian_phone IN (SELECT p.phone FROM profiles p WHERE p.id = auth.uid()))
-```
-This requires the guardian's `profiles.phone` to match `guardians.guardian_phone`. An alternative approach: also match by `guardian_email` against the guardian's auth email, or link guardian records directly to the guardian's user ID via a `guardian_user_id` column.
+### 13. Build Alerts Tab
+- New page `/guardian/alerts` showing all notifications grouped by type:
+  - SOS alerts, Fall alerts, Missed check-ins, Medication missed/taken, Vitals anomalies
+- Each alert shows timestamp, type badge, message, and dismiss action
+- Filter by type, date range
 
-Add a `guardian_user_id` column to the `guardians` table that stores the guardian's actual auth user ID (resolved from their email or phone). This makes all RLS queries simpler and more reliable than phone matching.
+### 15. Build Reports Tab
+- New page `/guardian/reports` with sections:
+  - **Medications**: List with dosage, timings, stock/refill status, Jan Aushadhi alternatives
+  - **Medication Adherence Trendline**: 7/14/30-day taken vs missed chart (recharts)
+  - **Check-in Trendline**: done/missed over time
+  - **Activity Trend**: steps, exercise minutes over time
+  - **Health Vitals Trend**: heart rate, BP, SpO2 over time
+  - **Nutrition Trend**: calories, macros over time
+- All data fetched from existing tables with guardian RLS policies
 
-### 5. Restrict Guardian Access to User Features
+## Phase 6: Services & Appointments (Items 14, 16)
 
-**Files:** `src/components/ProtectedRoute.tsx`, `src/components/AppLayout.tsx`, `src/pages/` (multiple), `src/App.tsx`
+### 14. Guardian Can Make Appointments for User
+- Add ability for guardian to insert into `appointments` table with `user_id = wardUserId`
+- New RLS policy: guardians can INSERT appointments for their wards
+- Add "Book Appointment" button in Guardian dashboard
+- Reuse `AddAppointmentDialog` component with ward's user_id
 
-- Create a `GuardianRoute` wrapper that only allows guardian-role users
-- Create a `UserRoute` wrapper that only allows user-role users  
-- Redirect guardians away from User-only pages (`/dashboard`, `/my-health`, `/appointments`, `/medical-vault`, `/subscription`) with a toast: "Register as a User to access this feature"
-- Guardians can access: `/guardian` (dashboard), `/guardian-settings`, `/reports`, `/my-profile` (read-only), `/help`
-- Update navigation (AppHeader, NavTabs) to never show User tabs to guardians
+### 16. Services Tab
+- Add "Services" tab to guardian navigation
+- Show limited services relevant to guardian: Ambulance booking, Medication ordering, Appointment booking
+- Other services show "Register as a User to access this feature"
 
-### 6. Redesign Guardian Navigation & Dashboard
+## Database Changes
 
-**Files:** `src/components/NavTabs.tsx`, `src/components/AppHeader.tsx`, `src/pages/GuardianDashboard.tsx`
+| Change | Type |
+|--------|------|
+| Add `nomination_token`, `nomination_expires_at` to `guardians` | Migration |
+| Create `guardian_pings` table | Migration |
+| Add guardian INSERT policy on `appointments` | Migration |
+| Add `shareLocationWithGuardian` default to user_settings | Code only |
+| Update RLS on various tables to also match `guardian_user_id` | Migration |
 
-Guardian bottom tabs:
-- **My User** (ward status, check-ins, alerts) — replaces "Dashboard"
-- **Alerts** (SOS, missed check-ins, medication, vitals, falls)
-- **Reports** (weekly summaries, care journal, health passport)
-- **Settings** (notification preferences, profile)
+## Route Changes (App.tsx)
 
-Guardian features (read-only monitoring):
-- SOS alerts with location
-- Check-in status tracking
-- Medication adherence (taken/missed/stock/refill)
-- Daily Health Passport view
-- Vitals report
-- Care Journal
-- Ambulance booking for ward
-- Weekly status report
-- Ward's read-only profile
+| Route | Page |
+|-------|------|
+| `/guardian` | GuardianDashboard (My User tab) |
+| `/guardian/alerts` | GuardianAlerts (new) |
+| `/guardian/reports` | GuardianReports (new) |
+| `/guardian/services` | GuardianServices (new) |
+| `/guardian-settings` | Settings |
 
-## Files Changed
+## Nav Tabs Update
 
-| File | Change |
-|------|--------|
-| `supabase/migrations/` (new) | Fix `handle_new_user()`, add `guardian_user_id` to guardians, fix Don Carlos data |
-| `src/pages/Register.tsx` | Pass role in metadata, fix phone save timing, send invite on guardian add |
-| `src/pages/Settings.tsx` | Set status to "pending", send invite email on guardian add |
-| `supabase/functions/send-guardian-invite/index.ts` | New edge function to email nomination invite |
-| `src/components/ProtectedRoute.tsx` | Add role-based route guards |
-| `src/App.tsx` | Apply UserRoute/GuardianRoute to appropriate pages |
-| `src/components/AppHeader.tsx` | Update guardian nav tabs |
-| `src/components/NavTabs.tsx` | Update guardian bottom tabs |
-| `src/pages/GuardianDashboard.tsx` | Use `guardian_user_id` for ward lookup instead of phone matching |
-| `src/components/NotificationCenter.tsx` | Update query to work with `guardian_user_id` |
+Guardian tabs become: **My User**, **Alerts**, **Reports**, **Services**, **Settings** (5 tabs)
+
+## Files Changed (estimated 15-20 files)
+
+- `supabase/migrations/` — 1-2 new migrations
+- `src/pages/GuardianDashboard.tsx` — major rewrite
+- `src/pages/GuardianAlerts.tsx` — new
+- `src/pages/GuardianReports.tsx` — new
+- `src/pages/GuardianServices.tsx` — new
+- `src/components/GuardianPingDialog.tsx` — new
+- `src/components/NavTabs.tsx` — add Services tab
+- `src/App.tsx` — add new routes
+- `src/pages/Settings.tsx` — location consent toggle, nomination status "pending"
+- `src/pages/Register.tsx` — nomination status "pending"
+- `supabase/functions/send-guardian-invite/index.ts` — WhatsApp + email invite with accept/reject
+- `supabase/functions/guardian-nomination-response/index.ts` — new
+- `src/components/WardEmergencyCard.tsx` — replace "Ward" with name
+- `src/components/WardVitalsSummary.tsx` — replace "Ward" with name
+- `src/components/WardActivitySummary.tsx` — replace "Ward" with name
+- `src/components/WardMedicationStatus.tsx` — replace "Ward" with name
+- `src/components/WardHealthPassport.tsx` — replace "Ward" with name
 
 ## Implementation Order
 
-1. Database migration (fix trigger + add guardian_user_id + data fix)
-2. Fix registration flow (role + phone + invite)
-3. Route guards (restrict guardian access)
-4. Guardian navigation redesign
-5. Notification/alert delivery fixes
-6. Test end-to-end with both accounts
+1. Database migrations (nomination tokens, guardian_pings, RLS)
+2. Nomination flow (invite + accept/reject + auto-accept)
+3. Location consent + map display
+4. Dashboard enhancements (timestamps, refresh, real data, rename Ward)
+5. Communication (Call User options, Ping User)
+6. Route + Ambulance with health data
+7. Alerts page
+8. Reports page with trendlines
+9. Services tab + Guardian appointments
+10. Realtime subscriptions for auto-refresh
 
