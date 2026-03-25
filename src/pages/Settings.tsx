@@ -489,6 +489,8 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BellRing className="w-5 h-5 text-primary" />
