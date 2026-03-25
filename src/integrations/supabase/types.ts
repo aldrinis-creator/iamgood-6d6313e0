@@ -326,6 +326,33 @@ export type Database = {
         }
         Relationships: []
       }
+      guardian_pings: {
+        Row: {
+          created_at: string
+          guardian_user_id: string
+          id: string
+          message: string
+          read: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          guardian_user_id: string
+          id?: string
+          message: string
+          read?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          guardian_user_id?: string
+          id?: string
+          message?: string
+          read?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       guardians: {
         Row: {
           created_at: string
@@ -337,6 +364,8 @@ export type Database = {
           is_primary: boolean
           is_vault_nominee: boolean
           nominated_at: string
+          nomination_expires_at: string | null
+          nomination_token: string | null
           relation: string | null
           status: string
           user_id: string
@@ -351,6 +380,8 @@ export type Database = {
           is_primary?: boolean
           is_vault_nominee?: boolean
           nominated_at?: string
+          nomination_expires_at?: string | null
+          nomination_token?: string | null
           relation?: string | null
           status?: string
           user_id: string
@@ -365,6 +396,8 @@ export type Database = {
           is_primary?: boolean
           is_vault_nominee?: boolean
           nominated_at?: string
+          nomination_expires_at?: string | null
+          nomination_token?: string | null
           relation?: string | null
           status?: string
           user_id?: string
