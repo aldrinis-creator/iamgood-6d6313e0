@@ -11,7 +11,7 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, metadata?: { full_name?: string }) => Promise<{ error: Error | null; data: any }>;
+  signUp: (email: string, password: string, metadata?: Record<string, string>) => Promise<{ error: Error | null; data: any }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
