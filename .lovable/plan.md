@@ -1,119 +1,53 @@
 
 
-# Jan Aushadhi Integration Plan — Affordable Medicines + Store Locator
+# Improve Meal Image Recognition Accuracy
 
-## Context
+## Problem
 
-Jan Aushadhi Kendras (PMBJP scheme) offer 2400+ generic medicines at 50-90% discount over branded equivalents. There is no public REST API — data comes from pmbi.co.in (product list) and janaushadhi.gov.in (store locator). Both sites use server-rendered pages, not APIs.
+The AI model (Gemini 2.5 Flash) misidentifies visually similar foods — brinjal slices as banana, avocado as cucumber. This leads to incorrect nutritional data being logged.
 
-## Strategy
+## Root Cause
 
-Since there is no official API, we use a **two-pronged approach**:
+1. **Weaker vision model**: Using `gemini-2.5-flash` for image analysis — a cost-optimized model with lower visual accuracy
+2. **No confirmation step**: Results are shown as final with no way for the user to correct misidentified items before saving
+3. **Generic prompt**: The system prompt doesn't instruct the model to express uncertainty or consider Indian cuisine context for ambiguous items
 
-1. **Medicine database** — Seed a Supabase table with the PMBI product catalog (~2400 items, available as downloadable PDF/Excel from pmbi.co.in). This table is searched client-side to show generic alternatives and Jan Aushadhi prices alongside the user's branded medications.
+## Solution — Three Changes
 
-2. **Store locator** — Use OpenStreetMap Overpass (already in the app) with the tag `name~"Jan Aushadhi"` OR `operator~"PMBJP"` to find nearby Kendras. Fallback: maintain a curated list in a `jan_aushadhi_stores` table seeded from the government's district-wise Kendra list.
+### 1. Upgrade Vision Model (Edge Function)
 
-## Integration Points (User-Facing)
+**File:** `supabase/functions/nutrition-advisor/index.ts`
 
-### A. In Medication Manager (Refill tab)
-When a user views their medication list or builds a refill order, each medication shows:
-- **Jan Aushadhi equivalent** with generic name, dosage, and MRP
-- **Savings badge**: "Save ₹XX (YY%)" comparing branded vs Jan Aushadhi price
-- **"Order from Jan Aushadhi"** button that locates the nearest Kendra and generates a WhatsApp order
+Switch image analysis from `google/gemini-2.5-flash` to `google/gemini-2.5-pro` — the strongest multimodal model available. This alone significantly reduces misidentification.
 
-### B. In Health Services
-Add a third tile: **"Jan Aushadhi Kendras"** alongside Hospitals and Pharmacies, opening the NearbyFacilities map filtered for Jan Aushadhi stores.
+### 2. Enhance System Prompt for Accuracy
 
-### C. Standalone Search (optional later)
-A search bar in the Medication Info tool to look up any medicine's Jan Aushadhi equivalent.
+**File:** `supabase/functions/nutrition-advisor/index.ts`
 
----
+Add to the `analyze_meal` system prompt:
+- Explicit instruction to consider Indian cuisine context (brinjal/baingan, bitter gourd, etc.)
+- Instruction to add a `confidence` field (0-100) per item indicating how certain the model is about the identification
+- Instruction to include an `alternatives` field listing other foods it could be if confidence is below 80%
+- Remind the model to distinguish visually similar foods (brinjal vs banana, avocado vs cucumber, etc.)
 
-## Technical Plan
+### 3. Add User Confirmation/Edit Step (UI)
 
-### 1. Database Migration — Two new tables
+**File:** `src/components/NutritionAdvisor.tsx`
 
-**`jan_aushadhi_products`** (~2400 rows, seeded once, updated periodically)
+After AI returns results but before saving to the calorie tracker:
+- Show each identified food item with its `confidence` score
+- Items with confidence < 80% are highlighted in amber with the `alternatives` list shown as selectable chips
+- User can tap an alternative to **re-query** that single item with a corrected name, or manually edit the food name
+- An "Confirm & Save" button replaces the current auto-display, so the user explicitly approves the identification
 
-| Column | Type | Description |
-|---|---|---|
-| id | uuid PK | |
-| drug_code | text | PMBI drug code |
-| generic_name | text | Generic medicine name |
-| unit_size | text | e.g. "10's", "100ml" |
-| mrp | numeric | Jan Aushadhi MRP in ₹ |
-| category | text | e.g. "Cardiovascular", "GIT" |
-| salt_composition | text | Active ingredients |
+### Updated Fields in Response Schema
 
-**`jan_aushadhi_stores`** (seeded from government list, ~12000 rows)
-
-| Column | Type | Description |
-|---|---|---|
-| id | uuid PK | |
-| store_name | text | |
-| state | text | |
-| district | text | |
-| address | text | |
-| pincode | text | |
-| phone | text | |
-| lat | double precision | Geocoded |
-| lon | double precision | Geocoded |
-
-Both tables: RLS open for SELECT to authenticated users (public data), no INSERT/UPDATE/DELETE for regular users.
-
-### 2. Edge Function — `jan-aushadhi-search`
-
-- **Input**: `{ type: "product_search" | "store_search", query: string, lat?: number, lon?: number }`
-- **Product search**: Fuzzy match on `generic_name` or `salt_composition` against user's medication name. Returns top matches with MRP and savings estimate.
-- **Store search**: Query `jan_aushadhi_stores` by proximity (lat/lon + haversine) or by pincode/district.
-- Uses AI (Lovable AI) to map branded medicine names to generic salt compositions for better matching.
-
-### 3. Refill Order Enhancement — `RefillOrder.tsx`
-
-- After loading user's medications, call `jan-aushadhi-search` for each medication name
-- Show a green card per medication with Jan Aushadhi match:
-  ```text
-  ┌──────────────────────────────────┐
-  │ 💊 Paracetamol 500mg (10's)     │
-  │ Jan Aushadhi MRP: ₹3.00         │
-  │ Branded price: ~₹15             │
-  │ 🏷️ Save up to 80%              │
-  │ [Find Nearest Kendra] [Order]   │
-  └──────────────────────────────────┘
-  ```
-- "Order" adds to existing WhatsApp order flow but pre-fills the nearest Jan Aushadhi Kendra's number
-- "Find Nearest Kendra" opens NearbyFacilities map filtered for Jan Aushadhi
-
-### 4. Health Services Update — `HealthServices.tsx`
-
-- Add a third button in the "Find Nearby" grid: **"Jan Aushadhi"** with a government-green color
-- Clicking opens `NearbyFacilities` with `type="janaushadhi"`
-
-### 5. NearbyFacilities Enhancement — `NearbyFacilities.tsx`
-
-- Extend the `type` prop to accept `"janaushadhi"`
-- For this type, query both Overpass (OSM tag `name~"Jan Aushadhi"`) AND the `jan_aushadhi_stores` table
-- Merge results, deduplicate by proximity, show on map
-
-### 6. Data Seeding Script
-
-- A one-time edge function or migration that seeds the `jan_aushadhi_products` table from a curated CSV/JSON (extracted from the PMBI PDF list)
-- Store data can be seeded similarly from the government's district-wise Excel
-- Include a note for periodic refresh (quarterly)
-
----
+Add two new fields to `jsonFormatAnalyze`:
+- `confidence` (number 0-100): how certain the model is about the food identification
+- `alternatives` (string[]): other possible foods if confidence is below 80%
 
 ## Files Changed
 
-- **Migration SQL** — create `jan_aushadhi_products` and `jan_aushadhi_stores` tables with RLS
-- **`supabase/functions/jan-aushadhi-search/index.ts`** — new edge function for product + store search
-- **`src/components/medications/RefillOrder.tsx`** — add Jan Aushadhi alternative cards with savings
-- **`src/components/HealthServices.tsx`** — add Jan Aushadhi Kendra tile
-- **`src/components/NearbyFacilities.tsx`** — support `"janaushadhi"` type
-- **Seed data** — initial product catalog and store locations (via migration INSERT or edge function)
-
-## Data Sourcing Note
-
-The PMBI product list (2400+ items) and Kendra locations (12000+ stores) are publicly available government data. The initial seed will be a curated extract. A quarterly refresh mechanism can be added later as an admin edge function.
+- `supabase/functions/nutrition-advisor/index.ts` — upgrade model, enhance prompt, add confidence/alternatives fields
+- `src/components/NutritionAdvisor.tsx` — add confirmation step with edit capability for low-confidence items
 
