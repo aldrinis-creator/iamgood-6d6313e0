@@ -152,6 +152,13 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
           </div>
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
+              <p className="text-sm font-medium">Live Location for Guardians</p>
+              <p className="text-xs text-muted-foreground">Allow guardians to see your location anytime (always shared during SOS/Fall)</p>
+            </div>
+            <Switch checked={(settings as any).shareLocationWithGuardian !== false} onCheckedChange={(v) => updateSetting("shareLocationWithGuardian" as any, v)} />
+          </div>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
               <p className="text-sm font-medium">Share Health Data</p>
               <p className="text-xs text-muted-foreground">Include blood type and allergies in SOS alerts</p>
             </div>
@@ -316,14 +323,14 @@ const Settings = () => {
       guardian_email: newEmail || null,
       relation: newRelation || null,
       is_primary: guardians.length === 0,
-      status: "accepted",
+      status: "pending",
       nominated_at: new Date().toISOString(),
       is_vault_nominee: false,
     } as any);
     if (error) {
       toast.error("Failed to add guardian");
     } else {
-      toast.success(`${newName} added as Guardian (auto-accepted, 24hr rejection window)`);
+      toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
       // Send invite email if email provided

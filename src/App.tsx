@@ -13,6 +13,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import UserDashboard from "./pages/UserDashboard";
 import GuardianDashboard from "./pages/GuardianDashboard";
+import GuardianAlerts from "./pages/GuardianAlerts";
+import GuardianReports from "./pages/GuardianReports";
+import GuardianServices from "./pages/GuardianServices";
 import MyHealth from "./pages/MyHealth";
 import MedicalVault from "./pages/MedicalVault";
 import Settings from "./pages/Settings";
@@ -49,7 +52,10 @@ const App = () => (
               <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
               {/* Guardian-only routes */}
               <Route path="/guardian" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
-              <Route path="/reports" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
+              <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
+              <Route path="/guardian/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
+              <Route path="/guardian/services" element={<GuardianRoute><GuardianServices /></GuardianRoute>} />
+              <Route path="/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
               <Route path="/guardian-settings" element={<GuardianRoute><Settings /></GuardianRoute>} />
               {/* Shared routes (both roles) */}
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

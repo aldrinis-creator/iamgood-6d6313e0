@@ -196,7 +196,7 @@ const Register = () => {
             guardian_email: g.email || null,
             relation: g.relation || null,
             is_primary: i === 0,
-            status: "accepted",
+            status: "pending",
           }));
         if (guardianRows.length > 0) {
           await supabase.from("guardians").insert(guardianRows);
