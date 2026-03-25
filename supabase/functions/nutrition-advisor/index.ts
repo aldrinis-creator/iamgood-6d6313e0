@@ -89,7 +89,12 @@ serve(async (req) => {
     const model = image ? "google/gemini-2.5-pro" : "google/gemini-3-flash-preview";
 
     let messages: any[];
-    if (image && type === "analyze_meal") {
+    if (type === "reanalyze_item" && foodName) {
+      messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `${personaContext}\n${timeContext}\n\nPlease provide a detailed and accurate nutritional breakdown for this food item: "${foodName}". Consider typical Indian serving sizes and preparation methods. Return exactly one item in the JSON array with confidence set to 100.` },
+      ];
+    } else if (image && type === "analyze_meal") {
       messages = [
         { role: "system", content: systemPrompt },
         {
