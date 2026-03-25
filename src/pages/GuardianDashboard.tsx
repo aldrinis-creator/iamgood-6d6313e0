@@ -15,7 +15,7 @@ import WardVitalsSummary from "@/components/WardVitalsSummary";
 import WardMedicationStatus from "@/components/WardMedicationStatus";
 import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
-import { playChime } from "@/lib/audioAlerts";
+import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -189,7 +189,13 @@ const GuardianDashboard = () => {
       .channel("guardian-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchNotifications();
-        if (payload?.new?.type === "missed_checkin") playChime();
+        const newNotif = payload?.new;
+        if (newNotif?.type === "sos" || newNotif?.type === "fall") {
+          const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
+          playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
+        } else if (newNotif?.type === "missed_checkin") {
+          playChime();
+        }
       })
       .subscribe();
     channels.push(notifChannel);

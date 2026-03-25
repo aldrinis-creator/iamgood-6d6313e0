@@ -7,6 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { playVoiceReminder, playChime } from "@/lib/audioAlerts";
 
 interface Notification {
   id: string;
@@ -49,7 +50,16 @@ const GuardianAlerts = () => {
   useEffect(() => {
     const channel = supabase
       .channel("guardian-alerts-page")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => fetchAll())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
+        fetchAll();
+        const newNotif = payload?.new;
+        if (newNotif?.type === "sos" || newNotif?.type === "fall") {
+          const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
+          playVoiceReminder(`Dear Guardian, please check on your user, as we have detected ${eventType} alert`);
+        } else if (newNotif?.type === "missed_checkin") {
+          playChime();
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchAll]);
