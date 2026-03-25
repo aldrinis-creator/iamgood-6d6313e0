@@ -308,6 +308,7 @@ const NutritionAdvisor = () => {
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [reanalyzingIdx, setReanalyzingIdx] = useState<number | null>(null);
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -436,11 +437,46 @@ const NutritionAdvisor = () => {
     setManualMeal({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
   };
 
+  const reanalyzeItem = async (itemIdx: number, correctedName: string) => {
+    if (!structuredData) return;
+    setReanalyzingIdx(itemIdx);
+    try {
+      let persona: any = null;
+      if (user) {
+        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
+        if (data) persona = data;
+      }
+      const { data, error } = await supabase.functions.invoke("nutrition-advisor", {
+        body: { type: "reanalyze_item", persona, foodName: correctedName },
+      });
+      if (error) throw error;
+      const raw = data?.response || "";
+      const parsed = parseResponse(raw);
+      if (parsed && parsed.length > 0) {
+        const updated = [...structuredData];
+        updated[itemIdx] = { ...parsed[0], confidence: 100, alternatives: [] };
+        setStructuredData(updated);
+        toast.success(`Updated nutrition data for "${correctedName}"`);
+      } else {
+        // Fallback: just update name
+        const updated = [...structuredData];
+        updated[itemIdx] = { ...updated[itemIdx], name: correctedName, confidence: 100, alternatives: [] };
+        setStructuredData(updated);
+        toast.warning("Updated name but couldn't fetch new nutrition data");
+      }
+    } catch {
+      const updated = [...structuredData];
+      updated[itemIdx] = { ...updated[itemIdx], name: correctedName, confidence: 100, alternatives: [] };
+      setStructuredData(updated);
+      toast.warning("Updated name but nutrition values may be inaccurate");
+    } finally {
+      setReanalyzingIdx(null);
+    }
+  };
+
   const handleSelectAlternative = (itemIdx: number, altName: string) => {
     if (!structuredData) return;
-    const updated = [...structuredData];
-    updated[itemIdx] = { ...updated[itemIdx], name: altName, confidence: 100, alternatives: [] };
-    setStructuredData(updated);
+    reanalyzeItem(itemIdx, altName);
   };
 
   const handleEditItemName = (idx: number) => {
@@ -451,11 +487,10 @@ const NutritionAdvisor = () => {
 
   const handleSaveEditName = (idx: number) => {
     if (!structuredData || !editName.trim()) return;
-    const updated = [...structuredData];
-    updated[idx] = { ...updated[idx], name: editName.trim(), confidence: 100, alternatives: [] };
-    setStructuredData(updated);
+    const correctedName = editName.trim();
     setEditingItemIdx(null);
     setEditName("");
+    reanalyzeItem(idx, correctedName);
   };
 
   const confirmIdentification = () => {
@@ -680,52 +715,61 @@ const NutritionAdvisor = () => {
                       return (
                         <div
                           key={idx}
-                          className={`p-3 rounded-lg border ${isLowConfidence ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background"}`}
+                          className={`p-3 rounded-lg border ${isLowConfidence ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background"} ${reanalyzingIdx === idx ? "opacity-70" : ""}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            {editingItemIdx === idx ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <Input
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="h-8 text-sm flex-1"
-                                  autoFocus
-                                  onKeyDown={(e) => e.key === "Enter" && handleSaveEditName(idx)}
-                                />
-                                <Button size="sm" className="h-8 px-2" onClick={() => handleSaveEditName(idx)}>
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingItemIdx(null)}>
-                                  <X className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm">{item.name}</span>
-                                  <ConfidenceBadge confidence={confidence} />
-                                </div>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditItemName(idx)}>
-                                  <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                          {isLowConfidence && alternatives.length > 0 && editingItemIdx !== idx && (
-                            <div className="mt-2 space-y-1.5">
-                              <span className="text-xs text-amber-600 font-medium">Could also be:</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {alternatives.map((alt, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => handleSelectAlternative(idx, alt)}
-                                    className="px-2.5 py-1 text-xs rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
-                                  >
-                                    {alt}
-                                  </button>
-                                ))}
-                              </div>
+                          {reanalyzingIdx === idx ? (
+                            <div className="flex items-center gap-2 py-1">
+                              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              <span className="text-sm text-muted-foreground">Fetching nutrition data...</span>
                             </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between gap-2">
+                                {editingItemIdx === idx ? (
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <Input
+                                      value={editName}
+                                      onChange={(e) => setEditName(e.target.value)}
+                                      className="h-8 text-sm flex-1"
+                                      autoFocus
+                                      onKeyDown={(e) => e.key === "Enter" && handleSaveEditName(idx)}
+                                    />
+                                    <Button size="sm" className="h-8 px-2" onClick={() => handleSaveEditName(idx)}>
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingItemIdx(null)}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{item.name}</span>
+                                      <ConfidenceBadge confidence={confidence} />
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditItemName(idx)}>
+                                      <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                              {isLowConfidence && alternatives.length > 0 && editingItemIdx !== idx && (
+                                <div className="mt-2 space-y-1.5">
+                                  <span className="text-xs text-amber-600 font-medium">Could also be:</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {alternatives.map((alt, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => handleSelectAlternative(idx, alt)}
+                                        className="px-2.5 py-1 text-xs rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
+                                      >
+                                        {alt}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       );
