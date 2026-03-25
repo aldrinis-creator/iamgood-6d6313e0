@@ -477,10 +477,18 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.exerciseReminder} onCheckedChange={(v) => updateSetting("exerciseReminder", v)} />
                 </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Guardian Voice Alerts</p>
+                      <p className="text-xs text-muted-foreground">Spoken alert when SOS or Fall events are detected</p>
+                    </div>
+                  </div>
+                  <Switch checked={settings.guardianVoiceAlerts} onCheckedChange={(v) => updateSetting("guardianVoiceAlerts", v)} />
+                </div>
               </CardContent>
             </Card>
-
-            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BellRing className="w-5 h-5 text-primary" />

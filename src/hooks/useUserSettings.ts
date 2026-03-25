@@ -128,6 +128,7 @@ const DEFAULTS: UserSettings = {
   exerciseReminder: true,
   hasHospitalizations: false,
   hasSurgeries: false,
+  guardianVoiceAlerts: true,
 };
 
 export function useUserSettings() {
