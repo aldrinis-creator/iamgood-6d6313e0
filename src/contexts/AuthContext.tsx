@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(async () => {
             await fetchProfile(session.user.id);
             // Auto-link guardian records by email/phone
-            supabase.rpc("link_guardian_user_id").catch(() => {});
+            supabase.rpc("link_guardian_user_id" as any).then(() => {}).catch(() => {});
           }, 0);
           // Request notification permission on sign-in
           if ("Notification" in window && Notification.permission === "default") {
