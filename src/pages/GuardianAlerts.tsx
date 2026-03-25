@@ -31,6 +31,7 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
 
 const GuardianAlerts = () => {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
