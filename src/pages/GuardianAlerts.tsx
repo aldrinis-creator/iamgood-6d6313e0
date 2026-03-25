@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { playVoiceReminder, playChime } from "@/lib/audioAlerts";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 interface Notification {
   id: string;
