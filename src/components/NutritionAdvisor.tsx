@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info, Save, BarChart3, Plus } from "lucide-react";
+import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info, Save, BarChart3, Plus, Edit2, ShieldAlert } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { Badge } from "@/components/ui/badge";
 
 type ActionType = "meal_plan" | "analyze_meal" | "post_workout" | "feeling_unwell";
 
@@ -39,6 +40,8 @@ interface NutritionItem {
   vitamin_c_mg?: number;
   calcium_mg?: number;
   iron_mg?: number;
+  confidence?: number;
+  alternatives?: string[];
 }
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
@@ -154,7 +157,6 @@ const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
             {i < rows.length - 1 && <Separator className="bg-primary/20" />}
           </div>
         ))}
-        {/* Macro Pie Chart */}
         {(() => {
           const protein = sum(i => i.protein_g);
           const carbs = sum(i => i.carbs_g);
@@ -200,7 +202,6 @@ const TotalSummaryCard = ({ items }: { items: NutritionItem[] }) => {
 
 const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; hideNutrition?: boolean }) => (
   <div className="space-y-3">
-    {/* Header card with calories & macros — hidden when table is shown */}
     {!hideNutrition && (
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -209,23 +210,17 @@ const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; h
             <h3 className="font-bold text-base">{item.name}</h3>
           </div>
           <p className="text-sm text-muted-foreground">{item.description}</p>
-
-          {/* Calorie badge */}
           <div className="bg-muted rounded-xl py-4 text-center">
             <span className="text-3xl font-bold text-success tabular-nums">{item.calories}</span>
             <span className="text-sm text-muted-foreground ml-1">kcal</span>
           </div>
-
           <MacroBar protein={item.protein_g} carbs={item.carbs_g} fats={item.fats_g} />
-
           {item.fiber_g > 0 && (
             <p className="text-xs text-center text-muted-foreground">Fiber: {item.fiber_g}g</p>
           )}
         </CardContent>
       </Card>
     )}
-
-    {/* Health Benefits */}
     {item.health_benefits?.length > 0 && (
       <Card className="border-success/20">
         <CardContent className="p-4 space-y-2">
@@ -241,8 +236,6 @@ const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; h
         </CardContent>
       </Card>
     )}
-
-    {/* Potential Issues */}
     {item.potential_issues?.length > 0 && (
       <Card className="border-destructive/20">
         <CardContent className="p-4 space-y-2">
@@ -258,8 +251,6 @@ const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; h
         </CardContent>
       </Card>
     )}
-
-    {/* Suggestions */}
     {item.suggestions?.length > 0 && (
       <Card className="border-primary/20">
         <CardContent className="p-4 space-y-2">
@@ -275,8 +266,6 @@ const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; h
         </CardContent>
       </Card>
     )}
-
-    {/* Health Rating — only show if nutrition card is visible (otherwise it's in DetailedNutritionList) */}
     {!hideNutrition && item.health_rating > 0 && (
       <div className="flex items-center justify-center gap-1 py-1">
         <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
@@ -285,6 +274,12 @@ const NutritionCard = ({ item, hideNutrition = false }: { item: NutritionItem; h
     )}
   </div>
 );
+
+const ConfidenceBadge = ({ confidence }: { confidence: number }) => {
+  if (confidence >= 90) return <Badge className="bg-success/10 text-success border-success/20 text-xs">{confidence}% sure</Badge>;
+  if (confidence >= 80) return <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{confidence}% sure</Badge>;
+  return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs"><ShieldAlert className="w-3 h-3 mr-1" />{confidence}% sure</Badge>;
+};
 
 const NutritionAdvisor = () => {
   const { user, profile } = useAuth();
@@ -309,6 +304,11 @@ const NutritionAdvisor = () => {
   const [manualMeal, setManualMeal] = useState({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
   const [savingManual, setSavingManual] = useState(false);
 
+  // Confirmation step state for analyze_meal
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
+  const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -328,7 +328,6 @@ const NutritionAdvisor = () => {
 
   const parseResponse = (raw: string): NutritionItem[] | null => {
     try {
-      // Strip markdown code fences if present
       let cleaned = raw.trim();
       if (cleaned.startsWith("```")) {
         cleaned = cleaned.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
@@ -349,6 +348,8 @@ const NutritionAdvisor = () => {
     setStructuredData(null);
     setUsedFallback(false);
     setSaved(false);
+    setPendingConfirmation(false);
+    setEditingItemIdx(null);
     setLoading(true);
     setShowMealUpload(false);
     try {
@@ -358,7 +359,6 @@ const NutritionAdvisor = () => {
         if (data) {
           persona = data;
         } else {
-          // Fallback: build partial persona from health_profile
           const { data: hp } = await supabase.from("health_profile").select("*").eq("user_id", user.id).maybeSingle();
           if (hp) {
             persona = {
@@ -395,6 +395,10 @@ const NutritionAdvisor = () => {
       const structured = parseResponse(raw);
       if (structured) {
         setStructuredData(structured);
+        // If analyzing a meal (photo), show confirmation step for items with confidence data
+        if (type === "analyze_meal" && structured.some(item => typeof item.confidence === "number")) {
+          setPendingConfirmation(true);
+        }
       } else {
         setAiResponse(raw || "No response received.");
       }
@@ -423,11 +427,40 @@ const NutritionAdvisor = () => {
     setAiResponse("");
     setStructuredData(null);
     setSaved(false);
+    setPendingConfirmation(false);
+    setEditingItemIdx(null);
     clearMealImage();
     setShowMealUpload(false);
     setShowTracker(false);
     setShowManualEntry(false);
     setManualMeal({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
+  };
+
+  const handleSelectAlternative = (itemIdx: number, altName: string) => {
+    if (!structuredData) return;
+    const updated = [...structuredData];
+    updated[itemIdx] = { ...updated[itemIdx], name: altName, confidence: 100, alternatives: [] };
+    setStructuredData(updated);
+  };
+
+  const handleEditItemName = (idx: number) => {
+    if (!structuredData) return;
+    setEditingItemIdx(idx);
+    setEditName(structuredData[idx].name);
+  };
+
+  const handleSaveEditName = (idx: number) => {
+    if (!structuredData || !editName.trim()) return;
+    const updated = [...structuredData];
+    updated[idx] = { ...updated[idx], name: editName.trim(), confidence: 100, alternatives: [] };
+    setStructuredData(updated);
+    setEditingItemIdx(null);
+    setEditName("");
+  };
+
+  const confirmIdentification = () => {
+    setPendingConfirmation(false);
+    toast.success("Food items confirmed! Review your nutrition details below.");
   };
 
   const handleManualMealSave = async () => {
@@ -627,7 +660,85 @@ const NutritionAdvisor = () => {
                 <p className="text-xs text-muted-foreground">For better recommendations, complete your Nutrition Persona in My Profile.</p>
               </div>
             )}
-            {activeAction === "analyze_meal" ? (
+
+            {/* Confirmation step for meal analysis */}
+            {activeAction === "analyze_meal" && pendingConfirmation && (
+              <Card className="border-amber-500/30 bg-amber-500/5">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-sm">Verify Identified Foods</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Please confirm each food item is correctly identified. Tap an alternative or edit the name if something looks wrong.
+                  </p>
+                  <div className="space-y-3">
+                    {structuredData.map((item, idx) => {
+                      const confidence = item.confidence ?? 100;
+                      const isLowConfidence = confidence < 80;
+                      const alternatives = item.alternatives || [];
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-lg border ${isLowConfidence ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background"}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            {editingItemIdx === idx ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <Input
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className="h-8 text-sm flex-1"
+                                  autoFocus
+                                  onKeyDown={(e) => e.key === "Enter" && handleSaveEditName(idx)}
+                                />
+                                <Button size="sm" className="h-8 px-2" onClick={() => handleSaveEditName(idx)}>
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingItemIdx(null)}>
+                                  <X className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">{item.name}</span>
+                                  <ConfidenceBadge confidence={confidence} />
+                                </div>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEditItemName(idx)}>
+                                  <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                          {isLowConfidence && alternatives.length > 0 && editingItemIdx !== idx && (
+                            <div className="mt-2 space-y-1.5">
+                              <span className="text-xs text-amber-600 font-medium">Could also be:</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {alternatives.map((alt, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => handleSelectAlternative(idx, alt)}
+                                    className="px-2.5 py-1 text-xs rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 transition-colors"
+                                  >
+                                    {alt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Button className="w-full" onClick={confirmIdentification}>
+                    <CheckCircle className="w-4 h-4 mr-1" /> Confirm & Continue
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeAction === "analyze_meal" && !pendingConfirmation ? (
               <>
                 {structuredData.map((item, idx) => (
                   <div key={idx} className="space-y-4">
@@ -636,7 +747,6 @@ const NutritionAdvisor = () => {
                   </div>
                 ))}
                 {structuredData.length >= 2 && <TotalSummaryCard items={structuredData} />}
-                {/* Save meal to tracker */}
                 <Card className="border-success/20">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2 text-success font-semibold text-sm">
@@ -666,11 +776,11 @@ const NutritionAdvisor = () => {
                   </CardContent>
                 </Card>
               </>
-            ) : (
+            ) : activeAction !== "analyze_meal" ? (
               structuredData.map((item, idx) => (
                 <NutritionCard key={idx} item={item} />
               ))
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="space-y-4">
@@ -714,7 +824,6 @@ const NutritionAdvisor = () => {
         ))}
       </div>
 
-      {/* Calorie Tracker Button */}
       <Button variant="outline" className="w-full" onClick={() => setShowTracker(true)}>
         <BarChart3 className="w-4 h-4 mr-2" />
         Calorie Tracker
