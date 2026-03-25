@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { playVoiceReminder, playChime } from "@/lib/audioAlerts";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 interface Notification {
   id: string;
@@ -30,6 +31,7 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
 
 const GuardianAlerts = () => {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ const GuardianAlerts = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchAll();
         const newNotif = payload?.new;
-        if (newNotif?.type === "sos" || newNotif?.type === "fall") {
+        if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on your user, as we have detected ${eventType} alert`);
         } else if (newNotif?.type === "missed_checkin") {

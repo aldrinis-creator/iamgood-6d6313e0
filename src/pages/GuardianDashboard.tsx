@@ -16,6 +16,7 @@ import WardMedicationStatus from "@/components/WardMedicationStatus";
 import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -55,6 +56,7 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
@@ -190,7 +192,7 @@ const GuardianDashboard = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchNotifications();
         const newNotif = payload?.new;
-        if (newNotif?.type === "sos" || newNotif?.type === "fall") {
+        if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
         } else if (newNotif?.type === "missed_checkin") {

@@ -81,6 +81,8 @@ export interface UserSettings {
   // Past Medical History toggles
   hasHospitalizations: boolean;
   hasSurgeries: boolean;
+  // Guardian-specific
+  guardianVoiceAlerts: boolean;
 }
 
 export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
@@ -126,6 +128,7 @@ const DEFAULTS: UserSettings = {
   exerciseReminder: true,
   hasHospitalizations: false,
   hasSurgeries: false,
+  guardianVoiceAlerts: true,
 };
 
 export function useUserSettings() {
