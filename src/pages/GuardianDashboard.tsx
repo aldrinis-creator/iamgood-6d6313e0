@@ -192,7 +192,7 @@ const GuardianDashboard = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchNotifications();
         const newNotif = payload?.new;
-        if (newNotif?.type === "sos" || newNotif?.type === "fall") {
+        if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
         } else if (newNotif?.type === "missed_checkin") {
