@@ -308,6 +308,7 @@ const NutritionAdvisor = () => {
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [reanalyzingIdx, setReanalyzingIdx] = useState<number | null>(null);
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
