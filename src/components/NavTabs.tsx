@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, HelpCircle, Settings, Shield } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -27,7 +27,6 @@ const NavTabs = () => {
 
     fetchUnread();
 
-    // Subscribe to realtime notifications
     const channel = supabase
       .channel("guardian-nav-notifications")
       .on(
@@ -48,9 +47,9 @@ const NavTabs = () => {
   ];
 
   const guardianTabs = [
-    { icon: Shield, label: "Dashboard", path: "/guardian", badge: unreadCount },
-    { icon: Home, label: "Zones", path: "/settings" },
-    { icon: Calendar, label: "Reports", path: "/reports" },
+    { icon: User, label: "My User", path: "/guardian", badge: unreadCount },
+    { icon: Bell, label: "Alerts", path: "/guardian", hash: "#alerts" },
+    { icon: FileText, label: "Reports", path: "/reports" },
     { icon: Settings, label: "Settings", path: "/guardian-settings" },
   ];
 
@@ -59,12 +58,12 @@ const NavTabs = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
       <div className="max-w-md mx-auto flex">
-        {tabs.map((tab) => {
+        {tabs.map((tab, tabIdx) => {
           const isActive = location.pathname === tab.path;
           const badge = "badge" in tab ? (tab as any).badge : 0;
           return (
             <button
-              key={tab.path}
+              key={`${tab.path}-${tabIdx}`}
               onClick={() => navigate(tab.path)}
               className={`flex-1 flex flex-col items-center py-2 px-1 text-xs transition-colors relative ${
                 isActive
