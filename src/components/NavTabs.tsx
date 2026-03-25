@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User, Stethoscope } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -48,8 +48,9 @@ const NavTabs = () => {
 
   const guardianTabs = [
     { icon: User, label: "My User", path: "/guardian", badge: unreadCount },
-    { icon: Bell, label: "Alerts", path: "/guardian", hash: "#alerts" },
-    { icon: FileText, label: "Reports", path: "/reports" },
+    { icon: Bell, label: "Alerts", path: "/guardian/alerts" },
+    { icon: FileText, label: "Reports", path: "/guardian/reports" },
+    { icon: Stethoscope, label: "Services", path: "/guardian/services" },
     { icon: Settings, label: "Settings", path: "/guardian-settings" },
   ];
 
