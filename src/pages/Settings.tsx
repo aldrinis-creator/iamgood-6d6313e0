@@ -326,6 +326,12 @@ const Settings = () => {
       toast.success(`${newName} added as Guardian (auto-accepted, 24hr rejection window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
+      // Send invite email if email provided
+      if (newEmail) {
+        supabase.functions.invoke("send-guardian-invite", {
+          body: { guardian_email: newEmail, guardian_name: newName, user_name: session.user.email, relation: newRelation },
+        }).catch(() => {});
+      }
       // Refresh
       const { data } = await supabase.from("guardians").select("*").eq("user_id", session.user.id).order("created_at");
       if (data) setGuardians(data as unknown as Guardian[]);
