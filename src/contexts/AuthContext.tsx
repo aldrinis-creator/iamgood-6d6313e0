@@ -52,7 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => fetchProfile(session.user.id), 0);
+          setTimeout(async () => {
+            await fetchProfile(session.user.id);
+            // Auto-link guardian records by email/phone
+            supabase.rpc("link_guardian_user_id").catch(() => {});
+          }, 0);
           // Request notification permission on sign-in
           if ("Notification" in window && Notification.permission === "default") {
             Notification.requestPermission();
