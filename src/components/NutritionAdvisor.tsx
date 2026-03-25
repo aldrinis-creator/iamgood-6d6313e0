@@ -437,11 +437,46 @@ const NutritionAdvisor = () => {
     setManualMeal({ meal_name: "", meal_type: "other", calories: "", protein: "", carbs: "", fats: "", fiber: "" });
   };
 
+  const reanalyzeItem = async (itemIdx: number, correctedName: string) => {
+    if (!structuredData) return;
+    setReanalyzingIdx(itemIdx);
+    try {
+      let persona: any = null;
+      if (user) {
+        const { data } = await supabase.from("nutrition_personas").select("*").eq("user_id", user.id).maybeSingle();
+        if (data) persona = data;
+      }
+      const { data, error } = await supabase.functions.invoke("nutrition-advisor", {
+        body: { type: "reanalyze_item", persona, foodName: correctedName },
+      });
+      if (error) throw error;
+      const raw = data?.response || "";
+      const parsed = parseResponse(raw);
+      if (parsed && parsed.length > 0) {
+        const updated = [...structuredData];
+        updated[itemIdx] = { ...parsed[0], confidence: 100, alternatives: [] };
+        setStructuredData(updated);
+        toast.success(`Updated nutrition data for "${correctedName}"`);
+      } else {
+        // Fallback: just update name
+        const updated = [...structuredData];
+        updated[itemIdx] = { ...updated[itemIdx], name: correctedName, confidence: 100, alternatives: [] };
+        setStructuredData(updated);
+        toast.warning("Updated name but couldn't fetch new nutrition data");
+      }
+    } catch {
+      const updated = [...structuredData];
+      updated[itemIdx] = { ...updated[itemIdx], name: correctedName, confidence: 100, alternatives: [] };
+      setStructuredData(updated);
+      toast.warning("Updated name but nutrition values may be inaccurate");
+    } finally {
+      setReanalyzingIdx(null);
+    }
+  };
+
   const handleSelectAlternative = (itemIdx: number, altName: string) => {
     if (!structuredData) return;
-    const updated = [...structuredData];
-    updated[itemIdx] = { ...updated[itemIdx], name: altName, confidence: 100, alternatives: [] };
-    setStructuredData(updated);
+    reanalyzeItem(itemIdx, altName);
   };
 
   const handleEditItemName = (idx: number) => {
@@ -452,11 +487,10 @@ const NutritionAdvisor = () => {
 
   const handleSaveEditName = (idx: number) => {
     if (!structuredData || !editName.trim()) return;
-    const updated = [...structuredData];
-    updated[idx] = { ...updated[idx], name: editName.trim(), confidence: 100, alternatives: [] };
-    setStructuredData(updated);
+    const correctedName = editName.trim();
     setEditingItemIdx(null);
     setEditName("");
+    reanalyzeItem(idx, correctedName);
   };
 
   const confirmIdentification = () => {
