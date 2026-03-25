@@ -7,6 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { playVoiceReminder, playChime } from "@/lib/audioAlerts";
 
 interface Notification {
   id: string;
