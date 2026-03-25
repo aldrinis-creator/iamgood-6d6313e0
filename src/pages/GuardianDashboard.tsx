@@ -56,6 +56,7 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
