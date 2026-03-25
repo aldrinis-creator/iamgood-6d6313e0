@@ -44,13 +44,24 @@ const jsonFormatAnalyze = `IMPORTANT: You MUST respond ONLY with a valid JSON ar
 - potential_issues (string[]): list of potential concerns personalized to user
 - health_rating (number 1-10): overall health rating for this user
 - suggestions (string[]): improvement tips
+- confidence (number 0-100): how confident you are about correctly identifying this food item from the image. 100 means absolutely certain, below 80 means uncertain.
+- alternatives (string[]): if confidence is below 80, list 2-3 other foods this could possibly be. If confidence >= 80, return an empty array.
 
-Use 0 for any field you cannot estimate. Return each distinct ingredient/food item separately.
-Example: [{"name":"Dal Tadka","description":"Yellow lentils tempered with spices","calories":180,"protein_g":12,"carbs_g":22,"fats_g":6,"saturated_fat_g":1,"polyunsaturated_fat_g":1,"monounsaturated_fat_g":3,"trans_fat_g":0,"cholesterol_mg":0,"sodium_mg":400,"potassium_mg":350,"fiber_g":4,"sugar_g":2,"vitamin_a_iu":50,"vitamin_c_mg":3,"calcium_mg":30,"iron_mg":3,"health_benefits":["High protein"],"potential_issues":["Sodium from salt"],"health_rating":7,"suggestions":["Use less oil"]}]`;
+CRITICAL IDENTIFICATION RULES:
+- Pay very close attention to food textures, colors, and cooking styles to distinguish visually similar foods.
+- Indian cuisine context is essential: brinjal/baingan (eggplant) slices are NOT banana slices — brinjal is purple-skinned with white-green flesh and visible seeds when cooked. Banana slices are uniformly pale yellow/white with no seeds.
+- Avocado slices have a creamy, buttery green flesh with a large pit mark — do NOT confuse with cucumber which has visible seeds in a watery center and a thin green skin.
+- Other commonly confused foods: lauki (bottle gourd) vs zucchini, tinda vs apple gourd, raw papaya vs mango, paneer vs tofu, poha vs upma, sevai vs noodles.
+- When uncertain, set a lower confidence score and list the alternatives.
+
+Use 0 for any nutritional field you cannot estimate. Return each distinct ingredient/food item separately.
+Example: [{"name":"Dal Tadka","description":"Yellow lentils tempered with spices","calories":180,"protein_g":12,"carbs_g":22,"fats_g":6,"saturated_fat_g":1,"polyunsaturated_fat_g":1,"monounsaturated_fat_g":3,"trans_fat_g":0,"cholesterol_mg":0,"sodium_mg":400,"potassium_mg":350,"fiber_g":4,"sugar_g":2,"vitamin_a_iu":50,"vitamin_c_mg":3,"calcium_mg":30,"iron_mg":3,"health_benefits":["High protein"],"potential_issues":["Sodium from salt"],"health_rating":7,"suggestions":["Use less oil"],"confidence":92,"alternatives":[]}]`;
 
 const systemPrompts: Record<string, string> = {
   meal_plan: `You are an Indian nutrition advisor. Suggest a detailed meal plan for the current time of day (breakfast/lunch/dinner/snack based on IST). Use Indian cuisine. Personalize based on the user's persona including their activity level, medical conditions, dietary preferences, and goals. Suggest 2-4 food items. ${jsonFormatBase}`,
-  analyze_meal: `You are a nutrition analyst. Analyze the meal shown in the image (or described by the user). Provide a comprehensive nutritional breakdown including all macronutrients, micronutrients, vitamins and minerals. Use Indian cuisine context. Consider the user's medical conditions and dietary restrictions. Return each distinct food item/ingredient as a separate object. ${jsonFormatAnalyze}`,
+  analyze_meal: `You are an expert nutrition analyst specializing in Indian and South Asian cuisine. Analyze the meal shown in the image (or described by the user). Provide a comprehensive nutritional breakdown including all macronutrients, micronutrients, vitamins and minerals.
+
+CRITICAL: Carefully identify each food item. Many Indian foods look similar — pay close attention to texture, color, cooking method, and context clues (plate type, other items on the plate, typical meal combinations). Consider the user's medical conditions and dietary restrictions. Return each distinct food item/ingredient as a separate object. ${jsonFormatAnalyze}`,
   post_workout: `You are a sports nutritionist specializing in Indian cuisine. Suggest a post-workout recovery meal with protein, carbs, and hydration tips. Personalize based on the user's persona including activity level and fitness goals. Suggest 2-3 food items. ${jsonFormatBase}`,
   feeling_unwell: `You are a gentle nutrition advisor. Suggest easy-to-digest, soothing Indian meals for someone who is not feeling well. Include khichdi, soups, and light options. Consider the user's medical conditions and allergies carefully. Suggest 2-3 food items. ${jsonFormatBase}`,
 };
@@ -73,7 +84,8 @@ serve(async (req) => {
     const istHour = (now.getUTCHours() + 5) % 24 + (now.getUTCMinutes() >= 30 ? 1 : 0);
     const timeContext = `Current IST hour is approximately ${istHour}:00.`;
 
-    const model = image ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview";
+    // Use gemini-2.5-pro for image analysis (strongest vision model), gemini-3-flash for text
+    const model = image ? "google/gemini-2.5-pro" : "google/gemini-3-flash-preview";
 
     let messages: any[];
     if (image && type === "analyze_meal") {
@@ -82,7 +94,7 @@ serve(async (req) => {
         {
           role: "user",
           content: [
-            { type: "text", text: `${personaContext}\n${timeContext}\n\nPlease analyze this meal image and provide a detailed nutritional breakdown.` },
+            { type: "text", text: `${personaContext}\n${timeContext}\n\nPlease carefully analyze this meal image. Pay close attention to food textures, colors, and cooking styles to accurately identify each item. This is likely Indian cuisine — consider that context when identifying foods.` },
             { type: "image_url", image_url: { url: image } },
           ],
         },
