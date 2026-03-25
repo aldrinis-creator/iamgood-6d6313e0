@@ -68,11 +68,9 @@ const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
-  // Step management
   const [step, setStep] = useState<number>(1);
   const [selectedRole, setSelectedRole] = useState<SelectedRole>(null);
 
-  // Form fields
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneCode, setPhoneCode] = useState("+91");
@@ -99,7 +97,6 @@ const Register = () => {
     }
   };
 
-  // Guardian helpers
   const addGuardian = () => {
     if (guardians.length < 5) {
       setGuardians([...guardians, { name: "", phone: "", email: "", relation: "" }]);
@@ -143,6 +140,16 @@ const Register = () => {
     }
   };
 
+  const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
+    try {
+      await supabase.functions.invoke("send-guardian-invite", {
+        body: { guardian_email: guardianEmail, guardian_name: guardianName, user_name: userName, relation },
+      });
+    } catch (e) {
+      console.error("Failed to send guardian invite:", e);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!fullName || !email || !password) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
@@ -154,7 +161,11 @@ const Register = () => {
     }
 
     setLoading(true);
-    const { data, error } = await signUp(email, password, { full_name: fullName });
+    // Pass app_role in metadata so DB trigger sets it correctly
+    const { data, error } = await signUp(email, password, { 
+      full_name: fullName,
+      app_role: selectedRole || "user",
+    });
 
     if (error) {
       setLoading(false);
@@ -164,11 +175,14 @@ const Register = () => {
 
     const userId = data?.user?.id;
     if (userId) {
-      // Update profile with phone, DOB, and role
+      // Wait briefly for the trigger to create the profile row
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Update profile with phone, DOB
+      const fullPhone = `${phoneCode}${phone}`;
       await supabase.from("profiles").update({
-        phone: `${phoneCode}${phone}`,
+        phone: fullPhone,
         date_of_birth: dob || null,
-        role: selectedRole as "user" | "guardian",
       }).eq("id", userId);
 
       // Insert guardians only for user role
@@ -182,16 +196,29 @@ const Register = () => {
             guardian_email: g.email || null,
             relation: g.relation || null,
             is_primary: i === 0,
+            status: "accepted",
           }));
         if (guardianRows.length > 0) {
           await supabase.from("guardians").insert(guardianRows);
+          
+          // Send invite emails to guardians with email
+          for (const g of guardianRows) {
+            if (g.guardian_email) {
+              sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
+            }
+          }
         }
+      }
+
+      // For guardian role, try to auto-link to any existing guardian records
+      if (selectedRole === "guardian") {
+        await supabase.rpc("link_guardian_user_id");
       }
     }
 
     setLoading(false);
     toast({ title: "Account created!", description: "Check your email to verify your account." });
-    navigate("/dashboard");
+    navigate(selectedRole === "guardian" ? "/guardian" : "/dashboard");
   };
 
   // --- Step 1: Role selection ---
@@ -253,7 +280,6 @@ const Register = () => {
     return (
       <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
         <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-          {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             <button type="button" onClick={handleBack} className="p-2 -ml-2 rounded-lg hover:bg-muted">
               <ChevronLeft className="w-5 h-5 text-foreground" />
@@ -312,7 +338,6 @@ const Register = () => {
             </div>
           </div>
 
-          {/* Sticky CTA */}
           <div className="sticky bottom-4 pt-4 mt-4">
             <Button
               type="button"
@@ -335,7 +360,6 @@ const Register = () => {
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button type="button" onClick={handleBack} className="p-2 -ml-2 rounded-lg hover:bg-muted">
             <ChevronLeft className="w-5 h-5 text-foreground" />
@@ -398,7 +422,6 @@ const Register = () => {
           )}
         </div>
 
-        {/* Sticky CTA */}
         <div className="sticky bottom-4 pt-4 mt-4">
           <Button
             type="button"
