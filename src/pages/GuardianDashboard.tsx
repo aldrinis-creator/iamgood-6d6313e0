@@ -16,6 +16,7 @@ import WardMedicationStatus from "@/components/WardMedicationStatus";
 import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
