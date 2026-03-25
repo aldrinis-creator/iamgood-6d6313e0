@@ -46,10 +46,12 @@ const AppHeader = () => {
               <DropdownMenuItem onClick={() => navigate("/my-profile")}>
                 <UserCircle className="w-4 h-4 mr-2" /> My Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/medical-vault")}>
-                <ShieldCheck className="w-4 h-4 mr-2" /> Medical Vault
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
+              {role === "user" && (
+                <DropdownMenuItem onClick={() => navigate("/medical-vault")}>
+                  <ShieldCheck className="w-4 h-4 mr-2" /> Medical Vault
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => navigate(role === "guardian" ? "/guardian-settings" : "/settings")}>
                 <Settings className="w-4 h-4 mr-2" /> Settings
               </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => { await signOut(); navigate("/login"); }}>
@@ -89,9 +91,9 @@ const AppHeader = () => {
       {role === "guardian" && (
         <nav className="flex gap-1 bg-primary-foreground/10 rounded-lg p-1">
           {[
-            { label: "Dashboard", path: "/guardian" },
-            { label: "Zones", path: "/settings" },
+            { label: "My User", path: "/guardian" },
             { label: "Reports", path: "/reports" },
+            { label: "Settings", path: "/guardian-settings" },
           ].map((tab) => (
             <button
               key={tab.path}

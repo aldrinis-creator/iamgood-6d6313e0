@@ -72,31 +72,22 @@ const GuardianDashboard = () => {
   const fetchWardCheckIns = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    // Get the user's phone from their profile
-    const { data: myProfile } = await supabase
-      .from("profiles")
-      .select("phone")
-      .eq("id", session.user.id)
-      .single();
-
-    if (!myProfile?.phone) return;
-
-    // Find guardians entries where this user's phone matches
+    // Find guardian entries where this user is linked via guardian_user_id
     const { data: guardianEntries } = await supabase
       .from("guardians")
       .select("user_id")
-      .eq("guardian_phone", myProfile.phone)
+      .eq("guardian_user_id", session.user.id)
       .limit(1);
 
     if (!guardianEntries || guardianEntries.length === 0) return;
-    const wardUserId = guardianEntries[0].user_id;
-    setWardUserId(wardUserId);
+    const wardId = guardianEntries[0].user_id;
+    setWardUserId(wardId);
 
     // Get ward's name
     const { data: wardProfile } = await supabase
       .from("profiles")
       .select("full_name")
-      .eq("id", wardUserId)
+      .eq("id", wardId)
       .single();
 
     if (wardProfile?.full_name) setWardName(wardProfile.full_name);
@@ -108,7 +99,7 @@ const GuardianDashboard = () => {
     const { data: checkIns } = await supabase
       .from("check_ins")
       .select("id, scheduled_at, status, responded_at")
-      .eq("user_id", wardUserId)
+      .eq("user_id", wardId)
       .gte("scheduled_at", todayStart.toISOString())
       .order("scheduled_at", { ascending: true });
 

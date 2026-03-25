@@ -332,6 +332,7 @@ export type Database = {
           guardian_email: string | null
           guardian_name: string
           guardian_phone: string
+          guardian_user_id: string | null
           id: string
           is_primary: boolean
           is_vault_nominee: boolean
@@ -345,6 +346,7 @@ export type Database = {
           guardian_email?: string | null
           guardian_name: string
           guardian_phone: string
+          guardian_user_id?: string | null
           id?: string
           is_primary?: boolean
           is_vault_nominee?: boolean
@@ -358,6 +360,7 @@ export type Database = {
           guardian_email?: string | null
           guardian_name?: string
           guardian_phone?: string
+          guardian_user_id?: string | null
           id?: string
           is_primary?: boolean
           is_vault_nominee?: boolean
@@ -1156,6 +1159,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_guardian_user_id: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "guardian"

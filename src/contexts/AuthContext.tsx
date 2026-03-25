@@ -11,7 +11,7 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, metadata?: { full_name?: string }) => Promise<{ error: Error | null; data: any }>;
+  signUp: (email: string, password: string, metadata?: Record<string, string>) => Promise<{ error: Error | null; data: any }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
@@ -52,7 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         if (session?.user) {
           // Use setTimeout to avoid Supabase deadlock
-          setTimeout(() => fetchProfile(session.user.id), 0);
+          setTimeout(async () => {
+            await fetchProfile(session.user.id);
+            // Auto-link guardian records by email/phone
+            try { await supabase.rpc("link_guardian_user_id" as any); } catch {};
+          }, 0);
           // Request notification permission on sign-in
           if ("Notification" in window && Notification.permission === "default") {
             Notification.requestPermission();
@@ -81,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, metadata?: { full_name?: string }) => {
+  const signUp = async (email: string, password: string, metadata?: Record<string, string>) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
