@@ -30,6 +30,7 @@ import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
 import GuardianMessages from "./pages/GuardianMessages";
+import MapMyJourney from "./pages/MapMyJourney";
 
 const queryClient = new QueryClient();
 
