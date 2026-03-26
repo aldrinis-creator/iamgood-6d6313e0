@@ -25,6 +25,7 @@ import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
+import Messages from "./pages/Messages";
 import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
