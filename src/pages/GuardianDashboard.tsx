@@ -582,9 +582,9 @@ const GuardianDashboard = () => {
         <div className="grid grid-cols-4 gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="flex-col h-auto py-4 bg-primary" size="lg">
+              <Button className={`flex-col h-auto py-4 ${wardPhone ? "bg-primary" : "bg-muted text-muted-foreground"}`} size="lg">
                 <Phone className="w-5 h-5 mb-1" />
-                <span className="text-xs">Call</span>
+                <span className="text-xs">Call{!wardPhone ? " ⚠" : ""}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
