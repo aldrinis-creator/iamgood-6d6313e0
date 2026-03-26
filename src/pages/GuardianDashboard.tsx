@@ -18,7 +18,7 @@ import WardMedicationAdherence from "@/components/WardMedicationAdherence";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -98,6 +98,7 @@ const GuardianDashboard = () => {
   const [activeSOS, setActiveSOS] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wardBattery, setWardBattery] = useState<number | null>(null);
+  const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
 
   // Track missed medication/check-in counts for escalation
@@ -213,6 +214,9 @@ const GuardianDashboard = () => {
       setLocationConsent(s?.shareLocationWithGuardian !== false);
       if (typeof s?.batteryLevel === "number") {
         setWardBattery(s.batteryLevel);
+      }
+      if ((data as any)?.updated_at) {
+        setBatteryUpdatedAt((data as any).updated_at);
       }
       // Read ward's saved location
       if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
@@ -538,6 +542,11 @@ const GuardianDashboard = () => {
                   {wardBattery !== null ? `${wardBattery}%` : "N/A"}
                 </p>
                 <p className="text-[10px] text-muted-foreground">Battery</p>
+                <p className="text-[9px] text-muted-foreground truncate">
+                  {batteryUpdatedAt
+                    ? formatDistanceToNow(new Date(batteryUpdatedAt), { addSuffix: true })
+                    : "—"}
+                </p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
