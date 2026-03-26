@@ -1,4 +1,5 @@
-import { Moon, Sun, DoorOpen } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
 import HealthPassport from "@/components/HealthPassport";
@@ -55,6 +56,7 @@ const msUntilSleepEnd = (to: string): number => {
 
 const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
+  const navigate = useNavigate();
   const { settings, updateSetting } = useUserSettings();
 
   const { session } = useAuth();
@@ -224,6 +226,19 @@ const UserDashboard = () => {
                 {settings.checkOutConfig.reason ? ` • ${settings.checkOutConfig.reason}` : ""}
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Map My Journey */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Navigation className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">Map My Journey</h3>
+              <p className="text-xs text-muted-foreground">Track your travel & keep guardians informed</p>
+            </div>
           </CardContent>
         </Card>
 
