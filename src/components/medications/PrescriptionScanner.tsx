@@ -96,7 +96,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     if (inputMode === "text") {
       const text = prescriptionText.trim();
       if (!text) {
-        toast.error("Please enter the medication names from your prescription");
+        toast.error("Please enter the medication names from the diagnosis");
         return;
       }
     } else {
