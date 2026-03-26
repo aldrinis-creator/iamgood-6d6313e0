@@ -14,6 +14,8 @@ interface Ping {
   read: boolean;
   created_at: string;
   guardian_name?: string;
+  reply_message?: string;
+  replied_at?: string;
 }
 
 const Messages = () => {
