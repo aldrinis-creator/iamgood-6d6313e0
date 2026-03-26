@@ -243,6 +243,15 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
 
       {result && <PrescriptionResults result={result} onSelectAlternative={alternativeMode ? onSelectAlternative : undefined} />}
 
+      {result && (
+        <ReportShareButtons
+          title="Doctor's Diagnosis Analysis"
+          subtitle="Medication Analysis Report"
+          content={[result.summary, ...(result.medications?.map(m => `${m.name} (${m.salt_composition}) — ${m.dosage} — ${m.status.toUpperCase()}`) || [])].join("\n")}
+          category="Doctor's Diagnosis"
+        />
+      )}
+
       {result && <SaveToVaultButton result={result} />}
 
       <p className="text-[10px] text-muted-foreground text-center">
