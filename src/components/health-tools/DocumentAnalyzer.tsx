@@ -187,23 +187,23 @@ const DocumentAnalyzer = () => {
   }
 
   const saveToVault = async () => {
+    if (!user) { toast.error("Please log in to save"); return; }
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Please log in to save"); return; }
       const recordType = selectedCat === "Doctor's Diagnosis" ? "Doctor's Diagnosis" : "AI Analysis";
       const { error } = await supabase.from("medical_records").insert({
-        user_id: session.user.id,
+        user_id: user.id,
         title: `${selectedCat || "Document"} Analysis — ${new Date().toLocaleDateString("en-IN")}`,
         record_type: recordType,
-        description: result,
+        description: result.substring(0, 50000),
         record_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
       setSaved(true);
       toast.success("Saved to Medical Vault");
-    } catch {
-      toast.error("Failed to save");
+    } catch (err: any) {
+      console.error("Vault save error:", err);
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
     } finally {
       setSaving(false);
     }

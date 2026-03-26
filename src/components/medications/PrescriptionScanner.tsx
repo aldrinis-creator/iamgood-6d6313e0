@@ -362,12 +362,12 @@ const PrescriptionResults = ({ result, onSelectAlternative }: { result: ScanResu
 );
 
 const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const saveToVault = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { toast.error("Please log in to save"); return; }
+    if (!user) { toast.error("Please log in to save"); return; }
 
     setSaving(true);
     try {
@@ -382,17 +382,18 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
       ].join("\n");
 
       const { error } = await supabase.from("medical_records").insert({
-        user_id: session.user.id,
+        user_id: user.id,
         title: "Doctor's Diagnosis Analysis",
         record_type: "Doctor's Diagnosis",
-        description,
+        description: description.substring(0, 50000),
         record_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
       setSaved(true);
       toast.success("Saved to Medical Vault");
-    } catch {
-      toast.error("Failed to save");
+    } catch (err: any) {
+      console.error("Vault save error:", err);
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
     } finally {
       setSaving(false);
     }

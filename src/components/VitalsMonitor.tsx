@@ -610,12 +610,13 @@ const DeviceReportsTab = () => {
         user_id: session.user.id,
         title: `Device Report Analysis - ${new Date().toLocaleDateString("en-IN")}`,
         record_type: "Lab Report",
-        description: analysis,
+        description: analysis.substring(0, 50000),
       });
       if (error) throw error;
       toast.success("Saved to Medical Vault");
-    } catch {
-      toast.error("Failed to save");
+    } catch (err: any) {
+      console.error("Vault save error:", err);
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
     } finally {
       setSaving(false);
     }
