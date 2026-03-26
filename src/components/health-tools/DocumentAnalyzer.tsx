@@ -39,6 +39,7 @@ const analysisSteps = [
 ];
 
 const DocumentAnalyzer = () => {
+  const { user } = useAuth();
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [mode, setMode] = useState<InputMode>("photo");
   const [file, setFile] = useState<File | null>(null);
