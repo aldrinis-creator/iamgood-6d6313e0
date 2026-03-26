@@ -39,7 +39,17 @@ const BatteryWarning: React.FC = () => {
     };
     (navigator as any).getBattery?.().then((b: any) => {
       batt = b;
-      update();
+      // Force-save on initial load so guardians always have a value
+      const initLevel = Math.round(b.level * 100);
+      setBattery({ level: initLevel, charging: b.charging });
+      if (session?.user?.id && lastSavedLevel.current === -1) {
+        lastSavedLevel.current = initLevel;
+        supabase.from("user_settings").upsert({
+          user_id: session.user.id,
+          settings: { ...settings, batteryLevel: initLevel },
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "user_id" }).then(() => {});
+      }
       b.addEventListener("levelchange", update);
       b.addEventListener("chargingchange", update);
     });
