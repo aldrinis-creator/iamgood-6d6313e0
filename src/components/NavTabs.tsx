@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User, Stethoscope } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User, Stethoscope, MessageCircle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
