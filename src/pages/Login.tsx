@@ -84,31 +84,34 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    let emailToUse = identifier.trim();
+    try {
+      let emailToUse = identifier.trim();
 
-    if (isPhoneInput(emailToUse)) {
-      const phone = formatPhone(emailToUse);
-      // Look up email via a server-side function since we can't access auth.users from client
-      const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
-      if (fnError || !data) {
-        setLoading(false);
-        toast({ title: "Sign in failed", description: "No account found with this phone number.", variant: "destructive" });
-        return;
+      if (isPhoneInput(emailToUse)) {
+        const phone = formatPhone(emailToUse);
+        const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
+        if (fnError || !data) {
+          toast({ title: "Sign in failed", description: "No account found with this phone number.", variant: "destructive" });
+          return;
+        }
+        emailToUse = data as string;
       }
-      emailToUse = data as string;
-    }
 
-    const { error } = await signIn(emailToUse, password);
-    setLoading(false);
-    if (error) {
-      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
-    } else {
-      if (rememberMe) {
-        localStorage.setItem(REMEMBER_KEY, identifier.trim());
+      const { error } = await signIn(emailToUse, password);
+      if (error) {
+        toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       } else {
-        localStorage.removeItem(REMEMBER_KEY);
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_KEY, identifier.trim());
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+        }
+        navigate("/dashboard");
       }
-      navigate("/dashboard");
+    } catch (err: any) {
+      toast({ title: "Sign in failed", description: err?.message || "An unexpected error occurred", variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
