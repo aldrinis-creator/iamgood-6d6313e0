@@ -378,11 +378,19 @@ const GuardianDashboard = () => {
       return;
     }
     const clean = wardPhone.replace(/[^0-9+]/g, "");
+    const openLink = (url: string) => {
+      // Try opening in a new window first; fall back to location change
+      const w = window.open(url, "_blank");
+      if (!w || w.closed) {
+        window.location.href = url;
+      }
+    };
     if (type === "whatsapp") {
-      window.open(`https://wa.me/${clean.replace("+", "")}`, "_blank");
+      openLink(`https://wa.me/${clean.replace("+", "")}`);
+      toast({ title: "Opening WhatsApp", description: `Calling ${wardName} on WhatsApp (${wardPhone})` });
     } else if (type === "flash") {
-      // Flash call: initiate a brief call (user just needs to see the ring)
-      window.open(`tel:${clean}`, "_self");
+      openLink(`tel:${clean}`);
+      toast({ title: "Flash Call initiated", description: `Calling ${wardPhone} — ring briefly to alert ${wardName}` });
       // Also send a ping so User gets a notification
       if (wardUserId && session?.user?.id) {
         supabase.from("guardian_pings").insert({
@@ -392,7 +400,8 @@ const GuardianDashboard = () => {
         } as any);
       }
     } else {
-      window.open(`tel:${clean}`, "_self");
+      openLink(`tel:${clean}`);
+      toast({ title: "Calling", description: `Dialing ${wardPhone}` });
     }
   };
 
