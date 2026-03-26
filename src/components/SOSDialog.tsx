@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar, Share2, Printer, Download, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 interface SOSDialogProps {
   open: boolean;
