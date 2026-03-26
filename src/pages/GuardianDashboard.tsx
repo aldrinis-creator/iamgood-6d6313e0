@@ -413,6 +413,7 @@ const GuardianDashboard = () => {
     const s = (settingsData as any)?.settings;
     if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
       setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      if (s?.lastLocationAt) setLocationUpdatedAt(s.lastLocationAt);
       return;
     }
     // Fallback to last SOS event
