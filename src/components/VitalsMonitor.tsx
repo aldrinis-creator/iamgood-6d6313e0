@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 /* ───────── types ───────── */
 interface VitalMetric { label: string; value: string | number; unit: string; icon: React.ReactNode; color: string }
