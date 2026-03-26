@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { BatteryLow, Zap, AlertTriangle } from "lucide-react";
 import { playChime, playVoiceReminder, ensureAudioReady } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BatteryState {
   level: number;
