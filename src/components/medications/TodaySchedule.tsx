@@ -1,14 +1,14 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, AlertTriangle, Sun, CloudSun, Moon } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Clock, AlertTriangle, Sun, CloudSun, Moon, Timer, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Medication {
   id: string;
@@ -30,6 +30,8 @@ interface DoseSlot {
 
 type TimePeriod = "Morning" | "Afternoon" | "Evening";
 
+const MAX_SNOOZES = 3;
+
 const getTimePeriod = (hour: number): TimePeriod => {
   if (hour < 12) return "Morning";
   if (hour < 17) return "Afternoon";
@@ -41,6 +43,9 @@ const periodIcon: Record<TimePeriod, React.ReactNode> = {
   Afternoon: <CloudSun className="w-3.5 h-3.5 text-orange-500" />,
   Evening: <Moon className="w-3.5 h-3.5 text-indigo-400" />,
 };
+
+const slotKey = (slot: DoseSlot) =>
+  `${slot.medication.id}_${slot.scheduledAt.getHours()}:${slot.scheduledAt.getMinutes()}`;
 
 const notifyGuardians = async (userId: string, medicationName: string, status: string, scheduledTime: string) => {
   try {
@@ -59,6 +64,13 @@ const TodaySchedule = () => {
   const { session } = useAuth();
   const [doses, setDoses] = useState<DoseSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hiddenTaken, setHiddenTaken] = useState<Set<string>>(new Set());
+  const [fadingOut, setFadingOut] = useState<Set<string>>(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  // Snooze state: key → { count, until (timestamp) }
+  const [snoozeState, setSnoozeState] = useState<Map<string, { count: number; until: number }>>(new Map());
+  const snoozeTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const loadSchedule = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -82,29 +94,27 @@ const TodaySchedule = () => {
       .gte("scheduled_at", todayStart.toISOString())
       .lte("scheduled_at", todayEnd.toISOString());
 
-    const logMap = new Map<string, any>();
-    (logs || []).forEach((l) => {
-      const key = `${l.medication_id}_${l.scheduled_at}`;
-      logMap.set(key, l);
-    });
-
     const slots: DoseSlot[] = [];
 
     for (const med of meds) {
       for (const timeStr of med.schedule_times) {
         const [hh, mm] = timeStr.split(":").map(Number);
         const scheduledAt = new Date(now);
-        scheduledAt.setHours(hh, mm, 0, 0);
+        scheduledAt.setHours(hh, mm || 0, 0, 0);
 
-        const key = `${med.id}_${scheduledAt.toISOString()}`;
-        const log = logMap.get(key);
+        // Match logs by medication_id + hour + minute (robust, no ISO mismatch)
+        const log = (logs || []).find((l) => {
+          if (l.medication_id !== med.id) return false;
+          const logDate = new Date(l.scheduled_at);
+          return logDate.getHours() === hh && logDate.getMinutes() === (mm || 0);
+        });
 
         let status: DoseSlot["status"] = "pending";
         let logId: string | null = null;
         let takenAt: string | null = null;
 
         if (log) {
-          status = log.status;
+          status = log.status as DoseSlot["status"];
           logId = log.id;
           takenAt = log.taken_at;
         } else {
@@ -140,11 +150,17 @@ const TodaySchedule = () => {
     return () => clearInterval(interval);
   }, [loadSchedule]);
 
+  // Cleanup snooze timers
+  useEffect(() => {
+    return () => {
+      snoozeTimers.current.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
   const markTaken = async (slot: DoseSlot) => {
     if (!session?.user?.id) return;
     const now = new Date();
-    const diffMin = Math.abs(differenceInMinutes(now, slot.scheduledAt));
-    if (diffMin > 60) { toast.error("This dose window has passed (±1 hour)."); return; }
+    const key = slotKey(slot);
 
     try {
       if (slot.logId) {
@@ -156,27 +172,124 @@ const TodaySchedule = () => {
         });
       }
       await supabase.from("medications").update({ remaining_quantity: Math.max(0, slot.medication.remaining_quantity - 1) }).eq("id", slot.medication.id);
-      toast.success(`${slot.medication.name} marked as taken`);
+      toast.success(`${slot.medication.name} marked as taken ✓`);
       notifyGuardians(session.user.id, slot.medication.name, "taken", slot.scheduledAt.toISOString());
-      loadSchedule();
+
+      // Fade out then hide
+      setFadingOut((prev) => new Set(prev).add(key));
+      setTimeout(() => {
+        setFadingOut((prev) => { const n = new Set(prev); n.delete(key); return n; });
+        setHiddenTaken((prev) => new Set(prev).add(key));
+        loadSchedule();
+      }, 800);
     } catch { toast.error("Failed to update"); }
   };
 
+  const handleSnooze = (slot: DoseSlot, minutes: number) => {
+    const key = slotKey(slot);
+    const current = snoozeState.get(key);
+    const count = (current?.count || 0) + 1;
 
-  // Summary stats
+    if (count > MAX_SNOOZES) {
+      // Auto-mark missed
+      autoMarkMissed(slot);
+      return;
+    }
+
+    const until = Date.now() + minutes * 60_000;
+    setSnoozeState((prev) => {
+      const next = new Map(prev);
+      next.set(key, { count, until });
+      return next;
+    });
+
+    toast(`${slot.medication.name} snoozed for ${minutes}m (${count}/${MAX_SNOOZES})`);
+
+    // Clear previous timer
+    const existingTimer = snoozeTimers.current.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    // Set timer to re-show
+    const timer = setTimeout(() => {
+      setSnoozeState((prev) => {
+        const next = new Map(prev);
+        const entry = next.get(key);
+        if (entry) {
+          next.set(key, { ...entry, until: 0 });
+        }
+        return next;
+      });
+
+      // If this was the last snooze, auto-mark missed after re-show
+      if (count >= MAX_SNOOZES) {
+        setTimeout(() => autoMarkMissed(slot), 2000);
+      }
+    }, minutes * 60_000);
+
+    snoozeTimers.current.set(key, timer);
+  };
+
+  const autoMarkMissed = async (slot: DoseSlot) => {
+    if (!session?.user?.id) return;
+    const key = slotKey(slot);
+
+    try {
+      if (slot.logId) {
+        await supabase.from("medication_logs").update({ status: "missed" }).eq("id", slot.logId);
+      } else {
+        await supabase.from("medication_logs").insert({
+          medication_id: slot.medication.id, user_id: session.user.id,
+          scheduled_at: slot.scheduledAt.toISOString(), status: "missed",
+        });
+      }
+      notifyGuardians(session.user.id, slot.medication.name, "missed", slot.scheduledAt.toISOString());
+      toast.error(`${slot.medication.name} recorded as Not Taken`);
+      setSnoozeState((prev) => { const n = new Map(prev); n.delete(key); return n; });
+      loadSchedule();
+    } catch { /* silent */ }
+  };
+
+  // Summary stats (include all, even hidden)
   const takenCount = doses.filter(d => d.status === "taken").length;
   const totalCount = doses.length;
   const progressPct = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
-  // Group by time period
+  // Separate pending/active from completed
+  const { activeDoses, completedDoses } = useMemo(() => {
+    const now = Date.now();
+    const active: DoseSlot[] = [];
+    const completed: DoseSlot[] = [];
+
+    doses.forEach((d) => {
+      const key = slotKey(d);
+
+      // Hidden after taking
+      if (hiddenTaken.has(key) || d.status === "taken") {
+        completed.push(d);
+        return;
+      }
+
+      // Currently snoozed (hidden)
+      const snooze = snoozeState.get(key);
+      if (snooze && snooze.until > now) {
+        return; // hidden during snooze
+      }
+
+      active.push(d);
+    });
+
+    return { activeDoses: active, completedDoses: completed };
+  }, [doses, hiddenTaken, snoozeState]);
+
+  // Group active doses by period
   const grouped = useMemo(() => {
     const groups: Record<TimePeriod, DoseSlot[]> = { Morning: [], Afternoon: [], Evening: [] };
-    doses.forEach(d => {
+    activeDoses.forEach(d => {
       const period = getTimePeriod(d.scheduledAt.getHours());
       groups[period].push(d);
     });
     return groups;
-  }, [doses]);
+  }, [activeDoses]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground text-center py-8">Loading schedule...</p>;
@@ -206,79 +319,149 @@ const TodaySchedule = () => {
         <Progress value={progressPct} className="h-2" />
       </div>
 
-      {/* Grouped doses */}
-      {periods.map(period => {
-        const slots = grouped[period];
-        if (slots.length === 0) return null;
+      {/* Active (pending/missed) doses grouped by period */}
+      {activeDoses.length === 0 && completedDoses.length > 0 ? (
+        <div className="text-center py-6 space-y-2">
+          <Check className="w-8 h-8 text-success mx-auto" />
+          <p className="text-sm font-medium text-success">All doses taken! 🎉</p>
+        </div>
+      ) : (
+        periods.map(period => {
+          const slots = grouped[period];
+          if (slots.length === 0) return null;
 
-        return (
-          <div key={period} className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
-              {periodIcon[period]}
-              {period}
+          return (
+            <div key={period} className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
+                {periodIcon[period]}
+                {period}
+              </div>
+              {slots.map((slot, i) => {
+                const key = slotKey(slot);
+                const isCurrent = Math.abs(differenceInMinutes(now, slot.scheduledAt)) <= 60;
+                const isPast = slot.scheduledAt < now && !isCurrent;
+                const isFading = fadingOut.has(key);
+                const snooze = snoozeState.get(key);
+                const snoozeCount = snooze?.count || 0;
+                const canSnooze = snoozeCount < MAX_SNOOZES && slot.status === "pending";
+
+                return (
+                  <Card
+                    key={`${slot.medication.id}-${slot.timeLabel}-${i}`}
+                    className={`transition-all duration-500 ${
+                      isFading ? "opacity-0 scale-95 h-0 overflow-hidden" : "opacity-100"
+                    } ${
+                      isCurrent && slot.status === "pending"
+                        ? "border-primary bg-primary/5 shadow-md"
+                        : slot.status === "missed"
+                        ? "border-destructive/30 bg-destructive/5"
+                        : ""
+                    }`}
+                  >
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="text-center min-w-[60px]">
+                          <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
+                          {isCurrent && slot.status === "pending" && (
+                            <Badge variant="default" className="text-[10px] mt-1">DUE NOW</Badge>
+                          )}
+                          {slot.status === "missed" && (
+                            <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
+                          )}
+                          {snoozeCount > 0 && slot.status === "pending" && (
+                            <Badge variant="secondary" className="text-[10px] mt-1">
+                              <Timer className="w-2.5 h-2.5 mr-0.5" />
+                              {snoozeCount}/{MAX_SNOOZES}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{slot.medication.name}</p>
+                          <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
+                          {slot.medication.instructions && (
+                            <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {(slot.status === "missed" || (slot.status === "pending" && !isCurrent && isPast)) && (
+                            <AlertTriangle className="w-4 h-4 text-destructive" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action buttons for pending doses */}
+                      {slot.status === "pending" && isCurrent && (
+                        <div className="flex items-center gap-2 pl-[72px]">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-8 text-xs gap-1"
+                            onClick={() => markTaken(slot)}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Taken
+                          </Button>
+                          {canSnooze && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs gap-1"
+                                onClick={() => handleSnooze(slot, 5)}
+                              >
+                                <Timer className="w-3 h-3" />
+                                5m
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs gap-1"
+                                onClick={() => handleSnooze(slot, 15)}
+                              >
+                                <Timer className="w-3 h-3" />
+                                15m
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-            {slots.map((slot, i) => {
-              const isCurrent = Math.abs(differenceInMinutes(now, slot.scheduledAt)) <= 60;
-              const isPast = slot.scheduledAt < now && !isCurrent;
+          );
+        })
+      )}
 
-              return (
-                <Card
-                  key={`${slot.medication.id}-${slot.timeLabel}-${i}`}
-                  className={`transition-all ${
-                    isCurrent && slot.status === "pending"
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : slot.status === "missed"
-                      ? "border-destructive/30 bg-destructive/5"
-                      : slot.status === "taken"
-                      ? "border-success/30 bg-success/5"
-                      : ""
-                  }`}
-                >
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <div className="text-center min-w-[60px]">
-                      <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
-                      {isCurrent && slot.status === "pending" && (
-                        <Badge variant="default" className="text-[10px] mt-1">NOW</Badge>
-                      )}
-                      {slot.status === "missed" && (
-                        <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
-                      )}
-                      {slot.status === "taken" && (
-                        <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
-                      )}
-                      {slot.status === "skipped" && (
-                        <Badge variant="secondary" className="text-[10px] mt-1">SKIPPED</Badge>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{slot.medication.name}</p>
-                      <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
-                      {slot.medication.instructions && (
-                        <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {(slot.status === "missed" || (slot.status === "pending" && !isCurrent && isPast)) && (
-                        <AlertTriangle className="w-5 h-5 text-destructive" />
-                      )}
-                      <Checkbox
-                        checked={slot.status === "taken"}
-                        disabled={slot.status !== "pending" || !isCurrent}
-                        onCheckedChange={() => markTaken(slot)}
-                        className={`h-6 w-6 rounded-md ${
-                          slot.status === "taken"
-                            ? "border-success data-[state=checked]:bg-success data-[state=checked]:text-success-foreground"
-                            : ""
-                        }`}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        );
-      })}
+      {/* Show completed toggle */}
+      {completedDoses.length > 0 && (
+        <Collapsible open={showCompleted} onOpenChange={setShowCompleted}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground gap-1">
+              {showCompleted ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showCompleted ? "Hide" : "Show"} completed ({completedDoses.length})
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1.5 pt-1">
+            {completedDoses.map((slot, i) => (
+              <Card key={`done-${slot.medication.id}-${slot.timeLabel}-${i}`} className="border-success/30 bg-success/5">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className="text-center min-w-[60px]">
+                    <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
+                    <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate line-through opacity-70">{slot.medication.name}</p>
+                    <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
+                  </div>
+                  <Check className="w-5 h-5 text-success shrink-0" />
+                </CardContent>
+              </Card>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   );
 };
