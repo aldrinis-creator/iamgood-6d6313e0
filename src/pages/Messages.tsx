@@ -14,6 +14,8 @@ interface Ping {
   read: boolean;
   created_at: string;
   guardian_name?: string;
+  reply_message?: string;
+  replied_at?: string;
 }
 
 const Messages = () => {
@@ -110,6 +112,12 @@ const Messages = () => {
                         )}
                       </div>
                       <p className="text-sm">{p.message}</p>
+                      {p.reply_message && (
+                        <div className="mt-1.5 pl-3 border-l-2 border-primary/30">
+                          <p className="text-xs text-primary font-medium">Your reply:</p>
+                          <p className="text-sm text-foreground/80">{p.reply_message}</p>
+                        </div>
+                      )}
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
                       </p>

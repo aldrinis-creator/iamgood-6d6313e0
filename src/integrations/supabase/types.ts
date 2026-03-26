@@ -333,6 +333,8 @@ export type Database = {
           id: string
           message: string
           read: boolean
+          replied_at: string | null
+          reply_message: string | null
           user_id: string
         }
         Insert: {
@@ -341,6 +343,8 @@ export type Database = {
           id?: string
           message: string
           read?: boolean
+          replied_at?: string | null
+          reply_message?: string | null
           user_id: string
         }
         Update: {
@@ -349,6 +353,8 @@ export type Database = {
           id?: string
           message?: string
           read?: boolean
+          replied_at?: string | null
+          reply_message?: string | null
           user_id?: string
         }
         Relationships: []
