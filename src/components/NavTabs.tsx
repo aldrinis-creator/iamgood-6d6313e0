@@ -71,11 +71,36 @@ const NavTabs = () => {
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
+  const [unreadReplies, setUnreadReplies] = useState(0);
+
+  useEffect(() => {
+    if (role !== "guardian" || !session?.user?.id) return;
+
+    const fetchUnreadReplies = async () => {
+      const { count } = await supabase
+        .from("guardian_pings")
+        .select("*", { count: "exact", head: true })
+        .eq("guardian_user_id", session.user.id)
+        .not("reply_message", "is", null)
+        .eq("guardian_read", false);
+      setUnreadReplies(count || 0);
+    };
+
+    fetchUnreadReplies();
+
+    const replyChannel = supabase
+      .channel("guardian-nav-replies")
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings" }, () => fetchUnreadReplies())
+      .subscribe();
+
+    return () => { supabase.removeChannel(replyChannel); };
+  }, [role, session?.user?.id]);
+
   const guardianTabs = [
     { icon: User, label: "My User", path: "/guardian", badge: unreadCount },
     { icon: Bell, label: "Alerts", path: "/guardian/alerts" },
     { icon: FileText, label: "Reports", path: "/guardian/reports" },
-    { icon: Stethoscope, label: "Services", path: "/guardian/services" },
+    { icon: MessageCircle, label: "Messages", path: "/guardian/messages", badge: unreadReplies },
     { icon: Settings, label: "Settings", path: "/guardian-settings" },
   ];
 
