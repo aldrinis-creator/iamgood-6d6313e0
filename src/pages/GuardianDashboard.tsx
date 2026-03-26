@@ -359,7 +359,14 @@ const GuardianDashboard = () => {
   };
 
   const handleCallUser = (type: "whatsapp" | "phone" | "flash") => {
-    if (!wardPhone) return;
+    if (!wardPhone) {
+      toast({
+        title: "No phone number available",
+        description: `Ask ${wardName} to add their phone number in Profile settings.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const clean = wardPhone.replace(/[^0-9+]/g, "");
     if (type === "whatsapp") {
       window.open(`https://wa.me/${clean.replace("+", "")}`, "_blank");
