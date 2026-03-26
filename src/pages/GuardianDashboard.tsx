@@ -705,6 +705,9 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Active Journey Tracker */}
+        {wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
+
         {/* Collapsible ward modules */}
         {wardUserId && (
           <div className="space-y-2">
