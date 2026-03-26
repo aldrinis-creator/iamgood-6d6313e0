@@ -1,4 +1,5 @@
-import { Moon, Sun, DoorOpen } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
 import HealthPassport from "@/components/HealthPassport";
