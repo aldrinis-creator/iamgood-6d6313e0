@@ -54,6 +54,7 @@ const App = () => (
               <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />
               <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
               <Route path="/messages" element={<UserRoute><Messages /></UserRoute>} />
+              <Route path="/journey" element={<UserRoute><MapMyJourney /></UserRoute>} />
               {/* Guardian-only routes */}
               <Route path="/guardian" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
               <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
