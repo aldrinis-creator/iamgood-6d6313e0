@@ -611,6 +611,9 @@ const GuardianDashboard = () => {
 
         {showAmbulance && <AmbulanceBooking />}
 
+        {/* Sent Pings with Replies */}
+        {wardUserId && <SentPingsSection guardianUserId={session?.user?.id} wardUserId={wardUserId} />}
+
         {/* Today's Check-Ins */}
         {(() => {
           const missedCount = todayCheckIns.filter(ci => ci.status === "missed").length;

@@ -31,11 +31,11 @@ const GuardianPingOverlay = () => {
   const sendReply = async () => {
     if (!reply.trim() || !ping || !session?.user?.id) return;
     setSending(true);
-    await supabase.from("guardian_pings").insert({
-      user_id: ping.guardian_user_id,
-      guardian_user_id: session.user.id,
-      message: `Reply: ${reply.trim()}`,
-    });
+    await supabase.from("guardian_pings").update({
+      reply_message: reply.trim(),
+      replied_at: new Date().toISOString(),
+      read: true,
+    } as any).eq("id", ping.id);
     setSending(false);
     dismiss();
   };
