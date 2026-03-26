@@ -94,7 +94,7 @@ const useMedicationAlarms = () => {
 
           const { data: existingLogs } = await supabase
             .from("medication_logs")
-            .select("id, status")
+            .select("id, status, scheduled_at")
             .eq("medication_id", med.id)
             .eq("user_id", session.user.id)
             .gte("scheduled_at", todayStart.toISOString())
