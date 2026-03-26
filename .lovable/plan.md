@@ -1,45 +1,44 @@
 
 
-# Fix Guardian Ping Reply Flow
+# Move Guardian Sent Messages to Bottom Nav with Badge
 
-## Current Problems
+## What Changes
 
-1. **RLS blocks replies**: The overlay inserts `{ user_id: guardian_id, guardian_user_id: user_id }` — swapping the IDs. But the RLS policy "Users can reply to guardian pings" requires `user_id = auth.uid()`. Since `user_id` is set to the guardian's ID (not the current user), the insert fails silently.
+Replace the "Services" tab in the guardian bottom nav bar with a "Messages" tab (since Services is already accessible from the top header nav).
 
-2. **Guardian never sees replies**: There's no UI on the Guardian Dashboard to view reply messages. Even if the insert worked, the guardian has no way to read them.
+## Technical Plan
 
-3. **No reply indicator in Messages page**: The Messages page only shows incoming pings, not the user's own replies.
+### 1. Create `src/pages/GuardianMessages.tsx`
+- Extract `SentPingsSection` logic from `GuardianDashboard.tsx` into a full page
+- Full-page list of all sent pings with replies, ordered newest first
+- Include unread reply count (pings where `reply_message IS NOT NULL` and a new `guardian_read` flag is false)
+- Real-time subscription for incoming replies
 
-## Solution
+### 2. Database migration
+- Add `guardian_read BOOLEAN DEFAULT false` to `guardian_pings` — tracks whether the guardian has seen a reply
 
-### Approach: Add a `reply_message` column to `guardian_pings`
+### 3. Update `src/components/NavTabs.tsx`
+- Replace `{ icon: Stethoscope, label: "Services", path: "/guardian/services" }` with `{ icon: MessageCircle, label: "Messages", path: "/guardian/messages", badge: unreadReplies }`
+- Add a realtime subscription counting pings where `reply_message IS NOT NULL AND guardian_read = false` for the badge bubble
+- Import `MessageCircle` (already imported)
 
-Instead of creating a new row with swapped IDs (which breaks RLS), store the reply directly on the original ping row. The user already has UPDATE permission on their own pings (`user_id = auth.uid()`).
+### 4. Update `src/App.tsx`
+- Add route: `/guardian/messages` → `<GuardianRoute><GuardianMessages /></GuardianRoute>`
 
-### Changes
+### 5. Update `src/components/AppHeader.tsx`
+- Remove "Services" from the guardian header tabs (it stays in nav bar? No — reversed: Services stays in header, Messages moves to bottom nav). Keep Services in the header tabs as-is.
 
-**1. Database migration**
-- Add `reply_message TEXT` and `replied_at TIMESTAMPTZ` columns to `guardian_pings`
+### 6. Clean up `src/pages/GuardianDashboard.tsx`
+- Remove inline `SentPingsSection` component (now lives on its own page)
+- Remove the `{wardUserId && <SentPingsSection ... />}` render
 
-**2. `GuardianPingOverlay.tsx`**
-- Change `sendReply` from INSERT (new row) to UPDATE on the original ping:
-  ```
-  UPDATE guardian_pings SET reply_message = '...', replied_at = now() WHERE id = ping.id
-  ```
-
-**3. `GuardianDashboard.tsx`**
-- Add a small "Sent Pings" section or badge that shows recent pings with replies
-- Subscribe to realtime changes on `guardian_pings` to see replies as they arrive
-
-**4. `Messages.tsx`**
-- Show the user's own reply beneath each ping message (if `reply_message` exists)
-
-### Files Modified
+## Files Modified
 
 | File | Change |
 |------|--------|
-| Migration | Add `reply_message`, `replied_at` to `guardian_pings` |
-| `src/components/GuardianPingOverlay.tsx` | UPDATE instead of INSERT for replies |
-| `src/pages/GuardianDashboard.tsx` | Show sent pings with replies |
-| `src/pages/Messages.tsx` | Display reply text under each ping |
+| Migration | Add `guardian_read` column |
+| `src/pages/GuardianMessages.tsx` | New page — sent pings list with reply tracking |
+| `src/components/NavTabs.tsx` | Replace Services → Messages with badge |
+| `src/App.tsx` | Add `/guardian/messages` route |
+| `src/pages/GuardianDashboard.tsx` | Remove `SentPingsSection` |
 
