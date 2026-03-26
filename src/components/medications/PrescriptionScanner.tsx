@@ -163,7 +163,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Upload a photo of your prescription or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
+            Upload a photo of your doctor's diagnosis or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
           </p>
         </CardContent>
       </Card>
