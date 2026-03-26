@@ -9,6 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { format, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition";
 
