@@ -226,7 +226,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
           ) : (
             <>
               <Textarea
-                placeholder={"Enter medication names from your prescription, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"}
+                placeholder={"Enter medication names from the diagnosis, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"}
                 value={prescriptionText}
                 onChange={(e) => setPrescriptionText(e.target.value.substring(0, MAX_INPUT_LENGTH))}
                 rows={5}
