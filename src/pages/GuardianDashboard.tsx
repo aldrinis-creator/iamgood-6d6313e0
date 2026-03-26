@@ -584,6 +584,9 @@ const GuardianDashboard = () => {
               <DropdownMenuItem onClick={() => handleCallUser("whatsapp")}>
                 💬 WhatsApp
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCallUser("flash")}>
+                ⚡ Flash Call
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button

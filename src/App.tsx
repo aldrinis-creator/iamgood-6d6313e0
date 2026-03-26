@@ -51,6 +51,7 @@ const App = () => (
               <Route path="/medical-vault" element={<UserRoute><MedicalVault /></UserRoute>} />
               <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />
               <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
+              <Route path="/messages" element={<UserRoute><Messages /></UserRoute>} />
               {/* Guardian-only routes */}
               <Route path="/guardian" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
               <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
