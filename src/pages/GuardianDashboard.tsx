@@ -83,6 +83,7 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
 const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
+  const { toast } = useToast();
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
