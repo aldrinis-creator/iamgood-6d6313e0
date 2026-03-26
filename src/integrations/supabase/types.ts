@@ -527,6 +527,95 @@ export type Database = {
         }
         Relationships: []
       }
+      journey_updates: {
+        Row: {
+          check_in_response: string | null
+          created_at: string
+          id: string
+          journey_id: string
+          lat: number | null
+          lng: number | null
+          user_id: string
+        }
+        Insert: {
+          check_in_response?: string | null
+          created_at?: string
+          id?: string
+          journey_id: string
+          lat?: number | null
+          lng?: number | null
+          user_id: string
+        }
+        Update: {
+          check_in_response?: string | null
+          created_at?: string
+          id?: string
+          journey_id?: string
+          lat?: number | null
+          lng?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_updates_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "journeys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journeys: {
+        Row: {
+          created_at: string
+          destination_lat: number
+          destination_lng: number
+          destination_name: string
+          ended_at: string | null
+          estimated_duration_min: number | null
+          id: string
+          origin_lat: number | null
+          origin_lng: number | null
+          origin_name: string | null
+          started_at: string | null
+          status: string
+          transport_mode: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          destination_lat: number
+          destination_lng: number
+          destination_name: string
+          ended_at?: string | null
+          estimated_duration_min?: number | null
+          id?: string
+          origin_lat?: number | null
+          origin_lng?: number | null
+          origin_name?: string | null
+          started_at?: string | null
+          status?: string
+          transport_mode?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          destination_lat?: number
+          destination_lng?: number
+          destination_name?: string
+          ended_at?: string | null
+          estimated_duration_min?: number | null
+          id?: string
+          origin_lat?: number | null
+          origin_lng?: number | null
+          origin_name?: string | null
+          started_at?: string | null
+          status?: string
+          transport_mode?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       meal_logs: {
         Row: {
           created_at: string
