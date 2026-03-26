@@ -56,6 +56,7 @@ const msUntilSleepEnd = (to: string): number => {
 
 const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
+  const navigate = useNavigate();
   const { settings, updateSetting } = useUserSettings();
 
   const { session } = useAuth();
