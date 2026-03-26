@@ -17,12 +17,14 @@ import useAppointmentAlarms from "@/hooks/useAppointmentAlarms";
 import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
+import useLocationSync from "@/hooks/useLocationSync";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
   useMedicationAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
+  useLocationSync();
   return null;
 };
 
