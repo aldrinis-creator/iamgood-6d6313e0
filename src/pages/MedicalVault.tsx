@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const RECORD_TYPES = [
   "Doctor's Diagnosis", "Lab Report", "Discharge Summary",
@@ -339,60 +340,25 @@ const MedicalVaultContent = () => {
     if (!profileView) return "";
     const pv = profileView;
     const userName = pv.full_name || "User";
-    const now = new Date().toLocaleString("en-IN");
     const shareText = buildShareText();
     const whatsAppUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     const emailSubject = encodeURIComponent(`Emergency Health Card — ${userName}`);
     const emailBody = encodeURIComponent(shareText);
     const emailUrl = `mailto:?subject=${emailSubject}&body=${emailBody}`;
 
-    // QR code linking to the user's public emergency profile
     const profileUrl = emergencyToken
       ? `${window.location.origin}/e/${emergencyToken}`
       : `${window.location.origin}/medical-vault`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(profileUrl)}&margin=4`;
 
-    const actionBar = includeActionBar ? `
+    const actionBarHtml = includeActionBar ? `
 <div class="action-bar" id="actionBar">
   <button onclick="document.getElementById('actionBar').style.display='none';window.print();setTimeout(()=>document.getElementById('actionBar').style.display='flex',500)" class="btn btn-print">🖨️ Print / Save PDF</button>
   <button onclick="window.open('${whatsAppUrl}','_blank')" class="btn btn-whatsapp">💬 WhatsApp</button>
   <button onclick="window.location.href='${emailUrl}'" class="btn btn-email">📧 Email</button>
-</div>` : "";
+</div>` : undefined;
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;padding:16px;font-size:13px;line-height:1.5;max-width:800px;margin:0 auto}
-.action-bar{display:flex;gap:8px;padding:12px 0;margin-bottom:12px;border-bottom:2px solid #e5e7eb;flex-wrap:wrap;justify-content:center}
-.btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity 0.2s}
-.btn:hover{opacity:0.85}
-.btn-print{background:#1a1a2e;color:#fff}
-.btn-whatsapp{background:#25d366;color:#fff}
-.btn-email{background:#2563eb;color:#fff}
-@media print{.action-bar{display:none!important}body{padding:32px}}
-.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:20px;text-align:center;position:relative}
-.header h1{font-size:22px;margin-bottom:4px}.header p{font-size:11px;opacity:0.9}
-.section{margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
-.section-title{background:#f3f4f6;padding:8px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb}
-.section-body{padding:12px 14px}
-.row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6}
-.row:last-child{border-bottom:none}
-.label{color:#6b7280;font-size:12px;min-width:140px}.value{font-weight:500;text-align:right}
-.badge{display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:11px;margin:2px;font-weight:600}
-.badge-blue{background:#eff6ff;color:#2563eb}.badge-green{background:#f0fdf4;color:#16a34a}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{background:#f3f4f6;text-align:left;padding:6px 10px;font-weight:600}
-td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
-.footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb}
-.alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px}
-.alert-box p{color:#dc2626;font-weight:600;font-size:12px}
-.qr-section{display:flex;align-items:center;gap:14px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:16px}
-.qr-section img{border-radius:6px;border:2px solid #e5e7eb}
-.qr-section .qr-text{font-size:11px;color:#6b7280}
-.qr-section .qr-text strong{color:#1a1a1a;font-size:12px;display:block;margin-bottom:2px}
-</style></head><body>
-${actionBar}
-<div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
+    const bodyHtml = `
 <div class="qr-section">
   <img src="${qrUrl}" alt="QR Code" width="100" height="100" />
   <div class="qr-text"><strong>📱 Scan for Emergency Profile</strong>First responders can scan this QR code to access the full emergency health profile quickly.</div>
@@ -417,9 +383,14 @@ ${pv.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><sp
 ${profileGuardians.length > 0 ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body">
 <table><tr><th>Name</th><th>Relation</th><th>Phone</th><th>Email</th></tr>
 ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td><td>${g.guardian_email || "—"}</td></tr>`).join("")}
-</table></div></div>` : ""}
-<div class="footer"><p>Auto-generated by Check-iN Emergency Response System. Keep this card with you or share with caregivers.</p></div>
-</body></html>`;
+</table></div></div>` : ""}`;
+
+    return buildLetterheadHtml({
+      title: "EMERGENCY HEALTH CARD",
+      subtitle: userName,
+      bodyHtml,
+      actionBarHtml,
+    });
   };
 
   const openEmergencyCardWindow = () => {

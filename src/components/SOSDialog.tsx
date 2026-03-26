@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Phone, MapPin, X, Droplets, AlertCircle, Stethoscope, Pill, Users, MessageCircle, Mail, Loader2, CheckCircle2, User, Heart, Calendar, Share2, Printer, Download, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 interface SOSDialogProps {
   open: boolean;
@@ -260,27 +261,11 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const emergencyProfileUrl = emergencyToken ? `${window.location.origin}/e/${emergencyToken}` : null;
 
   const buildCardHtml = useCallback(() => {
-    const now = new Date().toLocaleString("en-IN");
     const qrSection = emergencyProfileUrl
-      ? `<div class="section"><div class="section-title">📱 QR Code — Scan for Full Profile</div><div class="section-body" style="text-align:center;padding:16px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(emergencyProfileUrl)}" alt="QR Code" style="width:180px;height:180px" /><p style="margin-top:8px;font-size:11px;color:#6b7280">${emergencyProfileUrl}</p></div></div>`
+      ? `<div class="qr-section"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(emergencyProfileUrl)}" alt="QR Code" width="100" height="100" /><div class="qr-text"><strong>📱 Scan for Emergency Profile</strong>First responders can scan this QR code to access the full emergency health profile quickly.</div></div>`
       : "";
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Emergency Health Card — ${userName}</title><style>
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;font-size:13px;max-width:800px;margin:0 auto}
-.header{background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px;margin-bottom:16px;text-align:center}
-.header h1{font-size:20px}.header p{font-size:11px;opacity:0.9}
-.section{margin-bottom:12px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
-.section-title{background:#f3f4f6;padding:8px 14px;font-weight:700;font-size:13px;border-bottom:1px solid #e5e7eb}
-.section-body{padding:10px 14px}
-.row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6}.row:last-child{border-bottom:none}
-.label{color:#6b7280;font-size:12px;min-width:140px}.value{font-weight:500;text-align:right}
-.badge{display:inline-block;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:11px;margin:2px;font-weight:600}
-.alert-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:12px}
-.alert-box p{color:#dc2626;font-weight:600;font-size:12px}
-table{width:100%;border-collapse:collapse;font-size:12px}th{background:#f3f4f6;text-align:left;padding:6px 10px;font-weight:600}td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
-.footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb}
-@media print{body{padding:16px}}
-</style></head><body>
-<div class="header"><h1>🚨 EMERGENCY HEALTH CARD</h1><p>Generated: ${now} • Check-iN Emergency Response System</p></div>
+    const bodyHtml = `
+${qrSection}
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${userName}</span></div>
 ${userDob ? `<div class="row"><span class="label">DOB</span><span class="value">${userDob}</span></div>` : ""}
@@ -293,10 +278,13 @@ ${medical.conditions.length ? `<div class="section"><div class="section-title">�
 ${medicationDetails.length ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body"><table><tr><th>Medication</th><th>Dosage</th></tr>${medicationDetails.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td></tr>`).join("")}</table></div></div>` : ""}
 ${medical.familyDoctorName ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${medical.familyDoctorName}</span></div>${medical.familyDoctorPhone ? `<div class="row"><span class="label">Phone</span><span class="value">${medical.familyDoctorPhone}</span></div>` : ""}</div></div>` : ""}
 ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${g.guardian_name}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td></tr>`).join("")}</table></div></div>` : ""}
-${location ? `<div class="section"><div class="section-title">📍 Location</div><div class="section-body"><a href="https://maps.google.com/?q=${location.lat},${location.lng}">Open in Google Maps</a></div></div>` : ""}
-${qrSection}
-<div class="footer"><p>Auto-generated by Check-iN Emergency Response System</p></div>
-</body></html>`;
+${location ? `<div class="section"><div class="section-title">📍 Location</div><div class="section-body"><a href="https://maps.google.com/?q=${location.lat},${location.lng}">Open in Google Maps</a></div></div>` : ""}`;
+
+    return buildLetterheadHtml({
+      title: "EMERGENCY HEALTH CARD",
+      subtitle: userName,
+      bodyHtml,
+    });
   }, [userName, userDob, userPhone, userGender, medical, medicationDetails, guardians, location, emergencyProfileUrl]);
 
   const handlePrintCard = useCallback(() => {
