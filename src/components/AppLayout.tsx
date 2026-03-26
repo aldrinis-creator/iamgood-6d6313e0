@@ -82,6 +82,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <BatteryWarning />
         <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
         <ReminderOverlay />
+        {role === "user" && <GuardianPingOverlay />}
       </div>
     </div>
   );
