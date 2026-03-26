@@ -101,7 +101,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
       }
     } else {
       if (!imageBase64) {
-        toast.error("Please upload or take a photo of your prescription");
+        toast.error("Please upload or take a photo of the diagnosis");
         return;
       }
     }
