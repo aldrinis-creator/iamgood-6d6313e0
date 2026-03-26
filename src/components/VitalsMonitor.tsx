@@ -252,8 +252,16 @@ const DashboardTab = () => {
       </Button>
       {aiInsights && (
         <Card>
-          <CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{aiInsights}</ReactMarkdown>
+          <CardContent className="p-4 space-y-3">
+            <ReportShareButtons
+              title="Vitals AI Insights"
+              subtitle="AI Health Analysis"
+              content={aiInsights}
+              category="Vitals"
+            />
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown>{aiInsights}</ReactMarkdown>
+            </div>
           </CardContent>
         </Card>
       )}
