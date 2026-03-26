@@ -1,52 +1,39 @@
 
 
-# Simplify Medication Taken Flow + Snooze + Fix "Not Taken" Bug
+# Fix "Save to Medical Vault" — Failed to Save
 
-## Problems Identified
+## Root Cause
+The `saveToVault` functions in `DocumentAnalyzer.tsx`, `PrescriptionScanner.tsx`, and `VitalsMonitor.tsx` catch errors silently (`catch { toast.error("Failed to save") }`) without logging. The likely causes:
 
-1. **Taken medications stay visible** — after checking the box, the card remains with a "TAKEN" badge. User wants it to disappear.
-2. **Checkbox only works during ±1 hour window** — `disabled={slot.status !== "pending" || !isCurrent}` blocks interaction outside that window.
-3. **No snooze option** — user can only take or miss, no deferral.
-4. **"Not Taken" bug** — The `useMedicationAlarms.ts` hook writes a `missed` log at 60 minutes past. But `TodaySchedule.tsx` matches logs using `scheduledAt.toISOString()` as the key. If there's any timezone/millisecond mismatch between the two components constructing the `scheduledAt` Date, the log won't match and the UI shows "pending" which then falls through to "missed" visually. The alarm hook also inserts a `missed` log even if the user already marked it `taken` (it only checks for *existence* of a log, not its status — but the real issue is the key mismatch).
+1. **Session retrieval issue**: `DocumentAnalyzer` and `PrescriptionScanner` call `supabase.auth.getSession()` inline instead of using the `useAuth()` context that's already available. If session returns null transiently, the insert fails.
+2. **Description too long**: AI-generated analysis can be very long. If Postgres has a text limit or the payload exceeds Supabase REST API limits, the insert fails silently.
+3. **No error details shown**: The catch blocks don't log the actual error, making debugging impossible.
 
 ## Changes
 
-### 1. Hide taken medications from the list (`TodaySchedule.tsx`)
-- After `markTaken`, animate the card out (fade + shrink) and filter it from the visible list after 1.5 seconds.
-- Keep taken doses in `doses` state for the progress bar count, but filter them from the rendered grouped list.
-- Add a small "Show completed" toggle at the bottom so user can review what they took.
+### 1. `src/components/health-tools/DocumentAnalyzer.tsx`
+- Import and use `useAuth()` for session instead of calling `getSession()` inline
+- Add `console.error` in catch block to log actual error
+- Truncate `description` to 50,000 chars as safety net
+- Show error details in toast when available
 
-### 2. Add Snooze buttons (5min / 15min) (`TodaySchedule.tsx`)
-- For each pending dose in the current window, show two snooze buttons: "5m" and "15m".
-- Track snooze count per dose in local state (`Map<slotKey, number>`). Max 3 snoozes.
-- When snoozed, hide the card temporarily and re-show it after the snooze duration.
-- After 3 snoozes with no action, auto-insert a `missed` log (status = "missed") and notify guardians.
+### 2. `src/components/medications/PrescriptionScanner.tsx`
+- `SaveToVaultButton`: Pass session from parent or use `useAuth()` instead of inline `getSession()`
+- Add error logging in catch
+- Truncate description
 
-### 3. Fix the "Not Taken" status mismatch
-- **Root cause**: `TodaySchedule` builds a key as `${med.id}_${scheduledAt.toISOString()}` where `scheduledAt` is constructed with `setHours(hh, mm, 0, 0)`. The alarm hook does the same but they may run at different `now` moments producing different date strings (same day but different base). The log's `scheduled_at` from the INSERT uses `scheduledAt.toISOString()` — so the key should match. But the SELECT in `loadSchedule` compares `l.scheduled_at` (a DB timestamp string) with a locally-built ISO string. Postgres may store it with different precision.
-- **Fix**: Instead of exact string matching via Map key, match logs to slots by `medication_id` + hour/minute of `scheduled_at` (like `WardMedicationStatus` already does). This is more robust.
+### 3. `src/components/VitalsMonitor.tsx`
+- Same: add error logging, truncate description
 
-### 4. Prevent alarm hook from overwriting "taken" with "missed"
-- In `useMedicationAlarms.ts`, the missed-dose detection checks `if (!existingLogs || existingLogs.length === 0)` before inserting a missed log. This is correct. But add an explicit check: also query by status to ensure we don't re-insert if a "taken" log exists.
+### 4. All three files
+- Change `catch {` to `catch (err) { console.error("Vault save error:", err);` so errors are visible in logs
+- Show `err.message` in toast for user visibility
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/medications/TodaySchedule.tsx` | Hide taken doses, add snooze buttons, fix log matching |
-| `src/hooks/useMedicationAlarms.ts` | Fix missed-dose detection to respect existing taken logs |
-
-## Implementation Details
-
-**TodaySchedule.tsx**:
-- Add state: `hiddenTaken: Set<string>` for fade-out, `snoozeCount: Map<string, number>`, `snoozedUntil: Map<string, number>` (timestamp when snooze expires)
-- Change log matching from exact ISO key to hour+minute matching (lines 85-89)
-- Replace the Checkbox-only UI with: checkbox for "Take" + two small snooze buttons ("5m", "15m")
-- After checkbox tick: toast success, add to `hiddenTaken`, reload
-- Filter out `hiddenTaken` and `status === "taken"` from rendered list (keep in `doses` for progress)
-- Add "Show taken (N)" collapsible at bottom
-- After 3rd snooze expires without action: auto-mark missed, notify guardians
-
-**useMedicationAlarms.ts**:
-- Change missed-dose log query from `.select("id")` to `.select("id, status")` and skip insert if any log exists (regardless of status)
+| `src/components/health-tools/DocumentAnalyzer.tsx` | Use `useAuth()`, log errors, truncate |
+| `src/components/medications/PrescriptionScanner.tsx` | Use `useAuth()`, log errors, truncate |
+| `src/components/VitalsMonitor.tsx` | Log errors, truncate |
 
