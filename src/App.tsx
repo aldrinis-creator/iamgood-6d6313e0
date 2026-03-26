@@ -58,6 +58,7 @@ const App = () => (
               <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
               <Route path="/guardian/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
               <Route path="/guardian/services" element={<GuardianRoute><GuardianServices /></GuardianRoute>} />
+              <Route path="/guardian/messages" element={<GuardianRoute><GuardianMessages /></GuardianRoute>} />
               <Route path="/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
               <Route path="/guardian-settings" element={<GuardianRoute><Settings /></GuardianRoute>} />
               {/* Shared routes (both roles) */}
