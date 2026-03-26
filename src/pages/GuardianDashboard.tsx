@@ -222,6 +222,7 @@ const GuardianDashboard = () => {
       // Read ward's saved location
       if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
         setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+        if (s?.lastLocationAt) setLocationUpdatedAt(s.lastLocationAt);
       }
     }
   }, []);
