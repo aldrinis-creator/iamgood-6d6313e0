@@ -214,6 +214,10 @@ const GuardianDashboard = () => {
       if (typeof s?.batteryLevel === "number") {
         setWardBattery(s.batteryLevel);
       }
+      // Read ward's saved location
+      if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+        setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      }
     }
   }, []);
 
