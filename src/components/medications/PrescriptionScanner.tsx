@@ -236,7 +236,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
             </>
           )}
           <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={analyzePrescription} disabled={loading}>
-            {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Prescription</>}
+          {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Diagnosis</>}
           </Button>
         </CardContent>
       </Card>
