@@ -1,28 +1,20 @@
 
 
-# Fix Guardian Call Button
+# Add "Last Updated" Timestamp to Battery on Guardian Dashboard
 
-## Problem
+## Change
 
-The Call button dropdown (Mobile Call / WhatsApp / Flash Call) silently does nothing because `wardPhone` is `null`. The `handleCallUser` function exits early at `if (!wardPhone) return;` with no feedback.
+Show a relative timestamp (e.g. "2 min ago") next to the battery percentage in the Guardian Dashboard's info section. The timestamp comes from the ward's `user_settings.updated_at` field, which is already saved whenever battery level changes.
 
-Two root causes:
-1. The ward user likely hasn't saved a phone number in their profile, so `profiles.phone` is null
-2. Even if the phone is missing, the UI gives zero feedback — the dropdown options just do nothing
+## Technical Plan
 
-## Changes
-
-### 1. `src/pages/GuardianDashboard.tsx`
-- Add a toast notification when `wardPhone` is null: "No phone number available for {wardName}. Ask them to add their phone in Profile settings."
-- Disable the Call button visually (grey it out) when `wardPhone` is null, with a tooltip explaining why
-- Add a fallback: also check the user's `auth.users` phone from `user_metadata` during profile fetch
-
-### 2. `src/pages/MyProfile.tsx` (verify)
-- Confirm that the phone field is saved to the `profiles` table so guardians can access it
-- If phone is only in `user_metadata` but not synced to `profiles.phone`, add sync logic
+### `src/pages/GuardianDashboard.tsx`
+- Already fetching ward settings — store `updated_at` from the `user_settings` row alongside `wardBattery`
+- Add a new state variable `batteryUpdatedAt: string | null`
+- Next to the battery percentage display, render a small muted text like "Updated 5 min ago" using `formatDistanceToNow` from `date-fns`
+- If no timestamp available, show "—"
 
 | File | Change |
 |------|--------|
-| `src/pages/GuardianDashboard.tsx` | Toast when no phone, disable Call button when null |
-| `src/pages/MyProfile.tsx` | Verify phone saves to profiles table |
+| `src/pages/GuardianDashboard.tsx` | Store `updated_at`, display relative timestamp next to battery % |
 
