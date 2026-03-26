@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle } from "lucide-react";
@@ -82,6 +83,7 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
 const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
+  const { toast } = useToast();
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
@@ -357,7 +359,14 @@ const GuardianDashboard = () => {
   };
 
   const handleCallUser = (type: "whatsapp" | "phone" | "flash") => {
-    if (!wardPhone) return;
+    if (!wardPhone) {
+      toast({
+        title: "No phone number available",
+        description: `Ask ${wardName} to add their phone number in Profile settings.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const clean = wardPhone.replace(/[^0-9+]/g, "");
     if (type === "whatsapp") {
       window.open(`https://wa.me/${clean.replace("+", "")}`, "_blank");
@@ -573,9 +582,9 @@ const GuardianDashboard = () => {
         <div className="grid grid-cols-4 gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="flex-col h-auto py-4 bg-primary" size="lg">
+              <Button className={`flex-col h-auto py-4 ${wardPhone ? "bg-primary" : "bg-muted text-muted-foreground"}`} size="lg">
                 <Phone className="w-5 h-5 mb-1" />
-                <span className="text-xs">Call</span>
+                <span className="text-xs">Call{!wardPhone ? " ⚠" : ""}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
