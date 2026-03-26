@@ -1,99 +1,92 @@
 
 
-# Fix Guardian App Issues (12 Items)
+# Document Analyzer Enhancement, Prescription→Doctor's Diagnosis Rename, Vault Integration & PDF Reports
 
-## Root Cause: Audio Alerts Playing on Guardian App
-`AppLayout.tsx` unconditionally runs `useCheckInAudio()`, `useMedicationAlarms()`, `useAppointmentAlarms()`, and `useExerciseReminder()` for ALL roles. These hooks fire medication/check-in reminders meant only for the "user" role. Guardians hear the User's own reminders.
+## Overview
+Four interconnected changes: (1) redesign Document Analyzer with color and better UX, (2) rename "Prescription" to "Doctor's Diagnosis" everywhere, (3) wire Document Analyzer + PrescriptionScanner saves into the "Doctor's Diagnosis" category in Medical Vault, (4) add PDF generation with share/print for all reports.
 
-**Fix**: Wrap those 4 hook calls in a `role === "user"` guard inside `AppLayout.tsx`.
+## 1. Document Analyzer Redesign
+**File**: `src/components/health-tools/DocumentAnalyzer.tsx`
 
----
+- Add gradient header card with colored icon background
+- Color-code category buttons (Medical Images = blue, Lab Reports = green, Doctor's Diagnosis = amber, Doctor's Notes = teal) with filled backgrounds when selected
+- Add colored section headers in the results view (e.g., colored left border on the results card)
+- Improve the upload area with a subtle gradient border animation
+- Add a colored progress bar (primary gradient) during analysis
+- Results card: add colored badges for category, section dividers, and a soft background tint
+- Rename "Prescriptions" category to "Doctor's Diagnosis"
 
-## Item-by-Item Changes
+## 2. Rename "Prescription" → "Doctor's Diagnosis"
 
-### 1. Stop medication/check-in audio on Guardian app
-**File**: `src/components/AppLayout.tsx`
-- Only call `useCheckInAudio()`, `useMedicationAlarms()`, `useAppointmentAlarms()`, `useExerciseReminder()` when `role === "user"`.
+| File | Changes |
+|------|---------|
+| `src/components/health-tools/DocumentAnalyzer.tsx` | Category label |
+| `src/components/medications/PrescriptionScanner.tsx` | All user-facing text: title, placeholders, button labels, save record_type |
+| `src/components/medications/MedicationManager.tsx` | Tab label if visible |
+| `src/pages/MedicalVault.tsx` | `RECORD_TYPES` array: replace "Prescription" with "Doctor's Diagnosis" |
+| `src/pages/MyHealth.tsx` | healthToolsSubItems label if applicable |
+| `src/components/health-tools/MedicalDocuments.tsx` | RECORD_TYPES if duplicated |
 
-### 2. SOS banner still showing from 3:21 AM
-**File**: `src/pages/GuardianDashboard.tsx`
-- The SOS query fetches `status = 'active'` — if the SOS was never resolved/cancelled, it persists. Add auto-stale logic: treat SOS older than 2 hours as stale. Show a "Resolve" button for guardian to dismiss stale SOS banners. When clicked, update `sos_events.status = 'resolved'` (requires new RLS policy for guardian UPDATE on sos_events).
-- **Migration**: Add RLS policy allowing guardians to UPDATE `sos_events` for their wards (to resolve stale alerts).
+## 3. Save to Medical Vault as "Doctor's Diagnosis"
 
-### 3. Auto-dismiss medication alerts after 1 hour
-**File**: `src/pages/GuardianDashboard.tsx` and `src/pages/GuardianAlerts.tsx`
-- When displaying medication notifications, filter out those with `created_at` older than 1 hour OR auto-mark them as read. Implement in the notification display logic: if `type` includes "medication" and `created_at` is >1 hour ago, auto-mark as read.
+**DocumentAnalyzer.tsx** `saveToVault`:
+- Change `record_type` from `"AI Analysis"` to `"Doctor's Diagnosis"` when `selectedCat` is "Doctor's Diagnosis"
+- Change title to `"Doctor's Diagnosis — AI Analysis — {date}"`
 
-### 4. Build the Call button properly
-Already built with dropdown (Phone/WhatsApp) at line 458-474. Will verify it's functional — it's there and working. No change needed unless the dropdown isn't opening (UI issue).
+**PrescriptionScanner.tsx** `SaveToVaultButton`:
+- Change `record_type: "Prescription"` → `"Doctor's Diagnosis"`
+- Change `title: "Prescription Analysis"` → `"Doctor's Diagnosis Analysis"`
 
-### 5. Build Ping button with reply flow on User's app
-**File**: `src/components/GuardianPingDialog.tsx` — already built and working.
-**New**: Add a listener in the User's app to show incoming pings as an animated overlay with a reply option.
-- **File**: `src/components/GuardianPingOverlay.tsx` (new) — realtime subscription on `guardian_pings` for `user_id = auth.uid()`. Shows animated toast/overlay with the message and a "Reply" button. Reply inserts a new `guardian_pings` row back (user→guardian direction).
-- **File**: `src/components/AppLayout.tsx` — include `GuardianPingOverlay` for user role.
-- **Migration**: Add RLS policy for users to INSERT into `guardian_pings` (for replies, with `user_id = auth.uid()` as sender).
+Both components already have "Save to Medical Vault" buttons — just need the record_type and title updates.
 
-### 6. Audio alert after 3 missed medication reminders
-**File**: `src/pages/GuardianDashboard.tsx`
-- In the notification realtime handler, track consecutive medication_missed notifications. After 3 for the same time period (morning/afternoon/evening), trigger voice: `"{wardName} has not taken their morning medication."` 
-- Same logic for check-in: after 3 missed check-in notifications, voice alert.
+## 4. PDF Report Generation with Share/Print
 
-### 7. Battery Charge % + Last Active
-**File**: `src/pages/GuardianDashboard.tsx`
-- Battery % is device-local (navigator.getBattery). The guardian can't read the User's battery remotely without the User reporting it. 
-- **Solution**: Store User's battery level in `user_settings.settings.batteryLevel` periodically from `BatteryWarning.tsx`. Guardian dashboard reads it from `user_settings`.
-- **File**: `src/components/BatteryWarning.tsx` — add periodic save of battery level to `user_settings`.
-- Display battery % alongside Last Active in the status card on guardian dashboard. If ≤30%, show popup + audio: `"Please ask {wardName} to charge their phone now!"`
+Create a shared utility: `src/lib/reportPdf.ts`
 
-### 8. SOS/Fall trigger includes Emergency Health Card + profile + vitals
-**File**: `src/pages/GuardianDashboard.tsx`
-- When `activeSOS` is present, auto-show `WardEmergencyCard` and `WardVitalsSummary` prominently at the top (already shows at bottom — move/duplicate into the SOS banner area).
+This utility will:
+- Take markdown/text content + title + metadata
+- Generate a styled HTML document with the app branding (navy header, formatted sections)
+- Open in a new window for Print (which enables PDF save via browser)
+- Provide share via WhatsApp (text summary + link) and Email (mailto with subject/body)
 
-### 9. Current Medication tab: Guardian can order/scan/buy
-**File**: `src/pages/GuardianServices.tsx` or `src/pages/GuardianDashboard.tsx`
-- Import and render `MedicationManager`-like components (RefillOrder, PrescriptionScanner, JanAushadhiAlternatives) scoped to `wardUserId`. This requires the guardian to have SELECT access to ward's medications (already has RLS).
+**Implementation approach**: Use `window.open()` with styled HTML (no external PDF library needed — browser Print-to-PDF is the most reliable approach for a web app). The HTML will have:
+- Navy blue header with app name and report title
+- Formatted body with sections, colored headings, tables
+- Print-optimized CSS (`@media print`)
+- Auto-trigger `window.print()` for PDF option
 
-### 10. Battery % display + low battery popup for guardian
-Covered in item 7 above.
+**Apply to these components**:
 
-### 11. Location sharing toggle — default ON
-Already implemented: `shareLocationWithGuardian !== false` defaults to `true`. The toggle exists in Settings → Privacy. No change needed.
+| Component | Current State | Change |
+|-----------|--------------|--------|
+| `DoctorVisitReport.tsx` | Downloads as .txt | Add PDF/Print, WhatsApp, Email buttons |
+| `DocumentAnalyzer.tsx` | No download | Add PDF/Print, WhatsApp, Email buttons in results |
+| `PrescriptionScanner.tsx` | No download | Add PDF/Print, WhatsApp, Email in results |
+| `GuardianReports.tsx` | No export | Add "Export Report" button with PDF/Print, WhatsApp, Email |
+| `VitalsMonitor.tsx` | AI insights display | Add export buttons for insights |
 
-### 12. Collapsible/dropdown sections for clean screen
-**File**: `src/pages/GuardianDashboard.tsx`
-- Wrap each section in a `Collapsible` component (from shadcn):
-  - "{User}'s Medications" (WardMedicationStatus + WardMedicationAdherence)
-  - "{User}'s Health" (WardHealthPassport)
-  - "Emergency Health Card" (WardEmergencyCard)
-  - "{User}'s Vitals" (WardVitalsSummary)
-  - "{User}'s Activity" (WardActivitySummary)
-  - "Care Journal" (CareJournal)
-- Default: collapsed. SOS/Fall sections stay expanded.
-
----
-
-## Database Migration
-- Add guardian UPDATE policy on `sos_events` for resolving stale alerts
-- Add user INSERT policy on `guardian_pings` for reply messages (user replying to guardian)
+**Share options UI**: A dropdown or button group with:
+- 🖨️ Print / Save as PDF
+- 📱 Share via WhatsApp (`https://wa.me/?text=...`)
+- 📧 Email (`mailto:?subject=...&body=...`)
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/components/AppLayout.tsx` | Guard hooks behind `role === "user"`, add PingOverlay |
-| `src/pages/GuardianDashboard.tsx` | Collapsible sections, SOS stale logic, battery display, medication ordering, auto-dismiss, missed-dose audio |
-| `src/pages/GuardianAlerts.tsx` | Auto-dismiss old medication alerts |
-| `src/components/BatteryWarning.tsx` | Save battery % to user_settings periodically |
-| `src/components/GuardianPingOverlay.tsx` | New — User sees pings + can reply |
-| `supabase/migrations/` | New — RLS for guardian SOS update, user ping reply |
+| File | Type |
+|------|------|
+| `src/lib/reportPdf.ts` | New — shared PDF/print/share utility |
+| `src/components/health-tools/DocumentAnalyzer.tsx` | Redesign + rename + share buttons |
+| `src/components/medications/PrescriptionScanner.tsx` | Rename + share buttons |
+| `src/pages/MedicalVault.tsx` | Rename in RECORD_TYPES |
+| `src/components/health-tools/DoctorVisitReport.tsx` | PDF/share buttons |
+| `src/pages/GuardianReports.tsx` | Add export button |
+| `src/components/health-tools/MedicalDocuments.tsx` | Rename if RECORD_TYPES duplicated |
 
 ## Implementation Order
-1. Fix AppLayout hook guards (stops guardian audio immediately)
-2. Database migration
-3. SOS stale resolve + collapsible sections
-4. Battery reporting + guardian display
-5. Ping overlay with reply
-6. Missed medication/check-in escalation audio
-7. Auto-dismiss old medication alerts
+
+1. Create `src/lib/reportPdf.ts` utility
+2. Rename "Prescription" → "Doctor's Diagnosis" across all files
+3. Redesign Document Analyzer with colors and aesthetics
+4. Update save-to-vault record types
+5. Add PDF/share/print buttons to all report components
 
