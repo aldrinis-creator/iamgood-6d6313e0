@@ -17,13 +17,17 @@ import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { role } = useApp();
-  const [showCookieSettings, setShowCookieSettings] = useState(false);
+const UserOnlyHooks = () => {
   useCheckInAudio();
   useMedicationAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
+  return null;
+};
+
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { role } = useApp();
+  const [showCookieSettings, setShowCookieSettings] = useState(false);
   useAutoSleepMode();
 
   return (
