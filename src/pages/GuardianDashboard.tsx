@@ -542,6 +542,11 @@ const GuardianDashboard = () => {
                   {wardBattery !== null ? `${wardBattery}%` : "N/A"}
                 </p>
                 <p className="text-[10px] text-muted-foreground">Battery</p>
+                <p className="text-[9px] text-muted-foreground truncate">
+                  {batteryUpdatedAt
+                    ? formatDistanceToNow(new Date(batteryUpdatedAt), { addSuffix: true })
+                    : "—"}
+                </p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
