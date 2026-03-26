@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 interface Props {
   wardUserId: string;
