@@ -95,6 +95,7 @@ const GuardianDashboard = () => {
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
   const [locationConsent, setLocationConsent] = useState<boolean>(false);
   const [wardLocation, setWardLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationUpdatedAt, setLocationUpdatedAt] = useState<string | null>(null);
   const [activeSOS, setActiveSOS] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wardBattery, setWardBattery] = useState<number | null>(null);
