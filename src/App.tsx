@@ -29,6 +29,7 @@ import Messages from "./pages/Messages";
 import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
+import GuardianMessages from "./pages/GuardianMessages";
 
 const queryClient = new QueryClient();
 
