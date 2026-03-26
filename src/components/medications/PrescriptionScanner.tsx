@@ -372,8 +372,8 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
 
       const { error } = await supabase.from("medical_records").insert({
         user_id: session.user.id,
-        title: "Prescription Analysis",
-        record_type: "Prescription",
+        title: "Doctor's Diagnosis Analysis",
+        record_type: "Doctor's Diagnosis",
         description,
         record_date: new Date().toISOString().split("T")[0],
       });
