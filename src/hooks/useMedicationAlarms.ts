@@ -86,16 +86,27 @@ const useMedicationAlarms = () => {
         if (diffMin >= 60 && diffMin < 1440 && !missedFiredRef.current.has(missedKey)) {
           missedFiredRef.current.add(missedKey);
 
-          // Check if a log already exists for this slot
+          // Check if a log already exists for this slot (any status — don't overwrite "taken")
+          const todayStart = new Date(now);
+          todayStart.setHours(0, 0, 0, 0);
+          const todayEnd = new Date(now);
+          todayEnd.setHours(23, 59, 59, 999);
+
           const { data: existingLogs } = await supabase
             .from("medication_logs")
-            .select("id")
+            .select("id, status, scheduled_at")
             .eq("medication_id", med.id)
             .eq("user_id", session.user.id)
-            .eq("scheduled_at", scheduledAt.toISOString())
-            .limit(1);
+            .gte("scheduled_at", todayStart.toISOString())
+            .lte("scheduled_at", todayEnd.toISOString());
 
-          if (!existingLogs || existingLogs.length === 0) {
+          // Match by hour/minute instead of exact ISO string
+          const hasLog = (existingLogs || []).some((l) => {
+            const logDate = new Date(l.scheduled_at ?? "");
+            return logDate.getHours() === h && logDate.getMinutes() === (m || 0);
+          });
+
+          if (!hasLog) {
             // Write missed record
             await supabase.from("medication_logs").insert({
               medication_id: med.id,
