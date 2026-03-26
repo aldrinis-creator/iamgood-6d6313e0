@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Share2, Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 const DoctorVisitReport = () => {
   const { session } = useAuth();
@@ -16,7 +17,6 @@ const DoctorVisitReport = () => {
     if (!session?.user?.id) return;
     setLoading(true);
     try {
-      // Fetch user health data
       const [profileRes, medsRes, activityRes, wellnessRes, faceRes] = await Promise.all([
         supabase.from("health_profile").select("*").eq("user_id", session.user.id).maybeSingle(),
         supabase.from("medications").select("name, dosage, frequency, schedule_times").eq("user_id", session.user.id),
@@ -47,15 +47,6 @@ const DoctorVisitReport = () => {
     }
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: "Doctor Visit Report", text: report });
-    } else {
-      await navigator.clipboard.writeText(report);
-      toast.success("Report copied to clipboard");
-    }
-  };
-
   return (
     <div className="space-y-4">
       <Card>
@@ -74,20 +65,12 @@ const DoctorVisitReport = () => {
       {report && (
         <Card>
           <CardContent className="p-4 space-y-3">
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleShare}>
-                <Share2 className="w-3 h-3 mr-1" /> Share
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => {
-                const blob = new Blob([report], { type: "text/plain" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "doctor-visit-report.txt";
-                a.click();
-              }}>
-                <Download className="w-3 h-3 mr-1" /> Download
-              </Button>
-            </div>
+            <ReportShareButtons
+              title="Doctor Visit Report"
+              subtitle="Comprehensive Health Summary"
+              content={report}
+              category="Health Report"
+            />
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown>{report}</ReactMarkdown>
             </div>

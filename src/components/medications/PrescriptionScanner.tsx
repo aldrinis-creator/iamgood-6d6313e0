@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import type { AlternativeContext } from "./MedicationManager";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 const MAX_INPUT_LENGTH = 5000;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB

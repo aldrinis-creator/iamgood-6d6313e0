@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 
 const RECORD_TYPES = [
-  "Prescription", "Lab Report", "Discharge Summary",
+  "Doctor's Diagnosis", "Lab Report", "Discharge Summary",
   "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Legal Will", "Other",
 ];
 
