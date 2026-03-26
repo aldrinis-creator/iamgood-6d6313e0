@@ -15,6 +15,7 @@ import WardHealthPassport from "@/components/WardHealthPassport";
 import WardVitalsSummary from "@/components/WardVitalsSummary";
 import WardMedicationStatus from "@/components/WardMedicationStatus";
 import WardMedicationAdherence from "@/components/WardMedicationAdherence";
+import WardRefillOrder from "@/components/WardRefillOrder";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -709,6 +710,7 @@ const GuardianDashboard = () => {
             <CollapsibleSection title={`${wardName}'s Medications`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">💊</Badge>}>
               <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
               <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
+              <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
             </CollapsibleSection>
 
             <CollapsibleSection title={`${wardName}'s Health`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏥</Badge>}>
