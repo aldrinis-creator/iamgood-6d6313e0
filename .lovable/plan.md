@@ -1,72 +1,129 @@
 
 
-# Apply Check-iN Letterhead to All Reports and Prints
+# Map My Journey (MMJ) — Feature Plan
 
-## What Changes
+## Overview
 
-Replace all ad-hoc print/PDF HTML templates across the app with a unified letterhead format matching the uploaded `Check-iN_Letterhead.pdf`. Every printable report — for both Users and Guardians — will use the same branded layout.
+A journey-tracking feature that lets a User share their real-time travel with their Guardian. The User starts a journey (destination + transport mode), and the Guardian tracks it on a live map. Periodic "Are you OK?" check-ins happen during the journey. Both parties are notified as the destination approaches, and the journey auto-closes if not manually ended.
 
-## Letterhead Design (from PDF)
+## User Flow
 
 ```text
-+--------------------------------------------------+
-| [Check-iN Logo]  CHECK-iN              [FW Logo] |
-|                  Personal Safety &                |
-|                  Emergency Monitoring System       |
-|——————————————— red divider line ——————————————————|
-|                                                    |
-| REPORT TITLE                                       |
-| Generated on: DATE | TIME                         |
-|                                                    |
-| << Dynamic report content >>                       |
-|                                                    |
-|                                                    |
-|——————————————— thin divider ——————————————————————|
-| Check-iN | PERS    www.futurewave.in |             |
-|                    sales@futurewave.in | +91       |
-|                    7045868482                       |
-|                              Confidential | Page   |
-+--------------------------------------------------+
+USER                                         GUARDIAN
+──────                                       ────────
+1. Tap "Map My Journey"
+2. Enter destination (autocomplete)
+3. Select transport mode
+4. See route + ETA on map
+5. Tap "Start Journey"
+   ──── notification ──────────────────────► "User started a journey to X"
+6. Location tracked every 60s              ► Live map with route + user dot
+7. Every 15min (<1h) or 30min (>1h):
+   "Are you OK?" popup → respond
+   ──── status update ────────────────────► Sees health/status updates
+8. Approaching destination:
+   "Arriving soon" alert                   ► "User arriving soon" alert
+9. Tap "End Journey" (or auto-end 10min)
+   ──── notification ──────────────────────► "Journey completed safely"
 ```
 
 ## Technical Plan
 
-### 1. Copy logos to `public/`
-- Copy `Check-iN_Letterhead.pdf` logos (extracted images) to `public/images/` as `checkin-logo.png` and `futurewave-logo.png`
-- These will be embedded as base64 data URIs in the print HTML so they work offline
+### 1. New Database Table: `journeys`
 
-### 2. Update `src/lib/reportPdf.ts` — Central letterhead template
-- Replace `buildHtml()` with the letterhead layout:
-  - **Header**: Check-iN logo (left) + app name/tagline, Future Wave Technologies logo (right), red horizontal rule
-  - **Title block**: Report title, subtitle, generated date/time, category badge
-  - **Content area**: Same markdown-to-HTML converter
-  - **Footer**: "Check-iN | PERS" (left), contact info centered, "Confidential | Page" (right)
-- Embed both logos as inline base64 data URIs so print works without network
-- Export a new helper `buildLetterheadHtml(opts)` that other files can reuse for custom content
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| user_id | uuid | NOT NULL |
+| destination_name | text | NOT NULL |
+| destination_lat | float | NOT NULL |
+| destination_lng | float | NOT NULL |
+| origin_name | text | |
+| origin_lat | float | |
+| origin_lng | float | |
+| transport_mode | text | walk/car/bus/train/auto |
+| estimated_duration_min | int | |
+| status | text | active/completed/auto_completed |
+| started_at | timestamptz | DEFAULT now() |
+| ended_at | timestamptz | |
+| created_at | timestamptz | DEFAULT now() |
 
-### 3. Update `src/components/medications/RefillOrder.tsx`
-- Replace inline `saveAsPdf()` HTML with a call to a shared letterhead builder from `reportPdf.ts`
+RLS: User CRUD own rows. Guardians SELECT via guardians join.
 
-### 4. Update `src/components/WardRefillOrder.tsx`
-- Same: replace inline print HTML with shared letterhead builder
+### 2. New Database Table: `journey_updates`
 
-### 5. Update `src/components/SOSDialog.tsx`
-- Replace `buildCardHtml()` inline HTML with letterhead-wrapped version (keeping emergency red accent for the alert sections inside)
+Stores periodic location + check-in responses during a journey.
 
-### 6. Update `src/components/WardEmergencyCard.tsx`
-- Replace `handlePrint()` and `handleDownload()` inline HTML with letterhead-wrapped version
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| journey_id | uuid | FK to journeys |
+| user_id | uuid | NOT NULL |
+| lat | float | |
+| lng | float | |
+| check_in_response | text | null if just a location ping |
+| created_at | timestamptz | DEFAULT now() |
 
-### 7. Update `src/pages/MedicalVault.tsx`
-- Replace `buildEmergencyHtml()` inline HTML with letterhead-wrapped version
+RLS: User INSERT/SELECT own. Guardians SELECT via guardians join. Enable realtime.
+
+### 3. New Components (User Side)
+
+**`src/pages/MapMyJourney.tsx`** — Main page
+- Destination input with autocomplete (using OpenStreetMap Nominatim — free, no API key)
+- Transport mode selector (walk/car/bus/train/auto-rickshaw)
+- Route display using Leaflet + OSRM (free routing)
+- ETA calculation from OSRM response
+- "Start Journey" / "End Journey" button
+- Active journey status card with elapsed time and distance remaining
+
+**`src/hooks/useJourneyTracker.ts`** — Core tracking hook
+- When journey active: `watchPosition` for continuous GPS
+- Saves location to `journey_updates` every 60s
+- Calculates distance-to-destination; triggers "arriving soon" when <500m
+- Schedules "Are you OK?" popups (15min if ETA <1h, else 30min)
+- Auto-ends journey 10min after arriving within destination radius (~200m)
+- Notifies guardians at start, during check-ins, approaching, and end
+
+**`src/components/JourneyCheckInPopup.tsx`** — Periodic popup
+- "Are you OK?" with preset responses ("I'm fine", "Feeling tired", "Need a break") + free text
+- Response saved to `journey_updates.check_in_response`
+- Notifies guardian of response
+
+### 4. New Components (Guardian Side)
+
+**`src/components/GuardianJourneyTracker.tsx`** — Live map card on Guardian Dashboard
+- Shows when ward has an active journey
+- Leaflet map with: origin marker, destination marker, route polyline, live user position dot
+- Journey progress bar (distance covered / total)
+- List of check-in responses with timestamps
+- "Arriving soon" and "Journey completed" alerts
+
+### 5. Integration Points
+
+**`src/pages/UserDashboard.tsx`** — Add "Map My Journey" quick-action card
+**`src/components/NavTabs.tsx`** — No change (accessed from dashboard)
+**`src/pages/GuardianDashboard.tsx`** — Add `GuardianJourneyTracker` when active journey exists
+**`src/App.tsx`** — Add `/journey` route (UserRoute)
+**Notifications** — Insert into `notifications` table for guardian alerts
+
+### 6. Dependencies
+
+- **Leaflet + react-leaflet** — Map rendering (free, no API key)
+- **OpenStreetMap Nominatim API** — Destination autocomplete (free, rate-limited)
+- **OSRM** — Route calculation + ETA (free public API)
+
+No paid APIs or new secrets required.
+
+### 7. Files Summary
 
 | File | Change |
 |------|--------|
-| `public/images/checkin-logo.png` | New — Check-iN app logo for letterhead |
-| `public/images/futurewave-logo.png` | New — Future Wave Technologies logo |
-| `src/lib/reportPdf.ts` | Rewrite `buildHtml` with letterhead layout + export `buildLetterheadHtml` for custom body HTML |
-| `src/components/medications/RefillOrder.tsx` | Use shared letterhead builder |
-| `src/components/WardRefillOrder.tsx` | Use shared letterhead builder |
-| `src/components/SOSDialog.tsx` | Wrap emergency card in letterhead |
-| `src/components/WardEmergencyCard.tsx` | Wrap emergency card in letterhead |
-| `src/pages/MedicalVault.tsx` | Wrap emergency card in letterhead |
+| DB migration | Create `journeys` + `journey_updates` tables with RLS |
+| `src/pages/MapMyJourney.tsx` | New — journey setup + active tracking page |
+| `src/hooks/useJourneyTracker.ts` | New — GPS tracking, check-in scheduling, auto-end |
+| `src/components/JourneyCheckInPopup.tsx` | New — periodic "Are you OK?" popup |
+| `src/components/GuardianJourneyTracker.tsx` | New — live map + updates for guardian |
+| `src/pages/UserDashboard.tsx` | Add MMJ quick-action card |
+| `src/pages/GuardianDashboard.tsx` | Add journey tracker component |
+| `src/App.tsx` | Add `/journey` route |
 
