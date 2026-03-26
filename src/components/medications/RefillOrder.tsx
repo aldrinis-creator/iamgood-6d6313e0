@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 import type { SelectedAlternative } from "./MedicationManager";
 import JanAushadhiAlternatives from "./JanAushadhiAlternatives";
 

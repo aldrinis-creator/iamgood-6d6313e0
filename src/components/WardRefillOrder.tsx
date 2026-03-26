@@ -9,6 +9,7 @@ import {
   CheckCircle, MessageCircle, FileText, Share2, Pencil, X
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 interface Medication {
   id: string;
