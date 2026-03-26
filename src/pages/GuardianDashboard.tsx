@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Wifi, Bell, Moon, LogOut, RefreshCw, MessageCircle } from "lucide-react";
+import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Notification {
   id: string;
@@ -54,6 +55,29 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
   return <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />;
 };
 
+// Collapsible section wrapper
+const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Card className="cursor-pointer hover:border-primary/20 transition-colors">
+          <CardContent className="p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {icon}
+              <span className="text-sm font-semibold">{title}</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+          </CardContent>
+        </Card>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2 mt-1">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
 const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
@@ -70,6 +94,12 @@ const GuardianDashboard = () => {
   const [wardLocation, setWardLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeSOS, setActiveSOS] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [wardBattery, setWardBattery] = useState<number | null>(null);
+  const [batteryAlertShown, setBatteryAlertShown] = useState(false);
+
+  // Track missed medication/check-in counts for escalation
+  const missedMedCount = useRef(0);
+  const missedCheckInCount = useRef(0);
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -78,7 +108,22 @@ const GuardianDashboard = () => {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(10);
-    if (data) setNotifications(data as Notification[]);
+    if (data) {
+      // Auto-dismiss medication alerts older than 1 hour
+      const now = Date.now();
+      const processed = (data as Notification[]).map(n => {
+        if ((n.type === "medication_missed" || n.type === "medication_taken") && !n.read) {
+          const age = now - new Date(n.created_at).getTime();
+          if (age > 3600000) return { ...n, read: true };
+        }
+        return n;
+      });
+      // Mark old ones as read in DB (fire-and-forget)
+      processed.filter((n, i) => n.read && !(data as Notification[])[i].read).forEach(n => {
+        supabase.from("notifications").update({ read: true }).eq("id", n.id).then(() => {});
+      });
+      setNotifications(processed);
+    }
   }, [session?.user?.id]);
 
   const fetchWardCheckIns = useCallback(async () => {
@@ -94,7 +139,6 @@ const GuardianDashboard = () => {
     const wardId = guardianEntries[0].user_id;
     setWardUserId(wardId);
 
-    // Get ward's profile
     const { data: wardProfile } = await supabase
       .from("profiles")
       .select("full_name, phone")
@@ -104,7 +148,6 @@ const GuardianDashboard = () => {
     if (wardProfile?.full_name) setWardName(wardProfile.full_name);
     if (wardProfile?.phone) setWardPhone(wardProfile.phone);
 
-    // Get today's check-ins
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -117,7 +160,6 @@ const GuardianDashboard = () => {
 
     if (checkIns) setTodayCheckIns(checkIns);
 
-    // Get last active timestamp
     const { data: lastActivity } = await supabase
       .from("check_ins")
       .select("responded_at")
@@ -140,7 +182,9 @@ const GuardianDashboard = () => {
       .limit(1);
 
     if (sos?.[0]) {
-      setActiveSOS(sos[0]);
+      // Auto-stale: treat SOS older than 2 hours as stale
+      const sosAge = Date.now() - new Date(sos[0].triggered_at).getTime();
+      setActiveSOS({ ...sos[0], isStale: sosAge > 7200000 });
       if (sos[0].latitude && sos[0].longitude) {
         setWardLocation({ lat: sos[0].latitude, lng: sos[0].longitude });
       }
@@ -164,6 +208,9 @@ const GuardianDashboard = () => {
         reason: s?.checkOutConfig?.reason,
       });
       setLocationConsent(s?.shareLocationWithGuardian !== false);
+      if (typeof s?.batteryLevel === "number") {
+        setWardBattery(s.batteryLevel);
+      }
     }
   }, []);
 
@@ -183,6 +230,17 @@ const GuardianDashboard = () => {
     if (wardUserId) fetchWardSettings(wardUserId);
   }, [wardUserId, fetchWardSettings]);
 
+  // Battery low alert for guardian
+  useEffect(() => {
+    if (wardBattery !== null && wardBattery <= 30 && !batteryAlertShown && settings.guardianVoiceAlerts) {
+      setBatteryAlertShown(true);
+      playVoiceReminder(`Please ask ${wardName} to charge their phone now! Battery is at ${wardBattery} percent.`);
+    }
+    if (wardBattery !== null && wardBattery > 30) {
+      setBatteryAlertShown(false);
+    }
+  }, [wardBattery, wardName, batteryAlertShown, settings.guardianVoiceAlerts]);
+
   // Realtime subscriptions
   useEffect(() => {
     const channels: any[] = [];
@@ -196,7 +254,23 @@ const GuardianDashboard = () => {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
         } else if (newNotif?.type === "missed_checkin") {
-          playChime();
+          missedCheckInCount.current += 1;
+          if (missedCheckInCount.current >= 3 && settings.guardianVoiceAlerts) {
+            playVoiceReminder(`${wardName} has missed multiple check-ins. Please check on them.`);
+            missedCheckInCount.current = 0;
+          } else {
+            playChime();
+          }
+        } else if (newNotif?.type === "medication_missed") {
+          missedMedCount.current += 1;
+          if (missedMedCount.current >= 3 && settings.guardianVoiceAlerts) {
+            const hour = new Date().getHours();
+            const period = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+            playVoiceReminder(`${wardName} has not taken their ${period} medication.`);
+            missedMedCount.current = 0;
+          } else {
+            playChime();
+          }
         }
       })
       .subscribe();
@@ -209,14 +283,12 @@ const GuardianDashboard = () => {
         .subscribe();
       channels.push(settingsChannel);
 
-      // Auto-refresh check-ins
       const checkInChannel = supabase
         .channel("ward-checkins-rt")
         .on("postgres_changes", { event: "*", schema: "public", table: "check_ins", filter: `user_id=eq.${wardUserId}` }, () => fetchWardCheckIns())
         .subscribe();
       channels.push(checkInChannel);
 
-      // SOS events realtime
       const sosChannel = supabase
         .channel("ward-sos-rt")
         .on("postgres_changes", { event: "*", schema: "public", table: "sos_events", filter: `user_id=eq.${wardUserId}` }, () => fetchWardCheckIns())
@@ -225,7 +297,7 @@ const GuardianDashboard = () => {
     }
 
     return () => { channels.forEach(c => supabase.removeChannel(c)); };
-  }, [fetchNotifications, fetchWardCheckIns, wardUserId, fetchWardSettings]);
+  }, [fetchNotifications, fetchWardCheckIns, wardUserId, fetchWardSettings, wardName, settings.guardianVoiceAlerts]);
 
   // Poll SOS location every 30s during active SOS
   useEffect(() => {
@@ -247,6 +319,12 @@ const GuardianDashboard = () => {
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const resolveSOS = async () => {
+    if (!activeSOS) return;
+    await supabase.from("sos_events").update({ status: "resolved", resolved_at: new Date().toISOString() }).eq("id", activeSOS.id);
+    setActiveSOS(null);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -295,7 +373,6 @@ const GuardianDashboard = () => {
 
   const handleRefreshLocation = async () => {
     if (!wardUserId) return;
-    // Try to get location from latest SOS or activity
     const { data: lastSOS } = await supabase
       .from("sos_events")
       .select("latitude, longitude")
@@ -313,18 +390,33 @@ const GuardianDashboard = () => {
       <div className="p-4 space-y-4">
         {/* Active SOS Alert */}
         {activeSOS && (
-          <Card className="border-destructive bg-destructive/10 animate-pulse">
+          <Card className={`border-destructive bg-destructive/10 ${activeSOS.isStale ? "" : "animate-pulse"}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangle className="w-6 h-6 text-destructive" />
-                <h3 className="font-bold text-destructive text-lg">🆘 SOS ACTIVE</h3>
+                <h3 className="font-bold text-destructive text-lg">
+                  🆘 SOS {activeSOS.isStale ? "(Stale)" : "ACTIVE"}
+                </h3>
               </div>
               <p className="text-sm text-destructive">
                 {wardName} triggered SOS at {format(new Date(activeSOS.triggered_at), "dd MMM yyyy, hh:mm a")}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Type: {activeSOS.trigger_type} • Location updates every 30s
+                Type: {activeSOS.trigger_type} {activeSOS.isStale ? "• Over 2 hours ago" : "• Location updates every 30s"}
               </p>
+              {activeSOS.isStale && (
+                <Button variant="outline" size="sm" className="mt-2" onClick={resolveSOS}>
+                  ✓ Resolve / Dismiss
+                </Button>
+              )}
+
+              {/* Emergency Health Card + Vitals shown during SOS */}
+              {wardUserId && (
+                <div className="mt-3 space-y-2">
+                  <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />
+                  <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -358,7 +450,7 @@ const GuardianDashboard = () => {
         )}
 
         {/* User Status */}
-        <Card className={`border-${wardPauseMode === "active" ? "success" : wardPauseMode === "sleep" ? "primary" : "amber-500"}/30`}>
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -393,16 +485,27 @@ const GuardianDashboard = () => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="p-2 rounded-lg bg-card">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-primary mb-1" />
                 <p className="text-sm font-semibold">{getLastActiveText()}</p>
                 <p className="text-[10px] text-muted-foreground">Last Active</p>
               </div>
-              <div className="p-2 rounded-lg bg-card">
+              <div className="p-2 rounded-lg bg-muted">
+                <Battery className={`w-4 h-4 mx-auto mb-1 ${
+                  wardBattery !== null && wardBattery <= 30 ? "text-destructive" : "text-success"
+                }`} />
+                <p className={`text-sm font-semibold ${
+                  wardBattery !== null && wardBattery <= 30 ? "text-destructive" : ""
+                }`}>
+                  {wardBattery !== null ? `${wardBattery}%` : "N/A"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Battery</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <p className="text-sm font-semibold">{format(new Date(), "dd MMM, hh:mm a")}</p>
-                <p className="text-[10px] text-muted-foreground">Current Time</p>
+                <p className="text-sm font-semibold">{format(new Date(), "hh:mm a")}</p>
+                <p className="text-[10px] text-muted-foreground">Now</p>
               </div>
             </div>
           </CardContent>
@@ -533,14 +636,35 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Ward modules */}
-        {wardUserId && <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
-        {wardUserId && <CareJournal wardUserId={wardUserId} />}
+        {/* Collapsible ward modules */}
+        {wardUserId && (
+          <div className="space-y-2">
+            <CollapsibleSection title={`${wardName}'s Medications`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">💊</Badge>}>
+              <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
+              <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={`${wardName}'s Health`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏥</Badge>}>
+              <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Emergency Health Card" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🆔</Badge>}>
+              <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={`${wardName}'s Vitals`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">❤️</Badge>}>
+              <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={`${wardName}'s Activity`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏃</Badge>}>
+              <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
+              <CareJournal wardUserId={wardUserId} />
+            </CollapsibleSection>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
