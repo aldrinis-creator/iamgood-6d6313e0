@@ -1,0 +1,1 @@
+ALTER TABLE public.guardian_pings ADD COLUMN reply_message text, ADD COLUMN replied_at timestamptz;
