@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User, Stethoscope } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Shield, Bell, FileText, User, Stethoscope, MessageCircle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -39,9 +39,34 @@ const NavTabs = () => {
     return () => { supabase.removeChannel(channel); };
   }, [role, session?.user?.id]);
 
+  const [unreadPings, setUnreadPings] = useState(0);
+
+  useEffect(() => {
+    if (role !== "user" || !session?.user?.id) return;
+
+    const fetchUnreadPings = async () => {
+      const { count } = await supabase
+        .from("guardian_pings")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", session.user.id)
+        .eq("read", false);
+      setUnreadPings(count || 0);
+    };
+
+    fetchUnreadPings();
+
+    const pingChannel = supabase
+      .channel("user-nav-pings")
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings" }, () => fetchUnreadPings())
+      .subscribe();
+
+    return () => { supabase.removeChannel(pingChannel); };
+  }, [role, session?.user?.id]);
+
   const userTabs = [
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
+    { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
     { icon: Heart, label: "My Health", path: "/my-health" },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];

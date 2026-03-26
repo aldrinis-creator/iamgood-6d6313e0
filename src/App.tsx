@@ -25,6 +25,7 @@ import TermsOfService from "./pages/TermsOfService";
 import ResetPassword from "./pages/ResetPassword";
 import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
+import Messages from "./pages/Messages";
 import MyProfile from "./pages/MyProfile";
 import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/medical-vault" element={<UserRoute><MedicalVault /></UserRoute>} />
               <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />
               <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
+              <Route path="/messages" element={<UserRoute><Messages /></UserRoute>} />
               {/* Guardian-only routes */}
               <Route path="/guardian" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
               <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
