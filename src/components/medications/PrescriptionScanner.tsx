@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import type { AlternativeContext } from "./MedicationManager";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 const MAX_INPUT_LENGTH = 5000;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
@@ -95,12 +96,12 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     if (inputMode === "text") {
       const text = prescriptionText.trim();
       if (!text) {
-        toast.error("Please enter the medication names from your prescription");
+        toast.error("Please enter the medication names from the diagnosis");
         return;
       }
     } else {
       if (!imageBase64) {
-        toast.error("Please upload or take a photo of your prescription");
+        toast.error("Please upload or take a photo of the diagnosis");
         return;
       }
     }
@@ -163,7 +164,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Upload a photo of your prescription or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
+            Upload a photo of your doctor's diagnosis or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
           </p>
         </CardContent>
       </Card>
@@ -218,7 +219,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
                   className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 >
                   <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm font-medium">Tap to upload prescription photo</p>
+                  <p className="text-sm font-medium">Tap to upload diagnosis photo</p>
                   <p className="text-xs text-muted-foreground mt-1">JPG, PNG · Max 4MB</p>
                 </div>
               )}
@@ -226,7 +227,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
           ) : (
             <>
               <Textarea
-                placeholder={"Enter medication names from your prescription, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"}
+                placeholder={"Enter medication names from the diagnosis, e.g.:\nTab Crocin 500mg\nCap Omez 20mg\nTab Ecosprin 75mg"}
                 value={prescriptionText}
                 onChange={(e) => setPrescriptionText(e.target.value.substring(0, MAX_INPUT_LENGTH))}
                 rows={5}
@@ -236,12 +237,21 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
             </>
           )}
           <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={analyzePrescription} disabled={loading}>
-            {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Prescription</>}
+          {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Diagnosis</>}
           </Button>
         </CardContent>
       </Card>
 
       {result && <PrescriptionResults result={result} onSelectAlternative={alternativeMode ? onSelectAlternative : undefined} />}
+
+      {result && (
+        <ReportShareButtons
+          title="Doctor's Diagnosis Analysis"
+          subtitle="Medication Analysis Report"
+          content={[result.summary, ...(result.medications?.map(m => `${m.name} (${m.salt_composition}) — ${m.dosage} — ${m.status.toUpperCase()}`) || [])].join("\n")}
+          category="Doctor's Diagnosis"
+        />
+      )}
 
       {result && <SaveToVaultButton result={result} />}
 
@@ -372,8 +382,8 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
 
       const { error } = await supabase.from("medical_records").insert({
         user_id: session.user.id,
-        title: "Prescription Analysis",
-        record_type: "Prescription",
+        title: "Doctor's Diagnosis Analysis",
+        record_type: "Doctor's Diagnosis",
         description,
         record_date: new Date().toISOString().split("T")[0],
       });

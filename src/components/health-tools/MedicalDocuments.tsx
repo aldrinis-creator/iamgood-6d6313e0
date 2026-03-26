@@ -18,7 +18,7 @@ interface MedicalRecord {
   created_at: string;
 }
 
-const RECORD_TYPES = ["Lab Report", "Prescription", "Discharge Summary", "X-Ray / Scan", "Insurance", "Other"];
+const RECORD_TYPES = ["Lab Report", "Doctor's Diagnosis", "Discharge Summary", "X-Ray / Scan", "Insurance", "Other"];
 
 const MedicalDocuments = () => {
   const { session } = useAuth();
