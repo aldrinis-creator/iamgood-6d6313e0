@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const RECORD_TYPES = [
   "Doctor's Diagnosis", "Lab Report", "Discharge Summary",
