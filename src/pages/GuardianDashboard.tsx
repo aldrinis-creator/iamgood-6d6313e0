@@ -95,6 +95,7 @@ const GuardianDashboard = () => {
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
   const [locationConsent, setLocationConsent] = useState<boolean>(false);
   const [wardLocation, setWardLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationUpdatedAt, setLocationUpdatedAt] = useState<string | null>(null);
   const [activeSOS, setActiveSOS] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wardBattery, setWardBattery] = useState<number | null>(null);
@@ -221,6 +222,7 @@ const GuardianDashboard = () => {
       // Read ward's saved location
       if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
         setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+        if (s?.lastLocationAt) setLocationUpdatedAt(s.lastLocationAt);
       }
     }
   }, []);
@@ -411,6 +413,7 @@ const GuardianDashboard = () => {
     const s = (settingsData as any)?.settings;
     if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
       setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      if (s?.lastLocationAt) setLocationUpdatedAt(s.lastLocationAt);
       return;
     }
     // Fallback to last SOS event
@@ -585,6 +588,11 @@ const GuardianDashboard = () => {
                   {wardLocation.lat.toFixed(4)}° N, {wardLocation.lng.toFixed(4)}° E
                   {activeSOS && " • Auto-refreshing every 30s"}
                 </p>
+                {locationUpdatedAt && !activeSOS && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
+                  </p>
+                )}
                 {!activeSOS && (
                   <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
                     <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
