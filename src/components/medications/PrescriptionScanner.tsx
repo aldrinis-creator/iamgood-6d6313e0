@@ -218,7 +218,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
                   className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 >
                   <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm font-medium">Tap to upload prescription photo</p>
+                  <p className="text-sm font-medium">Tap to upload diagnosis photo</p>
                   <p className="text-xs text-muted-foreground mt-1">JPG, PNG · Max 4MB</p>
                 </div>
               )}
