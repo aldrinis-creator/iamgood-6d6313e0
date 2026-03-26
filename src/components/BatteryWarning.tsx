@@ -17,7 +17,9 @@ const BatteryWarning: React.FC = () => {
   const lowShownCount = useRef(0);
   const criticalShownCount = useRef(0);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
+  const lastSavedLevel = useRef<number>(-1);
   const { settings } = useUserSettings();
+  const { session } = useAuth();
 
   useEffect(() => {
     let batt: any;
