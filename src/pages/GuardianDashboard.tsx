@@ -588,6 +588,11 @@ const GuardianDashboard = () => {
                   {wardLocation.lat.toFixed(4)}° N, {wardLocation.lng.toFixed(4)}° E
                   {activeSOS && " • Auto-refreshing every 30s"}
                 </p>
+                {locationUpdatedAt && !activeSOS && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
+                  </p>
+                )}
                 {!activeSOS && (
                   <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
                     <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
