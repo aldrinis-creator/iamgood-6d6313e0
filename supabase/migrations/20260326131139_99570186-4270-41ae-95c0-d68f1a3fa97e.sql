@@ -1,0 +1,1 @@
+ALTER TABLE public.guardian_pings ADD COLUMN guardian_read boolean NOT NULL DEFAULT false;

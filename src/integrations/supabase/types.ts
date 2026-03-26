@@ -329,6 +329,7 @@ export type Database = {
       guardian_pings: {
         Row: {
           created_at: string
+          guardian_read: boolean
           guardian_user_id: string
           id: string
           message: string
@@ -339,6 +340,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          guardian_read?: boolean
           guardian_user_id: string
           id?: string
           message: string
@@ -349,6 +351,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          guardian_read?: boolean
           guardian_user_id?: string
           id?: string
           message?: string
