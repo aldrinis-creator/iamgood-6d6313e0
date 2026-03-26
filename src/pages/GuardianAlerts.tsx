@@ -43,7 +43,20 @@ const GuardianAlerts = () => {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
-    if (data) setNotifications(data as Notification[]);
+    if (data) {
+      const now = Date.now();
+      const processed = (data as Notification[]).map(n => {
+        if ((n.type === "medication_missed" || n.type === "medication_taken") && !n.read) {
+          const age = now - new Date(n.created_at).getTime();
+          if (age > 3600000) return { ...n, read: true };
+        }
+        return n;
+      });
+      processed.filter((n, i) => n.read && !(data as Notification[])[i].read).forEach(n => {
+        supabase.from("notifications").update({ read: true }).eq("id", n.id).then(() => {});
+      });
+      setNotifications(processed);
+    }
     setLoading(false);
   }, [session?.user?.id]);
 

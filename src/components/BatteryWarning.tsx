@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { BatteryLow, Zap, AlertTriangle } from "lucide-react";
 import { playChime, playVoiceReminder, ensureAudioReady } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BatteryState {
   level: number;
@@ -15,13 +17,25 @@ const BatteryWarning: React.FC = () => {
   const lowShownCount = useRef(0);
   const criticalShownCount = useRef(0);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
+  const lastSavedLevel = useRef<number>(-1);
   const { settings } = useUserSettings();
+  const { session } = useAuth();
 
   useEffect(() => {
     let batt: any;
     const update = () => {
       if (!batt) return;
-      setBattery({ level: Math.round(batt.level * 100), charging: batt.charging });
+      const level = Math.round(batt.level * 100);
+      setBattery({ level, charging: batt.charging });
+      // Save battery level to user_settings every 5% change
+      if (session?.user?.id && Math.abs(level - lastSavedLevel.current) >= 5) {
+        lastSavedLevel.current = level;
+        supabase.from("user_settings").upsert({
+          user_id: session.user.id,
+          settings: { ...settings, batteryLevel: level },
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "user_id" }).then(() => {});
+      }
     };
     (navigator as any).getBattery?.().then((b: any) => {
       batt = b;
@@ -35,7 +49,7 @@ const BatteryWarning: React.FC = () => {
         batt.removeEventListener("chargingchange", update);
       }
     };
-  }, []);
+  }, [session?.user?.id]);
 
   const show = useCallback(async (p: "low" | "critical", level: number) => {
     setPhase(p);

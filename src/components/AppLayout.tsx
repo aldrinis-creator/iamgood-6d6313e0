@@ -6,6 +6,7 @@ import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import FallDetectionOverlay from "@/components/FallDetectionOverlay";
+import GuardianPingOverlay from "@/components/GuardianPingOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
@@ -17,18 +18,23 @@ import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { role } = useApp();
-  const [showCookieSettings, setShowCookieSettings] = useState(false);
+const UserOnlyHooks = () => {
   useCheckInAudio();
   useMedicationAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
+  return null;
+};
+
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { role } = useApp();
+  const [showCookieSettings, setShowCookieSettings] = useState(false);
   useAutoSleepMode();
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
+        {role === "user" && <UserOnlyHooks />}
         <PwaInstallBanner />
         <AppHeader />
         <main className="flex-1 overflow-y-auto pb-24">
@@ -76,6 +82,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <BatteryWarning />
         <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
         <ReminderOverlay />
+        {role === "user" && <GuardianPingOverlay />}
       </div>
     </div>
   );
