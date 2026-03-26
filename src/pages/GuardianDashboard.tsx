@@ -355,11 +355,22 @@ const GuardianDashboard = () => {
     return format(new Date(lastActiveAt), "dd MMM");
   };
 
-  const handleCallUser = (type: "whatsapp" | "phone") => {
+  const handleCallUser = (type: "whatsapp" | "phone" | "flash") => {
     if (!wardPhone) return;
     const clean = wardPhone.replace(/[^0-9+]/g, "");
     if (type === "whatsapp") {
       window.open(`https://wa.me/${clean.replace("+", "")}`, "_blank");
+    } else if (type === "flash") {
+      // Flash call: initiate a brief call (user just needs to see the ring)
+      window.open(`tel:${clean}`, "_self");
+      // Also send a ping so User gets a notification
+      if (wardUserId && session?.user?.id) {
+        supabase.from("guardian_pings").insert({
+          guardian_user_id: session.user.id,
+          user_id: wardUserId,
+          message: `📞 Flash Call from ${session?.user?.user_metadata?.full_name || "Guardian"} — Please call back`,
+        } as any);
+      }
     } else {
       window.open(`tel:${clean}`, "_self");
     }
