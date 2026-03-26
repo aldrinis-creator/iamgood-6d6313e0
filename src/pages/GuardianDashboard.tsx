@@ -214,6 +214,10 @@ const GuardianDashboard = () => {
       if (typeof s?.batteryLevel === "number") {
         setWardBattery(s.batteryLevel);
       }
+      // Read ward's saved location
+      if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+        setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      }
     }
   }, []);
 
@@ -394,6 +398,18 @@ const GuardianDashboard = () => {
 
   const handleRefreshLocation = async () => {
     if (!wardUserId) return;
+    // First try user_settings (latest saved location)
+    const { data: settingsData } = await supabase
+      .from("user_settings" as any)
+      .select("settings")
+      .eq("user_id", wardUserId)
+      .maybeSingle();
+    const s = (settingsData as any)?.settings;
+    if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+      setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      return;
+    }
+    // Fallback to last SOS event
     const { data: lastSOS } = await supabase
       .from("sos_events")
       .select("latitude, longitude")
