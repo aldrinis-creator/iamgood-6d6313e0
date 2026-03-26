@@ -78,68 +78,6 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
   );
 };
 
-// Sent Pings section showing guardian's sent messages and any replies
-const SentPingsSection = ({ guardianUserId, wardUserId }: { guardianUserId?: string; wardUserId: string }) => {
-  const [pings, setPings] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!guardianUserId) return;
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("guardian_pings")
-        .select("*")
-        .eq("guardian_user_id", guardianUserId)
-        .eq("user_id", wardUserId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (data) setPings(data);
-    };
-    fetch();
-
-    const channel = supabase
-      .channel("guardian-sent-pings")
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "guardian_pings",
-        filter: `guardian_user_id=eq.${guardianUserId}`,
-      }, () => fetch())
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [guardianUserId, wardUserId]);
-
-  if (pings.length === 0) return null;
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <MessageCircle className="w-4 h-4 text-primary" />
-          Sent Messages
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {pings.map(p => (
-          <div key={p.id} className="p-2 rounded-lg bg-muted/50 space-y-1">
-            <p className="text-xs">{p.message}</p>
-            {p.reply_message ? (
-              <div className="pl-3 border-l-2 border-primary/30">
-                <p className="text-xs text-primary font-medium">Reply:</p>
-                <p className="text-sm">{p.reply_message}</p>
-              </div>
-            ) : (
-              <p className="text-[10px] text-muted-foreground italic">No reply yet</p>
-            )}
-            <p className="text-[10px] text-muted-foreground">
-              {format(new Date(p.created_at), "dd MMM, hh:mm a")}
-            </p>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-};
 
 const GuardianDashboard = () => {
   const { session } = useAuth();
