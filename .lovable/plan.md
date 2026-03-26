@@ -1,20 +1,34 @@
 
 
-# Add "Last Updated" Timestamp to Battery on Guardian Dashboard
+# Add "Ping Guardian" Button to User Messages Page
 
-## Change
+## What Changes
 
-Show a relative timestamp (e.g. "2 min ago") next to the battery percentage in the Guardian Dashboard's info section. The timestamp comes from the ward's `user_settings.updated_at` field, which is already saved whenever battery level changes.
+Add a "Ping" button on the User's Messages page that opens a dialog (similar to the Guardian's ping dialog) letting the user send a message to their guardian with preset options and custom text input.
+
+## How It Works
+
+The existing `guardian_pings` table and RLS policies already support this — users can INSERT rows where `user_id = auth.uid()`, and guardians can SELECT rows where `guardian_user_id = auth.uid()`. So we insert a ping with the user as `user_id` and the guardian as `guardian_user_id`, and the guardian will see it in their Messages page.
 
 ## Technical Plan
 
-### `src/pages/GuardianDashboard.tsx`
-- Already fetching ward settings — store `updated_at` from the `user_settings` row alongside `wardBattery`
-- Add a new state variable `batteryUpdatedAt: string | null`
-- Next to the battery percentage display, render a small muted text like "Updated 5 min ago" using `formatDistanceToNow` from `date-fns`
-- If no timestamp available, show "—"
+### 1. Create `src/components/UserPingDialog.tsx`
+- New dialog component similar to `GuardianPingDialog` but for the user role
+- Fetch the user's guardians from the `guardians` table (accepted ones with `guardian_user_id`)
+- If multiple guardians, show a selector; if one, auto-select
+- Preset messages tailored for user-to-guardian: "I'm fine ✅", "Call me please 📞", "Need help", "Miss you ❤️", "Took my medicine 💊", "Feeling unwell 🤒"
+- Custom message input + send button
+- Insert into `guardian_pings` with `user_id = session.user.id`, `guardian_user_id = selectedGuardianId`
+
+### 2. Update `src/pages/Messages.tsx`
+- Add a floating or header "Ping Guardian" button that opens `UserPingDialog`
+- Show sent pings from user in the messages list (fetch pings where `guardian_user_id` is in guardian list, showing both received and sent messages)
+
+### 3. Update `src/pages/GuardianMessages.tsx`
+- Ensure guardian sees user-initiated pings in their messages list (already works via existing query on `guardian_user_id = auth.uid()`)
 
 | File | Change |
 |------|--------|
-| `src/pages/GuardianDashboard.tsx` | Store `updated_at`, display relative timestamp next to battery % |
+| `src/components/UserPingDialog.tsx` | New — ping dialog for user to message guardian |
+| `src/pages/Messages.tsx` | Add Ping button, show sent messages too |
 
