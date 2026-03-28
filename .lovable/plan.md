@@ -1,30 +1,59 @@
 
 
-# Pixel-Perfect Letterhead from Official PDF
+# Uber-Like Real-Time Journey Tracker for Guardians
 
-## Problem
-The current CSS-recreated letterhead doesn't match the uploaded PDF design — the FW logo, wave swooshes, and styling details differ from the official version.
+## Current State
 
-## Approach
-Extract the top header area (~120px) and bottom footer area (~180px) from the uploaded PDF as cropped images, convert to base64 data URIs, and embed them directly in the letterhead HTML. This guarantees pixel-perfect match with zero CSS approximation.
+- The ward's location is saved to `journey_updates` every **60 seconds**
+- The guardian's `GuardianJourneyTracker` fetches updates on mount and listens via Supabase Realtime (`postgres_changes` on `journey_updates` INSERT)
+- The map shows a static marker at the last known position with a polyline of the route trail
+- No smooth animation, no heading/bearing indicator, no auto-panning
 
-## Steps
+## What Changes
 
-1. **Extract header/footer images from the PDF** — use Python (`pdf2image` + `Pillow`) to render the PDF page, crop the top ~15% as the header image and bottom ~25% as the footer image, then convert both to optimized base64 JPEG strings.
+Transform the guardian's journey map into an Uber-style live tracker with:
+1. **Smooth marker animation** — marker glides between positions instead of jumping
+2. **Custom car/person icon** with heading/bearing rotation based on direction of travel
+3. **Auto-pan map** to follow the ward's position as it moves
+4. **Increase location save frequency** from 60s → **15s** during active journeys for near-real-time tracking
+5. **Larger, more prominent map** (200px → 350px) with fullscreen toggle
+6. **Live ETA countdown** updating every second
+7. **Route path styling** — thicker animated dashed line showing the traveled path, faded line to destination
+8. **Origin and destination markers** with distinct custom icons (green start pin, red destination flag)
 
-2. **Update `src/lib/reportPdf.ts`** — replace `buildLetterheadHeader()` to render a single `<img>` tag with the base64 header image (full width). Replace `buildLetterheadFooter()` similarly with the footer image. Simplify `getLetterheadCss()` by removing all the hand-crafted header/footer CSS classes (`.fw-icon`, `.fw-f`, `.footer-wave`, etc.) and replacing with simple full-width image styling.
+## Technical Approach
 
-3. **Keep everything else unchanged** — title block, content area, markdown-to-HTML, utility styles, action bar, QR section, and all export functions remain as-is.
+### 1. Increase tracking frequency (`useJourneyTracker.ts`)
+- Change `lastSaveTime` threshold from 60000ms → 15000ms (save location every 15s)
+- This gives guardians ~4x more frequent position updates
+
+### 2. Enable Supabase Realtime on `journey_updates` (migration)
+- `ALTER PUBLICATION supabase_realtime ADD TABLE public.journey_updates;` — required for the guardian to receive INSERT events in real time
+
+### 3. Upgrade `GuardianJourneyTracker.tsx`
+- **Animated marker**: Use `useRef` to store previous position; on new update, interpolate lat/lng over ~1s using `requestAnimationFrame` for smooth gliding
+- **Directional icon**: Create a custom Leaflet `divIcon` with a rotated arrow/car SVG; compute bearing from previous → current position
+- **Auto-pan**: Add a `PanToPosition` map child component that calls `map.panTo()` smoothly on each new position
+- **Fullscreen toggle**: Button to expand map to fill the card
+- **Live ETA**: A `useEffect` with 1s interval counting down `estimated_duration_min - elapsed`
+- **Styled route**: Traveled path (solid blue), remaining path to destination (dashed gray)
+
+### 4. Custom marker icons
+- Ward's current position: Pulsing blue dot with directional arrow (CSS animation)
+- Origin: Green circle marker
+- Destination: Red flag/pin marker
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/reportPdf.ts` | Replace header/footer builders with embedded base64 images from the official PDF; simplify CSS |
+| `src/hooks/useJourneyTracker.ts` | Reduce save interval from 60s → 15s |
+| `src/components/GuardianJourneyTracker.tsx` | Full rewrite: animated marker, auto-pan, directional icon, larger map, fullscreen, live ETA, styled route |
+| Migration | Add `journey_updates` to Supabase Realtime publication |
 
-## Technical Notes
-- Base64 images ensure the letterhead renders in print-to-PDF without external dependencies
-- All consumers (`ReportShareButtons`, `buildLetterheadHtml`, `WardEmergencyCard`, `WardRefillOrder`, `GuardianReports`, `SOSDialog`, `MedicalVault`) automatically pick up the change
-- Header image: full-width, contains logo + "Check-iN" + tagline + gradient line
-- Footer image: full-width, contains FW logo + contact info + wave swooshes
+## Limitations
+
+- GPS accuracy depends on ward's device (typically 5-15m on mobile)
+- Updates still depend on the ward's browser/PWA being active (background geolocation has browser limitations)
+- Not true GPS streaming — it's periodic saves (every 15s) with smooth interpolation between points on the guardian side
 
