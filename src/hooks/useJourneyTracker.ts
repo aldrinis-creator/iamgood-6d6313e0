@@ -270,6 +270,9 @@ export function useJourneyTracker() {
     setCurrentPos(null);
     setDistanceRemaining(null);
     setArrivingSoon(false);
+    setRouteDeviation(false);
+    setExpectedRoute([]);
+    deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     if (autoEndTimer.current) clearTimeout(autoEndTimer.current);
     if (checkInTimer.current) clearInterval(checkInTimer.current);
