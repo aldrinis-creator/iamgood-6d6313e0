@@ -1,3 +1,5 @@
+/// <reference types="google.maps" />
+
 let loadPromise: Promise<void> | null = null;
 
 export function loadGoogleMapsAPI(): Promise<void> {
