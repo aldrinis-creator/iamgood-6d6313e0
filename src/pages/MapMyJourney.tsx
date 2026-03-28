@@ -69,10 +69,12 @@ const MapMyJourney = () => {
     distanceRemaining,
     showCheckIn,
     arrivingSoon,
+    routeDeviation,
     startJourney,
     endJourney,
     respondCheckIn,
     setShowCheckIn,
+    setExpectedRoute,
   } = useJourneyTracker();
 
   // Setup form state
