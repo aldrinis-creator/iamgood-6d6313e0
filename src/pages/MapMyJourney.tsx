@@ -152,6 +152,10 @@ const MapMyJourney = () => {
   const handleStartJourney = async () => {
     if (!selectedDest || !originPos || eta === null) return;
     setLoading(true);
+    // Set expected route for geofence detection before starting
+    if (routeCoords.length > 0) {
+      setExpectedRoute(routeCoords);
+    }
     const journey = await startJourney({
       destination_name: selectedDest.name,
       destination_lat: selectedDest.lat,
