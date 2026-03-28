@@ -1,55 +1,30 @@
 
 
-# Update Letterhead to Match Official Check-iN Design
+# Pixel-Perfect Letterhead from Official PDF
 
-## What Changes
-
-Replace the current simplified text-based letterhead in `src/lib/reportPdf.ts` with the official Check-iN letterhead design from the uploaded image. The new design features colorful gradient wave banners at top and bottom, the Future Wave Technologies Pvt. Ltd. logo, and proper footer contact layout.
-
-## Design from Uploaded Letterhead
-
-```text
-┌─────────────────────────────────────────────┐
-│  ~~~ Colorful wave swoosh (purple/orange) ~~│
-│                    FW  Future Wave           │
-│                        Technologies Pvt. Ltd.│
-├─────── orange/red divider line ─────────────┤
-│  [Logo]  Check-iN                           │
-│          A PERS PRODUCT OF FUTURE WAVE TECH │
-│                                             │
-│         (report content area)               │
-│                                             │
-│                                             │
-├─────────────────────────────────────────────┤
-│  ~~~ Colorful wave swoosh (bottom) ~~~~~~~~~│
-│  📞 +917045864882 | 🌐 futurewave.in | ✉ sales│
-└─────────────────────────────────────────────┘
-```
+## Problem
+The current CSS-recreated letterhead doesn't match the uploaded PDF design — the FW logo, wave swooshes, and styling details differ from the official version.
 
 ## Approach
+Extract the top header area (~120px) and bottom footer area (~180px) from the uploaded PDF as cropped images, convert to base64 data URIs, and embed them directly in the letterhead HTML. This guarantees pixel-perfect match with zero CSS approximation.
 
-1. **Copy the uploaded letterhead image** into `public/` as a reference asset
-2. **Create top wave header and bottom wave footer as base64-encoded image slices** — crop the top ~80px and bottom ~80px from the uploaded letterhead and embed as base64 data URIs in the CSS, ensuring the wave graphics render in print
-3. **Update `buildLetterheadHeader()`** — replace text-only "FUTURE WAVE / Technologies" with proper "Future Wave Technologies Pvt. Ltd." branding alongside the wave header graphic
-4. **Update `buildLetterheadFooter()`** — add the wave footer graphic with contact info showing phone icon, globe icon, and email icon matching the uploaded design
-5. **Update `getLetterheadCss()`** — adjust styles for the new wave-based layout, proper spacing, and the orange divider line between header waves and content area
+## Steps
 
-## Key Design Details (from image)
+1. **Extract header/footer images from the PDF** — use Python (`pdf2image` + `Pillow`) to render the PDF page, crop the top ~15% as the header image and bottom ~25% as the footer image, then convert both to optimized base64 JPEG strings.
 
-- **Company name**: "Future Wave Technologies Pvt. Ltd." (not just "FUTURE WAVE / Technologies")
-- **Tagline**: "A PERS PRODUCT OF FUTURE **WAVE** TECHNOLOGIES" (WAVE is bold)
-- **Phone**: +917045864882 (note: different from current +91 7045868482)
-- **Divider**: Single orange/red line below the wave header
-- **Footer contacts**: Phone, website (https://futurewave.in), email (sales@futurewave.in) with icons
+2. **Update `src/lib/reportPdf.ts`** — replace `buildLetterheadHeader()` to render a single `<img>` tag with the base64 header image (full width). Replace `buildLetterheadFooter()` similarly with the footer image. Simplify `getLetterheadCss()` by removing all the hand-crafted header/footer CSS classes (`.fw-icon`, `.fw-f`, `.footer-wave`, etc.) and replacing with simple full-width image styling.
+
+3. **Keep everything else unchanged** — title block, content area, markdown-to-HTML, utility styles, action bar, QR section, and all export functions remain as-is.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/reportPdf.ts` | Update header/footer HTML builders and CSS to match official letterhead with wave graphics, proper branding text, and contact details |
+| `src/lib/reportPdf.ts` | Replace header/footer builders with embedded base64 images from the official PDF; simplify CSS |
 
 ## Technical Notes
-
-- The wave graphics will be embedded as base64 data URIs (same approach as the existing logo) to ensure they render in print-to-PDF workflows without external dependencies
-- All existing consumers (`ReportShareButtons`, `buildLetterheadHtml`, `printReport`, `WardEmergencyCard`, `WardRefillOrder`, `GuardianReports`) automatically pick up the change since they all call the shared functions
+- Base64 images ensure the letterhead renders in print-to-PDF without external dependencies
+- All consumers (`ReportShareButtons`, `buildLetterheadHtml`, `WardEmergencyCard`, `WardRefillOrder`, `GuardianReports`, `SOSDialog`, `MedicalVault`) automatically pick up the change
+- Header image: full-width, contains logo + "Check-iN" + tagline + gradient line
+- Footer image: full-width, contains FW logo + contact info + wave swooshes
 
