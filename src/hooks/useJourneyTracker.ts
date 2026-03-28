@@ -147,7 +147,7 @@ export function useJourneyTracker() {
           } else {
             if (routeDeviation) {
               setRouteDeviation(false);
-              notifyGuardians("✅ Back on Route", `User is back on the expected route to ${activeJourney.destination_name}.`);
+              notifyGuardians("✅ Back on Route", `User is back on the expected route to ${activeJourney.destination_name}.`, "route_deviation");
             }
           }
         }
