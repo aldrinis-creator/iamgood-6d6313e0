@@ -73,6 +73,8 @@ const GuardianAlerts = () => {
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on your user, as we have detected ${eventType} alert`);
+        } else if (newNotif?.type === "route_deviation" && settings.guardianVoiceAlerts) {
+          playVoiceReminder("Dear Guardian, your ward has deviated from the expected route. Please check on them.");
         } else if (newNotif?.type === "missed_checkin") {
           playChime();
         }
