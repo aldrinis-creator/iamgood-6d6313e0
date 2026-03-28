@@ -293,9 +293,11 @@ export function useJourneyTracker() {
     distanceRemaining,
     showCheckIn,
     arrivingSoon,
+    routeDeviation,
     startJourney,
     endJourney,
     respondCheckIn,
     setShowCheckIn,
+    setExpectedRoute,
   };
 }
