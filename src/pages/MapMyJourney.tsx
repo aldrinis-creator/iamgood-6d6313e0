@@ -87,6 +87,7 @@ const MapMyJourney = () => {
   const [eta, setEta] = useState<number | null>(null);
   const [originPos, setOriginPos] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showStreetView, setShowStreetView] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Get user's current location on mount
