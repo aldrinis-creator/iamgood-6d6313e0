@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge } from "lucide-react";
+import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
+import StreetViewPanel from "@/components/StreetViewPanel";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ if (typeof document !== "undefined" && !document.getElementById(PULSE_STYLE_ID))
 const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
   const [journey, setJourney] = useState<Journey | null>(null);
   const [updates, setUpdates] = useState<Update[]>([]);
+  const [showStreetView, setShowStreetView] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [etaCountdown, setEtaCountdown] = useState<string>("");
   const prevPosRef = useRef<[number, number] | null>(null);
@@ -417,7 +419,28 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </Button>
+
+          {/* Street View toggle */}
+          <Button
+            size="sm"
+            variant={showStreetView ? "default" : "secondary"}
+            className="absolute bottom-2 right-2 z-[1000] h-7 shadow-md text-[10px] gap-1"
+            onClick={() => setShowStreetView((s) => !s)}
+          >
+            <Eye className="w-3 h-3" />
+            Street View
+          </Button>
         </div>
+
+        {/* Street View Panel */}
+        {showStreetView && currentPosition && (
+          <StreetViewPanel
+            lat={currentPosition[0]}
+            lng={currentPosition[1]}
+            heading={prevPosRef.current ? bearing(prevPosRef.current[0], prevPosRef.current[1], currentPosition[0], currentPosition[1]) : 0}
+            height={250}
+          />
+        )}
 
         {/* Check-in responses */}
         {checkIns.length > 0 && (
