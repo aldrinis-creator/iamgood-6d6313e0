@@ -237,6 +237,8 @@ export function useJourneyTracker() {
     setActiveJourney(journey);
     setUpdates([]);
     setArrivingSoon(false);
+    setRouteDeviation(false);
+    deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     lastSaveTime.current = 0;
 
