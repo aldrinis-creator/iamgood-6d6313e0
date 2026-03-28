@@ -275,6 +275,19 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
       : 0;
   const arrivingSoon = distRemaining !== null && distRemaining < 500;
 
+  // Compute current speed from last two GPS updates
+  const validUpdates = updates.filter((u) => u.lat && u.lng);
+  const speedKmh = (() => {
+    if (validUpdates.length < 2) return null;
+    const last = validUpdates[validUpdates.length - 1];
+    const prev = validUpdates[validUpdates.length - 2];
+    const dist = haversine(prev.lat!, prev.lng!, last.lat!, last.lng!);
+    const timeDiffS = (new Date(last.created_at).getTime() - new Date(prev.created_at).getTime()) / 1000;
+    if (timeDiffS <= 0) return null;
+    const speed = (dist / timeDiffS) * 3.6; // m/s → km/h
+    return speed > 300 ? null : Math.round(speed); // discard GPS noise spikes
+  })();
+
   const checkIns = updates.filter((u) => u.check_in_response);
 
   // Points for initial fit bounds (only first time)
