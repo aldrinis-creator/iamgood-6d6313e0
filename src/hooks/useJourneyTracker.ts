@@ -199,7 +199,7 @@ export function useJourneyTracker() {
     if (data) setUpdates((prev) => [...prev, data as JourneyUpdate]);
   };
 
-  const notifyGuardians = useCallback(async (title: string, message: string) => {
+  const notifyGuardians = useCallback(async (title: string, message: string, type: string = "journey") => {
     if (!session?.user?.id) return;
     const { data: guardians } = await supabase
       .from("guardians")
@@ -212,7 +212,7 @@ export function useJourneyTracker() {
         guardian_id: g.id,
         title,
         message,
-        type: "journey",
+        type,
       }))
     );
   }, [session?.user?.id]);
