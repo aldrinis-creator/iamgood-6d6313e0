@@ -10,7 +10,7 @@ export function loadGoogleMapsAPI(): Promise<void> {
     return Promise.reject(new Error("Google Maps API key not configured"));
   }
 
-  if (window.google?.maps) {
+  if ((window as any).google?.maps) {
     return Promise.resolve();
   }
 

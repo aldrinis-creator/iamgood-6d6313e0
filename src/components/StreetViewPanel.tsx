@@ -25,7 +25,7 @@ const StreetViewPanel = ({ lat, lng, heading = 0, height = 250 }: StreetViewPane
 
   // Initialize panorama
   useEffect(() => {
-    if (loading || error || !containerRef.current || !window.google?.maps) return;
+    if (loading || error || !containerRef.current || !(window as any).google?.maps) return;
 
     const svService = new google.maps.StreetViewService();
     const position = new google.maps.LatLng(lat, lng);
