@@ -27,6 +27,8 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
   medication_taken: { icon: Pill, color: "text-success", label: "Medication" },
   vital_anomaly: { icon: Heart, color: "text-destructive", label: "Vitals" },
   nomination_rejected: { icon: Bell, color: "text-muted-foreground", label: "Nomination" },
+  journey: { icon: Activity, color: "text-primary", label: "Journey" },
+  route_deviation: { icon: AlertTriangle, color: "text-destructive", label: "Route Alert" },
 };
 
 const GuardianAlerts = () => {
@@ -71,6 +73,8 @@ const GuardianAlerts = () => {
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on your user, as we have detected ${eventType} alert`);
+        } else if (newNotif?.type === "route_deviation" && settings.guardianVoiceAlerts) {
+          playVoiceReminder("Dear Guardian, your ward has deviated from the expected route. Please check on them.");
         } else if (newNotif?.type === "missed_checkin") {
           playChime();
         }

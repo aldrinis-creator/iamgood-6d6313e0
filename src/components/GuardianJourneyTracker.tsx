@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Navigation, Maximize2, Minimize2 } from "lucide-react";
+import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
 
@@ -301,6 +301,13 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
             {wardName}'s Live Journey
           </h3>
           <div className="flex items-center gap-2">
+            {distRemaining !== null && distRemaining > 200 && (() => {
+              // Check for route deviation visually — if latest position is far from straight line
+              const straightDist = journey.origin_lat && journey.origin_lng
+                ? haversine(journey.origin_lat, journey.origin_lng, journey.destination_lat, journey.destination_lng)
+                : null;
+              return null; // Deviation shown via notifications; badge below is driven by notification type
+            })()}
             {arrivingSoon ? (
               <Badge className="bg-success text-success-foreground animate-pulse text-[10px]">🏁 Arriving</Badge>
             ) : (

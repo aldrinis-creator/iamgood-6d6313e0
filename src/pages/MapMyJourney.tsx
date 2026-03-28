@@ -69,10 +69,12 @@ const MapMyJourney = () => {
     distanceRemaining,
     showCheckIn,
     arrivingSoon,
+    routeDeviation,
     startJourney,
     endJourney,
     respondCheckIn,
     setShowCheckIn,
+    setExpectedRoute,
   } = useJourneyTracker();
 
   // Setup form state
@@ -150,6 +152,10 @@ const MapMyJourney = () => {
   const handleStartJourney = async () => {
     if (!selectedDest || !originPos || eta === null) return;
     setLoading(true);
+    // Set expected route for geofence detection before starting
+    if (routeCoords.length > 0) {
+      setExpectedRoute(routeCoords);
+    }
     const journey = await startJourney({
       destination_name: selectedDest.name,
       destination_lat: selectedDest.lat,
@@ -219,11 +225,18 @@ const MapMyJourney = () => {
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-primary">🗺️ Journey Active</span>
-                  {arrivingSoon && (
-                    <span className="text-xs bg-success text-success-foreground px-2 py-0.5 rounded-full animate-pulse">
-                      🏁 Arriving Soon
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {routeDeviation && (
+                      <span className="text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded-full animate-pulse">
+                        ⚠️ Off Route
+                      </span>
+                    )}
+                    {arrivingSoon && (
+                      <span className="text-xs bg-success text-success-foreground px-2 py-0.5 rounded-full animate-pulse">
+                        🏁 Arriving Soon
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-sm font-medium">{activeJourney.destination_name}</p>
                 <div className="flex gap-4 text-xs text-muted-foreground">
