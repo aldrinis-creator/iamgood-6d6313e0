@@ -36,6 +36,19 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Distance from a point to the nearest point on a polyline (in meters)
+function distanceToRoute(lat: number, lng: number, route: [number, number][]): number {
+  if (route.length === 0) return Infinity;
+  let minDist = Infinity;
+  for (let i = 0; i < route.length; i++) {
+    const d = haversine(lat, lng, route[i][0], route[i][1]);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+const GEOFENCE_THRESHOLD_M = 500;
+
 export function useJourneyTracker() {
   const { session } = useAuth();
   const [activeJourney, setActiveJourney] = useState<JourneyData | null>(null);
@@ -44,12 +57,15 @@ export function useJourneyTracker() {
   const [distanceRemaining, setDistanceRemaining] = useState<number | null>(null);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [arrivingSoon, setArrivingSoon] = useState(false);
+  const [routeDeviation, setRouteDeviation] = useState(false);
+  const [expectedRoute, setExpectedRoute] = useState<[number, number][]>([]);
 
   const watchId = useRef<number | null>(null);
   const lastSaveTime = useRef(0);
   const checkInTimer = useRef<ReturnType<typeof setInterval>>();
   const autoEndTimer = useRef<ReturnType<typeof setTimeout>>();
   const arrivedAt = useRef<number | null>(null);
+  const deviationNotifiedAt = useRef<number>(0);
 
   // Fetch active journey on mount
   useEffect(() => {
