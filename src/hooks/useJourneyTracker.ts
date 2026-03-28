@@ -140,7 +140,8 @@ export function useJourneyTracker() {
               deviationNotifiedAt.current = now2;
               notifyGuardians(
                 "⚠️ Route Deviation",
-                `User has deviated ${Math.round(routeDist)}m from the expected route to ${activeJourney.destination_name}.`
+                `User has deviated ${Math.round(routeDist)}m from the expected route to ${activeJourney.destination_name}.`,
+                "route_deviation"
               );
             }
           } else {
