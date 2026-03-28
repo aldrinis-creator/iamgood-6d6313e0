@@ -27,6 +27,8 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
   medication_taken: { icon: Pill, color: "text-success", label: "Medication" },
   vital_anomaly: { icon: Heart, color: "text-destructive", label: "Vitals" },
   nomination_rejected: { icon: Bell, color: "text-muted-foreground", label: "Nomination" },
+  journey: { icon: Activity, color: "text-primary", label: "Journey" },
+  route_deviation: { icon: AlertTriangle, color: "text-destructive", label: "Route Alert" },
 };
 
 const GuardianAlerts = () => {
