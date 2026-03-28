@@ -129,6 +129,28 @@ export function useJourneyTracker() {
           }
         }
 
+        // Geofence: detect deviation >500m from expected route
+        if (expectedRoute.length > 0 && dist > 200) {
+          const routeDist = distanceToRoute(lat, lng, expectedRoute);
+          const now2 = Date.now();
+          if (routeDist > GEOFENCE_THRESHOLD_M) {
+            if (!routeDeviation) setRouteDeviation(true);
+            // Notify guardians max once every 5 minutes
+            if (now2 - deviationNotifiedAt.current > 5 * 60 * 1000) {
+              deviationNotifiedAt.current = now2;
+              notifyGuardians(
+                "⚠️ Route Deviation",
+                `User has deviated ${Math.round(routeDist)}m from the expected route to ${activeJourney.destination_name}.`
+              );
+            }
+          } else {
+            if (routeDeviation) {
+              setRouteDeviation(false);
+              notifyGuardians("✅ Back on Route", `User is back on the expected route to ${activeJourney.destination_name}.`);
+            }
+          }
+        }
+
         // Save location every 15s for near-real-time guardian tracking
         const now = Date.now();
         if (now - lastSaveTime.current >= 15000) {
