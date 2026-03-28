@@ -178,6 +178,7 @@ if (typeof document !== "undefined" && !document.getElementById(PULSE_STYLE_ID))
 const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
   const [journey, setJourney] = useState<Journey | null>(null);
   const [updates, setUpdates] = useState<Update[]>([]);
+  const [showStreetView, setShowStreetView] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [etaCountdown, setEtaCountdown] = useState<string>("");
   const prevPosRef = useRef<[number, number] | null>(null);
