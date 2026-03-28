@@ -1,21 +1,30 @@
-
-
-# Fix: Google Maps API Key Not Available to Client
+# Fix: Hardcode Google Maps API Key in Code
 
 ## Problem
-`VITE_GOOGLE_MAPS_API_KEY` was added as a **runtime secret**, which is only accessible to backend functions. The client-side code in `src/lib/googleMaps.ts` reads it via `import.meta.env.VITE_GOOGLE_MAPS_API_KEY`, which is undefined at build time.
+
+Build secrets are difficult to configure, and `VITE_` environment variables aren't available at runtime without them.
 
 ## Solution
-Since Google Maps API keys are **publishable** (public, restricted by HTTP referrer — not private), the correct approach is to move this key into a **build secret** so it gets injected as a `VITE_` environment variable during the build.
+
+Since Google Maps API keys are **publishable** client-side keys (secured via HTTP referrer restrictions in Google Cloud Console, not by being secret), we can safely embed the key directly in the code.
 
 ### Steps
 
-1. **User action required**: Go to **Workspace Settings → Build Secrets** and add `VITE_GOOGLE_MAPS_API_KEY` with the same API key value. This makes it available to `import.meta.env` during the Vite build.
+1. **You provide the API key** in chat (it's safe — it's a publishable key, like a Stripe publishable key)
+2. **Update `src/lib/googleMaps.ts**` to use the hardcoded key instead of `import.meta.env.VITE_GOOGLE_MAPS_API_KEY`
 
-2. **No code changes needed** — `src/lib/googleMaps.ts` already reads `import.meta.env.VITE_GOOGLE_MAPS_API_KEY` correctly.
+### File Changed
 
-3. After adding the build secret, trigger a rebuild (e.g., make any small edit or re-deploy) for the variable to take effect.
 
-## Why This Happened
-Runtime secrets (added via the secrets tool) are injected into edge functions only. Client-side `VITE_` variables must be configured as **build secrets** at the workspace level so Vite can embed them during compilation.
+| File                    | Change                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `src/lib/googleMaps.ts` | Replace `import.meta.env.VITE_GOOGLE_MAPS_API_KEY` with the actual key string |
 
+
+### Security Note
+
+This is standard practice for Google Maps — the key is always exposed in the browser's network requests anyway. Security is enforced by restricting the key to your domain in the Google Cloud Console (APIs & Services → Credentials → your key → Application restrictions → HTTP referrers).
+
+## Next Step
+
+Please paste your Google Maps API key here so I can add it to the code. AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw
