@@ -419,7 +419,28 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </Button>
+
+          {/* Street View toggle */}
+          <Button
+            size="sm"
+            variant={showStreetView ? "default" : "secondary"}
+            className="absolute bottom-2 right-2 z-[1000] h-7 shadow-md text-[10px] gap-1"
+            onClick={() => setShowStreetView((s) => !s)}
+          >
+            <Eye className="w-3 h-3" />
+            Street View
+          </Button>
         </div>
+
+        {/* Street View Panel */}
+        {showStreetView && currentPosition && (
+          <StreetViewPanel
+            lat={currentPosition[0]}
+            lng={currentPosition[1]}
+            heading={prevPosRef.current ? bearing(prevPosRef.current[0], prevPosRef.current[1], currentPosition[0], currentPosition[1]) : 0}
+            height={250}
+          />
+        )}
 
         {/* Check-in responses */}
         {checkIns.length > 0 && (
