@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge } from "lucide-react";
+import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
 
