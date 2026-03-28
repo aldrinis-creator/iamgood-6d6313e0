@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
 
@@ -275,6 +275,19 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
       : 0;
   const arrivingSoon = distRemaining !== null && distRemaining < 500;
 
+  // Compute current speed from last two GPS updates
+  const validUpdates = updates.filter((u) => u.lat && u.lng);
+  const speedKmh = (() => {
+    if (validUpdates.length < 2) return null;
+    const last = validUpdates[validUpdates.length - 1];
+    const prev = validUpdates[validUpdates.length - 2];
+    const dist = haversine(prev.lat!, prev.lng!, last.lat!, last.lng!);
+    const timeDiffS = (new Date(last.created_at).getTime() - new Date(prev.created_at).getTime()) / 1000;
+    if (timeDiffS <= 0) return null;
+    const speed = (dist / timeDiffS) * 3.6; // m/s → km/h
+    return speed > 300 ? null : Math.round(speed); // discard GPS noise spikes
+  })();
+
   const checkIns = updates.filter((u) => u.check_in_response);
 
   // Points for initial fit bounds (only first time)
@@ -325,6 +338,11 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
         {/* Stats row */}
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span><Clock className="w-3 h-3 inline mr-1" />{elapsed} min elapsed</span>
+          {speedKmh !== null && (
+            <span className="font-semibold text-primary">
+              <Gauge className="w-3 h-3 inline mr-1" />{speedKmh} km/h
+            </span>
+          )}
           {etaCountdown && (
             <span className={`font-semibold ${etaCountdown === "Overdue" ? "text-destructive" : "text-primary"}`}>
               ETA: {etaCountdown}
