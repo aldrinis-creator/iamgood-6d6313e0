@@ -113,9 +113,9 @@ export function useJourneyTracker() {
           }
         }
 
-        // Save location every 60s
+        // Save location every 15s for near-real-time guardian tracking
         const now = Date.now();
-        if (now - lastSaveTime.current >= 60000) {
+        if (now - lastSaveTime.current >= 15000) {
           lastSaveTime.current = now;
           saveLocationUpdate(lat, lng);
         }
