@@ -338,6 +338,11 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
         {/* Stats row */}
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span><Clock className="w-3 h-3 inline mr-1" />{elapsed} min elapsed</span>
+          {speedKmh !== null && (
+            <span className="font-semibold text-primary">
+              <Gauge className="w-3 h-3 inline mr-1" />{speedKmh} km/h
+            </span>
+          )}
           {etaCountdown && (
             <span className={`font-semibold ${etaCountdown === "Overdue" ? "text-destructive" : "text-primary"}`}>
               ETA: {etaCountdown}
