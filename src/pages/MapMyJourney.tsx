@@ -278,7 +278,7 @@ const MapMyJourney = () => {
             </Card>
 
             {/* Map */}
-            <div className="rounded-lg overflow-hidden border border-border" style={{ height: 350 }}>
+            <div className="relative rounded-lg overflow-hidden border border-border" style={{ height: 350 }}>
               <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -294,7 +294,36 @@ const MapMyJourney = () => {
                   <Polyline positions={activeRouteCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3 }} />
                 )}
               </MapContainer>
+
+              {/* Street View toggle */}
+              <Button
+                size="sm"
+                variant={showStreetView ? "default" : "secondary"}
+                className="absolute bottom-2 right-2 z-[1000] h-7 shadow-md text-[10px] gap-1"
+                onClick={() => setShowStreetView((s) => !s)}
+              >
+                <Eye className="w-3 h-3" />
+                Street View
+              </Button>
             </div>
+
+            {/* Street View Panel */}
+            {showStreetView && currentPos && (
+              <StreetViewPanel
+                lat={currentPos.lat}
+                lng={currentPos.lng}
+                heading={activeRouteCoords.length >= 2
+                  ? (() => {
+                      const last = activeRouteCoords[activeRouteCoords.length - 1];
+                      const prev = activeRouteCoords[activeRouteCoords.length - 2];
+                      const dLat = last[0] - prev[0];
+                      const dLng = last[1] - prev[1];
+                      return (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
+                    })()
+                  : 0}
+                height={250}
+              />
+            )}
           </>
         ) : (
           <>
