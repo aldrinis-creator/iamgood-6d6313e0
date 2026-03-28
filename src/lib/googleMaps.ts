@@ -5,10 +5,7 @@ let loadPromise: Promise<void> | null = null;
 export function loadGoogleMapsAPI(): Promise<void> {
   if (loadPromise) return loadPromise;
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  if (!apiKey) {
-    return Promise.reject(new Error("Google Maps API key not configured"));
-  }
+  const apiKey = "AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw";
 
   if ((window as any).google?.maps) {
     return Promise.resolve();
