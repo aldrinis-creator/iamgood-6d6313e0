@@ -12,6 +12,7 @@ import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
+import StreetViewPanel from "@/components/StreetViewPanel";
 
 // Fix Leaflet default icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
