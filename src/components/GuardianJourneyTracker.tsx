@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
+import StreetViewPanel from "@/components/StreetViewPanel";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
