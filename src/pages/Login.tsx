@@ -131,6 +131,75 @@ const Login = () => {
     }
   };
 
+  // OTP login mode
+  if (otpMode) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
+              <Heart className="w-8 h-8 text-success-foreground fill-current" />
+            </div>
+            <h1 className="text-2xl font-bold text-primary">Check-iN</h1>
+            <p className="text-sm text-muted-foreground">Sign in with OTP</p>
+          </div>
+
+          {!otpPhone ? (
+            <div className="space-y-4">
+              <div>
+                <Label>Phone Number</Label>
+                <Input
+                  placeholder="Enter your phone number"
+                  className="text-base"
+                  type="tel"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                className="w-full bg-primary text-lg py-6"
+                size="lg"
+                onClick={() => {
+                  const val = identifier.trim();
+                  if (!val) {
+                    toast({ title: "Enter phone number", variant: "destructive" });
+                    return;
+                  }
+                  const phone = formatPhone(val);
+                  setOtpPhone(phone);
+                }}
+              >
+                Send OTP
+              </Button>
+              <div className="text-center">
+                <button className="text-sm text-primary underline" onClick={() => setOtpMode(false)}>
+                  Back to password sign in
+                </button>
+              </div>
+            </div>
+          ) : (
+            <OtpVerification
+              phone={otpPhone}
+              onVerified={async () => {
+                // After OTP verified, look up email and sign in
+                const { data } = await supabase.rpc("get_email_by_phone" as any, { _phone: otpPhone });
+                if (data) {
+                  toast({ title: "Phone verified!", description: "You're signed in." });
+                  navigate("/dashboard");
+                } else {
+                  toast({ title: "No account found", description: "Please register first.", variant: "destructive" });
+                  setOtpPhone("");
+                }
+              }}
+              onCancel={() => setOtpPhone("")}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (showForgot) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
