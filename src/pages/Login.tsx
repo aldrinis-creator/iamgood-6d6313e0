@@ -273,6 +273,10 @@ const Login = () => {
           </button>
           <br />
           <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+          <br />
+          <button className="text-sm text-primary font-medium flex items-center justify-center gap-1 mx-auto mt-1" onClick={() => setOtpMode(true)}>
+            <Smartphone className="w-4 h-4" /> Sign in with OTP
+          </button>
         </div>
       </div>
     </div>
