@@ -52,14 +52,10 @@ const FallDetectionOverlay = () => {
 
     const guardianEmails = guardians.map((g) => g.guardian_email).filter(Boolean) as string[];
 
-    // Open WhatsApp for each guardian
-    guardians.forEach((g, i) => {
-      const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
-      const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
-      setTimeout(() => {
-        window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
-      }, i * 500);
-    });
+    const guardianPhones = guardians.map((g) => g.guardian_phone).filter(Boolean) as string[];
+
+    // Send all alerts via edge function (MSG91 WhatsApp + email + push)
+    // Fallback to wa.me only if edge function fails
 
     // Send email + push via edge function
     try {
