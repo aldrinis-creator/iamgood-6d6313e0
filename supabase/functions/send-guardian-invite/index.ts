@@ -111,13 +111,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send WhatsApp message if phone provided
+    // Send WhatsApp/SMS via MSG91 if phone provided
     if (guardian_phone) {
-      const whatsappMsg = encodeURIComponent(
-        `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\nYou have 24 hours to reject. If not rejected, you'll be auto-accepted as their Guardian.\n\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
-      );
-      // Log the WhatsApp link (actual SMS/WhatsApp API integration would go here)
-      console.log(`WhatsApp link: https://wa.me/${guardian_phone.replace(/[^0-9]/g, "")}?text=${whatsappMsg}`);
+      const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
+      const msg91InviteTemplate = Deno.env.get("MSG91_INVITE_TEMPLATE_ID");
+      if (msg91AuthKey && msg91InviteTemplate) {
+        const clean = guardian_phone.replace(/[^0-9]/g, "");
+        const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+        try {
+          await fetch("https://control.msg91.com/api/v5/flow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
+            body: JSON.stringify({
+              template_id: msg91InviteTemplate,
+              short_url: "1",
+              recipients: [{
+                mobiles: mobile,
+                guardian_name,
+                user_name,
+                relation: relationText,
+                accept_link: acceptLink,
+                reject_link: rejectLink || "",
+              }],
+            }),
+          });
+          console.log("MSG91 invite sent to:", mobile);
+        } catch (e) {
+          console.error("MSG91 invite error:", e);
+        }
+      } else {
+        // Fallback: log WhatsApp link
+        const whatsappMsg = encodeURIComponent(
+          `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
+        );
+        console.log(`WhatsApp link: https://wa.me/${guardian_phone.replace(/[^0-9]/g, "")}?text=${whatsappMsg}`);
+      }
     }
 
     return new Response(

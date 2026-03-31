@@ -95,6 +95,31 @@ Deno.serve(async (req) => {
 
     await supabase.from("notifications").insert(notifications);
 
+    // MSG91 WhatsApp notification for medication
+    const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
+    const msg91MedTemplate = Deno.env.get("MSG91_MED_TEMPLATE_ID");
+    if (msg91AuthKey && msg91MedTemplate) {
+      const recipients = eligibleGuardians
+        .filter((g: any) => g.guardian_phone)
+        .map((g: any) => {
+          const clean = g.guardian_phone.replace(/[^0-9]/g, "");
+          const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+          return { mobiles: mobile, user_name: userName, medication_name, status: statusLabel, message };
+        });
+
+      if (recipients.length > 0) {
+        try {
+          await fetch("https://control.msg91.com/api/v5/flow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
+            body: JSON.stringify({ template_id: msg91MedTemplate, short_url: "0", recipients }),
+          });
+        } catch (e) {
+          console.error("MSG91 medication alert error:", e);
+        }
+      }
+    }
+
     // Send push notifications to guardian devices
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
 

@@ -262,8 +262,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- MSG91 WhatsApp alerts to guardians ---
+    let msg91Sent = 0;
+    const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
+    const msg91SosTemplate = Deno.env.get("MSG91_SOS_TEMPLATE_ID");
+
+    if (msg91AuthKey && msg91SosTemplate && guardianRows?.length) {
+      const guardianPhones = guardianRows.map((g: any) => g.guardian_phone).filter(Boolean);
+      const recipients = guardianPhones.map((phone: string) => {
+        const clean = phone.replace(/[^0-9]/g, "");
+        const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+        return { mobiles: mobile, user_name: user_name || "User", message: message.substring(0, 500) };
+      });
+
+      if (recipients.length > 0) {
+        try {
+          const flowRes = await fetch("https://control.msg91.com/api/v5/flow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
+            body: JSON.stringify({ template_id: msg91SosTemplate, short_url: "0", recipients }),
+          });
+          const flowResult = await flowRes.json();
+          console.log("MSG91 SOS flow result:", JSON.stringify(flowResult));
+          if (flowRes.ok) msg91Sent = recipients.length;
+        } catch (e) {
+          console.error("MSG91 SOS send error:", e);
+        }
+      }
+    }
+
     return new Response(
-      JSON.stringify({ sent: emailResults.length, results: emailResults, pushSent }),
+      JSON.stringify({ sent: emailResults.length, results: emailResults, pushSent, msg91Sent }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
