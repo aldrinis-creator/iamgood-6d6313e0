@@ -189,18 +189,33 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       .filter(Boolean) as string[];
 
     try {
-      await supabase.functions.invoke("send-sos-alert", {
+      const { data: sosResult } = await supabase.functions.invoke("send-sos-alert", {
         body: {
           user_id: session?.user?.id,
           message,
           guardian_emails: guardianEmails,
+          guardian_phones: guardianPhones,
           doctor_email: null,
           doctor_name: medical.familyDoctorName,
           user_name: userName,
         },
       });
+      // If MSG91 didn't send, fallback to wa.me links
+      if (!sosResult?.msg91Sent) {
+        guardians.forEach((g, i) => {
+          setTimeout(() => {
+            window.open(getWhatsAppLink(g.guardian_phone), "_blank");
+          }, i * 500);
+        });
+      }
     } catch (e) {
-      console.error("Failed to send SOS emails:", e);
+      console.error("Failed to send SOS alerts:", e);
+      // Fallback to wa.me links
+      guardians.forEach((g, i) => {
+        setTimeout(() => {
+          window.open(getWhatsAppLink(g.guardian_phone), "_blank");
+        }, i * 500);
+      });
     }
 
     setSending(false);

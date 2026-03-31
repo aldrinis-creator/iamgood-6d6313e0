@@ -57,20 +57,38 @@ const FallDetectionOverlay = () => {
     // Send all alerts via edge function (MSG91 WhatsApp + email + push)
     // Fallback to wa.me only if edge function fails
 
-    // Send email + push via edge function
     try {
-      await supabase.functions.invoke("send-sos-alert", {
+      const { data: result } = await supabase.functions.invoke("send-sos-alert", {
         body: {
           user_id: uid,
           message: msg,
           guardian_emails: guardianEmails,
+          guardian_phones: guardianPhones,
           doctor_email: null,
           doctor_name: hp?.family_doctor_name || null,
           user_name: userName,
         },
       });
+      // If MSG91 didn't send WhatsApp, fallback to wa.me
+      if (!result?.msg91Sent) {
+        guardians.forEach((g, i) => {
+          const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
+          const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+          setTimeout(() => {
+            window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
+          }, i * 500);
+        });
+      }
     } catch (e) {
       console.error("Failed to send fall detection alerts:", e);
+      // Fallback to wa.me links
+      guardians.forEach((g, i) => {
+        const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
+        const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+        setTimeout(() => {
+          window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
+        }, i * 500);
+      });
     }
   }, [session?.user?.id]);
 
