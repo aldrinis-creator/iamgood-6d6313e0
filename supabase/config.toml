@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.send-sos-alert]
 verify_jwt = false
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.msg91-send]
+verify_jwt = false

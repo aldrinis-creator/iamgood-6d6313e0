@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, Eye, EyeOff } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
+import OtpVerification from "@/components/OtpVerification";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -79,6 +80,8 @@ const Login = () => {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [otpMode, setOtpMode] = useState(false);
+  const [otpPhone, setOtpPhone] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +130,75 @@ const Login = () => {
       setShowForgot(false);
     }
   };
+
+  // OTP login mode
+  if (otpMode) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
+              <Heart className="w-8 h-8 text-success-foreground fill-current" />
+            </div>
+            <h1 className="text-2xl font-bold text-primary">Check-iN</h1>
+            <p className="text-sm text-muted-foreground">Sign in with OTP</p>
+          </div>
+
+          {!otpPhone ? (
+            <div className="space-y-4">
+              <div>
+                <Label>Phone Number</Label>
+                <Input
+                  placeholder="Enter your phone number"
+                  className="text-base"
+                  type="tel"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                className="w-full bg-primary text-lg py-6"
+                size="lg"
+                onClick={() => {
+                  const val = identifier.trim();
+                  if (!val) {
+                    toast({ title: "Enter phone number", variant: "destructive" });
+                    return;
+                  }
+                  const phone = formatPhone(val);
+                  setOtpPhone(phone);
+                }}
+              >
+                Send OTP
+              </Button>
+              <div className="text-center">
+                <button className="text-sm text-primary underline" onClick={() => setOtpMode(false)}>
+                  Back to password sign in
+                </button>
+              </div>
+            </div>
+          ) : (
+            <OtpVerification
+              phone={otpPhone}
+              onVerified={async () => {
+                // After OTP verified, look up email and sign in
+                const { data } = await supabase.rpc("get_email_by_phone" as any, { _phone: otpPhone });
+                if (data) {
+                  toast({ title: "Phone verified!", description: "You're signed in." });
+                  navigate("/dashboard");
+                } else {
+                  toast({ title: "No account found", description: "Please register first.", variant: "destructive" });
+                  setOtpPhone("");
+                }
+              }}
+              onCancel={() => setOtpPhone("")}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (showForgot) {
     return (
@@ -201,6 +273,10 @@ const Login = () => {
           </button>
           <br />
           <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+          <br />
+          <button className="text-sm text-primary font-medium flex items-center justify-center gap-1 mx-auto mt-1" onClick={() => setOtpMode(true)}>
+            <Smartphone className="w-4 h-4" /> Sign in with OTP
+          </button>
         </div>
       </div>
     </div>
