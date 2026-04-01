@@ -194,7 +194,7 @@ const GuardianDashboard = () => {
     } else {
       setActiveSOS(null);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, selectedWard]);
 
   const fetchWardSettings = useCallback(async (wId: string) => {
     const { data } = await supabase
