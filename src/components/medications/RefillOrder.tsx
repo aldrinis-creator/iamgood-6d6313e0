@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertTriangle, ShoppingCart, Package, ShieldAlert, Loader2,
   CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
@@ -35,6 +36,12 @@ export interface OrderItem {
 }
 
 const PHARMACY_STORAGE_KEY = "checkin_pharmacy_whatsapp";
+const DOCTOR_INFO_KEY = "checkin_order_doctor_info";
+
+interface DoctorInfo {
+  doctorName: string;
+  hospitalName: string;
+}
 
 interface RefillOrderProps {
   onScanAlternative?: (medId: string, medName: string) => void;
@@ -42,9 +49,10 @@ interface RefillOrderProps {
   onClearSelectedAlternative?: () => void;
   orderItems: OrderItem[];
   setOrderItems: React.Dispatch<React.SetStateAction<OrderItem[]>>;
+  onRefillDone?: () => void;
 }
 
-const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative, orderItems, setOrderItems }: RefillOrderProps) => {
+const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAlternative, orderItems, setOrderItems, onRefillDone }: RefillOrderProps) => {
   const { session } = useAuth();
   const navigate = useNavigate();
   const [meds, setMeds] = useState<Medication[]>([]);
@@ -55,6 +63,14 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   // Order flow state
   const [orderConfirmed, setOrderConfirmed] = useState(false);
+  const [showDoctorForm, setShowDoctorForm] = useState(false);
+  const [doctorInfo, setDoctorInfo] = useState<DoctorInfo>(() => {
+    try {
+      const saved = localStorage.getItem(DOCTOR_INFO_KEY);
+      return saved ? JSON.parse(saved) : { doctorName: "", hospitalName: "" };
+    } catch { return { doctorName: "", hospitalName: "" }; }
+  });
+  const [editingDoctor, setEditingDoctor] = useState(false);
   const [pharmacyNumber, setPharmacyNumber] = useState(() =>
     localStorage.getItem(PHARMACY_STORAGE_KEY) || ""
   );
@@ -77,7 +93,6 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   useEffect(() => { load(); }, [load]);
 
-  // Handle selected alternative from Scan tab
   useEffect(() => {
     if (!selectedAlternative) return;
     setOrderItems((prev) => prev.map((item) =>
@@ -125,9 +140,9 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
       .eq("id", med.id);
     toast.success(`${med.name} refilled to ${med.total_quantity}`);
     load();
+    onRefillDone?.();
   };
 
-  // Order flow
   const addToOrder = (med: Medication) => {
     setOrderItems((prev) => {
       if (prev.find((o) => o.med.id === med.id)) return prev;
@@ -145,17 +160,38 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
       toast.error("Add medications to your order first");
       return;
     }
+    // Show doctor form step first
+    setShowDoctorForm(true);
+    setTimeout(() => orderRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  const proceedAfterDoctor = () => {
+    if (!doctorInfo.doctorName.trim()) {
+      toast.error("Doctor name is required");
+      return;
+    }
+    if (!doctorInfo.hospitalName.trim()) {
+      toast.error("Hospital / Clinic name is required");
+      return;
+    }
+    localStorage.setItem(DOCTOR_INFO_KEY, JSON.stringify(doctorInfo));
+    setShowDoctorForm(false);
     setOrderConfirmed(true);
+    setEditingDoctor(false);
     setTimeout(() => orderRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
   const editOrder = () => {
     setOrderConfirmed(false);
+    setShowDoctorForm(false);
   };
 
   const buildOrderText = () => {
     const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    let text = `🏥 *Medication Order*\n📅 ${date}\n\n`;
+    let text = `🏥 *Medication Order*\n📅 ${date}\n`;
+    if (doctorInfo.doctorName) text += `👨‍⚕️ Dr. ${doctorInfo.doctorName}\n`;
+    if (doctorInfo.hospitalName) text += `🏨 ${doctorInfo.hospitalName}\n`;
+    text += `\n`;
     orderItems.forEach((item, i) => {
       text += `${i + 1}. *${item.med.name}* — ${item.med.dosage}\n   Qty: ${item.qty}\n`;
     });
@@ -177,7 +213,9 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const saveAsPdf = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) { toast.error("Please allow popups"); return; }
-    const tableHtml = `<table><tr><th>#</th><th>Medication</th><th>Dosage</th><th>Qty</th></tr>${orderItems.map((item, i) => `<tr><td>${i + 1}</td><td>${item.med.name}</td><td>${item.med.dosage}</td><td>${item.qty}</td></tr>`).join("")}</table>`;
+    const doctorRow = doctorInfo.doctorName ? `<p><strong>Doctor:</strong> Dr. ${doctorInfo.doctorName}</p>` : "";
+    const hospitalRow = doctorInfo.hospitalName ? `<p><strong>Hospital/Clinic:</strong> ${doctorInfo.hospitalName}</p>` : "";
+    const tableHtml = `${doctorRow}${hospitalRow}<table><tr><th>#</th><th>Medication</th><th>Dosage</th><th>Qty</th></tr>${orderItems.map((item, i) => `<tr><td>${i + 1}</td><td>${item.med.name}</td><td>${item.med.dosage}</td><td>${item.qty}</td></tr>`).join("")}</table>`;
     const html = buildLetterheadHtml({
       title: "Medication Order",
       bodyHtml: tableHtml,
@@ -315,7 +353,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
             )}
 
             {/* Order Cart Summary */}
-            {orderItems.length > 0 && !orderConfirmed && (
+            {orderItems.length > 0 && !orderConfirmed && !showDoctorForm && (
               <div className="pt-3 border-t border-border space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Order ({orderItems.length} items)</p>
                 {orderItems.map((item) => (
@@ -340,6 +378,47 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         </Card>
       </div>
 
+      {/* Doctor / Hospital Form Step */}
+      {showDoctorForm && (
+        <div ref={orderRef} className="space-y-3">
+          <Card className="border-primary/30">
+            <CardContent className="p-4 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-primary" />
+                Doctor & Hospital Details
+              </h3>
+              <p className="text-xs text-muted-foreground">Required before confirming order.</p>
+              <div>
+                <Label htmlFor="doc-name">Doctor Name *</Label>
+                <Input
+                  id="doc-name"
+                  placeholder="e.g. Dr. Sharma"
+                  value={doctorInfo.doctorName}
+                  onChange={(e) => setDoctorInfo(prev => ({ ...prev, doctorName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="hosp-name">Hospital / Clinic Name *</Label>
+                <Input
+                  id="hosp-name"
+                  placeholder="e.g. City Hospital"
+                  value={doctorInfo.hospitalName}
+                  onChange={(e) => setDoctorInfo(prev => ({ ...prev, hospitalName: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowDoctorForm(false)}>
+                  Back
+                </Button>
+                <Button className="flex-1" onClick={proceedAfterDoctor}>
+                  <CheckCircle className="w-4 h-4 mr-2" /> Proceed
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Order Confirmation */}
       {orderConfirmed && (
         <div ref={orderRef} className="space-y-3">
@@ -348,6 +427,41 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
               <CheckCircle className="w-10 h-10 text-primary mx-auto" />
               <h3 className="text-lg font-bold text-primary">Order Confirmed!</h3>
               <p className="text-sm text-muted-foreground">Choose how to share or save your order.</p>
+              {/* Show doctor info */}
+              <div className="text-left bg-card rounded-md p-3 text-sm space-y-1 border">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Doctor & Hospital</span>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setEditingDoctor(!editingDoctor)}>
+                    <Pencil className="w-3 h-3 mr-1" /> Edit
+                  </Button>
+                </div>
+                {editingDoctor ? (
+                  <div className="space-y-2 pt-1">
+                    <Input
+                      placeholder="Doctor Name"
+                      value={doctorInfo.doctorName}
+                      onChange={(e) => setDoctorInfo(prev => ({ ...prev, doctorName: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Hospital / Clinic"
+                      value={doctorInfo.hospitalName}
+                      onChange={(e) => setDoctorInfo(prev => ({ ...prev, hospitalName: e.target.value }))}
+                    />
+                    <Button size="sm" variant="outline" className="w-full" onClick={() => {
+                      localStorage.setItem(DOCTOR_INFO_KEY, JSON.stringify(doctorInfo));
+                      setEditingDoctor(false);
+                      toast.success("Doctor info saved");
+                    }}>
+                      <CheckCircle className="w-3 h-3 mr-1" /> Save
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <p>👨‍⚕️ Dr. {doctorInfo.doctorName}</p>
+                    <p>🏨 {doctorInfo.hospitalName}</p>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
 
