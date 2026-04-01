@@ -68,7 +68,7 @@ const JanAushadhiAlternatives = ({ medicationNames, onFindKendra, onOrderFromKen
 
   const confirmCart = () => {
     cart.forEach(item => {
-      onOrderFromKendra(item.medName, item.genericName);
+      onOrderFromKendra(item.medName, item.genericName, item.unitSize, item.mrp);
     });
     setCart([]);
   };
