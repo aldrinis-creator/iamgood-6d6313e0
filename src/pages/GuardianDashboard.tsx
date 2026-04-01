@@ -23,6 +23,8 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { format, formatDistanceToNow } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import WardPicker from "@/components/WardPicker";
 
 interface Notification {
   id: string;
