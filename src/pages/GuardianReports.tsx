@@ -146,6 +146,7 @@ const GuardianReports = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <WardPicker />
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />

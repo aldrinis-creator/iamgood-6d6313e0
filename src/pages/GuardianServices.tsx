@@ -57,6 +57,7 @@ const GuardianServices = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <WardPicker />
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Stethoscope className="w-5 h-5 text-primary" /> Services
         </h1>
