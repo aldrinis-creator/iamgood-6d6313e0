@@ -1283,6 +1283,10 @@ export type Database = {
     }
     Functions: {
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
+      guardian_ward_count: {
+        Args: { _guardian_email: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
