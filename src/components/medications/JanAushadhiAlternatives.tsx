@@ -23,7 +23,7 @@ interface CartItem {
 interface Props {
   medicationNames: string[];
   onFindKendra: () => void;
-  onOrderFromKendra: (medName: string, genericName: string) => void;
+  onOrderFromKendra: (medName: string, genericName: string, unitSize?: string, mrp?: number) => void;
 }
 
 const JanAushadhiAlternatives = ({ medicationNames, onFindKendra, onOrderFromKendra }: Props) => {
@@ -68,7 +68,7 @@ const JanAushadhiAlternatives = ({ medicationNames, onFindKendra, onOrderFromKen
 
   const confirmCart = () => {
     cart.forEach(item => {
-      onOrderFromKendra(item.medName, item.genericName);
+      onOrderFromKendra(item.medName, item.genericName, item.unitSize, item.mrp);
     });
     setCart([]);
   };
