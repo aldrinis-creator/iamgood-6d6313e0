@@ -94,6 +94,7 @@ const GuardianDashboard = () => {
   const [wardName, setWardName] = useState("User");
   const [wardUserId, setWardUserId] = useState<string | null>(null);
   const [wardPhone, setWardPhone] = useState<string | null>(null);
+  const { selectedWard } = useGuardianWard();
   const [wardPauseMode, setWardPauseMode] = useState<string>("active");
   const [wardPauseDetails, setWardPauseDetails] = useState<{ sleepTo?: string; endsAt?: string; reason?: string }>({});
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
