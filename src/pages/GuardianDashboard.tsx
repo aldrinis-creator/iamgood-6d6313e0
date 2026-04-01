@@ -439,7 +439,7 @@ const GuardianDashboard = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
-        {/* Active SOS Alert */}
+        <WardPicker />
         {activeSOS && (
           <Card className={`border-destructive bg-destructive/10 ${activeSOS.isStale ? "" : "animate-pulse"}`}>
             <CardContent className="p-4">

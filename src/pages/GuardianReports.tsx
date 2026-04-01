@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle } from "lucide-react";
@@ -10,14 +10,17 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from "rec
 import { format, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import WardPicker from "@/components/WardPicker";
 
 type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition";
 
 const GuardianReports = () => {
   const { session } = useAuth();
+  const { selectedWard } = useGuardianWard();
   const [activeSection, setActiveSection] = useState<ReportSection>("medications");
-  const [wardUserId, setWardUserId] = useState<string | null>(null);
-  const [wardName, setWardName] = useState("User");
+  const wardUserId = selectedWard?.userId || null;
+  const wardName = selectedWard?.name || "User";
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -28,18 +31,9 @@ const GuardianReports = () => {
   const [vitalData, setVitalData] = useState<any[]>([]);
   const [mealLogs, setMealLogs] = useState<any[]>([]);
 
-  const fetchWard = useCallback(async () => {
-    if (!session?.user?.id) return;
-    const { data } = await supabase.from("guardians").select("user_id").eq("guardian_user_id", session.user.id).limit(1);
-    if (data?.[0]) {
-      setWardUserId(data[0].user_id);
-      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data[0].user_id).single();
-      if (profile?.full_name) setWardName(profile.full_name);
-    }
-    setLoading(false);
-  }, [session?.user?.id]);
-
-  useEffect(() => { fetchWard(); }, [fetchWard]);
+  useEffect(() => {
+    setLoading(!selectedWard);
+  }, [selectedWard]);
 
   // Fetch data based on active section
   useEffect(() => {
