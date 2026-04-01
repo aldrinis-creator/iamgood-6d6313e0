@@ -138,24 +138,17 @@ const GuardianDashboard = () => {
 
   const fetchWardCheckIns = useCallback(async () => {
     if (!session?.user?.id) return;
-    const { data: guardianEntries } = await supabase
-      .from("guardians")
-      .select("user_id")
-      .eq("guardian_user_id", session.user.id)
-      .eq("status", "accepted")
-      .limit(1);
-
-    if (!guardianEntries || guardianEntries.length === 0) return;
-    const wardId = guardianEntries[0].user_id;
+    if (!selectedWard) return;
+    const wardId = selectedWard.userId;
     setWardUserId(wardId);
+    setWardName(selectedWard.name);
 
+    // Fetch phone
     const { data: wardProfile } = await supabase
       .from("profiles")
-      .select("full_name, phone")
+      .select("phone")
       .eq("id", wardId)
       .single();
-
-    if (wardProfile?.full_name) setWardName(wardProfile.full_name);
     if (wardProfile?.phone) setWardPhone(wardProfile.phone);
 
     const todayStart = new Date();
