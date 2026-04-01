@@ -269,11 +269,17 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         <JanAushadhiAlternatives
           medicationNames={allMeds.map((m) => m.name)}
           onFindKendra={() => navigate("/my-health?tool=Services&facility=janaushadhi")}
-          onOrderFromKendra={(medName, genericName) => {
+          onOrderFromKendra={(medName, genericName, unitSize, mrp) => {
             const med = allMeds.find((m) => m.name === medName);
-            if (med) {
-              addToOrder({ ...med, name: genericName });
-            }
+            const jaMed: Medication = {
+              id: `ja-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              name: `${genericName} (Jan Aushadhi)`,
+              dosage: unitSize || med?.dosage || "",
+              remaining_quantity: 0,
+              total_quantity: 1,
+              low_stock_threshold: 0,
+            };
+            setOrderItems((prev) => [...prev, { med: jaMed, qty: 1 }]);
             toast.success(`Added ${genericName} to order`);
           }}
         />
