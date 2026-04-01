@@ -364,7 +364,12 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Order ({orderItems.length} items)</p>
                 {orderItems.map((item) => (
                   <div key={item.med.id} className="flex items-center justify-between text-sm gap-1">
-                    <span className="flex-1 truncate">{item.med.name} — {item.med.dosage}</span>
+                    <span className="flex-1 truncate">
+                      {item.med.name} — {item.med.dosage}
+                      {item.med.id.startsWith("ja-") && (
+                        <Badge variant="secondary" className="ml-1 text-[9px] bg-[hsl(142,70%,45%)]/10 text-[hsl(142,70%,45%)]">Jan Aushadhi</Badge>
+                      )}
+                    </span>
                     {onScanAlternative && (
                       <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-primary" onClick={() => onScanAlternative(item.med.id, item.med.name)}>
                         <Camera className="w-3 h-3 mr-1" /> Alt
