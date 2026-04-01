@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Pill, Package, Bell, ShieldAlert, Camera, ChevronDown, Settings } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import TodaySchedule from "./TodaySchedule";
 import MedicationList from "./MedicationList";
 import RefillOrder, { type OrderItem } from "./RefillOrder";
@@ -21,11 +23,26 @@ export interface SelectedAlternative {
 }
 
 const MedicationManager = () => {
+  const { session } = useAuth();
   const [manageTab, setManageTab] = useState("meds");
   const [manageOpen, setManageOpen] = useState(false);
   const [altContext, setAltContext] = useState<AlternativeContext | null>(null);
   const [selectedAlt, setSelectedAlt] = useState<SelectedAlternative | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [hasLowStock, setHasLowStock] = useState(false);
+
+  const checkLowStock = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from("medications")
+      .select("id, remaining_quantity, low_stock_threshold")
+      .eq("user_id", session.user.id);
+    if (data) {
+      setHasLowStock(data.some((m: any) => m.remaining_quantity <= m.low_stock_threshold));
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => { checkLowStock(); }, [checkLowStock]);
 
   const handleScanAlternative = (medId: string, medName: string) => {
     setAltContext({ medId, medName });
@@ -43,6 +60,8 @@ const MedicationManager = () => {
   const handleCancelAltMode = () => {
     setAltContext(null);
   };
+
+  const lowStockClass = hasLowStock ? "text-destructive" : "";
 
   return (
     <div className="space-y-4">
@@ -64,13 +83,13 @@ const MedicationManager = () => {
         <CollapsibleContent className="pt-3">
           <Tabs value={manageTab} onValueChange={setManageTab} className="w-full">
             <TabsList className="w-full grid grid-cols-5">
-              <TabsTrigger value="meds" className="text-xs gap-1">
+              <TabsTrigger value="meds" className={`text-xs gap-1 ${lowStockClass}`}>
                 <Pill className="w-3 h-3" /> Meds
               </TabsTrigger>
               <TabsTrigger value="scan" className="text-xs gap-1">
                 <Camera className="w-3 h-3" /> Scan
               </TabsTrigger>
-              <TabsTrigger value="refill" className="text-xs gap-1">
+              <TabsTrigger value="refill" className={`text-xs gap-1 ${lowStockClass}`}>
                 <Package className="w-3 h-3" /> Refill
               </TabsTrigger>
               <TabsTrigger value="banned" className="text-xs gap-1">
@@ -96,6 +115,7 @@ const MedicationManager = () => {
                 onClearSelectedAlternative={() => setSelectedAlt(null)}
                 orderItems={orderItems}
                 setOrderItems={setOrderItems}
+                onRefillDone={checkLowStock}
               />
             </TabsContent>
             <TabsContent value="banned"><BannedMedications /></TabsContent>
