@@ -1,87 +1,69 @@
 
 
-# Medication Refill & Jan Aushadhi Enhancements
+# Multi-Ward Guardian Support (up to 3 Users per Guardian)
 
 ## Overview
-Four related improvements to the medication management and Jan Aushadhi features.
+Allow a single guardian account to monitor up to 3 different users. Add a ward selector to the Guardian Dashboard and enforce the 3-ward limit during registration/nomination.
 
----
+## Current State
+- DB: No constraint on guardian-to-user ratio — already supports multiple wards
+- UI: Guardian Dashboard uses `.limit(1)` and always picks the first ward — only shows one user
+- All guardian pages (Dashboard, Messages, Reports, Services, Alerts) assume a single ward
 
-## 1. User-Added Jan Aushadhi Kendra with Detailed Address
+## Changes
 
-**Current**: `AddFacilityDialog` has generic name/phone/address fields. For `janaushadhi` type, address is free-text with geocoding.
+### 1. Ward Selector Context
+Create a `GuardianWardContext` that:
+- Fetches all accepted guardian entries for the current user
+- Stores the selected ward (`wardUserId`, `wardName`)
+- Provides a `setSelectedWard` function
+- Persists last-selected ward in `localStorage`
 
-**Change**: When `type === "janaushadhi"`, show structured address fields:
-- Shop Name (required)
-- Phone Number
-- Pincode (required)
-- Road Name/Number (required)
-- Area (required)
-- City (required)
-- State (optional)
+**File**: `src/contexts/GuardianWardContext.tsx` (new)
 
-Auto-geocode using pincode + city for coordinates. Save into `user_facilities` table (already supports `janaushadhi` facility_type). Compose full address string from structured fields.
+### 2. Ward Picker Component
+A compact dropdown at the top of the Guardian Dashboard showing ward names with a colored dot indicator. Appears only when guardian has 2+ wards.
 
-**Files**: `src/components/facilities/AddFacilityDialog.tsx`
+**File**: `src/components/WardPicker.tsx` (new)
 
----
+### 3. Update Guardian Dashboard
+- Remove the inline ward-fetching logic (lines 138-156)
+- Consume `GuardianWardContext` for `wardUserId` and `wardName`
+- All data fetching keyed off the context's `wardUserId`
 
-## 2. Red Highlight on Tablets & Refill Tabs When Refill Due
+**File**: `src/pages/GuardianDashboard.tsx`
 
-**Current**: `MedicationManager` tabs have no visual indicator for low stock.
+### 4. Update Guardian Sub-Pages
+Pass `wardUserId` from context instead of re-querying:
+- `src/pages/GuardianMessages.tsx`
+- `src/pages/GuardianReports.tsx`
+- `src/pages/GuardianServices.tsx`
+- `src/pages/GuardianAlerts.tsx`
 
-**Change**:
-- Pass `hasLowStock` boolean from `MedicationManager` (query medications where `remaining_quantity <= low_stock_threshold`)
-- Apply red styling (`text-destructive`) to "Meds" and "Refill" `TabsTrigger` when any medication is low stock
-- Remove red styling once all medications are replenished (re-query after refill)
+### 5. Enforce 3-Ward Limit
+- In `Register.tsx` (guardian nomination step) and `Settings.tsx` (add guardian): before inserting into `guardians`, check if the nominated guardian already has 3 accepted entries. Show a toast if limit reached.
+- Add a DB function `guardian_ward_count(guardian_email text)` that returns the count of accepted guardian entries for that email, usable in validation.
 
-**Files**: `src/components/medications/MedicationManager.tsx`
+### 6. Wrap Guardian Routes
+In `App.tsx`, wrap all `/guardian/*` routes with `GuardianWardProvider`.
 
----
+## Files Changed
 
-## 3. Doctor & Hospital Name on Order Confirmation
+| File | Change |
+|------|--------|
+| `src/contexts/GuardianWardContext.tsx` | **New** — multi-ward state management |
+| `src/components/WardPicker.tsx` | **New** — ward selector dropdown |
+| `src/pages/GuardianDashboard.tsx` | Use ward context instead of inline fetch |
+| `src/pages/GuardianMessages.tsx` | Use ward context |
+| `src/pages/GuardianReports.tsx` | Use ward context |
+| `src/pages/GuardianServices.tsx` | Use ward context |
+| `src/pages/GuardianAlerts.tsx` | Use ward context |
+| `src/App.tsx` | Wrap guardian routes with `GuardianWardProvider` |
+| `src/pages/Register.tsx` | Add 3-ward limit check on guardian nomination |
+| `src/pages/Settings.tsx` | Add 3-ward limit check on guardian add |
+| New migration | `guardian_ward_count()` DB function for validation |
 
-**Current**: `confirmOrder()` immediately shows the share screen.
-
-**Change**:
-- Before final confirmation, show a form requiring **Doctor Name** and **Hospital/Clinic Name**
-- Persist these values in `localStorage` (key: `checkin_order_doctor_info`) so they auto-fill next time
-- Allow editing with a save button
-- Include doctor/hospital info in `buildOrderText()` and PDF output
-
-**Files**: `src/components/medications/RefillOrder.tsx`
-
----
-
-## 4. Jan Aushadhi Shopping Cart Integration + Direct Kendra Navigation
-
-**Current**: Tapping "Order" on Jan Aushadhi alternatives adds to the main order list but nothing visible happens in the Jan Aushadhi section. "Find Nearest Jan Aushadhi Kendra" navigates via query params.
-
-**Changes**:
-
-### 4a. Jan Aushadhi Cart
-- When user taps "Order" on a Jan Aushadhi alternative, add it to a **visible cart within the JanAushadhiAlternatives component**
-- Show cart summary at bottom with item count and "Confirm Order" button
-- User can continue selecting more items from both Jan Aushadhi alternatives and the Order Medications list
-- On confirm, show the final cart (same confirmation flow as regular orders)
-- Lift Jan Aushadhi cart items into the shared `orderItems` state in `MedicationManager`
-
-### 4b. Direct Kendra Navigation
-- Change `onFindKendra` to navigate to the Jan Aushadhi facility view directly: `navigate("/my-health?tool=Services&facility=janaushadhi")`
-- This already works via `HealthServices` useEffect — just ensure it opens correctly
-
-**Files**: `src/components/medications/JanAushadhiAlternatives.tsx`, `src/components/medications/RefillOrder.tsx`, `src/components/medications/MedicationManager.tsx`
-
----
-
-## Implementation Summary
-
-| File | Changes |
-|------|---------|
-| `src/components/facilities/AddFacilityDialog.tsx` | Structured address fields for Jan Aushadhi type |
-| `src/components/medications/MedicationManager.tsx` | Low-stock query, red tab styling, pass cart state |
-| `src/components/medications/RefillOrder.tsx` | Doctor/hospital form before confirmation, include in order text/PDF |
-| `src/components/medications/JanAushadhiAlternatives.tsx` | Visual cart for selected Jan Aushadhi items, confirm flow |
-
-No database changes required — all existing tables support these features.
+## No Breaking Changes
+- Single-ward guardians see no UI difference (picker hidden)
+- Existing data works as-is
 
