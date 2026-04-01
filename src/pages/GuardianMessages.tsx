@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import AppLayout from "@/components/AppLayout";
+import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Check } from "lucide-react";
 import { format } from "date-fns";
@@ -18,15 +20,17 @@ interface Ping {
 
 const GuardianMessages = () => {
   const { session } = useAuth();
+  const { selectedWard } = useGuardianWard();
   const [pings, setPings] = useState<Ping[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPings = async () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !selectedWard) return;
     const { data } = await supabase
       .from("guardian_pings")
       .select("*")
       .eq("guardian_user_id", session.user.id)
+      .eq("user_id", selectedWard.userId)
       .order("created_at", { ascending: false })
       .limit(50);
     if (data) setPings(data as unknown as Ping[]);
@@ -38,6 +42,7 @@ const GuardianMessages = () => {
         .from("guardian_pings")
         .update({ guardian_read: true } as any)
         .eq("guardian_user_id", session.user.id)
+        .eq("user_id", selectedWard.userId)
         .not("reply_message", "is", null)
         .eq("guardian_read", false);
     }
@@ -46,7 +51,7 @@ const GuardianMessages = () => {
   useEffect(() => {
     fetchPings();
 
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !selectedWard) return;
     const channel = supabase
       .channel("guardian-messages-page")
       .on("postgres_changes", {
@@ -58,11 +63,12 @@ const GuardianMessages = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, selectedWard?.userId]);
 
   return (
     <AppLayout>
       <div className="space-y-4">
+        <WardPicker />
         <div className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-primary" />
           <h1 className="text-lg font-bold">Sent Messages</h1>
@@ -78,7 +84,6 @@ const GuardianMessages = () => {
           pings.map(p => (
             <Card key={p.id}>
               <CardContent className="p-3 space-y-2">
-                {/* Sent message */}
                 <div className="flex justify-end">
                   <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
                     <p className="text-sm">{p.message}</p>
@@ -88,7 +93,6 @@ const GuardianMessages = () => {
                   </div>
                 </div>
 
-                {/* Reply */}
                 {p.reply_message ? (
                   <div className="flex justify-start">
                     <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">

@@ -23,6 +23,8 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { format, formatDistanceToNow } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import WardPicker from "@/components/WardPicker";
 
 interface Notification {
   id: string;
@@ -92,6 +94,7 @@ const GuardianDashboard = () => {
   const [wardName, setWardName] = useState("User");
   const [wardUserId, setWardUserId] = useState<string | null>(null);
   const [wardPhone, setWardPhone] = useState<string | null>(null);
+  const { selectedWard } = useGuardianWard();
   const [wardPauseMode, setWardPauseMode] = useState<string>("active");
   const [wardPauseDetails, setWardPauseDetails] = useState<{ sleepTo?: string; endsAt?: string; reason?: string }>({});
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
@@ -135,24 +138,17 @@ const GuardianDashboard = () => {
 
   const fetchWardCheckIns = useCallback(async () => {
     if (!session?.user?.id) return;
-    const { data: guardianEntries } = await supabase
-      .from("guardians")
-      .select("user_id")
-      .eq("guardian_user_id", session.user.id)
-      .eq("status", "accepted")
-      .limit(1);
-
-    if (!guardianEntries || guardianEntries.length === 0) return;
-    const wardId = guardianEntries[0].user_id;
+    if (!selectedWard) return;
+    const wardId = selectedWard.userId;
     setWardUserId(wardId);
+    setWardName(selectedWard.name);
 
+    // Fetch phone
     const { data: wardProfile } = await supabase
       .from("profiles")
-      .select("full_name, phone")
+      .select("phone")
       .eq("id", wardId)
       .single();
-
-    if (wardProfile?.full_name) setWardName(wardProfile.full_name);
     if (wardProfile?.phone) setWardPhone(wardProfile.phone);
 
     const todayStart = new Date();
@@ -198,7 +194,7 @@ const GuardianDashboard = () => {
     } else {
       setActiveSOS(null);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, selectedWard]);
 
   const fetchWardSettings = useCallback(async (wId: string) => {
     const { data } = await supabase
@@ -443,7 +439,7 @@ const GuardianDashboard = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
-        {/* Active SOS Alert */}
+        <WardPicker />
         {activeSOS && (
           <Card className={`border-destructive bg-destructive/10 ${activeSOS.isStale ? "" : "animate-pulse"}`}>
             <CardContent className="p-4">

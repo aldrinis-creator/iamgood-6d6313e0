@@ -8,30 +8,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import WardPicker from "@/components/WardPicker";
 
 const GuardianServices = () => {
   const { session } = useAuth();
-  const [wardUserId, setWardUserId] = useState<string | null>(null);
-  const [wardName, setWardName] = useState("User");
+  const { selectedWard } = useGuardianWard();
+  const wardUserId = selectedWard?.userId || null;
+  const wardName = selectedWard?.name || "User";
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [showApptDialog, setShowApptDialog] = useState(false);
   const [wardAppointments, setWardAppointments] = useState<any[]>([]);
 
-  const fetchWard = useCallback(async () => {
-    if (!session?.user?.id) return;
-    const { data } = await supabase.from("guardians").select("user_id").eq("guardian_user_id", session.user.id).limit(1);
-    if (data?.[0]) {
-      setWardUserId(data[0].user_id);
-      const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data[0].user_id).single();
-      if (profile?.full_name) setWardName(profile.full_name);
+  const fetchWardAppointments = useCallback(async () => {
+    if (!wardUserId) return;
+    const { data: appts } = await supabase.from("appointments").select("*").eq("user_id", wardUserId).order("start_date", { ascending: false });
+    if (appts) setWardAppointments(appts);
+  }, [wardUserId]);
 
-      // Fetch ward's appointments for the dialog
-      const { data: appts } = await supabase.from("appointments").select("*").eq("user_id", data[0].user_id).order("start_date", { ascending: false });
-      if (appts) setWardAppointments(appts);
-    }
-  }, [session?.user?.id]);
-
-  useEffect(() => { fetchWard(); }, [fetchWard]);
+  useEffect(() => { fetchWardAppointments(); }, [fetchWardAppointments]);
 
   const availableServices = [
     {
@@ -62,6 +57,7 @@ const GuardianServices = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <WardPicker />
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Stethoscope className="w-5 h-5 text-primary" /> Services
         </h1>

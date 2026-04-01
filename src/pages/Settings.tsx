@@ -316,6 +316,14 @@ const Settings = () => {
       toast.error("Maximum 5 guardians allowed");
       return;
     }
+    // Check if this guardian already monitors 3 users
+    if (newEmail) {
+      const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: newEmail });
+      if (typeof countResult === "number" && countResult >= 3) {
+        toast.error(`${newName} already monitors 3 users (maximum). They cannot be added as your guardian.`);
+        return;
+      }
+    }
     const { error } = await supabase.from("guardians").insert({
       user_id: session.user.id,
       guardian_name: newName,

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppProvider } from "@/contexts/AppContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { GuardianWardProvider } from "@/contexts/GuardianWardContext";
 import { UserRoute, GuardianRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -56,12 +57,12 @@ const App = () => (
               <Route path="/messages" element={<UserRoute><Messages /></UserRoute>} />
               <Route path="/journey" element={<UserRoute><MapMyJourney /></UserRoute>} />
               {/* Guardian-only routes */}
-              <Route path="/guardian" element={<GuardianRoute><GuardianDashboard /></GuardianRoute>} />
-              <Route path="/guardian/alerts" element={<GuardianRoute><GuardianAlerts /></GuardianRoute>} />
-              <Route path="/guardian/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
-              <Route path="/guardian/services" element={<GuardianRoute><GuardianServices /></GuardianRoute>} />
-              <Route path="/guardian/messages" element={<GuardianRoute><GuardianMessages /></GuardianRoute>} />
-              <Route path="/reports" element={<GuardianRoute><GuardianReports /></GuardianRoute>} />
+              <Route path="/guardian" element={<GuardianRoute><GuardianWardProvider><GuardianDashboard /></GuardianWardProvider></GuardianRoute>} />
+              <Route path="/guardian/alerts" element={<GuardianRoute><GuardianWardProvider><GuardianAlerts /></GuardianWardProvider></GuardianRoute>} />
+              <Route path="/guardian/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
+              <Route path="/guardian/services" element={<GuardianRoute><GuardianWardProvider><GuardianServices /></GuardianWardProvider></GuardianRoute>} />
+              <Route path="/guardian/messages" element={<GuardianRoute><GuardianWardProvider><GuardianMessages /></GuardianWardProvider></GuardianRoute>} />
+              <Route path="/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
               <Route path="/guardian-settings" element={<GuardianRoute><Settings /></GuardianRoute>} />
               {/* Shared routes (both roles) */}
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

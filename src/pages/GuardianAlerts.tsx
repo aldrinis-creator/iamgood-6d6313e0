@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import WardPicker from "@/components/WardPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +104,7 @@ const GuardianAlerts = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <WardPicker />
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" /> Alerts

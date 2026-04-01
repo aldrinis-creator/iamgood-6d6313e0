@@ -160,6 +160,17 @@ const Register = () => {
       return;
     }
 
+    // Check 3-ward limit for each nominated guardian with an email
+    if (selectedRole === "user") {
+      for (const g of guardians.filter(g => g.email)) {
+        const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
+        if (typeof countResult === "number" && countResult >= 3) {
+          toast({ title: "Guardian limit reached", description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.`, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     // Pass app_role in metadata so DB trigger sets it correctly
     const { data, error } = await signUp(email, password, { 
