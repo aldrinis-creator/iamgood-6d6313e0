@@ -118,9 +118,16 @@ const GuardianAlerts = () => {
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" /> Alerts
           </h1>
-          <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs">
-            Mark all read
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs">
+              Mark all read
+            </Button>
+            {readCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearReadAlerts} className="text-xs gap-1 text-destructive hover:text-destructive">
+                <Trash2 className="w-4 h-4" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}
