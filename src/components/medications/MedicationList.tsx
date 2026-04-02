@@ -37,9 +37,9 @@ const emptyForm = {
   dosage: "1 tablet",
   frequency: "once_daily",
   instructions: "",
-  total_quantity: 30,
-  remaining_quantity: 30,
-  low_stock_threshold: 5,
+  total_quantity: "30",
+  remaining_quantity: "30",
+  low_stock_threshold: "5",
   schedule_times: ["08:00"],
   start_date: new Date().toISOString().split("T")[0],
   end_date: "",
@@ -79,9 +79,9 @@ const MedicationList = () => {
       dosage: med.dosage,
       frequency: med.frequency,
       instructions: med.instructions || "",
-      total_quantity: med.total_quantity,
-      remaining_quantity: med.remaining_quantity,
-      low_stock_threshold: med.low_stock_threshold,
+      total_quantity: String(med.total_quantity),
+      remaining_quantity: String(med.remaining_quantity),
+      low_stock_threshold: String(med.low_stock_threshold),
       schedule_times: med.schedule_times,
       start_date: med.start_date,
       end_date: med.end_date || "",
@@ -101,9 +101,9 @@ const MedicationList = () => {
       dosage: form.dosage,
       frequency: form.frequency,
       instructions: form.instructions || null,
-      total_quantity: form.total_quantity,
-      remaining_quantity: form.remaining_quantity,
-      low_stock_threshold: form.low_stock_threshold,
+      total_quantity: Number(form.total_quantity) || 0,
+      remaining_quantity: Number(form.remaining_quantity) || 0,
+      low_stock_threshold: Number(form.low_stock_threshold) || 0,
       schedule_times: form.schedule_times,
       start_date: form.start_date,
       end_date: form.end_date || null,
@@ -234,16 +234,16 @@ const MedicationList = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-sm">Total Qty</Label>
-                <Input type="number" value={form.total_quantity} onChange={(e) => setForm((f) => ({ ...f, total_quantity: Number(e.target.value) }))} />
+                <Input type="number" value={form.total_quantity} onChange={(e) => setForm((f) => ({ ...f, total_quantity: e.target.value }))} />
               </div>
               <div>
                 <Label className="text-sm">Remaining</Label>
-                <Input type="number" value={form.remaining_quantity} onChange={(e) => setForm((f) => ({ ...f, remaining_quantity: Number(e.target.value) }))} />
+                <Input type="number" value={form.remaining_quantity} onChange={(e) => setForm((f) => ({ ...f, remaining_quantity: e.target.value }))} />
               </div>
             </div>
             <div>
               <Label className="text-sm">Low Stock Alert Threshold</Label>
-              <Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm((f) => ({ ...f, low_stock_threshold: Number(e.target.value) }))} />
+              <Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm((f) => ({ ...f, low_stock_threshold: e.target.value }))} />
             </div>
             <div>
               <Label className="text-sm">Schedule Times</Label>
