@@ -205,12 +205,14 @@ Deno.serve(async (req) => {
 
       if (guardians && guardians.length > 0) {
         const scheduledTime = new Date(checkIn.scheduled_at);
-        const timeStr = scheduledTime.toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-          timeZone: "Asia/Kolkata",
-        });
+        // Convert to IST manually (UTC+5:30) for reliable formatting
+        const istMs = scheduledTime.getTime() + (5.5 * 60 * 60 * 1000);
+        const istDate = new Date(istMs);
+        const istHours = istDate.getUTCHours();
+        const istMinutes = istDate.getUTCMinutes();
+        const period = istHours >= 12 ? "PM" : "AM";
+        const displayHour = istHours % 12 || 12;
+        const timeStr = `${displayHour}:${String(istMinutes).padStart(2, "0")} ${period}`;
 
         const message = `${userName} missed their ${timeStr} check-in. Please reach out to make sure they're okay.`;
 
