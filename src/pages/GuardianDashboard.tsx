@@ -352,10 +352,20 @@ const GuardianDashboard = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const CHECK_IN_HOURS = [7, 12, 19];
   const formatCheckInTime = (scheduled_at: string) => {
-    return new Date(scheduled_at).toLocaleTimeString("en-IN", {
-      hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
-    });
+    // Extract local hour from the stored timestamp and map to known check-in labels
+    const d = new Date(scheduled_at);
+    const hour = d.getHours();
+    // Find nearest check-in hour
+    let closest = CHECK_IN_HOURS[0];
+    for (const h of CHECK_IN_HOURS) {
+      if (Math.abs(h - hour) < Math.abs(closest - hour)) closest = h;
+    }
+    if (closest === 0) return "12:00 AM";
+    if (closest < 12) return `${closest}:00 AM`;
+    if (closest === 12) return "12:00 PM";
+    return `${closest - 12}:00 PM`;
   };
 
   const getStatusLabel = (status: string) => {
