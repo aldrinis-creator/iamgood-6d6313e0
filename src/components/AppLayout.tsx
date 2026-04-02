@@ -18,6 +18,7 @@ import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
 import useLocationSync from "@/hooks/useLocationSync";
+import SOSActiveBar from "@/components/SOSActiveBar";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -37,6 +38,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
         {role === "user" && <UserOnlyHooks />}
+        <SOSActiveBar />
         <PwaInstallBanner />
         <AppHeader />
         <main className="flex-1 overflow-y-auto pb-24">

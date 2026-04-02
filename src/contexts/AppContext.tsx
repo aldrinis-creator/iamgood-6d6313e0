@@ -101,7 +101,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setActiveSosId(null);
     }
-  }, [activeSosId]);
+
+    // Notify guardians that user is safe
+    if (session?.user?.id) {
+      const currentUserName = profile?.full_name || "User";
+
+      // Get guardians
+      const { data: guardianRows } = await supabase
+        .from("guardians")
+        .select("id, guardian_email")
+        .eq("user_id", session.user.id);
+
+      if (guardianRows?.length) {
+        // Insert "all clear" notifications
+        const notifRows = guardianRows.map((g: any) => ({
+          user_id: session.user.id,
+          guardian_id: g.id,
+          title: "✅ SOS Resolved",
+          message: `${currentUserName} has marked themselves as safe. The SOS alert has been cancelled.`,
+          type: "sos_resolved",
+        }));
+        await supabase.from("notifications").insert(notifRows);
+
+        // Send "all clear" via edge function (email/push/WhatsApp)
+        const guardianEmails = guardianRows.map((g: any) => g.guardian_email).filter(Boolean);
+        supabase.functions.invoke("send-sos-alert", {
+          body: {
+            user_id: session.user.id,
+            message: `✅ ALL CLEAR — ${currentUserName} has confirmed they are safe. The SOS alert has been cancelled.`,
+            guardian_emails: guardianEmails,
+            user_name: currentUserName,
+          },
+        }).catch((e) => console.error("Failed to send all-clear:", e));
+      }
+    }
+  }, [activeSosId, session, profile]);
 
   return (
     <AppContext.Provider value={{ role, setRole, isLoggedIn, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName, pauseMode, setPauseMode }}>
