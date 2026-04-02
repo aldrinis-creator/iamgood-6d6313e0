@@ -234,11 +234,11 @@ const MedicationList = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-sm">Total Qty</Label>
-                <Input type="number" value={form.total_quantity} onChange={(e) => setForm((f) => ({ ...f, total_quantity: Number(e.target.value) }))} />
+                <Input type="number" value={form.total_quantity} onChange={(e) => setForm((f) => ({ ...f, total_quantity: e.target.value }))} />
               </div>
               <div>
                 <Label className="text-sm">Remaining</Label>
-                <Input type="number" value={form.remaining_quantity} onChange={(e) => setForm((f) => ({ ...f, remaining_quantity: Number(e.target.value) }))} />
+                <Input type="number" value={form.remaining_quantity} onChange={(e) => setForm((f) => ({ ...f, remaining_quantity: e.target.value }))} />
               </div>
             </div>
             <div>
