@@ -98,6 +98,15 @@ const GuardianAlerts = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const clearReadAlerts = async () => {
+    const readIds = notifications.filter(n => n.read).map(n => n.id);
+    if (readIds.length === 0) return;
+    await supabase.from("notifications").delete().in("id", readIds);
+    setNotifications(prev => prev.filter(n => !n.read));
+  };
+
+  const readCount = notifications.filter(n => n.read).length;
+
   const filtered = filter === "all" ? notifications : notifications.filter(n => n.type === filter);
   const types = [...new Set(notifications.map(n => n.type))];
 
