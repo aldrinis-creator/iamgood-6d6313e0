@@ -3,7 +3,7 @@ import WardPicker from "@/components/WardPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, AlertTriangle, Heart, Pill, Activity, Filter } from "lucide-react";
+import { Bell, AlertTriangle, Heart, Pill, Activity, Filter, Trash2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,6 +98,15 @@ const GuardianAlerts = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const clearReadAlerts = async () => {
+    const readIds = notifications.filter(n => n.read).map(n => n.id);
+    if (readIds.length === 0) return;
+    await supabase.from("notifications").delete().in("id", readIds);
+    setNotifications(prev => prev.filter(n => !n.read));
+  };
+
+  const readCount = notifications.filter(n => n.read).length;
+
   const filtered = filter === "all" ? notifications : notifications.filter(n => n.type === filter);
   const types = [...new Set(notifications.map(n => n.type))];
 
@@ -109,9 +118,16 @@ const GuardianAlerts = () => {
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" /> Alerts
           </h1>
-          <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs">
-            Mark all read
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs">
+              Mark all read
+            </Button>
+            {readCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearReadAlerts} className="text-xs gap-1 text-destructive hover:text-destructive">
+                <Trash2 className="w-4 h-4" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}

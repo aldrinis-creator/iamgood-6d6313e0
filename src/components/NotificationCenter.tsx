@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,15 @@ const NotificationCenter = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const clearReadNotifications = async () => {
+    const readIds = notifications.filter((n) => n.read).map((n) => n.id);
+    if (readIds.length === 0) return;
+    await supabase.from("notifications").delete().in("id", readIds);
+    setNotifications((prev) => prev.filter((n) => !n.read));
+  };
+
+  const readCount = notifications.filter((n) => n.read).length;
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "missed_checkin": return "text-destructive";
@@ -86,11 +95,18 @@ const NotificationCenter = () => {
         <SheetHeader className="p-4 pb-2 border-b border-border">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-xl">Notifications</SheetTitle>
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-sm gap-1">
-                <CheckCheck className="w-4 h-4" /> Mark all read
-              </Button>
-            )}
+            <div className="flex gap-1">
+              {unreadCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs gap-1">
+                  <CheckCheck className="w-4 h-4" /> Mark all read
+                </Button>
+              )}
+              {readCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearReadNotifications} className="text-xs gap-1 text-destructive hover:text-destructive">
+                  <Trash2 className="w-4 h-4" /> Clear
+                </Button>
+              )}
+            </div>
           </div>
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-80px)]">
