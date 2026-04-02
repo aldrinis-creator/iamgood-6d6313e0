@@ -262,6 +262,13 @@ const GuardianDashboard = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchNotifications();
         const newNotif = payload?.new;
+        if (!newNotif?.id) return;
+        // Skip if we already alerted for this notification
+        if (alertedNotifIds.current.has(newNotif.id)) return;
+        alertedNotifIds.current.add(newNotif.id);
+        // Only alert for the selected ward's notifications
+        if (wardUserId && newNotif.user_id !== wardUserId) return;
+
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
