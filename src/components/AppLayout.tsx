@@ -18,6 +18,7 @@ import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
 import useLocationSync from "@/hooks/useLocationSync";
+import SOSActiveBar from "@/components/SOSActiveBar";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
