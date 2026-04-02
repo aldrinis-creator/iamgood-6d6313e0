@@ -110,6 +110,7 @@ const GuardianDashboard = () => {
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
   const missedCheckInCount = useRef(0);
+  const alertedNotifIds = useRef<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
