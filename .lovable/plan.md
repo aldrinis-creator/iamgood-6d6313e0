@@ -1,25 +1,38 @@
 
 
-# Fix: Quantity Input UX in Medication Form
+# Auto-Clear Notifications + Manual Clear Button
 
-## Problem
-The quantity fields (`Total Qty`, `Remaining`, `Low Stock Threshold`) use `Number(e.target.value)` in their onChange handlers. When a user tries to delete the current value to type a new one, `Number("")` returns `0`, so the field snaps back to `0` and can't be cleared.
+## Approach
 
-## Fix
-Store these three fields as `string` in the form state (instead of `number`), allowing the input to be empty. Convert to `number` only at save time.
+1. **Auto-cleanup via pg_cron**: Schedule a daily database job that deletes notifications older than 7 days. This keeps the table lean without any client-side logic.
 
-### File: `src/components/medications/MedicationList.tsx`
+2. **Manual "Clear All" button**: Add a "Clear" button to both the user's `NotificationCenter` (bell icon sheet) and the guardian's `GuardianAlerts` page. This deletes all read notifications immediately, giving users control.
 
-1. **Change `emptyForm` defaults** from numbers to strings:
-   - `total_quantity: "30"`, `remaining_quantity: "30"`, `low_stock_threshold: "5"`
+## Changes
 
-2. **Update onChange handlers** to store raw string value:
-   - `onChange={(e) => setForm(f => ({ ...f, total_quantity: e.target.value }))}`
-   - Same for `remaining_quantity` and `low_stock_threshold`
+### 1. Database: pg_cron job for 7-day auto-delete
+- Schedule a daily cron job that runs `DELETE FROM notifications WHERE created_at < now() - interval '7 days'`
+- Uses existing pg_cron + pg_net extensions
 
-3. **Update `openEdit`** to convert existing numeric values to strings when populating the form.
+### 2. `src/components/NotificationCenter.tsx`
+- Add a "Clear" button next to "Mark all read" in the header
+- On click, delete all read notifications from the database and update local state
+- Show confirmation before clearing
 
-4. **Update `handleSave`** to convert strings back to numbers (`Number(form.total_quantity) || 0`) before inserting/updating.
+### 3. `src/pages/GuardianAlerts.tsx`
+- Add a "Clear" button next to "Mark all read"
+- Same logic: deletes read notifications from the database
 
-One file changed. No database or backend changes needed.
+### 4. Database: RLS policy update
+- Currently notifications table has no DELETE policy for users
+- Add DELETE policies so users and guardians can delete their own notifications
+
+## Files
+
+| File | Change |
+|------|--------|
+| Database (cron job) | Daily cleanup of notifications > 7 days |
+| Database (migration) | Add DELETE RLS policies on notifications |
+| `src/components/NotificationCenter.tsx` | Add "Clear" button for read notifications |
+| `src/pages/GuardianAlerts.tsx` | Add "Clear" button for read notifications |
 
