@@ -3,7 +3,7 @@ import WardPicker from "@/components/WardPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, AlertTriangle, Heart, Pill, Activity, Filter } from "lucide-react";
+import { Bell, AlertTriangle, Heart, Pill, Activity, Filter, Trash2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
