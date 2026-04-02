@@ -110,6 +110,7 @@ const GuardianDashboard = () => {
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
   const missedCheckInCount = useRef(0);
+  const alertedNotifIds = useRef<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -261,6 +262,13 @@ const GuardianDashboard = () => {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
         fetchNotifications();
         const newNotif = payload?.new;
+        if (!newNotif?.id) return;
+        // Skip if we already alerted for this notification
+        if (alertedNotifIds.current.has(newNotif.id)) return;
+        alertedNotifIds.current.add(newNotif.id);
+        // Only alert for the selected ward's notifications
+        if (wardUserId && newNotif.user_id !== wardUserId) return;
+
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
@@ -352,10 +360,20 @@ const GuardianDashboard = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const CHECK_IN_HOURS = [7, 12, 19];
   const formatCheckInTime = (scheduled_at: string) => {
-    return new Date(scheduled_at).toLocaleTimeString("en-IN", {
-      hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
-    });
+    // Extract local hour from the stored timestamp and map to known check-in labels
+    const d = new Date(scheduled_at);
+    const hour = d.getHours();
+    // Find nearest check-in hour
+    let closest = CHECK_IN_HOURS[0];
+    for (const h of CHECK_IN_HOURS) {
+      if (Math.abs(h - hour) < Math.abs(closest - hour)) closest = h;
+    }
+    if (closest === 0) return "12:00 AM";
+    if (closest < 12) return `${closest}:00 AM`;
+    if (closest === 12) return "12:00 PM";
+    return `${closest - 12}:00 PM`;
   };
 
   const getStatusLabel = (status: string) => {
