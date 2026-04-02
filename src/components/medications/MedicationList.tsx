@@ -95,15 +95,36 @@ const MedicationList = () => {
       return;
     }
 
+    const totalQty = Number(form.total_quantity);
+    const remainingQty = Number(form.remaining_quantity);
+    const threshold = Number(form.low_stock_threshold);
+
+    if (!totalQty || totalQty <= 0) {
+      toast.error("Total quantity must be greater than 0");
+      return;
+    }
+    if (remainingQty < 0) {
+      toast.error("Remaining quantity cannot be negative");
+      return;
+    }
+    if (remainingQty > totalQty) {
+      toast.error("Remaining quantity cannot exceed total quantity");
+      return;
+    }
+    if (threshold < 0) {
+      toast.error("Low stock threshold cannot be negative");
+      return;
+    }
+
     const payload = {
       user_id: session.user.id,
       name: form.name.trim(),
       dosage: form.dosage,
       frequency: form.frequency,
       instructions: form.instructions || null,
-      total_quantity: Number(form.total_quantity) || 0,
-      remaining_quantity: Number(form.remaining_quantity) || 0,
-      low_stock_threshold: Number(form.low_stock_threshold) || 0,
+      total_quantity: totalQty,
+      remaining_quantity: remainingQty,
+      low_stock_threshold: threshold,
       schedule_times: form.schedule_times,
       start_date: form.start_date,
       end_date: form.end_date || null,
