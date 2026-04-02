@@ -15,16 +15,26 @@ const FallDetectionOverlay = () => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [profileRes, hpRes, gRes] = await Promise.all([
+    const [profileRes, hpRes, gRes, npRes] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", uid).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
+      supabase.from("nutrition_personas").select("blood_group, allergies, medical_conditions").eq("user_id", uid).maybeSingle(),
     ]);
 
     const userName = profileRes.data?.full_name || "User";
     const phone = profileRes.data?.phone || "";
     const dob = profileRes.data?.date_of_birth || "";
-    const hp = hpRes.data;
+    const rawHp = hpRes.data;
+    const np = npRes.data as any;
+    const hp = {
+      blood_group: rawHp?.blood_group || np?.blood_group || null,
+      allergies: rawHp?.allergies?.length ? rawHp.allergies : (np?.allergies ?? []),
+      chronic_conditions: rawHp?.chronic_conditions?.length ? rawHp.chronic_conditions : (np?.medical_conditions ?? []),
+      current_medications: rawHp?.current_medications ?? [],
+      family_doctor_name: rawHp?.family_doctor_name ?? null,
+      family_doctor_phone: rawHp?.family_doctor_phone ?? null,
+    };
     const guardians = gRes.data || [];
 
     // Build message
