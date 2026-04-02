@@ -18,45 +18,72 @@ const BatteryWarning: React.FC = () => {
   const criticalShownCount = useRef(0);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
   const lastSavedLevel = useRef<number>(-1);
+  const settingsRef = useRef<any>(null);
+  const battRef = useRef<any>(null);
   const { settings } = useUserSettings();
   const { session } = useAuth();
 
+  // Keep settingsRef current to avoid stale closures
   useEffect(() => {
-    let batt: any;
-    const update = () => {
-      if (!batt) return;
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    if (!("getBattery" in navigator)) {
+      console.warn("Battery API not supported in this browser");
+      return;
+    }
+
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const readBattery = (batt: any) => {
       const level = Math.round(batt.level * 100);
       setBattery({ level, charging: batt.charging });
+
       // Save battery level to user_settings every 5% change
+      const currentSettings = settingsRef.current;
       if (session?.user?.id && Math.abs(level - lastSavedLevel.current) >= 5) {
         lastSavedLevel.current = level;
         supabase.from("user_settings").upsert({
           user_id: session.user.id,
-          settings: { ...settings, batteryLevel: level },
+          settings: { ...currentSettings, batteryLevel: level },
           updated_at: new Date().toISOString(),
         } as any, { onConflict: "user_id" }).then(() => {});
       }
     };
-    (navigator as any).getBattery?.().then((b: any) => {
-      batt = b;
-      // Force-save on initial load so guardians always have a value
+
+    (navigator as any).getBattery().then((b: any) => {
+      battRef.current = b;
+
+      // Initial read + force-save
       const initLevel = Math.round(b.level * 100);
       setBattery({ level: initLevel, charging: b.charging });
       if (session?.user?.id && lastSavedLevel.current === -1) {
         lastSavedLevel.current = initLevel;
+        const currentSettings = settingsRef.current;
         supabase.from("user_settings").upsert({
           user_id: session.user.id,
-          settings: { ...settings, batteryLevel: initLevel },
+          settings: { ...currentSettings, batteryLevel: initLevel },
           updated_at: new Date().toISOString(),
         } as any, { onConflict: "user_id" }).then(() => {});
       }
-      b.addEventListener("levelchange", update);
-      b.addEventListener("chargingchange", update);
+
+      // Event listeners
+      const handler = () => readBattery(b);
+      b.addEventListener("levelchange", handler);
+      b.addEventListener("chargingchange", handler);
+
+      // Polling fallback every 60s to catch missed events
+      intervalId = setInterval(() => readBattery(b), 60_000);
+    }).catch(() => {
+      console.warn("Battery API promise rejected");
     });
+
     return () => {
-      if (batt) {
-        batt.removeEventListener("levelchange", update);
-        batt.removeEventListener("chargingchange", update);
+      clearInterval(intervalId);
+      if (battRef.current) {
+        battRef.current.removeEventListener("levelchange", () => {});
+        battRef.current.removeEventListener("chargingchange", () => {});
       }
     };
   }, [session?.user?.id]);
@@ -67,7 +94,6 @@ const BatteryWarning: React.FC = () => {
     clearTimeout(dismissTimer.current);
     dismissTimer.current = setTimeout(() => setVisible(false), 6000);
 
-    // Re-prime audio before playing
     await ensureAudioReady();
 
     const isCritical = p === "critical";
@@ -75,17 +101,17 @@ const BatteryWarning: React.FC = () => {
       ? `Battery critically low at ${level} percent! Charge immediately to stay connected.`
       : `Battery is getting low at ${level} percent. Please charge your phone soon.`;
 
-    if (settings.voiceReminders) {
+    const s = settingsRef.current;
+    if (s?.voiceReminders) {
       playVoiceReminder(message);
-    } else if (settings.audioAlerts) {
+    } else if (s?.audioAlerts) {
       playChime();
     }
 
-    // Vibration
-    if (settings.vibration && navigator.vibrate) {
+    if (s?.vibration && navigator.vibrate) {
       navigator.vibrate(isCritical ? [300, 150, 300, 150, 300] : [200, 100, 200]);
     }
-  }, [settings.voiceReminders, settings.audioAlerts, settings.vibration]);
+  }, []);
 
   useEffect(() => {
     if (battery.charging) {
@@ -97,7 +123,7 @@ const BatteryWarning: React.FC = () => {
     if (battery.level <= 10 && criticalShownCount.current < 3) {
       criticalShownCount.current += 1;
       show("critical", battery.level);
-    } else if (battery.level <= 20 && battery.level > 10 && lowShownCount.current < 3) {
+    } else if (battery.level <= 30 && battery.level > 10 && lowShownCount.current < 3) {
       lowShownCount.current += 1;
       show("low", battery.level);
     }
@@ -121,7 +147,6 @@ const BatteryWarning: React.FC = () => {
         style={{ animation: isLow ? "bounce-warn 1.2s ease-in-out 3" : "shake-critical 0.6s ease-in-out 5" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Animated icon */}
         <div
           className={`rounded-full p-5 ${
             isLow ? "bg-amber-100 dark:bg-amber-900" : "bg-red-100 dark:bg-red-900"
@@ -135,13 +160,11 @@ const BatteryWarning: React.FC = () => {
           )}
         </div>
 
-        {/* Bolt accent */}
         <Zap
           className={`absolute top-4 right-4 ${isLow ? "text-amber-400" : "text-destructive"}`}
           style={{ animation: "spin-bolt 2s linear infinite" }}
         />
 
-        {/* Percentage */}
         <span
           className={`text-5xl font-black tabular-nums ${
             isLow ? "text-amber-700 dark:text-amber-300" : "text-destructive"
@@ -150,7 +173,6 @@ const BatteryWarning: React.FC = () => {
           {battery.level}%
         </span>
 
-        {/* Message */}
         <p className={`text-lg font-semibold leading-snug ${
           isLow ? "text-amber-800 dark:text-amber-200" : "text-red-800 dark:text-red-200"
         }`}>
@@ -159,7 +181,6 @@ const BatteryWarning: React.FC = () => {
             : "Battery critically low! Charge immediately to stay connected."}
         </p>
 
-        {/* Dismiss */}
         <button
           onClick={() => setVisible(false)}
           className={`mt-2 px-6 py-2.5 rounded-full text-sm font-semibold transition-transform active:scale-95 ${
