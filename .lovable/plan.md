@@ -1,40 +1,47 @@
 
 
-# Fix: Profile Data Not Appearing in SOS Flash
+# Close the SOS Loop
 
-## Root Cause
-Data mismatch between where profile fields are **saved** vs. where the SOS card **reads** them:
-
-| Field | Saved to (MyProfile) | Read from (SOSDialog) |
-|-------|----------------------|----------------------|
-| Blood group | `nutrition_personas` | `health_profile` ← empty |
-| Allergies | `nutrition_personas` | `health_profile` ← empty |
-| Chronic conditions | `nutrition_personas` | `health_profile` ← empty |
-| Doctor name/phone | `health_profile` | `health_profile` ✓ works |
-
-The `handleSave` in MyProfile saves blood_group, allergies, and medical_conditions to `nutrition_personas`, but the SOS card queries `health_profile` for those fields — which are never populated.
-
-## Fix Strategy
-**Option A (chosen):** Update `SOSDialog.fetchData` and `FallDetectionOverlay.sendFallAlerts` to also query `nutrition_personas` and merge the data. This is the safest approach — no migration needed, no risk of data duplication.
-
-Additionally, sync `health_profile` during save so both tables stay consistent (for other consumers like the emergency profile page).
+## Problem
+Once SOS is triggered, there's no clean way to end it:
+- User has no "I'm Safe" button after the SOS dialog closes
+- Guardian can only resolve after 2 hours (stale)
+- No notification sent to guardians when SOS is resolved/cancelled
 
 ## Changes
 
-### 1. `src/pages/MyProfile.tsx` — Sync health_profile on save
-Update `handleSave` to also write `blood_group`, `allergies`, `chronic_conditions` to `health_profile` alongside the existing doctor fields.
+### 1. User-side: "I'm Safe" banner
+**File: `src/components/SOSActiveBar.tsx`** (new)
+- Persistent top banner shown when `emergencyMode === true`
+- Red bar with "SOS Active" label and an "I'm Safe" button
+- Clicking "I'm Safe" calls `cancelSOS()` and sends a resolution notification
 
-### 2. `src/components/SOSDialog.tsx` — Fallback to nutrition_personas
-In `fetchData`, also query `nutrition_personas` and use its values as fallback when `health_profile` fields are empty.
+**File: `src/components/AppLayout.tsx`**
+- Render `SOSActiveBar` when emergency mode is active
 
-### 3. `src/components/FallDetectionOverlay.tsx` — Same fallback
-In `sendFallAlerts`, also query `nutrition_personas` for the same fallback logic.
+### 2. Guardian-side: Allow immediate resolve
+**File: `src/pages/GuardianDashboard.tsx`**
+- Show "Resolve" button on ALL active SOS events, not just stale ones
+- Add a confirmation dialog before resolving
 
-## Files Changed
+### 3. Send "SOS Resolved" notification
+**File: `src/contexts/AppContext.tsx`**
+- Update `cancelSOS` to also:
+  - Insert a `notifications` row (type: `sos_resolved`) for each guardian
+  - Invoke `send-sos-alert` edge function with an "all clear" message
+
+**File: `src/pages/GuardianDashboard.tsx`**
+- Update `resolveSOS` to similarly notify the user and other guardians
+
+### 4. Real-time status sync
+- Guardian Dashboard already subscribes to `sos_events` changes — when user cancels, the active SOS card will auto-dismiss via the existing realtime channel
+
+## Files
 
 | File | Change |
 |------|--------|
-| `src/pages/MyProfile.tsx` | Add blood_group, allergies, chronic_conditions to the health_profile upsert |
-| `src/components/SOSDialog.tsx` | Add nutrition_personas query as fallback data source |
-| `src/components/FallDetectionOverlay.tsx` | Add nutrition_personas query as fallback data source |
+| `src/components/SOSActiveBar.tsx` | **New** — persistent "I'm Safe" banner for user |
+| `src/components/AppLayout.tsx` | Render SOSActiveBar |
+| `src/contexts/AppContext.tsx` | Send resolution notifications in cancelSOS |
+| `src/pages/GuardianDashboard.tsx` | Show resolve button immediately + send notifications on resolve |
 
