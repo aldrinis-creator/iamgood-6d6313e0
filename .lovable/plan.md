@@ -1,38 +1,30 @@
 
 
-# Auto-Clear Notifications + Manual Clear Button
+# Fix Battery Warning: Raise Threshold + Ensure It Fires
 
-## Approach
-
-1. **Auto-cleanup via pg_cron**: Schedule a daily database job that deletes notifications older than 7 days. This keeps the table lean without any client-side logic.
-
-2. **Manual "Clear All" button**: Add a "Clear" button to both the user's `NotificationCenter` (bell icon sheet) and the guardian's `GuardianAlerts` page. This deletes all read notifications immediately, giving users control.
+## Root Cause
+The `navigator.getBattery()` API silently fails on unsupported browsers (iOS Safari, Firefox) — the `.then()` simply never resolves, so the component stays at its default `level: 100` and never triggers. Even on supported browsers, the promise may resolve but only fires `levelchange` events at ~1% increments, meaning the initial check is the only reliable trigger point.
 
 ## Changes
 
-### 1. Database: pg_cron job for 7-day auto-delete
-- Schedule a daily cron job that runs `DELETE FROM notifications WHERE created_at < now() - interval '7 days'`
-- Uses existing pg_cron + pg_net extensions
+### File: `src/components/BatteryWarning.tsx`
 
-### 2. `src/components/NotificationCenter.tsx`
-- Add a "Clear" button next to "Mark all read" in the header
-- On click, delete all read notifications from the database and update local state
-- Show confirmation before clearing
+1. **Raise low-battery threshold from 20% → 30%**
+   - Line 100: change `battery.level <= 20` to `battery.level <= 30` and the upper bound on critical check from `> 10` stays, low range becomes `> 10 && <= 30`
 
-### 3. `src/pages/GuardianAlerts.tsx`
-- Add a "Clear" button next to "Mark all read"
-- Same logic: deletes read notifications from the database
+2. **Fix: trigger threshold check on initial battery read**
+   - Currently `setBattery()` inside the `.then()` callback does trigger a re-render, but the `show` callback may have stale `settings` on first mount. Add `settings` to the `useEffect` dependency for the getBattery hook isn't needed — the threshold effect already depends on `battery` and `show`.
+   - The real fix: add a **polling fallback** — if `getBattery` isn't available, poll `navigator.getBattery` every 60s. If it's truly unsupported, log a warning and skip gracefully.
 
-### 4. Database: RLS policy update
-- Currently notifications table has no DELETE policy for users
-- Add DELETE policies so users and guardians can delete their own notifications
+3. **Fix stale `settings` in `update` closure**
+   - The `useEffect` on line 24 captures `settings` in its closure but only depends on `session?.user?.id`. Add `settings` to deps (or use a ref for settings) so battery-save uses current values.
 
-## Files
+4. **Add periodic re-check**
+   - After initial battery read, set a 60-second interval that re-reads `batt.level` and calls `setBattery()` — this ensures the threshold effect runs even if `levelchange` events are missed (common on some Android WebViews).
 
-| File | Change |
-|------|--------|
-| Database (cron job) | Daily cleanup of notifications > 7 days |
-| Database (migration) | Add DELETE RLS policies on notifications |
-| `src/components/NotificationCenter.tsx` | Add "Clear" button for read notifications |
-| `src/pages/GuardianAlerts.tsx` | Add "Clear" button for read notifications |
+### Summary of threshold logic after fix:
+- **≤ 10%** → critical alert (red, shake animation, up to 3 times)
+- **11–30%** → low alert (amber, bounce animation, up to 3 times)
+
+One file changed. No database or backend changes.
 
