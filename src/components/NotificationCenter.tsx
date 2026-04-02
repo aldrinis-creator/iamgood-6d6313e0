@@ -62,6 +62,15 @@ const NotificationCenter = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const clearReadNotifications = async () => {
+    const readIds = notifications.filter((n) => n.read).map((n) => n.id);
+    if (readIds.length === 0) return;
+    await supabase.from("notifications").delete().in("id", readIds);
+    setNotifications((prev) => prev.filter((n) => !n.read));
+  };
+
+  const readCount = notifications.filter((n) => n.read).length;
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "missed_checkin": return "text-destructive";
