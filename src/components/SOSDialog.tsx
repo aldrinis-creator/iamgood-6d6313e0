@@ -65,7 +65,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
-    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes] = await Promise.all([
+    const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes, npRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
@@ -74,16 +74,20 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       supabase.from("wellness_logs").select("mood, stress_level, energy_level").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("medications").select("name, dosage").eq("user_id", uid),
       supabase.from("emergency_share_tokens").select("token").eq("user_id", uid).eq("is_active", true).maybeSingle(),
+      supabase.from("nutrition_personas").select("blood_group, allergies, medical_conditions").eq("user_id", uid).maybeSingle(),
     ]);
 
+    const hp = hpRes.data;
+    const np = npRes.data;
+
     setMedical({
-      bloodGroup: hpRes.data?.blood_group ?? null,
-      allergies: hpRes.data?.allergies ?? [],
-      conditions: hpRes.data?.chronic_conditions ?? [],
-      medications: hpRes.data?.current_medications ?? [],
+      bloodGroup: hp?.blood_group || (np as any)?.blood_group || null,
+      allergies: (hp?.allergies?.length ? hp.allergies : (np as any)?.allergies) ?? [],
+      conditions: (hp?.chronic_conditions?.length ? hp.chronic_conditions : (np as any)?.medical_conditions) ?? [],
+      medications: hp?.current_medications ?? [],
       doctorName: apRes.data?.doctor_name ?? null,
-      familyDoctorName: (hpRes.data as any)?.family_doctor_name ?? null,
-      familyDoctorPhone: (hpRes.data as any)?.family_doctor_phone ?? null,
+      familyDoctorName: (hp as any)?.family_doctor_name ?? null,
+      familyDoctorPhone: (hp as any)?.family_doctor_phone ?? null,
     });
     setGuardians(gRes.data ?? []);
     setMedicationDetails(medsRes.data ?? []);

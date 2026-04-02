@@ -267,6 +267,9 @@ const ProfileContent = () => {
         user_id: userId,
         family_doctor_name: doctorName || null,
         family_doctor_phone: doctorPhone || null,
+        blood_group: bloodGroup || null,
+        allergies,
+        chronic_conditions: medicalConditions,
       } as any, { onConflict: "user_id" }),
       supabase.from("nutrition_personas").upsert({
         user_id: userId,
