@@ -1,47 +1,25 @@
 
 
-# Close the SOS Loop
+# Fix: Quantity Input UX in Medication Form
 
 ## Problem
-Once SOS is triggered, there's no clean way to end it:
-- User has no "I'm Safe" button after the SOS dialog closes
-- Guardian can only resolve after 2 hours (stale)
-- No notification sent to guardians when SOS is resolved/cancelled
+The quantity fields (`Total Qty`, `Remaining`, `Low Stock Threshold`) use `Number(e.target.value)` in their onChange handlers. When a user tries to delete the current value to type a new one, `Number("")` returns `0`, so the field snaps back to `0` and can't be cleared.
 
-## Changes
+## Fix
+Store these three fields as `string` in the form state (instead of `number`), allowing the input to be empty. Convert to `number` only at save time.
 
-### 1. User-side: "I'm Safe" banner
-**File: `src/components/SOSActiveBar.tsx`** (new)
-- Persistent top banner shown when `emergencyMode === true`
-- Red bar with "SOS Active" label and an "I'm Safe" button
-- Clicking "I'm Safe" calls `cancelSOS()` and sends a resolution notification
+### File: `src/components/medications/MedicationList.tsx`
 
-**File: `src/components/AppLayout.tsx`**
-- Render `SOSActiveBar` when emergency mode is active
+1. **Change `emptyForm` defaults** from numbers to strings:
+   - `total_quantity: "30"`, `remaining_quantity: "30"`, `low_stock_threshold: "5"`
 
-### 2. Guardian-side: Allow immediate resolve
-**File: `src/pages/GuardianDashboard.tsx`**
-- Show "Resolve" button on ALL active SOS events, not just stale ones
-- Add a confirmation dialog before resolving
+2. **Update onChange handlers** to store raw string value:
+   - `onChange={(e) => setForm(f => ({ ...f, total_quantity: e.target.value }))}`
+   - Same for `remaining_quantity` and `low_stock_threshold`
 
-### 3. Send "SOS Resolved" notification
-**File: `src/contexts/AppContext.tsx`**
-- Update `cancelSOS` to also:
-  - Insert a `notifications` row (type: `sos_resolved`) for each guardian
-  - Invoke `send-sos-alert` edge function with an "all clear" message
+3. **Update `openEdit`** to convert existing numeric values to strings when populating the form.
 
-**File: `src/pages/GuardianDashboard.tsx`**
-- Update `resolveSOS` to similarly notify the user and other guardians
+4. **Update `handleSave`** to convert strings back to numbers (`Number(form.total_quantity) || 0`) before inserting/updating.
 
-### 4. Real-time status sync
-- Guardian Dashboard already subscribes to `sos_events` changes — when user cancels, the active SOS card will auto-dismiss via the existing realtime channel
-
-## Files
-
-| File | Change |
-|------|--------|
-| `src/components/SOSActiveBar.tsx` | **New** — persistent "I'm Safe" banner for user |
-| `src/components/AppLayout.tsx` | Render SOSActiveBar |
-| `src/contexts/AppContext.tsx` | Send resolution notifications in cancelSOS |
-| `src/pages/GuardianDashboard.tsx` | Show resolve button immediately + send notifications on resolve |
+One file changed. No database or backend changes needed.
 
