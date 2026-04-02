@@ -467,11 +467,9 @@ const GuardianDashboard = () => {
               <p className="text-xs text-muted-foreground mt-1">
                 Type: {activeSOS.trigger_type} {activeSOS.isStale ? "• Over 2 hours ago" : "• Location updates every 30s"}
               </p>
-              {activeSOS.isStale && (
-                <Button variant="outline" size="sm" className="mt-2" onClick={resolveSOS}>
-                  ✓ Resolve / Dismiss
-                </Button>
-              )}
+              <Button variant="outline" size="sm" className="mt-2" onClick={resolveSOS}>
+                ✓ Resolve / Mark Safe
+              </Button>
 
               {/* Emergency Health Card + Vitals shown during SOS */}
               {wardUserId && (
