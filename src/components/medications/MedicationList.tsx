@@ -243,7 +243,7 @@ const MedicationList = () => {
             </div>
             <div>
               <Label className="text-sm">Low Stock Alert Threshold</Label>
-              <Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm((f) => ({ ...f, low_stock_threshold: Number(e.target.value) }))} />
+              <Input type="number" value={form.low_stock_threshold} onChange={(e) => setForm((f) => ({ ...f, low_stock_threshold: e.target.value }))} />
             </div>
             <div>
               <Label className="text-sm">Schedule Times</Label>
