@@ -1,34 +1,40 @@
 
 
-# Fix: Jan Aushadhi Orders Not Persisting in Shopping Cart
+# Fix: Profile Data Not Appearing in SOS Flash
 
-## Problem
-Two bugs in the Jan Aushadhi → Refill order flow:
+## Root Cause
+Data mismatch between where profile fields are **saved** vs. where the SOS card **reads** them:
 
-1. **Jan Aushadhi items vanish on tab switch**: The cart state lives inside `JanAushadhiAlternatives` component. When user switches to the Refill tab, the component may re-render and the internal cart resets.
+| Field | Saved to (MyProfile) | Read from (SOSDialog) |
+|-------|----------------------|----------------------|
+| Blood group | `nutrition_personas` | `health_profile` ← empty |
+| Allergies | `nutrition_personas` | `health_profile` ← empty |
+| Chronic conditions | `nutrition_personas` | `health_profile` ← empty |
+| Doctor name/phone | `health_profile` | `health_profile` ✓ works |
 
-2. **Jan Aushadhi items not shown in order cart**: When `onOrderFromKendra` calls `addToOrder`, it creates an order item using the original medication's `id`. If that med is already in the order, the duplicate check (`prev.find(o => o.med.id === med.id)`) silently drops it. Even when added, the item reuses the original med object with just the name swapped, making it indistinguishable from regular items.
+The `handleSave` in MyProfile saves blood_group, allergies, and medical_conditions to `nutrition_personas`, but the SOS card queries `health_profile` for those fields — which are never populated.
 
-3. **ID collision**: A Jan Aushadhi generic for "Paracetamol 500mg" gets the same `med.id` as the original Paracetamol entry, so only one can exist in the order at a time.
+## Fix Strategy
+**Option A (chosen):** Update `SOSDialog.fetchData` and `FallDetectionOverlay.sendFallAlerts` to also query `nutrition_personas` and merge the data. This is the safest approach — no migration needed, no risk of data duplication.
 
-## Fix
+Additionally, sync `health_profile` during save so both tables stay consistent (for other consumers like the emergency profile page).
 
-### 1. Give Jan Aushadhi items unique IDs (`RefillOrder.tsx`)
-In the `onOrderFromKendra` handler, generate a unique ID for Jan Aushadhi items (e.g., `ja-${Date.now()}`) so they don't collide with regular medication IDs. This allows both the original and generic to coexist in the cart.
+## Changes
 
-### 2. Lift Jan Aushadhi cart confirmation to work directly (`JanAushadhiAlternatives.tsx`)
-When user taps "Add to Order" in the Jan Aushadhi cart, each item calls `onOrderFromKendra` which should immediately appear in the RefillOrder cart. The issue is the items need unique IDs (fix #1 above).
+### 1. `src/pages/MyProfile.tsx` — Sync health_profile on save
+Update `handleSave` to also write `blood_group`, `allergies`, `chronic_conditions` to `health_profile` alongside the existing doctor fields.
 
-### 3. Label Jan Aushadhi items in the order cart (`RefillOrder.tsx`)
-Add a visual badge ("Jan Aushadhi") next to items that were added via the generic alternative flow, so users can distinguish them in the combined cart.
+### 2. `src/components/SOSDialog.tsx` — Fallback to nutrition_personas
+In `fetchData`, also query `nutrition_personas` and use its values as fallback when `health_profile` fields are empty.
 
-### 4. Persist Jan Aushadhi selections across tab switches (`MedicationManager.tsx`)
-The `orderItems` state is already lifted to `MedicationManager` — once fix #1 ensures unique IDs, Jan Aushadhi items will persist in the shared `orderItems` array across tab switches.
+### 3. `src/components/FallDetectionOverlay.tsx` — Same fallback
+In `sendFallAlerts`, also query `nutrition_personas` for the same fallback logic.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/medications/RefillOrder.tsx` | Fix `onOrderFromKendra` to use unique IDs for Jan Aushadhi items; add "Jan Aushadhi" badge in cart display |
-| `src/components/medications/JanAushadhiAlternatives.tsx` | Pass dosage/unit info through `onOrderFromKendra` for better cart display |
+| `src/pages/MyProfile.tsx` | Add blood_group, allergies, chronic_conditions to the health_profile upsert |
+| `src/components/SOSDialog.tsx` | Add nutrition_personas query as fallback data source |
+| `src/components/FallDetectionOverlay.tsx` | Add nutrition_personas query as fallback data source |
 
