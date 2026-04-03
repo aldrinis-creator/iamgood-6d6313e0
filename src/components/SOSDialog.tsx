@@ -39,6 +39,16 @@ interface Guardian {
   relation: string | null;
 }
 
+interface MedHistoryEntry {
+  type: string;
+  reason: string;
+  hospital_name: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  treatment: string | null;
+  doctor_name: string | null;
+}
+
 const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const { session } = useAuth();
   const { triggerSOS, cancelSOS } = useApp();
