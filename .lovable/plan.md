@@ -1,22 +1,39 @@
 
 
-# Fix: Ward Battery Display + Guardian Battery Alert
+## Fix OTP Functionality
 
-## Issues Found
+### Problem Analysis
 
-1. **Ward battery always "N/A"**: `fetchWardSettings` (line 203) only selects `settings` column but tries to read `updated_at` from the response (line 218). More importantly, the `batteryLevel` key is being saved correctly by the User's `BatteryWarning`, but the select query is missing the `updated_at` field for the timestamp display.
+Two issues found:
 
-2. **Guardian's own battery alert not firing**: The `BatteryWarning` component renders for all roles (AppLayout line 86), so guardians should get alerts. However, the component's `show()` function reads from `settingsRef` which depends on `useUserSettings`. If the guardian has no `user_settings` row yet (common for new guardians), `settings` defaults to `DEFAULTS` with `voiceReminders: true` and `audioAlerts: true` — so it should work. The real issue is likely that `getBattery()` returns a promise that silently fails on the guardian's browser, and while we added polling, the polling only runs after the initial `.then()` succeeds. If `getBattery()` rejects, no polling starts.
+1. **Wrong template ID**: The `MSG91_OTP_TEMPLATE_ID` secret needs to be set to the new value `69ce5a9bb83c239f890741f8`.
 
-## Changes
+2. **OTP login doesn't actually sign the user in**: After OTP verification succeeds in `Login.tsx`, the code just navigates to `/dashboard` without creating an auth session. The user hits a protected route and gets bounced back to login. The flow needs to use Supabase's phone auth (`signInWithOtp` / `verifyOtp`) to create a real session, OR use a custom approach that signs the user in with their email+a server-generated token after MSG91 verification.
 
-### `src/pages/GuardianDashboard.tsx`
-- Fix `fetchWardSettings` select to include `updated_at`: `.select("settings, updated_at")`
-- Add a periodic poll (every 2 minutes) of the ward's `user_settings` to keep battery level fresh, since the realtime subscription already handles this but may miss updates
+3. **Registration has no OTP verification**: Phone numbers are saved without verification during registration.
 
-### `src/components/BatteryWarning.tsx`
-- Move the polling interval setup outside the `.then()` block so it still runs even if `getBattery()` rejects
-- This ensures guardian phones that support the API but have a delayed promise still get polled
+### Plan
 
-No database changes needed. Two files modified.
+#### Step 1 — Update the MSG91 OTP template ID secret
+Set `MSG91_OTP_TEMPLATE_ID` to `69ce5a9bb83c239f890741f8`.
+
+#### Step 2 — Fix the post-OTP-verification sign-in flow
+After MSG91 verifies the OTP, the edge function needs to generate a Supabase auth session for the user. Approach:
+- In the `send-otp` edge function, when `action === "verify"` succeeds, look up the user's email via `get_email_by_phone` DB function, then use the Supabase Admin API (`signInWithPassword` won't work without password) to generate a magic link or custom token.
+- Better approach: Use `supabase.auth.admin.generateLink()` to create a one-time sign-in link, or return a short-lived session token.
+- Simplest secure approach: After MSG91 OTP verification succeeds, the edge function calls `auth.admin.generateLink({ type: 'magiclink', email })` and returns the token. The client then uses `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })` to establish the session.
+
+#### Step 3 — Update `OtpVerification.tsx` and `Login.tsx`
+- After successful OTP verify response from edge function, use the returned token/link to establish a real Supabase auth session.
+- Handle the case where no account exists for the phone number (show "register first" message).
+
+#### Step 4 — Deploy and test the updated edge function
+
+### Files to modify
+- `supabase/functions/send-otp/index.ts` — add post-verify auth token generation using Supabase admin client
+- `src/components/OtpVerification.tsx` — pass back auth data from edge function response
+- `src/pages/Login.tsx` — use returned auth data to establish session
+
+### Secret update
+- `MSG91_OTP_TEMPLATE_ID` → `69ce5a9bb83c239f890741f8`
 
