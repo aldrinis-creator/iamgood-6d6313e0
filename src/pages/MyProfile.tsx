@@ -346,6 +346,26 @@ const ProfileContent = () => {
           lines.push(`  • ${med.name} — ${med.dosage}, ${FREQUENCIES[med.frequency] || med.frequency}`);
         });
       }
+      const hospitalizations = medicalHistory.filter((h) => h.type === "hospitalization");
+      const surgeries = medicalHistory.filter((h) => h.type === "surgery");
+      if (hospitalizations.length > 0) {
+        lines.push("");
+        lines.push("Past Hospitalizations:");
+        hospitalizations.forEach((h) => {
+          lines.push(`  • ${h.reason}${h.hospital_name ? ` at ${h.hospital_name}` : ""}${h.start_date ? ` (${h.start_date}${h.end_date ? ` to ${h.end_date}` : ""})` : ""}`);
+          if (h.treatment) lines.push(`    Treatment: ${h.treatment}`);
+          if (h.medications) lines.push(`    Medications: ${h.medications}`);
+        });
+      }
+      if (surgeries.length > 0) {
+        lines.push("");
+        lines.push("Past Surgeries:");
+        surgeries.forEach((s) => {
+          lines.push(`  • ${s.reason}${s.nature ? ` (${s.nature})` : ""}${s.hospital_name ? ` at ${s.hospital_name}` : ""}${s.start_date ? ` on ${s.start_date}` : ""}`);
+          if (s.doctor_name) lines.push(`    Doctor: ${s.doctor_name}`);
+          if (s.advice) lines.push(`    Advice: ${s.advice}`);
+        });
+      }
       return lines.join("\n");
     };
 
