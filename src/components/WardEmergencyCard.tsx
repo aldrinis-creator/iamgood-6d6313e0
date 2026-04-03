@@ -50,16 +50,18 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [meds, setMeds] = useState<MedView[]>([]);
   const [guardians, setGuardians] = useState<GuardianView[]>([]);
+  const [medicalHistory, setMedicalHistory] = useState<MedicalHistoryEntry[]>([]);
   const [profile, setProfile] = useState<{ date_of_birth: string | null; gender: string | null; phone: string | null; blood_group?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const fetchData = useCallback(async () => {
-    const [profileRes, healthRes, medsRes, guardiansRes] = await Promise.all([
+    const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
       supabase.from("profiles").select("date_of_birth, gender, phone").eq("id", wardUserId).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", wardUserId).maybeSingle(),
       supabase.from("medications").select("name, dosage, frequency, schedule_times").eq("user_id", wardUserId),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", wardUserId),
+      supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", wardUserId).order("start_date", { ascending: false }),
     ]);
 
     setProfile(profileRes.data);
