@@ -28,6 +28,16 @@ interface MedView {
   schedule_times: string[];
 }
 
+interface MedicalHistoryEntry {
+  type: string;
+  reason: string;
+  hospital_name: string | null;
+  doctor_name: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  treatment: string | null;
+}
+
 interface GuardianView {
   guardian_name: string;
   guardian_phone: string;
