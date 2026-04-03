@@ -108,6 +108,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setUserDob(profileRes.data?.date_of_birth ?? "");
     setUserGender(profileRes.data?.gender ?? "");
     setEmergencyToken(tokenRes.data?.token ?? null);
+    setMedicalHistory((historyRes.data ?? []) as MedHistoryEntry[]);
 
     // Store latest health data for the SOS message
     (window as any).__sosHealthData = {
