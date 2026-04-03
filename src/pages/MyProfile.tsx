@@ -198,17 +198,20 @@ const ProfileContent = () => {
 
   // Medications (read-only)
   const [medications, setMedications] = useState<Medication[]>([]);
+  // Medical history (read-only for PDF)
+  const [medicalHistory, setMedicalHistory] = useState<any[]>([]);
 
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!userId) return;
 
-    const [guardianRes, healthRes, personaRes, medsRes] = await Promise.all([
+    const [guardianRes, healthRes, personaRes, medsRes, historyRes] = await Promise.all([
       supabase.from("guardians").select("*").eq("user_id", userId).order("is_primary", { ascending: false }),
       supabase.from("health_profile").select("*").eq("user_id", userId).limit(1),
       supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("medications").select("*").eq("user_id", userId).order("name"),
+      supabase.from("medical_history").select("*").eq("user_id", userId).order("start_date", { ascending: false }),
     ]);
 
     if (guardianRes.data) setGuardians(guardianRes.data);
@@ -232,6 +235,7 @@ const ProfileContent = () => {
     }
 
     if (medsRes.data) setMedications(medsRes.data as Medication[]);
+    if (historyRes.data) setMedicalHistory(historyRes.data);
   }, [userId]);
 
   useEffect(() => {
@@ -342,6 +346,26 @@ const ProfileContent = () => {
           lines.push(`  • ${med.name} — ${med.dosage}, ${FREQUENCIES[med.frequency] || med.frequency}`);
         });
       }
+      const hospitalizations = medicalHistory.filter((h) => h.type === "hospitalization");
+      const surgeries = medicalHistory.filter((h) => h.type === "surgery");
+      if (hospitalizations.length > 0) {
+        lines.push("");
+        lines.push("Past Hospitalizations:");
+        hospitalizations.forEach((h) => {
+          lines.push(`  • ${h.reason}${h.hospital_name ? ` at ${h.hospital_name}` : ""}${h.start_date ? ` (${h.start_date}${h.end_date ? ` to ${h.end_date}` : ""})` : ""}`);
+          if (h.treatment) lines.push(`    Treatment: ${h.treatment}`);
+          if (h.medications) lines.push(`    Medications: ${h.medications}`);
+        });
+      }
+      if (surgeries.length > 0) {
+        lines.push("");
+        lines.push("Past Surgeries:");
+        surgeries.forEach((s) => {
+          lines.push(`  • ${s.reason}${s.nature ? ` (${s.nature})` : ""}${s.hospital_name ? ` at ${s.hospital_name}` : ""}${s.start_date ? ` on ${s.start_date}` : ""}`);
+          if (s.doctor_name) lines.push(`    Doctor: ${s.doctor_name}`);
+          if (s.advice) lines.push(`    Advice: ${s.advice}`);
+        });
+      }
       return lines.join("\n");
     };
 
@@ -393,6 +417,28 @@ const ProfileContent = () => {
         medications.forEach((med) => {
           const isLow = med.remaining_quantity <= med.low_stock_threshold;
           html += `<tr><td>${med.name}</td><td>${med.dosage}</td><td>${FREQUENCIES[med.frequency] || med.frequency}</td><td style="${isLow ? "color:#dc2626;font-weight:600" : ""}">${med.remaining_quantity}/${med.total_quantity}${isLow ? " ⚠️" : ""}</td></tr>`;
+        });
+        html += `</table></div></div>`;
+      }
+
+      const hospitalizations = medicalHistory.filter((h) => h.type === "hospitalization");
+      const surgeries = medicalHistory.filter((h) => h.type === "surgery");
+
+      if (hospitalizations.length > 0) {
+        html += `<div class="section"><div class="section-title">🏥 Past Hospitalizations</div><div class="section-body">`;
+        html += `<table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>`;
+        hospitalizations.forEach((h) => {
+          const period = h.start_date ? `${h.start_date}${h.end_date ? ` — ${h.end_date}` : ""}` : "—";
+          html += `<tr><td>${h.reason}</td><td>${h.hospital_name || "—"}</td><td>${period}</td><td>${h.treatment || "—"}</td></tr>`;
+        });
+        html += `</table></div></div>`;
+      }
+
+      if (surgeries.length > 0) {
+        html += `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body">`;
+        html += `<table><tr><th>Reason</th><th>Nature</th><th>Doctor</th><th>Date</th></tr>`;
+        surgeries.forEach((s) => {
+          html += `<tr><td>${s.reason}</td><td>${s.nature || "—"}</td><td>${s.doctor_name || "—"}</td><td>${s.start_date || "—"}</td></tr>`;
         });
         html += `</table></div></div>`;
       }
