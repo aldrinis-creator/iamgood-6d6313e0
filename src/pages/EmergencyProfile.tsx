@@ -54,11 +54,12 @@ const EmergencyProfile = () => {
       const userId = (tokenRow as any).user_id;
 
       // Fetch all data in parallel (anon RLS allows it for active tokens)
-      const [profileRes, healthRes, medsRes, guardiansRes] = await Promise.all([
+      const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
         supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
         supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
         supabase.from("medications").select("name, dosage").eq("user_id", userId),
         supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", userId),
+        supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
       ]);
 
       const p = profileRes.data;
