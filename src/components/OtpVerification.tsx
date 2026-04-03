@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface OtpVerificationProps {
   phone: string;
-  onVerified: () => void;
+  onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
   onCancel: () => void;
 }
 
@@ -56,7 +56,7 @@ const OtpVerification = ({ phone, onVerified, onCancel }: OtpVerificationProps) 
         toast({ title: "Invalid OTP", description: "Please check the code and try again.", variant: "destructive" });
       } else {
         toast({ title: "Phone verified!" });
-        onVerified();
+        onVerified(data);
       }
     } catch {
       toast({ title: "Verification failed", variant: "destructive" });
