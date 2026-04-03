@@ -19,6 +19,8 @@ interface EmergencyData {
   family_doctor_phone: string | null;
   medications: { name: string; dosage: string }[];
   guardians: { name: string; phone: string; relation: string | null }[];
+  hospitalizations: { reason: string; hospital_name: string | null; start_date: string | null; end_date: string | null; treatment: string | null }[];
+  surgeries: { reason: string; hospital_name: string | null; doctor_name: string | null; start_date: string | null }[];
 }
 
 const EmergencyProfile = () => {
@@ -52,11 +54,12 @@ const EmergencyProfile = () => {
       const userId = (tokenRow as any).user_id;
 
       // Fetch all data in parallel (anon RLS allows it for active tokens)
-      const [profileRes, healthRes, medsRes, guardiansRes] = await Promise.all([
+      const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
         supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
         supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
         supabase.from("medications").select("name, dosage").eq("user_id", userId),
         supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", userId),
+        supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
       ]);
 
       const p = profileRes.data;
@@ -75,6 +78,8 @@ const EmergencyProfile = () => {
         family_doctor_phone: h?.family_doctor_phone || null,
         medications: (medsRes.data || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
         guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation })),
+        hospitalizations: (historyRes.data || []).filter((h: any) => h.type === "hospitalization").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, start_date: h.start_date, end_date: h.end_date, treatment: h.treatment })),
+        surgeries: (historyRes.data || []).filter((h: any) => h.type === "surgery").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, doctor_name: h.doctor_name, start_date: h.start_date })),
       });
       setLoading(false);
     };
@@ -239,6 +244,51 @@ const EmergencyProfile = () => {
                     {g.relation && <p className="text-xs text-muted-foreground capitalize">{g.relation}</p>}
                   </div>
                   <a href={`tel:${g.phone}`} className="text-sm text-primary font-medium">{g.phone}</a>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Past Hospitalizations */}
+        {data.hospitalizations.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Heart className="w-4 h-4 text-primary" /> Past Hospitalizations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {data.hospitalizations.map((h, i) => (
+                <div key={i} className="py-2 border-b border-border last:border-0">
+                  <p className="text-sm font-medium">{h.reason}</p>
+                  <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground mt-1">
+                    {h.hospital_name && <span>🏥 {h.hospital_name}</span>}
+                    {h.start_date && <span>📅 {h.start_date}{h.end_date ? ` — ${h.end_date}` : ""}</span>}
+                    {h.treatment && <span>💊 {h.treatment}</span>}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Past Surgeries */}
+        {data.surgeries.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-primary" /> Past Surgeries
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {data.surgeries.map((s, i) => (
+                <div key={i} className="py-2 border-b border-border last:border-0">
+                  <p className="text-sm font-medium">{s.reason}</p>
+                  <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground mt-1">
+                    {s.hospital_name && <span>🏥 {s.hospital_name}</span>}
+                    {s.start_date && <span>📅 {s.start_date}</span>}
+                  </div>
                 </div>
               ))}
             </CardContent>
