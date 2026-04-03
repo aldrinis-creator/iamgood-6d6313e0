@@ -306,10 +306,140 @@ const ProfileContent = () => {
     setter((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  return (
+    const buildProfileText = () => {
+      const lines: string[] = [];
+      lines.push(`Name: ${fullName || "—"}`);
+      lines.push(`Date of Birth: ${dob ? `${dob} (${age} yrs)` : "—"}`);
+      lines.push(`Mobile: ${phone || "—"}`);
+      lines.push(`Gender: ${gender || "—"}`);
+      lines.push(`Weight: ${weightKg ? `${weightKg} kg` : "—"}`);
+      lines.push(`Height: ${heightM ? `${heightM} m` : "—"}`);
+      if (bmi && bmiInfo) lines.push(`BMI: ${bmi.toFixed(1)} — ${bmiInfo.label}`);
+      lines.push("");
+      lines.push(`Blood Group: ${bloodGroup || "—"}`);
+      lines.push(`Diet Type: ${dietType || "—"}`);
+      lines.push(`Allergies: ${allergies.length > 0 ? allergies.join(", ") : "—"}`);
+      lines.push(`Medical Conditions: ${medicalConditions.length > 0 ? medicalConditions.join(", ") : "—"}`);
+      lines.push(`Activity Level: ${activityLevel || "—"}`);
+      lines.push(`Smoking: ${smoking || "—"}`);
+      lines.push(`Alcohol: ${alcohol || "—"}`);
+      if (dietaryPreferences.length > 0) lines.push(`Dietary Preferences: ${dietaryPreferences.join(", ")}`);
+      if (healthGoals.length > 0) lines.push(`Health Goals: ${healthGoals.join(", ")}`);
+      lines.push("");
+      lines.push(`Family Doctor: ${doctorName || "—"}`);
+      lines.push(`Doctor Phone: ${doctorPhone || "—"}`);
+      if (guardians.length > 0) {
+        lines.push("");
+        lines.push("Guardians:");
+        guardians.forEach((g) => {
+          lines.push(`  • ${g.guardian_name} (${g.relation || "—"}) — ${g.guardian_phone}`);
+        });
+      }
+      if (medications.length > 0) {
+        lines.push("");
+        lines.push("Current Medications:");
+        medications.forEach((med) => {
+          lines.push(`  • ${med.name} — ${med.dosage}, ${FREQUENCIES[med.frequency] || med.frequency}`);
+        });
+      }
+      return lines.join("\n");
+    };
+
+    const buildProfileHtml = () => {
+      const row = (label: string, value: string) =>
+        `<div class="row"><span class="label">${label}</span><span class="value">${value || "—"}</span></div>`;
+
+      let html = `<div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">`;
+      html += row("Full Name", fullName);
+      html += row("Date of Birth", dob ? `${dob} (${age} yrs)` : "—");
+      html += row("Mobile", phone);
+      html += row("Gender", gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : "—");
+      html += `</div></div>`;
+
+      html += `<div class="section"><div class="section-title">⚖️ Body Metrics</div><div class="section-body">`;
+      html += row("Weight", weightKg ? `${weightKg} kg` : "—");
+      html += row("Height", heightM ? `${heightM} m` : "—");
+      if (bmi && bmiInfo) html += row("BMI", `${bmi.toFixed(1)} — ${bmiInfo.label}`);
+      html += `</div></div>`;
+
+      html += `<div class="section"><div class="section-title">❤️ Body & Health</div><div class="section-body">`;
+      html += row("Blood Group", bloodGroup);
+      html += row("Diet Type", dietType ? dietType.replace("-", " ") : "—");
+      html += row("Allergies", allergies.length > 0 ? allergies.map(a => `<span class="badge">${a}</span>`).join(" ") : "—");
+      html += row("Medical Conditions", medicalConditions.length > 0 ? medicalConditions.map(c => `<span class="badge">${c}</span>`).join(" ") : "—");
+      html += row("Activity Level", activityLevel ? activityLevel.charAt(0).toUpperCase() + activityLevel.slice(1) : "—");
+      html += row("Smoking", smoking ? smoking.charAt(0).toUpperCase() + smoking.slice(1) : "—");
+      html += row("Alcohol", alcohol ? alcohol.charAt(0).toUpperCase() + alcohol.slice(1) : "—");
+      if (dietaryPreferences.length > 0) html += row("Dietary Preferences", dietaryPreferences.map(d => `<span class="badge-blue badge">${d}</span>`).join(" "));
+      if (healthGoals.length > 0) html += row("Health Goals", healthGoals.map(g => `<span class="badge-green badge">${g}</span>`).join(" "));
+      html += `</div></div>`;
+
+      html += `<div class="section"><div class="section-title">🩺 Family Doctor</div><div class="section-body">`;
+      html += row("Doctor Name", doctorName);
+      html += row("Doctor Phone", doctorPhone);
+      html += `</div></div>`;
+
+      if (guardians.length > 0) {
+        html += `<div class="section"><div class="section-title">🛡️ Guardians</div><div class="section-body">`;
+        guardians.forEach((g) => {
+          html += `<div class="row"><span class="label">${g.guardian_name}${g.relation ? ` (${g.relation})` : ""}</span><span class="value">${g.guardian_phone}</span></div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      if (medications.length > 0) {
+        html += `<div class="section"><div class="section-title">💊 Current Medications</div><div class="section-body">`;
+        html += `<table><tr><th>Name</th><th>Dosage</th><th>Frequency</th><th>Stock</th></tr>`;
+        medications.forEach((med) => {
+          const isLow = med.remaining_quantity <= med.low_stock_threshold;
+          html += `<tr><td>${med.name}</td><td>${med.dosage}</td><td>${FREQUENCIES[med.frequency] || med.frequency}</td><td style="${isLow ? "color:#dc2626;font-weight:600" : ""}">${med.remaining_quantity}/${med.total_quantity}${isLow ? " ⚠️" : ""}</td></tr>`;
+        });
+        html += `</table></div></div>`;
+      }
+
+      return html;
+    };
+
+    const handlePrintProfile = () => {
+      const html = buildLetterheadHtml({
+        title: "My Health Profile",
+        subtitle: fullName || "Health Profile Report",
+        bodyHtml: buildProfileHtml(),
+        includeDisclaimer: false,
+      });
+      const win = window.open("", "_blank");
+      if (!win) return;
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 400);
+    };
+
+    const handleShareWhatsApp = () => {
+      const text = `*My Health Profile*\nCheck-iN\n${new Date().toLocaleDateString("en-IN")}\n\n${buildProfileText()}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const handleShareEmail = () => {
+      const subject = "My Health Profile — Check-iN";
+      const body = `My Health Profile\nDate: ${new Date().toLocaleDateString("en-IN")}\n\n${buildProfileText()}`;
+      window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+    };
+
+    return (
     <div className="space-y-4">
-      {/* Edit toggle */}
-      <div className="flex justify-end">
+      {/* Edit toggle + Share actions */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-1.5 print:hidden">
+          <Button size="sm" variant="outline" className="gap-1" onClick={handlePrintProfile}>
+            <Printer className="w-3.5 h-3.5" /> PDF
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1 text-success border-success/30 hover:bg-success/10" onClick={handleShareWhatsApp}>
+            <MessageCircle className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1" onClick={handleShareEmail}>
+            <Mail className="w-3.5 h-3.5" />
+          </Button>
+        </div>
         <Button
           variant={editing ? "default" : "outline"}
           size="sm"
