@@ -78,6 +78,8 @@ const EmergencyProfile = () => {
         family_doctor_phone: h?.family_doctor_phone || null,
         medications: (medsRes.data || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
         guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation })),
+        hospitalizations: (historyRes.data || []).filter((h: any) => h.type === "hospitalization").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, start_date: h.start_date, end_date: h.end_date, treatment: h.treatment })),
+        surgeries: (historyRes.data || []).filter((h: any) => h.type === "surgery").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, doctor_name: h.doctor_name, start_date: h.start_date })),
       });
       setLoading(false);
     };
