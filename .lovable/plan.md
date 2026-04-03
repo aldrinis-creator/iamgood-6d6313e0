@@ -1,39 +1,32 @@
 
 
-## Fix OTP Functionality
+## Add OTP Verification During Registration
 
-### Problem Analysis
+### Current Flow
+- Step 1: Role selection → Step 2: Personal details (name, phone, email, password) → Step 3: Guardian nomination (user role) or submit (guardian role)
+- Phone is saved directly without verification
 
-Two issues found:
+### Updated Flow
+- Step 1: Role selection → Step 2: Personal details → **Step 2.5: OTP verification** → Step 3: Guardian nomination (user) or submit (guardian)
+- After user fills in details and clicks Next, an OTP is sent to their phone via MSG91
+- Phone is only accepted after successful OTP verification
 
-1. **Wrong template ID**: The `MSG91_OTP_TEMPLATE_ID` secret needs to be set to the new value `69ce5a9bb83c239f890741f8`.
+### Changes
 
-2. **OTP login doesn't actually sign the user in**: After OTP verification succeeds in `Login.tsx`, the code just navigates to `/dashboard` without creating an auth session. The user hits a protected route and gets bounced back to login. The flow needs to use Supabase's phone auth (`signInWithOtp` / `verifyOtp`) to create a real session, OR use a custom approach that signs the user in with their email+a server-generated token after MSG91 verification.
+**`src/pages/Register.tsx`**
+- Add new step constants: `TOTAL_STEPS_USER = 4`, `TOTAL_STEPS_GUARDIAN = 3`
+- Add `phoneVerified` state flag
+- In `handleDetailsNext`: instead of proceeding to step 3 or submitting, transition to an OTP verification step
+- Render `OtpVerification` component when on the OTP step
+- On successful verification, proceed to guardian nomination (user) or submit (guardian)
+- Handle back navigation for the new step
 
-3. **Registration has no OTP verification**: Phone numbers are saved without verification during registration.
+**No edge function changes needed** — the existing `send-otp` function already handles send/verify and doesn't require an existing account (it just won't generate a session token for unregistered phones, which is fine during registration).
 
-### Plan
-
-#### Step 1 — Update the MSG91 OTP template ID secret
-Set `MSG91_OTP_TEMPLATE_ID` to `69ce5a9bb83c239f890741f8`.
-
-#### Step 2 — Fix the post-OTP-verification sign-in flow
-After MSG91 verifies the OTP, the edge function needs to generate a Supabase auth session for the user. Approach:
-- In the `send-otp` edge function, when `action === "verify"` succeeds, look up the user's email via `get_email_by_phone` DB function, then use the Supabase Admin API (`signInWithPassword` won't work without password) to generate a magic link or custom token.
-- Better approach: Use `supabase.auth.admin.generateLink()` to create a one-time sign-in link, or return a short-lived session token.
-- Simplest secure approach: After MSG91 OTP verification succeeds, the edge function calls `auth.admin.generateLink({ type: 'magiclink', email })` and returns the token. The client then uses `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })` to establish the session.
-
-#### Step 3 — Update `OtpVerification.tsx` and `Login.tsx`
-- After successful OTP verify response from edge function, use the returned token/link to establish a real Supabase auth session.
-- Handle the case where no account exists for the phone number (show "register first" message).
-
-#### Step 4 — Deploy and test the updated edge function
-
-### Files to modify
-- `supabase/functions/send-otp/index.ts` — add post-verify auth token generation using Supabase admin client
-- `src/components/OtpVerification.tsx` — pass back auth data from edge function response
-- `src/pages/Login.tsx` — use returned auth data to establish session
-
-### Secret update
-- `MSG91_OTP_TEMPLATE_ID` → `69ce5a9bb83c239f890741f8`
+### Step-by-step
+1. Increase total step counts by 1 for both roles
+2. After details validation passes, go to new OTP step instead of next step / submit
+3. Render `OtpVerification` on the OTP step with the formatted phone number
+4. On OTP verified callback, mark phone as verified and proceed (step 3 for guardians = submit, step 4 for users = guardian nomination)
+5. Update back button logic for the new step
 
