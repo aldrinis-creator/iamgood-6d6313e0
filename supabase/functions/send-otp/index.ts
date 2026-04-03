@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -67,6 +69,62 @@ Deno.serve(async (req) => {
     console.log(`MSG91 OTP ${action || "send"} response:`, JSON.stringify(result));
 
     const success = result.type === "success" || result.type === "otp_verified";
+
+    // If OTP verification succeeded, generate a Supabase auth session
+    if (action === "verify" && success) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+
+        // Look up email by phone
+        const phoneWithPlus = `+${formattedPhone}`;
+        const { data: email, error: rpcError } = await supabaseAdmin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
+
+        if (rpcError || !email) {
+          return new Response(
+            JSON.stringify({ success: true, verified: true, session: null, no_account: true }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Generate a magic link for the user
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+          type: "magiclink",
+          email: email as string,
+        });
+
+        if (linkError || !linkData) {
+          console.error("Failed to generate magic link:", linkError);
+          return new Response(
+            JSON.stringify({ success: true, verified: true, session: null, error: "Failed to create session" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Extract token_hash from the generated link
+        const properties = linkData.properties;
+        const tokenHash = properties?.hashed_token;
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            verified: true,
+            token_hash: tokenHash,
+            email: email as string,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (authErr) {
+        console.error("Auth session generation error:", authErr);
+        return new Response(
+          JSON.stringify({ success: true, verified: true, session: null, error: String(authErr) }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     return new Response(
       JSON.stringify({ success, result }),
