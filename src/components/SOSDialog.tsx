@@ -68,6 +68,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [userGender, setUserGender] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [emergencyToken, setEmergencyToken] = useState<string | null>(null);
+  const [medicalHistory, setMedicalHistory] = useState<MedHistoryEntry[]>([]);
   const countingRef = useRef(true);
   const hasSentRef = useRef(false);
 
