@@ -35,6 +35,7 @@ const BatteryWarning: React.FC = () => {
     }
 
     let intervalId: ReturnType<typeof setInterval>;
+    let handler: (() => void) | null = null;
 
     const readBattery = (batt: any) => {
       const level = Math.round(batt.level * 100);
@@ -51,6 +52,13 @@ const BatteryWarning: React.FC = () => {
         } as any, { onConflict: "user_id" }).then(() => {});
       }
     };
+
+    // Start polling immediately — runs even if getBattery() rejects
+    intervalId = setInterval(() => {
+      if (battRef.current) {
+        readBattery(battRef.current);
+      }
+    }, 60_000);
 
     (navigator as any).getBattery().then((b: any) => {
       battRef.current = b;
@@ -69,21 +77,18 @@ const BatteryWarning: React.FC = () => {
       }
 
       // Event listeners
-      const handler = () => readBattery(b);
+      handler = () => readBattery(b);
       b.addEventListener("levelchange", handler);
       b.addEventListener("chargingchange", handler);
-
-      // Polling fallback every 60s to catch missed events
-      intervalId = setInterval(() => readBattery(b), 60_000);
     }).catch(() => {
       console.warn("Battery API promise rejected");
     });
 
     return () => {
       clearInterval(intervalId);
-      if (battRef.current) {
-        battRef.current.removeEventListener("levelchange", () => {});
-        battRef.current.removeEventListener("chargingchange", () => {});
+      if (battRef.current && handler) {
+        battRef.current.removeEventListener("levelchange", handler);
+        battRef.current.removeEventListener("chargingchange", handler);
       }
     };
   }, [session?.user?.id]);

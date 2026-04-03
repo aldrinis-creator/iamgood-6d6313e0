@@ -200,7 +200,7 @@ const GuardianDashboard = () => {
   const fetchWardSettings = useCallback(async (wId: string) => {
     const { data } = await supabase
       .from("user_settings" as any)
-      .select("settings")
+      .select("settings, updated_at")
       .eq("user_id", wId)
       .maybeSingle();
     if (data) {
@@ -240,6 +240,10 @@ const GuardianDashboard = () => {
 
   useEffect(() => {
     if (wardUserId) fetchWardSettings(wardUserId);
+    // Poll ward settings every 2 minutes to keep battery level fresh
+    if (!wardUserId) return;
+    const pollId = setInterval(() => fetchWardSettings(wardUserId), 120_000);
+    return () => clearInterval(pollId);
   }, [wardUserId, fetchWardSettings]);
 
   // Battery low alert for guardian
