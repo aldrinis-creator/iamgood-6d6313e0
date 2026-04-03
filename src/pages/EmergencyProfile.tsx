@@ -19,6 +19,8 @@ interface EmergencyData {
   family_doctor_phone: string | null;
   medications: { name: string; dosage: string }[];
   guardians: { name: string; phone: string; relation: string | null }[];
+  hospitalizations: { reason: string; hospital_name: string | null; start_date: string | null; end_date: string | null; treatment: string | null }[];
+  surgeries: { reason: string; hospital_name: string | null; doctor_name: string | null; start_date: string | null }[];
 }
 
 const EmergencyProfile = () => {
