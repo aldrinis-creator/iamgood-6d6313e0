@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, Battery, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -575,9 +575,15 @@ const GuardianDashboard = () => {
                 <p className="text-[10px] text-muted-foreground">Last Active</p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
-                <Battery className={`w-4 h-4 mx-auto mb-1 ${
-                  wardBattery !== null && wardBattery <= 30 ? "text-destructive" : "text-success"
-                }`} />
+                {(() => {
+                  const level = wardBattery;
+                  const iconClass = `w-5 h-5 mx-auto mb-1 ${level !== null && level <= 10 ? "text-destructive animate-pulse" : level !== null && level <= 30 ? "text-amber-500" : "text-success"}`;
+                  if (level === null) return <BatteryLow className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />;
+                  if (level <= 10) return <BatteryWarning className={iconClass} />;
+                  if (level <= 30) return <BatteryLow className={iconClass} />;
+                  if (level <= 60) return <BatteryMedium className={iconClass} />;
+                  return <BatteryFull className={iconClass} />;
+                })()}
                 <p className={`text-sm font-semibold ${
                   wardBattery !== null && wardBattery <= 30 ? "text-destructive" : ""
                 }`}>
