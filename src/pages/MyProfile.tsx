@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
@@ -16,10 +16,12 @@ import {
   User, Phone, Calendar, Scale, Ruler, Heart, Shield,
   Save, Edit, ShieldCheck, Stethoscope,
   Trash2, Mail, Plus, Loader2, ChevronDown, Activity, Apple, Pill, AlertTriangle,
+  Printer, MessageCircle, Share2,
 } from "lucide-react";
 import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
 import PastMedicalHistory from "@/components/PastMedicalHistory";
+import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
