@@ -198,6 +198,8 @@ const ProfileContent = () => {
 
   // Medications (read-only)
   const [medications, setMedications] = useState<Medication[]>([]);
+  // Medical history (read-only for PDF)
+  const [medicalHistory, setMedicalHistory] = useState<any[]>([]);
 
   const [saving, setSaving] = useState(false);
 
