@@ -75,6 +75,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
     } : null);
     setMeds((medsRes.data || []) as MedView[]);
     setGuardians((guardiansRes.data || []) as GuardianView[]);
+    setMedicalHistory((historyRes.data || []) as MedicalHistoryEntry[]);
     setLoading(false);
   }, [wardUserId]);
 
