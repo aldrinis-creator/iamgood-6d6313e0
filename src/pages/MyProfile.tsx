@@ -206,11 +206,12 @@ const ProfileContent = () => {
   const loadData = useCallback(async () => {
     if (!userId) return;
 
-    const [guardianRes, healthRes, personaRes, medsRes] = await Promise.all([
+    const [guardianRes, healthRes, personaRes, medsRes, historyRes] = await Promise.all([
       supabase.from("guardians").select("*").eq("user_id", userId).order("is_primary", { ascending: false }),
       supabase.from("health_profile").select("*").eq("user_id", userId).limit(1),
       supabase.from("nutrition_personas").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("medications").select("*").eq("user_id", userId).order("name"),
+      supabase.from("medical_history").select("*").eq("user_id", userId).order("start_date", { ascending: false }),
     ]);
 
     if (guardianRes.data) setGuardians(guardianRes.data);
@@ -234,6 +235,7 @@ const ProfileContent = () => {
     }
 
     if (medsRes.data) setMedications(medsRes.data as Medication[]);
+    if (historyRes.data) setMedicalHistory(historyRes.data);
   }, [userId]);
 
   useEffect(() => {
