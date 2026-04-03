@@ -181,14 +181,27 @@ const Login = () => {
           ) : (
             <OtpVerification
               phone={otpPhone}
-              onVerified={async () => {
-                // After OTP verified, look up email and sign in
-                const { data } = await supabase.rpc("get_email_by_phone" as any, { _phone: otpPhone });
-                if (data) {
+              onVerified={async (data) => {
+                if (data?.no_account) {
+                  toast({ title: "No account found", description: "Please register first.", variant: "destructive" });
+                  setOtpPhone("");
+                  return;
+                }
+
+                if (data?.token_hash && data?.email) {
+                  // Use the token_hash to establish a real Supabase session
+                  const { error: verifyError } = await supabase.auth.verifyOtp({
+                    token_hash: data.token_hash,
+                    type: "magiclink",
+                  });
+                  if (verifyError) {
+                    toast({ title: "Sign in failed", description: verifyError.message, variant: "destructive" });
+                    return;
+                  }
                   toast({ title: "Phone verified!", description: "You're signed in." });
                   navigate("/dashboard");
                 } else {
-                  toast({ title: "No account found", description: "Please register first.", variant: "destructive" });
+                  toast({ title: "Verification error", description: "Could not create session. Please try again.", variant: "destructive" });
                   setOtpPhone("");
                 }
               }}
