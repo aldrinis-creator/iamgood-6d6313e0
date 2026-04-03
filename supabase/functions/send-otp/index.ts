@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
       url = `${MSG91_BASE}/otp/verify?otp=${otp}&mobile=${formattedPhone}`;
       method = "GET";
     } else if (action === "resend") {
-      url = `${MSG91_BASE}/otp/retry?retrytype=text&mobile=${formattedPhone}`;
+      // Send a fresh OTP instead of retry (retry fails if original session expired)
+      url = `${MSG91_BASE}/otp?template_id=${templateId}&mobile=${formattedPhone}`;
       method = "POST";
     } else {
       // Default: send OTP
