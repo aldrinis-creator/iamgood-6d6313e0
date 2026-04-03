@@ -313,6 +313,8 @@ ${medical.conditions.length ? `<div class="section"><div class="section-title">�
 ${medicationDetails.length ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body"><table><tr><th>Medication</th><th>Dosage</th></tr>${medicationDetails.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td></tr>`).join("")}</table></div></div>` : ""}
 ${medical.familyDoctorName ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${medical.familyDoctorName}</span></div>${medical.familyDoctorPhone ? `<div class="row"><span class="label">Phone</span><span class="value">${medical.familyDoctorPhone}</span></div>` : ""}</div></div>` : ""}
 ${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${g.guardian_name}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td></tr>`).join("")}</table></div></div>` : ""}
+${sosHospitalizations.length ? `<div class="section"><div class="section-title">🏥 Past Hospitalizations</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>${sosHospitalizations.map(h => `<tr><td>${h.reason}</td><td>${h.hospital_name || "—"}</td><td>${h.start_date ? `${h.start_date}${h.end_date ? ` — ${h.end_date}` : ""}` : "—"}</td><td>${h.treatment || "—"}</td></tr>`).join("")}</table></div></div>` : ""}
+${sosSurgeries.length ? `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Doctor</th><th>Date</th></tr>${sosSurgeries.map(s => `<tr><td>${s.reason}</td><td>${s.hospital_name || "—"}</td><td>${s.doctor_name || "—"}</td><td>${s.start_date || "—"}</td></tr>`).join("")}</table></div></div>` : ""}
 ${location ? `<div class="section"><div class="section-title">📍 Location</div><div class="section-body"><a href="https://maps.google.com/?q=${location.lat},${location.lng}">Open in Google Maps</a></div></div>` : ""}`;
 
     return buildLetterheadHtml({
@@ -320,7 +322,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
       subtitle: userName,
       bodyHtml,
     });
-  }, [userName, userDob, userPhone, userGender, medical, medicationDetails, guardians, location, emergencyProfileUrl]);
+  }, [userName, userDob, userPhone, userGender, medical, medicationDetails, guardians, location, emergencyProfileUrl, sosHospitalizations, sosSurgeries]);
 
   const handlePrintCard = useCallback(() => {
     const html = buildCardHtml();
