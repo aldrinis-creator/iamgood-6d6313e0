@@ -200,7 +200,7 @@ const GuardianDashboard = () => {
   const fetchWardSettings = useCallback(async (wId: string) => {
     const { data } = await supabase
       .from("user_settings" as any)
-      .select("settings")
+      .select("settings, updated_at")
       .eq("user_id", wId)
       .maybeSingle();
     if (data) {
