@@ -421,6 +421,28 @@ const ProfileContent = () => {
         html += `</table></div></div>`;
       }
 
+      const hospitalizations = medicalHistory.filter((h) => h.type === "hospitalization");
+      const surgeries = medicalHistory.filter((h) => h.type === "surgery");
+
+      if (hospitalizations.length > 0) {
+        html += `<div class="section"><div class="section-title">🏥 Past Hospitalizations</div><div class="section-body">`;
+        html += `<table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>`;
+        hospitalizations.forEach((h) => {
+          const period = h.start_date ? `${h.start_date}${h.end_date ? ` — ${h.end_date}` : ""}` : "—";
+          html += `<tr><td>${h.reason}</td><td>${h.hospital_name || "—"}</td><td>${period}</td><td>${h.treatment || "—"}</td></tr>`;
+        });
+        html += `</table></div></div>`;
+      }
+
+      if (surgeries.length > 0) {
+        html += `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body">`;
+        html += `<table><tr><th>Reason</th><th>Nature</th><th>Doctor</th><th>Date</th></tr>`;
+        surgeries.forEach((s) => {
+          html += `<tr><td>${s.reason}</td><td>${s.nature || "—"}</td><td>${s.doctor_name || "—"}</td><td>${s.start_date || "—"}</td></tr>`;
+        });
+        html += `</table></div></div>`;
+      }
+
       return html;
     };
 
