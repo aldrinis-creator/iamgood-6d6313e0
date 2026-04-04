@@ -93,7 +93,9 @@ const MapMyJourney = () => {
   const [originPos, setOriginPos] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const placesDiv = useRef<HTMLDivElement | null>(null);
