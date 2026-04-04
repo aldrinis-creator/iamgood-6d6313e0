@@ -98,25 +98,39 @@ const MapMyJourney = () => {
     );
   }, []);
 
-  // Destination autocomplete via Nominatim
+  // Destination autocomplete via Nominatim with location bias
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (query.length < 3) {
+    if (query.length < 2) {
       setSearchResults([]);
       return;
     }
     searchTimer.current = setTimeout(async () => {
       try {
+        const params = new URLSearchParams({
+          format: "json",
+          q: query,
+          limit: "10",
+          addressdetails: "1",
+          dedupe: "1",
+        });
+        // Bias results around user's current location for relevance
+        if (originPos) {
+          const delta = 0.5; // ~50km viewbox
+          params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
+          params.set("bounded", "0"); // prefer viewbox but don't restrict
+        }
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=in`
+          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+          { headers: { "User-Agent": "CheckiN-App/1.0" } }
         );
         const data = await res.json();
         setSearchResults(data);
       } catch {
         setSearchResults([]);
       }
-    }, 500);
-  }, []);
+    }, 350);
+  }, [originPos]);
 
   // Fetch route from OSRM
   const fetchRoute = useCallback(async (origin: { lat: number; lng: number }, dest: { lat: number; lng: number }, mode: string) => {
