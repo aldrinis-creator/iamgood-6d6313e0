@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import OtpVerification from "@/components/OtpVerification";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -61,8 +62,8 @@ const OrDivider = () => (
 
 type SelectedRole = "user" | "guardian" | null;
 
-const TOTAL_STEPS_USER = 3;
-const TOTAL_STEPS_GUARDIAN = 2;
+const TOTAL_STEPS_USER = 4;
+const TOTAL_STEPS_GUARDIAN = 3;
 
 const Register = () => {
   const { signUp } = useAuth();
@@ -78,6 +79,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
@@ -94,6 +96,8 @@ const Register = () => {
       setSelectedRole(null);
     } else if (step === 3) {
       setStep(2);
+    } else if (step === 4) {
+      setStep(3);
     }
   };
 
@@ -133,11 +137,21 @@ const Register = () => {
       toast({ title: "Invalid phone number", description: phoneError, variant: "destructive" });
       return;
     }
+    // Go to OTP verification step
+    setStep(3);
+  };
+
+  const handleOtpVerified = () => {
+    setPhoneVerified(true);
     if (selectedRole === "user") {
-      setStep(3);
+      setStep(4); // Guardian nomination
     } else {
-      handleSubmit();
+      handleSubmit(); // Guardian role: submit directly
     }
+  };
+
+  const handleOtpCancel = () => {
+    setStep(2); // Back to details
   };
 
   const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
@@ -358,8 +372,8 @@ const Register = () => {
               onClick={handleDetailsNext}
             >
               {selectedRole === "guardian"
-                ? loading ? "Creating Account..." : "Create Guardian Account"
-                : "Next — Add Guardians"}
+                ? loading ? "Creating Account..." : "Next — Verify Phone"
+                : "Next — Verify Phone"}
             </Button>
           </div>
         </div>
@@ -367,7 +381,37 @@ const Register = () => {
     );
   }
 
-  // --- Step 3: Nominate guardians (user role only) ---
+  // --- Step 3: OTP verification ---
+  if (step === 3) {
+    const fullPhone = `${phoneCode}${phone}`;
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
+        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+          <div className="flex items-center gap-3 mb-4">
+            <button type="button" onClick={handleOtpCancel} className="p-2 -ml-2 rounded-lg hover:bg-muted">
+              <ChevronLeft className="w-5 h-5 text-foreground" />
+            </button>
+            <div className="flex-1">
+              <Progress value={(3 / totalSteps) * 100} className="h-2" />
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              Step 3/{totalSteps}
+            </span>
+          </div>
+
+          <div className="mt-8">
+            <OtpVerification
+              phone={fullPhone}
+              onVerified={handleOtpVerified}
+              onCancel={handleOtpCancel}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Step 4: Nominate guardians (user role only) ---
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
