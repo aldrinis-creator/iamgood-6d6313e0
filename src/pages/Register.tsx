@@ -411,7 +411,7 @@ const Register = () => {
     );
   }
 
-  // --- Step 3: Nominate guardians (user role only) ---
+  // --- Step 4: Nominate guardians (user role only) ---
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
