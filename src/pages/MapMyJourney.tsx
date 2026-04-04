@@ -119,38 +119,46 @@ const MapMyJourney = () => {
     );
   }, []);
 
-  // Destination autocomplete via Nominatim with location bias
+  // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({
-          format: "json",
-          q: query,
-          limit: "10",
-          addressdetails: "1",
-          dedupe: "1",
-        });
-        // Bias results around user's current location for relevance
-        if (originPos) {
-          const delta = 0.5; // ~50km viewbox
-          params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
-          params.set("bounded", "0"); // prefer viewbox but don't restrict
-        }
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-          { headers: { "User-Agent": "CheckiN-App/1.0" } }
-        );
-        const data = await res.json();
-        setSearchResults(data);
-      } catch {
-        setSearchResults([]);
+    searchTimer.current = setTimeout(() => {
+      if (!autocompleteService.current) {
+        // Fallback to Nominatim if Google not loaded
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`, { headers: { "User-Agent": "CheckiN-App/1.0" } })
+          .then(r => r.json())
+          .then(data => setSearchResults(data.map((d: any) => ({ place_id: d.place_id, description: d.display_name, main_text: d.display_name.split(",")[0], secondary_text: d.display_name.split(",").slice(1).join(",").trim(), lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))))
+          .catch(() => setSearchResults([]));
+        return;
       }
-    }, 350);
+
+      const request: google.maps.places.AutocompletionRequest = {
+        input: query,
+        ...(originPos && {
+          locationBias: {
+            center: { lat: originPos.lat, lng: originPos.lng },
+            radius: 50000,
+          } as any,
+        }),
+      };
+
+      autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSearchResults(predictions.map(p => ({
+            place_id: p.place_id,
+            description: p.description,
+            main_text: p.structured_formatting.main_text,
+            secondary_text: p.structured_formatting.secondary_text || "",
+          })));
+        } else {
+          setSearchResults([]);
+        }
+      });
+    }, 300);
   }, [originPos]);
 
   // Fetch route from OSRM
@@ -181,9 +189,31 @@ const MapMyJourney = () => {
   }, [selectedDest, originPos, transportMode, fetchRoute]);
 
   const handleSelectDest = (result: SearchResult) => {
-    setSelectedDest({ name: result.display_name, lat: parseFloat(result.lat), lng: parseFloat(result.lon) });
-    setDestination(result.display_name);
-    setSearchResults([]);
+    // If we already have lat/lng (fallback mode), use directly
+    if (result.lat && result.lng) {
+      setSelectedDest({ name: result.description, lat: result.lat, lng: result.lng });
+      setDestination(result.main_text);
+      setSearchResults([]);
+      return;
+    }
+    // Otherwise use PlacesService to get coordinates
+    if (!placesService.current) return;
+    placesService.current.getDetails(
+      { placeId: result.place_id, fields: ["geometry", "name", "formatted_address"] },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+          setSelectedDest({
+            name: place.formatted_address || result.description,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
+          setDestination(result.main_text);
+          setSearchResults([]);
+        } else {
+          toast.error("Could not get location details");
+        }
+      }
+    );
   };
 
   const handleStartJourney = async () => {
