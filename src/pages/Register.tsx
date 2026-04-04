@@ -62,8 +62,8 @@ const OrDivider = () => (
 
 type SelectedRole = "user" | "guardian" | null;
 
-const TOTAL_STEPS_USER = 3;
-const TOTAL_STEPS_GUARDIAN = 2;
+const TOTAL_STEPS_USER = 4;
+const TOTAL_STEPS_GUARDIAN = 3;
 
 const Register = () => {
   const { signUp } = useAuth();
