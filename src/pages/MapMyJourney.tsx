@@ -49,9 +49,12 @@ const TRANSPORT_MODES = [
 ];
 
 interface SearchResult {
-  display_name: string;
-  lat: string;
-  lon: string;
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
+  lat?: number;
+  lng?: number;
 }
 
 // Component to fit map bounds
