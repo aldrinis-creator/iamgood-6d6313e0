@@ -93,6 +93,23 @@ const MapMyJourney = () => {
   const [loading, setLoading] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const placesDiv = useRef<HTMLDivElement | null>(null);
+
+  // Load Google Places API
+  useEffect(() => {
+    loadGoogleMapsAPI().then(() => {
+      autocompleteService.current = new google.maps.places.AutocompleteService();
+      // PlacesService needs a DOM element or map
+      if (!placesDiv.current) {
+        placesDiv.current = document.createElement("div");
+      }
+      placesService.current = new google.maps.places.PlacesService(placesDiv.current);
+    }).catch(() => {
+      console.warn("Google Places API failed to load, falling back to basic search");
+    });
+  }, []);
 
   // Get user's current location on mount
   useEffect(() => {
