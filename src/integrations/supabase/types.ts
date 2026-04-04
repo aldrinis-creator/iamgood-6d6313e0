@@ -1091,6 +1091,45 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_destinations: {
+        Row: {
+          created_at: string
+          id: string
+          is_favorite: boolean
+          last_used_at: string
+          lat: number
+          lng: number
+          name: string
+          place_id: string | null
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          last_used_at?: string
+          lat: number
+          lng: number
+          name: string
+          place_id?: string | null
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          last_used_at?: string
+          lat?: number
+          lng?: number
+          name?: string
+          place_id?: string | null
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       sos_events: {
         Row: {
           cancelled_at: string | null
