@@ -137,11 +137,21 @@ const Register = () => {
       toast({ title: "Invalid phone number", description: phoneError, variant: "destructive" });
       return;
     }
+    // Go to OTP verification step
+    setStep(3);
+  };
+
+  const handleOtpVerified = () => {
+    setPhoneVerified(true);
     if (selectedRole === "user") {
-      setStep(3);
+      setStep(4); // Guardian nomination
     } else {
-      handleSubmit();
+      handleSubmit(); // Guardian role: submit directly
     }
+  };
+
+  const handleOtpCancel = () => {
+    setStep(2); // Back to details
   };
 
   const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
