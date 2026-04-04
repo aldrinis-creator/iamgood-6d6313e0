@@ -408,15 +408,22 @@ const MapMyJourney = () => {
                       }}
                     />
                     {searchResults.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {searchResults.map((r, i) => (
                           <button
-                            key={i}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b border-border last:border-0"
+                            key={r.place_id || i}
+                            className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-0"
                             onClick={() => handleSelectDest(r)}
                           >
-                            <MapPin className="w-3 h-3 inline mr-1 text-muted-foreground" />
-                            {r.display_name.length > 80 ? r.display_name.slice(0, 80) + "..." : r.display_name}
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{r.main_text}</p>
+                                {r.secondary_text && (
+                                  <p className="text-xs text-muted-foreground truncate">{r.secondary_text}</p>
+                                )}
+                              </div>
+                            </div>
                           </button>
                         ))}
                       </div>
