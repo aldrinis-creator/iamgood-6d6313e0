@@ -79,6 +79,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
