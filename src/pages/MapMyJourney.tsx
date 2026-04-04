@@ -222,6 +222,8 @@ const MapMyJourney = () => {
   const handleStartJourney = async () => {
     if (!selectedDest || !originPos || eta === null) return;
     setLoading(true);
+    // Save destination for future quick access
+    saveDestination({ name: selectedDest.name, lat: selectedDest.lat, lng: selectedDest.lng });
     // Set expected route for geofence detection before starting
     if (routeCoords.length > 0) {
       setExpectedRoute(routeCoords);
