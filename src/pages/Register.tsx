@@ -372,9 +372,39 @@ const Register = () => {
               onClick={handleDetailsNext}
             >
               {selectedRole === "guardian"
-                ? loading ? "Creating Account..." : "Create Guardian Account"
-                : "Next — Add Guardians"}
+                ? loading ? "Creating Account..." : "Next — Verify Phone"
+                : "Next — Verify Phone"}
             </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Step 3: OTP verification ---
+  if (step === 3) {
+    const fullPhone = `${phoneCode}${phone}`;
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
+        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+          <div className="flex items-center gap-3 mb-4">
+            <button type="button" onClick={handleOtpCancel} className="p-2 -ml-2 rounded-lg hover:bg-muted">
+              <ChevronLeft className="w-5 h-5 text-foreground" />
+            </button>
+            <div className="flex-1">
+              <Progress value={(3 / totalSteps) * 100} className="h-2" />
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              Step 3/{totalSteps}
+            </span>
+          </div>
+
+          <div className="mt-8">
+            <OtpVerification
+              phone={fullPhone}
+              onVerified={handleOtpVerified}
+              onCancel={handleOtpCancel}
+            />
           </div>
         </div>
       </div>
