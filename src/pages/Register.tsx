@@ -96,6 +96,8 @@ const Register = () => {
       setSelectedRole(null);
     } else if (step === 3) {
       setStep(2);
+    } else if (step === 4) {
+      setStep(3);
     }
   };
 
