@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Building2, Store } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
 import StreetViewPanel from "@/components/StreetViewPanel";
+import { loadGoogleMapsAPI } from "@/lib/googleMaps";
 
 // Fix Leaflet default icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -48,9 +49,12 @@ const TRANSPORT_MODES = [
 ];
 
 interface SearchResult {
-  display_name: string;
-  lat: string;
-  lon: string;
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
+  lat?: number;
+  lng?: number;
 }
 
 // Component to fit map bounds
@@ -89,6 +93,23 @@ const MapMyJourney = () => {
   const [loading, setLoading] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const placesDiv = useRef<HTMLDivElement | null>(null);
+
+  // Load Google Places API
+  useEffect(() => {
+    loadGoogleMapsAPI().then(() => {
+      autocompleteService.current = new google.maps.places.AutocompleteService();
+      // PlacesService needs a DOM element or map
+      if (!placesDiv.current) {
+        placesDiv.current = document.createElement("div");
+      }
+      placesService.current = new google.maps.places.PlacesService(placesDiv.current);
+    }).catch(() => {
+      console.warn("Google Places API failed to load, falling back to basic search");
+    });
+  }, []);
 
   // Get user's current location on mount
   useEffect(() => {
@@ -98,38 +119,46 @@ const MapMyJourney = () => {
     );
   }, []);
 
-  // Destination autocomplete via Nominatim with location bias
+  // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({
-          format: "json",
-          q: query,
-          limit: "10",
-          addressdetails: "1",
-          dedupe: "1",
-        });
-        // Bias results around user's current location for relevance
-        if (originPos) {
-          const delta = 0.5; // ~50km viewbox
-          params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
-          params.set("bounded", "0"); // prefer viewbox but don't restrict
-        }
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-          { headers: { "User-Agent": "CheckiN-App/1.0" } }
-        );
-        const data = await res.json();
-        setSearchResults(data);
-      } catch {
-        setSearchResults([]);
+    searchTimer.current = setTimeout(() => {
+      if (!autocompleteService.current) {
+        // Fallback to Nominatim if Google not loaded
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`, { headers: { "User-Agent": "CheckiN-App/1.0" } })
+          .then(r => r.json())
+          .then(data => setSearchResults(data.map((d: any) => ({ place_id: d.place_id, description: d.display_name, main_text: d.display_name.split(",")[0], secondary_text: d.display_name.split(",").slice(1).join(",").trim(), lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))))
+          .catch(() => setSearchResults([]));
+        return;
       }
-    }, 350);
+
+      const request: google.maps.places.AutocompletionRequest = {
+        input: query,
+        ...(originPos && {
+          locationBias: {
+            center: { lat: originPos.lat, lng: originPos.lng },
+            radius: 50000,
+          } as any,
+        }),
+      };
+
+      autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSearchResults(predictions.map(p => ({
+            place_id: p.place_id,
+            description: p.description,
+            main_text: p.structured_formatting.main_text,
+            secondary_text: p.structured_formatting.secondary_text || "",
+          })));
+        } else {
+          setSearchResults([]);
+        }
+      });
+    }, 300);
   }, [originPos]);
 
   // Fetch route from OSRM
@@ -160,9 +189,31 @@ const MapMyJourney = () => {
   }, [selectedDest, originPos, transportMode, fetchRoute]);
 
   const handleSelectDest = (result: SearchResult) => {
-    setSelectedDest({ name: result.display_name, lat: parseFloat(result.lat), lng: parseFloat(result.lon) });
-    setDestination(result.display_name);
-    setSearchResults([]);
+    // If we already have lat/lng (fallback mode), use directly
+    if (result.lat && result.lng) {
+      setSelectedDest({ name: result.description, lat: result.lat, lng: result.lng });
+      setDestination(result.main_text);
+      setSearchResults([]);
+      return;
+    }
+    // Otherwise use PlacesService to get coordinates
+    if (!placesService.current) return;
+    placesService.current.getDetails(
+      { placeId: result.place_id, fields: ["geometry", "name", "formatted_address"] },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+          setSelectedDest({
+            name: place.formatted_address || result.description,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
+          setDestination(result.main_text);
+          setSearchResults([]);
+        } else {
+          toast.error("Could not get location details");
+        }
+      }
+    );
   };
 
   const handleStartJourney = async () => {
@@ -357,15 +408,22 @@ const MapMyJourney = () => {
                       }}
                     />
                     {searchResults.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {searchResults.map((r, i) => (
                           <button
-                            key={i}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b border-border last:border-0"
+                            key={r.place_id || i}
+                            className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-0"
                             onClick={() => handleSelectDest(r)}
                           >
-                            <MapPin className="w-3 h-3 inline mr-1 text-muted-foreground" />
-                            {r.display_name.length > 80 ? r.display_name.slice(0, 80) + "..." : r.display_name}
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{r.main_text}</p>
+                                {r.secondary_text && (
+                                  <p className="text-xs text-muted-foreground truncate">{r.secondary_text}</p>
+                                )}
+                              </div>
+                            </div>
                           </button>
                         ))}
                       </div>
