@@ -183,13 +183,35 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Deduplicate: keep only ONE pending check-in per user+scheduled_hour
+    // This prevents sending multiple alerts for the same missed slot
+    const seen = new Set<string>();
+    const uniqueCheckIns: typeof pendingCheckIns = [];
+    const duplicateIds: string[] = [];
+    for (const ci of pendingCheckIns) {
+      const scheduledDate = new Date(ci.scheduled_at);
+      const key = `${ci.user_id}-${scheduledDate.getUTCFullYear()}-${scheduledDate.getUTCMonth()}-${scheduledDate.getUTCDate()}-${scheduledDate.getUTCHours()}`;
+      if (seen.has(key)) {
+        duplicateIds.push(ci.id);
+      } else {
+        seen.add(key);
+        uniqueCheckIns.push(ci);
+      }
+    }
+
+    // Mark duplicates as missed immediately without sending alerts
+    if (duplicateIds.length > 0) {
+      await supabase.from("check_ins").update({ status: "missed" }).in("id", duplicateIds);
+      console.log(`Silently marked ${duplicateIds.length} duplicate check-ins as missed`);
+    }
+
     console.log(`Found ${pendingCheckIns.length} missed check-ins`);
 
     let notificationsCreated = 0;
     let emailsSent = 0;
     let pushesSent = 0;
 
-    for (const checkIn of pendingCheckIns) {
+    for (const checkIn of uniqueCheckIns) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
@@ -343,7 +365,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: "Processed missed check-ins",
-        missed: pendingCheckIns.length,
+        missed: uniqueCheckIns.length,
         notifications: notificationsCreated,
         emails: emailsSent,
         pushes: pushesSent,
