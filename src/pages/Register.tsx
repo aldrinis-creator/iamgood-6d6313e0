@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -82,6 +82,8 @@ const Register = () => {
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [sentGuardianCount, setSentGuardianCount] = useState(0);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
@@ -211,25 +213,113 @@ const Register = () => {
       return;
     }
 
+    const guardiansWithEmail = guardianRows.filter(g => g.guardian_email);
     if (selectedRole === "user") {
-      for (const g of guardianRows) {
+      for (const g of guardiansWithEmail) {
         if (g.guardian_email) {
           sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
         }
       }
     }
+    setSentGuardianCount(guardiansWithEmail.length);
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
     }
 
     setLoading(false);
-    toast.success("Account created!", { description: "Check your email to verify your account." });
-    navigate(selectedRole === "guardian" ? "/guardian" : "/dashboard");
+    setRegistrationComplete(true);
   };
+
+  // --- Registration success screen ---
+  if (registrationComplete) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-success/10 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-10 h-10 text-success" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">Account Created!</h1>
+            <p className="text-muted-foreground">Welcome to Check-iN, {fullName}.</p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4 text-left">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
+              <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground text-sm">Verify your email</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
+                </p>
+              </div>
+            </div>
+
+            {selectedRole === "user" && sentGuardianCount > 0 && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
+                <Users className="w-5 h-5 text-success mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Guardian invitations sent</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {sentGuardianCount === 1
+                      ? "An invitation email has been sent to your guardian."
+                      : `Invitation emails have been sent to ${sentGuardianCount} guardians.`}
+                    {" "}They'll receive instructions to set up their guardian account.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedRole === "user" && sentGuardianCount === 0 && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50 border border-border">
+                <Users className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">No guardian invitations sent</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Your guardians were saved but no email invitations were sent (no email addresses provided). You can add guardian emails later from Settings.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedRole === "guardian" && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <Shield className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Guardian account ready</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          <Button
+            className="w-full text-lg min-h-[52px]"
+            size="lg"
+            onClick={() => navigate("/login")}
+          >
+            Go to Sign In
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            Didn't receive the email? Check your spam folder or sign in to resend the verification.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // --- Step 1: Role selection ---
   if (step === 1) {
+  };
+
     return (
       <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
         <div className="w-full max-w-md space-y-6">
