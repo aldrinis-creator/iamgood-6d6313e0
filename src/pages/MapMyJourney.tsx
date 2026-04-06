@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
@@ -95,7 +95,7 @@ const MapMyJourney = () => {
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination } = useSavedDestinations();
+  const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const placesDiv = useRef<HTMLDivElement | null>(null);
@@ -351,8 +351,8 @@ const MapMyJourney = () => {
             <div className="relative rounded-lg overflow-hidden border border-border" style={{ height: 350 }}>
               <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution="&copy; Google"
+                  url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
                 />
                 <FitBounds bounds={mapBounds} />
                 {currentPos && <Marker position={[currentPos.lat, currentPos.lng]} icon={userIcon} />}
@@ -531,8 +531,8 @@ const MapMyJourney = () => {
                   <div className="rounded-lg overflow-hidden border border-border" style={{ height: 250 }}>
                     <MapContainer center={[originPos.lat, originPos.lng]} zoom={12} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                       <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution="&copy; Google"
+                        url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
                       />
                       <FitBounds bounds={mapBounds} />
                       <Marker position={[originPos.lat, originPos.lng]} icon={userIcon} />
