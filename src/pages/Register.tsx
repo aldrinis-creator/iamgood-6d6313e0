@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Shield, Heart, Plus, Trash2, User, ChevronLeft } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
@@ -402,6 +402,7 @@ const Register = () => {
           <div className="mt-8">
             <OtpVerification
               phone={fullPhone}
+              purpose="register"
               onVerified={handleOtpVerified}
               onCancel={handleOtpCancel}
             />

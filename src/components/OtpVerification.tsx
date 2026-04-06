@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface OtpVerificationProps {
   phone: string;
+  purpose?: "login" | "register";
   onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
   onCancel: () => void;
 }
