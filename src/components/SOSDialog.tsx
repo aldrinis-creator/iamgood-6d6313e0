@@ -154,7 +154,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     const healthData = (window as any).__sosHealthData;
     let msg = `🚨 SOS ALERT from ${userName}!`;
     if (userPhone) msg += `\n📞 Phone: ${userPhone}`;
-    if (userDob) msg += `\n🎂 DOB: ${userDob}`;
+    if (userDob) msg += `\n🎂 Age: ${Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} years`;
     if (location) {
       msg += `\n📍 Location: https://maps.google.com/?q=${location.lat},${location.lng}`;
     }
@@ -265,7 +265,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     const lines = [
       `🚨 EMERGENCY HEALTH CARD — ${userName}`,
       "",
-      userDob ? `DOB: ${userDob}` : "",
+      userDob ? `Age: ${Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} years` : "",
       userPhone ? `Phone: ${userPhone}` : "",
       userGender ? `Gender: ${userGender}` : "",
       medical.bloodGroup ? `Blood Group: ${medical.bloodGroup}` : "",
@@ -303,7 +303,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 ${qrSection}
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${userName}</span></div>
-${userDob ? `<div class="row"><span class="label">DOB</span><span class="value">${userDob}</span></div>` : ""}
+${userDob ? `<div class="row"><span class="label">Age</span><span class="value">${Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} years</span></div>` : ""}
 ${userGender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${userGender}</span></div>` : ""}
 ${userPhone ? `<div class="row"><span class="label">Phone</span><span class="value">${userPhone}</span></div>` : ""}
 ${medical.bloodGroup ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${medical.bloodGroup}</span></span></div>` : ""}
@@ -406,7 +406,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Personal</p>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Name:</span> <span className="font-medium text-foreground">{userName}</span></div>
-                {userDob && <div><span className="text-muted-foreground">DOB:</span> <span className="font-medium text-foreground">{userDob}</span></div>}
+                {userDob && <div><span className="text-muted-foreground">Age:</span> <span className="font-medium text-foreground">{Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} yrs</span></div>}
                 {userPhone && <div><span className="text-muted-foreground">Phone:</span> <span className="font-medium text-foreground">{userPhone}</span></div>}
                 {userGender && <div><span className="text-muted-foreground">Gender:</span> <span className="font-medium text-foreground capitalize">{userGender}</span></div>}
               </div>
