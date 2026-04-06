@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
@@ -95,7 +95,7 @@ const MapMyJourney = () => {
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination } = useSavedDestinations();
+  const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const placesDiv = useRef<HTMLDivElement | null>(null);
@@ -351,8 +351,8 @@ const MapMyJourney = () => {
             <div className="relative rounded-lg overflow-hidden border border-border" style={{ height: 350 }}>
               <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution="&copy; Google"
+                  url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
                 />
                 <FitBounds bounds={mapBounds} />
                 {currentPos && <Marker position={[currentPos.lat, currentPos.lng]} icon={userIcon} />}
@@ -400,20 +400,82 @@ const MapMyJourney = () => {
             {/* Setup Form */}
             <Card>
               <CardContent className="p-4 space-y-4">
+                {/* Home / Work Quick-Set */}
+                <div className="flex gap-2">
+                  <Button
+                    variant={homeDest ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 gap-1.5"
+                    onClick={() => {
+                      if (homeDest) {
+                        const name = homeDest.name.replace("🏠 Home: ", "");
+                        setSelectedDest({ name: homeDest.name, lat: homeDest.lat, lng: homeDest.lng });
+                        setDestination(name.split(",")[0]);
+                      } else if (selectedDest) {
+                        setHomeWork("home", selectedDest);
+                        toast.success("Home location saved!");
+                      } else {
+                        toast.info("Search for a destination first, then set as Home");
+                      }
+                    }}
+                  >
+                    <Home className="w-4 h-4" />
+                    {homeDest ? "Home" : "Set Home"}
+                  </Button>
+                  <Button
+                    variant={workDest ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 gap-1.5"
+                    onClick={() => {
+                      if (workDest) {
+                        const name = workDest.name.replace("🏢 Work: ", "");
+                        setSelectedDest({ name: workDest.name, lat: workDest.lat, lng: workDest.lng });
+                        setDestination(name.split(",")[0]);
+                      } else if (selectedDest) {
+                        setHomeWork("work", selectedDest);
+                        toast.success("Work location saved!");
+                      } else {
+                        toast.info("Search for a destination first, then set as Work");
+                      }
+                    }}
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    {workDest ? "Work" : "Set Work"}
+                  </Button>
+                </div>
+
                 {/* Destination Input */}
                 <div className="space-y-2">
                   <Label>Destination</Label>
                   <div className="relative">
-                    <Input
-                      placeholder="Search destination..."
-                      value={destination}
-                      onFocus={() => setInputFocused(true)}
-                      onBlur={() => setTimeout(() => setInputFocused(false), 200)}
-                      onChange={(e) => {
-                        setDestination(e.target.value);
-                        searchDestination(e.target.value);
-                      }}
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder="Search destination..."
+                        value={destination}
+                        onFocus={() => setInputFocused(true)}
+                        onBlur={() => setTimeout(() => setInputFocused(false), 300)}
+                        onChange={(e) => {
+                          setDestination(e.target.value);
+                          searchDestination(e.target.value);
+                          if (!e.target.value) setSelectedDest(null);
+                        }}
+                      />
+                      {destination && (
+                        <button
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setDestination("");
+                            setSelectedDest(null);
+                            setSearchResults([]);
+                            setRouteCoords([]);
+                            setEta(null);
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                     {/* Search results dropdown */}
                     {searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -421,7 +483,10 @@ const MapMyJourney = () => {
                           <button
                             key={r.place_id || i}
                             className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-0"
-                            onClick={() => handleSelectDest(r)}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectDest(r);
+                            }}
                           >
                             <div className="flex items-start gap-2">
                               <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -451,14 +516,19 @@ const MapMyJourney = () => {
                           >
                             <button
                               className="flex-1 text-left px-3 py-2.5"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setSelectedDest({ name: d.name, lat: d.lat, lng: d.lng });
                                 setDestination(d.name.split(",")[0]);
                                 setInputFocused(false);
                               }}
                             >
                               <div className="flex items-start gap-2">
-                                {d.is_favorite ? (
+                                {d.name.startsWith("🏠") ? (
+                                  <Home className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                                ) : d.name.startsWith("🏢") ? (
+                                  <Briefcase className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                                ) : d.is_favorite ? (
                                   <Star className="w-4 h-4 mt-0.5 text-yellow-500 fill-yellow-500 shrink-0" />
                                 ) : (
                                   <History className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -473,14 +543,20 @@ const MapMyJourney = () => {
                             </button>
                             <button
                               className="p-1.5 hover:text-yellow-500 text-muted-foreground"
-                              onClick={() => toggleFavorite(d.id, d.is_favorite)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                toggleFavorite(d.id, d.is_favorite);
+                              }}
                               title={d.is_favorite ? "Remove from favorites" : "Add to favorites"}
                             >
                               <Star className={`w-3.5 h-3.5 ${d.is_favorite ? "text-yellow-500 fill-yellow-500" : ""}`} />
                             </button>
                             <button
                               className="p-1.5 hover:text-destructive text-muted-foreground mr-1"
-                              onClick={() => removeDestination(d.id)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                removeDestination(d.id);
+                              }}
                               title="Remove"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -531,8 +607,8 @@ const MapMyJourney = () => {
                   <div className="rounded-lg overflow-hidden border border-border" style={{ height: 250 }}>
                     <MapContainer center={[originPos.lat, originPos.lng]} zoom={12} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                       <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution="&copy; Google"
+                        url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
                       />
                       <FitBounds bounds={mapBounds} />
                       <Marker position={[originPos.lat, originPos.lng]} icon={userIcon} />

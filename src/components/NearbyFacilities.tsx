@@ -246,9 +246,9 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       zoom: 5,
       zoomControl: false,
     });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-      maxZoom: 18,
+    L.tileLayer("https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+      attribution: "© Google",
+      maxZoom: 20,
     }).addTo(leafletMap.current);
     L.control.zoom({ position: "bottomright" }).addTo(leafletMap.current);
 
@@ -521,7 +521,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       )}
 
       <p className="text-[10px] text-center text-muted-foreground">
-        Data from OpenStreetMap · Location used only for search
+        Data from Google Maps · Location used only for search
       </p>
 
       <AddFacilityDialog
