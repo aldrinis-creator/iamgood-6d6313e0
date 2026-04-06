@@ -13,6 +13,9 @@ import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import OtpVerification from "@/components/OtpVerification";
+import PhoneInput from "@/components/PhoneInput";
+
+const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -394,7 +397,7 @@ const Register = () => {
 
           <div className="mt-8">
             <OtpVerification
-              phone={fullPhone}
+              phone={phone.replace(/\s/g, "")}
               purpose="register"
               onVerified={handleOtpVerified}
               onCancel={handleOtpCancel}
