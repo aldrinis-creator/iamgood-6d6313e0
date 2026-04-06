@@ -85,7 +85,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (data) {
       setActiveSosId(data.id);
     }
-  }, [session]);
+  }, [session?.user?.id]);
 
   const cancelSOS = useCallback(async () => {
     setEmergencyMode(false);
