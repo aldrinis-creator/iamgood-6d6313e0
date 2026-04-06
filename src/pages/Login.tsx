@@ -10,7 +10,7 @@ import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone } from "lucide-rea
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { Separator } from "@/components/ui/separator";
+
 import OtpVerification from "@/components/OtpVerification";
 
 const GoogleIcon = () => (
