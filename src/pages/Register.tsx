@@ -189,6 +189,8 @@ const Register = () => {
     const { data, error } = await signUp(email, password, { 
       full_name: fullName,
       app_role: selectedRole || "user",
+      phone: phone.replace(/\s/g, ""),
+      date_of_birth: dob || "",
     });
 
     if (error) {
@@ -201,12 +203,6 @@ const Register = () => {
     if (userId) {
       // Wait briefly for the trigger to create the profile row
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update profile with phone, DOB
-      await supabase.from("profiles").update({
-        phone: phone.replace(/\s/g, ""),
-        date_of_birth: dob || null,
-      }).eq("id", userId);
 
       // Insert guardians only for user role
       if (selectedRole === "user") {
