@@ -461,6 +461,17 @@ const MapMyJourney = () => {
                     {workDest ? "Work" : "Set Work"}
                   </Button>
                 </div>
+                {pendingHomeWork && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-muted-foreground"
+                    onClick={() => setPendingHomeWork(null)}
+                  >
+                    <X className="w-3.5 h-3.5 mr-1" />
+                    Cancel setting {pendingHomeWork === "home" ? "Home" : "Work"}
+                  </Button>
+                )}
 
                 {/* Destination Input */}
                 <div className="space-y-2">
