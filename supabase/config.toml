@@ -1,25 +1,21 @@
 project_id = "magnrdegcegxdtgapyez"
 
-[functions.nutrition-advisor]
-verify_jwt = false
-
-[functions.health-tools]
-verify_jwt = false
-
-[functions.check-missed-checkins]
-verify_jwt = false
-
-[functions.notify-guardian-medication]
-verify_jwt = false
-
-[functions.send-sos-alert]
-verify_jwt = false
-
-[functions.send-otp]
-verify_jwt = false
-
-[functions.msg91-send]
-verify_jwt = false
-
-[functions.process-email-queue]
-verify_jwt = true
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.check-missed-checkins]
+    verify_jwt = false
+  [functions.health-tools]
+    verify_jwt = false
+  [functions.msg91-send]
+    verify_jwt = false
+  [functions.notify-guardian-medication]
+    verify_jwt = false
+  [functions.nutrition-advisor]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.send-otp]
+    verify_jwt = false
+  [functions.send-sos-alert]
+    verify_jwt = false
