@@ -37,6 +37,7 @@ interface Guardian {
   guardian_phone: string;
   guardian_email: string | null;
   relation: string | null;
+  is_primary: boolean;
 }
 
 interface MedHistoryEntry {
@@ -78,7 +79,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes, npRes, historyRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", uid).order("is_primary", { ascending: false }),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("profiles").select("full_name, phone, date_of_birth, gender").eq("id", uid).maybeSingle(),
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
@@ -493,7 +494,10 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                   {guardians.map((g, i) => (
                     <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-2.5">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                        <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                          {g.guardian_name}
+                          {g.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                        </p>
                         <p className="text-xs text-muted-foreground">{g.relation || "Guardian"}</p>
                       </div>
                       <a href={`tel:${g.guardian_phone}`} className="text-sm text-primary font-medium flex items-center gap-1 shrink-0">
