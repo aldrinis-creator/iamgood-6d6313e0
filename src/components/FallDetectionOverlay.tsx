@@ -10,6 +10,7 @@ const FallDetectionOverlay = () => {
   const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled } = useFallDetection();
   const { triggerSOS } = useApp();
   const { session } = useAuth();
+  const hasSentRef = useRef(false);
 
   const sendFallAlerts = useCallback(async () => {
     if (!session?.user?.id) return;
