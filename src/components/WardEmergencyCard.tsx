@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, Share2, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -82,20 +86,23 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleSetPrimary = async (guardianId: string) => {
-    // Remove primary from all guardians of this ward
+  const [confirmPrimaryId, setConfirmPrimaryId] = useState<string | null>(null);
+  const confirmPrimaryName = guardians.find(g => g.id === confirmPrimaryId)?.guardian_name;
+
+  const handleSetPrimary = async () => {
+    if (!confirmPrimaryId) return;
     const { error: clearError } = await supabase
       .from("guardians")
       .update({ is_primary: false })
       .eq("user_id", wardUserId);
-    if (clearError) { toast.error("Failed to update primary guardian"); return; }
-    // Set new primary
+    if (clearError) { toast.error("Failed to update primary guardian"); setConfirmPrimaryId(null); return; }
     const { error } = await supabase
       .from("guardians")
       .update({ is_primary: true })
-      .eq("id", guardianId);
-    if (error) { toast.error("Failed to update primary guardian"); return; }
+      .eq("id", confirmPrimaryId);
+    if (error) { toast.error("Failed to update primary guardian"); setConfirmPrimaryId(null); return; }
     toast.success("Primary guardian updated");
+    setConfirmPrimaryId(null);
     fetchData();
   };
 
@@ -193,6 +200,7 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
   if (!health && !profile) return null;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
@@ -284,7 +292,7 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
                       variant="ghost"
                       size="sm"
                       className="h-6 text-[10px] px-2 text-muted-foreground hover:text-primary"
-                      onClick={() => handleSetPrimary(g.id)}
+                      onClick={() => setConfirmPrimaryId(g.id)}
                     >
                       Set Primary
                     </Button>
@@ -311,6 +319,22 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog open={!!confirmPrimaryId} onOpenChange={(open) => !open && setConfirmPrimaryId(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Change Primary Guardian?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to set <span className="font-semibold">{confirmPrimaryName}</span> as the primary emergency contact? They will be contacted first during emergencies.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSetPrimary}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 
