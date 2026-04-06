@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -622,22 +622,7 @@ const GuardianDashboard = () => {
               </div>
             ) : wardLocation ? (
               <div className="space-y-2">
-                <div className="h-48 bg-muted rounded-lg relative overflow-hidden">
-                  <iframe
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${wardLocation.lng - 0.01},${wardLocation.lat - 0.01},${wardLocation.lng + 0.01},${wardLocation.lat + 0.01}&layer=mapnik&marker=${wardLocation.lat},${wardLocation.lng}`}
-                    className="w-full h-full border-0"
-                    title="Ward Location"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  {wardLocation.lat.toFixed(4)}° N, {wardLocation.lng.toFixed(4)}° E
-                  {activeSOS && " • Auto-refreshing every 30s"}
-                </p>
-                {locationUpdatedAt && !activeSOS && (
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
-                  </p>
-                )}
+                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} />
                 {!activeSOS && (
                   <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
                     <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
