@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
+import PhoneInput from "@/components/PhoneInput";
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -144,29 +145,29 @@ const Login = () => {
             <p className="text-sm text-muted-foreground">Sign in with OTP</p>
           </div>
 
-          {!otpPhone ? (
+          {!otpPhone ? (() => {
+            const digitCount = identifier.replace(/[^\d]/g, "").length;
+            const hasInput = identifier.trim().length > 0;
+            const isValid = digitCount >= 10;
+            return (
             <div className="space-y-4">
               <div>
                 <Label>Phone Number</Label>
-                <Input
-                  placeholder="Enter your phone number"
-                  className="text-base"
-                  type="tel"
+                <PhoneInput
                   value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  required
+                  onChange={setIdentifier}
+                  placeholder="98765 43210"
                 />
+                {hasInput && !isValid && (
+                  <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
+                )}
               </div>
               <Button
                 className="w-full bg-primary text-lg py-6"
                 size="lg"
+                disabled={!isValid}
                 onClick={() => {
-                  const val = identifier.trim();
-                  if (!val) {
-                    toast.error("Enter phone number");
-                    return;
-                  }
-                  const phone = formatPhone(val);
+                  const phone = formatPhone(identifier.trim());
                   setOtpPhone(phone);
                 }}
               >
@@ -179,7 +180,8 @@ const Login = () => {
                 </button>
               </div>
             </div>
-          ) : (
+            );
+          })() : (
             <OtpVerification
               phone={otpPhone}
               onVerified={async (data) => {
