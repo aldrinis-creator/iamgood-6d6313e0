@@ -95,7 +95,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
       health?.chronic_conditions.length ? `Conditions: ${health.chronic_conditions.join(", ")}` : "",
       meds.length ? `Medications: ${meds.map(m => `${m.name} (${m.dosage})`).join(", ")}` : "",
       health?.family_doctor_name ? `Doctor: ${health.family_doctor_name}${health.family_doctor_phone ? ` (${health.family_doctor_phone})` : ""}` : "",
-      guardians.length ? `Emergency Contacts: ${guardians.map(g => `${g.guardian_name} ${g.guardian_phone}`).join(", ")}` : "",
+      guardians.length ? `Emergency Contacts: ${guardians.map(g => `${g.guardian_name}${g.is_primary ? " (Primary)" : ""} ${g.guardian_phone}`).join(", ")}` : "",
       hospitalizations.length ? `\n🏥 Hospitalizations:\n${hospitalizations.map(h => `• ${h.reason}${h.hospital_name ? ` at ${h.hospital_name}` : ""}${h.start_date ? ` (${h.start_date})` : ""}`).join("\n")}` : "",
       surgeries.length ? `\n✂️ Surgeries:\n${surgeries.map(s => `• ${s.reason}${s.hospital_name ? ` at ${s.hospital_name}` : ""}${s.start_date ? ` (${s.start_date})` : ""}`).join("\n")}` : "",
       "",
@@ -245,6 +245,25 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
         {/* Emergency Notes */}
         {health?.emergency_notes && (
           <p className="text-xs text-muted-foreground italic">📝 {health.emergency_notes}</p>
+        )}
+
+        {/* Emergency Contacts */}
+        {guardians.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Shield className="w-3 h-3" /> Emergency Contacts</p>
+            {guardians.map((g, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                <div>
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    {g.guardian_name}
+                    {g.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                  </span>
+                  {g.relation && <p className="text-xs text-muted-foreground capitalize">{g.relation}</p>}
+                </div>
+                <a href={`tel:${g.guardian_phone}`} className="text-sm text-primary font-medium">{g.guardian_phone}</a>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Actions */}
