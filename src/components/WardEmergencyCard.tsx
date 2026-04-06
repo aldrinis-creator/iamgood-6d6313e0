@@ -318,6 +318,22 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog open={!!confirmPrimaryId} onOpenChange={(open) => !open && setConfirmPrimaryId(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Change Primary Guardian?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to set <span className="font-semibold">{confirmPrimaryName}</span> as the primary emergency contact? They will be contacted first during emergencies.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleSetPrimary}>Confirm</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 
