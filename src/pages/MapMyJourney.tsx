@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
@@ -94,7 +94,9 @@ const MapMyJourney = () => {
   const [loading, setLoading] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
@@ -125,7 +127,7 @@ const MapMyJourney = () => {
   // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (query.length < 2) {
+    if (query.length < 1) {
       setSearchResults([]);
       return;
     }
@@ -192,11 +194,21 @@ const MapMyJourney = () => {
   }, [selectedDest, originPos, transportMode, fetchRoute]);
 
   const handleSelectDest = (result: SearchResult) => {
+    const finalize = (name: string, lat: number, lng: number) => {
+      setSelectedDest({ name, lat, lng });
+      setDestination(name.split(",")[0]);
+      setSearchResults([]);
+      // If pending Home/Work, save it
+      if (pendingHomeWork) {
+        setHomeWork(pendingHomeWork, { name, lat, lng });
+        toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} location saved!`);
+        setPendingHomeWork(null);
+      }
+    };
+
     // If we already have lat/lng (fallback mode), use directly
     if (result.lat && result.lng) {
-      setSelectedDest({ name: result.description, lat: result.lat, lng: result.lng });
-      setDestination(result.main_text);
-      setSearchResults([]);
+      finalize(result.description, result.lat, result.lng);
       return;
     }
     // Otherwise use PlacesService to get coordinates
@@ -205,13 +217,11 @@ const MapMyJourney = () => {
       { placeId: result.place_id, fields: ["geometry", "name", "formatted_address"] },
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          setSelectedDest({
-            name: place.formatted_address || result.description,
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          });
-          setDestination(result.main_text);
-          setSearchResults([]);
+          finalize(
+            place.formatted_address || result.description,
+            place.geometry.location.lat(),
+            place.geometry.location.lng(),
+          );
         } else {
           toast.error("Could not get location details");
         }
@@ -411,11 +421,15 @@ const MapMyJourney = () => {
                         const name = homeDest.name.replace("🏠 Home: ", "");
                         setSelectedDest({ name: homeDest.name, lat: homeDest.lat, lng: homeDest.lng });
                         setDestination(name.split(",")[0]);
-                      } else if (selectedDest) {
-                        setHomeWork("home", selectedDest);
-                        toast.success("Home location saved!");
+                        setPendingHomeWork(null);
                       } else {
-                        toast.info("Search for a destination first, then set as Home");
+                        setPendingHomeWork("home");
+                        setDestination("");
+                        setSelectedDest(null);
+                        setSearchResults([]);
+                        setInputFocused(true);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                        toast.info("Search and select a place to set as Home");
                       }
                     }}
                   >
@@ -431,11 +445,15 @@ const MapMyJourney = () => {
                         const name = workDest.name.replace("🏢 Work: ", "");
                         setSelectedDest({ name: workDest.name, lat: workDest.lat, lng: workDest.lng });
                         setDestination(name.split(",")[0]);
-                      } else if (selectedDest) {
-                        setHomeWork("work", selectedDest);
-                        toast.success("Work location saved!");
+                        setPendingHomeWork(null);
                       } else {
-                        toast.info("Search for a destination first, then set as Work");
+                        setPendingHomeWork("work");
+                        setDestination("");
+                        setSelectedDest(null);
+                        setSearchResults([]);
+                        setInputFocused(true);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                        toast.info("Search and select a place to set as Work");
                       }
                     }}
                   >
@@ -448,9 +466,10 @@ const MapMyJourney = () => {
                 <div className="space-y-2">
                   <Label>Destination</Label>
                   <div className="relative">
-                    <div className="relative">
+                     <div className="relative">
                       <Input
-                        placeholder="Search destination..."
+                        ref={inputRef}
+                        placeholder={pendingHomeWork ? `Search to set as ${pendingHomeWork === "home" ? "Home 🏠" : "Work 🏢"}...` : "Search destination..."}
                         value={destination}
                         onFocus={() => setInputFocused(true)}
                         onBlur={() => setTimeout(() => setInputFocused(false), 300)}
@@ -459,6 +478,7 @@ const MapMyJourney = () => {
                           searchDestination(e.target.value);
                           if (!e.target.value) setSelectedDest(null);
                         }}
+                        className={pendingHomeWork ? "ring-2 ring-primary" : ""}
                       />
                       {destination && (
                         <button
@@ -470,6 +490,7 @@ const MapMyJourney = () => {
                             setSearchResults([]);
                             setRouteCoords([]);
                             setEta(null);
+                            setPendingHomeWork(null);
                           }}
                         >
                           <X className="w-4 h-4" />
@@ -501,68 +522,103 @@ const MapMyJourney = () => {
                         ))}
                       </div>
                     )}
-                    {/* Recent/Saved destinations when input is focused but empty */}
-                    {inputFocused && searchResults.length === 0 && destination.length < 2 && savedDests.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {/* Recent/Saved destinations + category chips when input is focused but empty */}
+                    {inputFocused && searchResults.length === 0 && destination.length < 1 && (
+                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-72 overflow-y-auto">
+                        {/* Quick category chips */}
                         <div className="px-3 py-2 border-b border-border">
-                          <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                            <History className="w-3 h-3" /> Recent & Saved
-                          </p>
-                        </div>
-                        {savedDests.map((d) => (
-                          <div
-                            key={d.id}
-                            className="flex items-center gap-1 hover:bg-accent transition-colors border-b border-border last:border-0"
-                          >
-                            <button
-                              className="flex-1 text-left px-3 py-2.5"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setSelectedDest({ name: d.name, lat: d.lat, lng: d.lng });
-                                setDestination(d.name.split(",")[0]);
-                                setInputFocused(false);
-                              }}
-                            >
-                              <div className="flex items-start gap-2">
-                                {d.name.startsWith("🏠") ? (
-                                  <Home className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                                ) : d.name.startsWith("🏢") ? (
-                                  <Briefcase className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                                ) : d.is_favorite ? (
-                                  <Star className="w-4 h-4 mt-0.5 text-yellow-500 fill-yellow-500 shrink-0" />
-                                ) : (
-                                  <History className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                )}
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-foreground truncate">{d.name.split(",")[0]}</p>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {d.name.split(",").slice(1).join(",").trim() || `Used ${d.use_count}×`}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                            <button
-                              className="p-1.5 hover:text-yellow-500 text-muted-foreground"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                toggleFavorite(d.id, d.is_favorite);
-                              }}
-                              title={d.is_favorite ? "Remove from favorites" : "Add to favorites"}
-                            >
-                              <Star className={`w-3.5 h-3.5 ${d.is_favorite ? "text-yellow-500 fill-yellow-500" : ""}`} />
-                            </button>
-                            <button
-                              className="p-1.5 hover:text-destructive text-muted-foreground mr-1"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                removeDestination(d.id);
-                              }}
-                              title="Remove"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">Quick Search</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { label: "Restaurant", icon: UtensilsCrossed },
+                              { label: "Hospital", icon: Hospital },
+                              { label: "Mall", icon: ShoppingBag },
+                              { label: "Station", icon: TrainFront },
+                            ].map((chip) => (
+                              <button
+                                key={chip.label}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setDestination(chip.label);
+                                  searchDestination(chip.label);
+                                }}
+                              >
+                                <chip.icon className="w-3 h-3" />
+                                {chip.label}
+                              </button>
+                            ))}
                           </div>
-                        ))}
+                        </div>
+                        {/* Saved destinations list */}
+                        {savedDests.length > 0 && (
+                          <>
+                            <div className="px-3 py-2 border-b border-border">
+                              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                                <History className="w-3 h-3" /> Recent & Saved
+                              </p>
+                            </div>
+                            {savedDests.map((d) => (
+                              <div
+                                key={d.id}
+                                className="flex items-center gap-1 hover:bg-accent transition-colors border-b border-border last:border-0"
+                              >
+                                <button
+                                  className="flex-1 text-left px-3 py-2.5"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setSelectedDest({ name: d.name, lat: d.lat, lng: d.lng });
+                                    setDestination(d.name.split(",")[0]);
+                                    setInputFocused(false);
+                                    if (pendingHomeWork) {
+                                      setHomeWork(pendingHomeWork, { name: d.name, lat: d.lat, lng: d.lng });
+                                      toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} location saved!`);
+                                      setPendingHomeWork(null);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    {d.name.startsWith("🏠") ? (
+                                      <Home className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                                    ) : d.name.startsWith("🏢") ? (
+                                      <Briefcase className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                                    ) : d.is_favorite ? (
+                                      <Star className="w-4 h-4 mt-0.5 text-accent-foreground shrink-0" />
+                                    ) : (
+                                      <History className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-foreground truncate">{d.name.split(",")[0]}</p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {d.name.split(",").slice(1).join(",").trim() || `Used ${d.use_count}×`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                                <button
+                                  className="p-1.5 hover:text-accent-foreground text-muted-foreground"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    toggleFavorite(d.id, d.is_favorite);
+                                  }}
+                                  title={d.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                                >
+                                  <Star className={`w-3.5 h-3.5 ${d.is_favorite ? "text-accent-foreground fill-current" : ""}`} />
+                                </button>
+                                <button
+                                  className="p-1.5 hover:text-destructive text-muted-foreground mr-1"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    removeDestination(d.id);
+                                  }}
+                                  title="Remove"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
