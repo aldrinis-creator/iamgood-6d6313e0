@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -83,6 +83,9 @@ const Login = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [otpMode, setOtpMode] = useState(false);
   const [otpPhone, setOtpPhone] = useState("");
+  const [showResendVerify, setShowResendVerify] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +106,12 @@ const Login = () => {
 
       const { error } = await signIn(emailToUse, password);
       if (error) {
-        toast.error("Sign in failed", { description: error.message });
+        if (error.message?.toLowerCase().includes("email not confirmed")) {
+          setResendEmail(emailToUse);
+          setShowResendVerify(true);
+        } else {
+          toast.error("Sign in failed", { description: error.message });
+        }
       } else {
         if (rememberMe) {
           localStorage.setItem(REMEMBER_KEY, identifier.trim());
@@ -129,6 +137,22 @@ const Login = () => {
     } else {
       toast.success("Password reset email sent", { description: "Check your inbox for the reset link." });
       setShowForgot(false);
+    }
+  };
+
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resendEmail.trim()) return;
+    setResendLoading(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: resendEmail.trim(),
+    });
+    setResendLoading(false);
+    if (error) {
+      toast.error("Could not resend", { description: error.message });
+    } else {
+      toast.success("Verification email sent!", { description: "Check your inbox and click the link." });
     }
   };
 
@@ -237,6 +261,36 @@ const Login = () => {
           </form>
           <div className="text-center">
             <button className="text-sm text-primary underline" onClick={() => setShowForgot(false)}>
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showResendVerify) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold text-primary">Email Not Verified</h1>
+            <p className="text-sm text-muted-foreground">Your email address hasn't been verified yet. Please check your inbox or resend the verification email.</p>
+          </div>
+          <form onSubmit={handleResendVerification} className="space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input placeholder="Enter your email" className="text-base" type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={resendLoading}>
+              {resendLoading ? "Sending..." : "Resend Verification Email"}
+            </Button>
+          </form>
+          <div className="text-center">
+            <button className="text-sm text-primary underline" onClick={() => setShowResendVerify(false)}>
               Back to Sign In
             </button>
           </div>
