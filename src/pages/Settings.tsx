@@ -341,10 +341,25 @@ const Settings = () => {
       toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
-      // Send invite email if email provided
+      // Send branded invite email if email provided
       if (newEmail) {
+        const baseUrl = "https://iamgood.lovable.app";
+        supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "guardian-invitation",
+            recipientEmail: newEmail,
+            idempotencyKey: `guardian-invite-${newEmail}-${Date.now()}`,
+            templateData: {
+              guardianName: newName,
+              userName: session.user.email,
+              relation: newRelation,
+              acceptLink: `${baseUrl}/register`,
+            },
+          },
+        }).catch(() => {});
+        // Also trigger MSG91 SMS/WhatsApp
         supabase.functions.invoke("send-guardian-invite", {
-          body: { guardian_email: newEmail, guardian_name: newName, user_name: session.user.email, relation: newRelation },
+          body: { guardian_name: newName, user_name: session.user.email, relation: newRelation, guardian_phone: newPhone },
         }).catch(() => {});
       }
       // Refresh

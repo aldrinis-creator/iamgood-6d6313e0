@@ -58,6 +58,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await fetchProfile(session.user.id);
             // Auto-link guardian records by email/phone
             try { await supabase.rpc("link_guardian_user_id" as any); } catch {};
+            // Send welcome email once (idempotent)
+            if (session.user.email) {
+              const profileData = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+              supabase.functions.invoke("send-transactional-email", {
+                body: {
+                  templateName: "welcome",
+                  recipientEmail: session.user.email,
+                  idempotencyKey: `welcome-${session.user.id}`,
+                  templateData: { name: profileData.data?.full_name || "" },
+                },
+              }).catch(() => {});
+            }
           }, 0);
           // Request notification permission on sign-in
           if ("Notification" in window && Notification.permission === "default") {

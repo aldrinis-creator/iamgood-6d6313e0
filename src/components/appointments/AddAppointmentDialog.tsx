@@ -102,6 +102,25 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       toast.success(editId ? "Appointment updated" : "Appointment added");
       onOpenChange(false);
+      // Send appointment confirmation email for new appointments
+      if (!editId && session?.user?.email) {
+        supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "appointment-confirmation",
+            recipientEmail: session.user.email,
+            idempotencyKey: `appt-confirm-${Date.now()}`,
+            templateData: {
+              name: session.user.user_metadata?.full_name || "",
+              title: form.title,
+              date: form.start_date,
+              time: form.start_time,
+              doctorName: form.doctor_name || undefined,
+              location: form.location || undefined,
+              appointmentType: form.appointment_type,
+            },
+          },
+        }).catch(() => {});
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });
