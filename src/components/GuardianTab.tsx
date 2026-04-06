@@ -54,9 +54,16 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     fetchGuardians();
   }, [fetchGuardians]);
 
+  const phoneDigitCount = phone.replace(/[^\d]/g, "").length;
+  const isPhoneValid = phoneDigitCount >= 10;
+
   const handleAdd = async () => {
     if (!userId || !name.trim() || !phone.trim() || !email.trim()) {
       toast.error("Name, phone and email are required for emergency notifications");
+      return;
+    }
+    if (!isPhoneValid) {
+      toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
       return;
     }
     setAdding(true);
@@ -150,6 +157,9 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
               <div>
                 <Label className="text-xs">Phone *</Label>
                 <PhoneInput value={phone} onChange={setPhone} />
+                {phone.trim().length > 0 && !isPhoneValid && (
+                  <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Email * (for emergency notifications)</Label>
