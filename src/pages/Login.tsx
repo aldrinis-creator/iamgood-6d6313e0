@@ -180,7 +180,8 @@ const Login = () => {
                 </button>
               </div>
             </div>
-          ) : (
+            );
+          })() : (
             <OtpVerification
               phone={otpPhone}
               onVerified={async (data) => {
