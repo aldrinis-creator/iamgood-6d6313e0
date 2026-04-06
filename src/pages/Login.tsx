@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
@@ -31,7 +31,7 @@ const GoogleSignInButton = ({ label = "Sign in with Google" }: { label?: string 
       redirect_uri: window.location.origin,
     });
     if (error) {
-      toast({ title: "Google sign-in failed", description: String(error), variant: "destructive" });
+      toast.error("Google sign-in failed", { description: String(error) });
     }
     setLoading(false);
   };
@@ -94,7 +94,7 @@ const Login = () => {
         const phone = formatPhone(emailToUse);
         const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
         if (fnError || !data) {
-          toast({ title: "Sign in failed", description: "No account found with this phone number.", variant: "destructive" });
+          toast.error("No account found with this phone number.");
           return;
         }
         emailToUse = data as string;
@@ -102,7 +102,7 @@ const Login = () => {
 
       const { error } = await signIn(emailToUse, password);
       if (error) {
-        toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
+        toast.error("Sign in failed", { description: error.message });
       } else {
         if (rememberMe) {
           localStorage.setItem(REMEMBER_KEY, identifier.trim());
@@ -112,7 +112,7 @@ const Login = () => {
         navigate("/dashboard");
       }
     } catch (err: any) {
-      toast({ title: "Sign in failed", description: err?.message || "An unexpected error occurred", variant: "destructive" });
+      toast.error("Sign in failed", { description: err?.message || "An unexpected error occurred" });
     } finally {
       setLoading(false);
     }
@@ -124,9 +124,9 @@ const Login = () => {
     const { error } = await resetPassword(forgotEmail);
     setForgotLoading(false);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast.error(error.message);
     } else {
-      toast({ title: "Password reset email sent", description: "Check your inbox for the reset link." });
+      toast.success("Password reset email sent", { description: "Check your inbox for the reset link." });
       setShowForgot(false);
     }
   };
@@ -163,13 +163,14 @@ const Login = () => {
                 onClick={() => {
                   const val = identifier.trim();
                   if (!val) {
-                    toast({ title: "Enter phone number", variant: "destructive" });
+                    toast.error("Enter phone number");
                     return;
                   }
                   const phone = formatPhone(val);
                   setOtpPhone(phone);
                 }}
               >
+                <Smartphone className="w-5 h-5 mr-2" />
                 Send OTP
               </Button>
               <div className="text-center">
@@ -183,25 +184,24 @@ const Login = () => {
               phone={otpPhone}
               onVerified={async (data) => {
                 if (data?.no_account) {
-                  toast({ title: "No account found", description: "Please register first.", variant: "destructive" });
+                  toast.error("No account found", { description: "Please register first." });
                   setOtpPhone("");
                   return;
                 }
 
                 if (data?.token_hash && data?.email) {
-                  // Use the token_hash to establish a real Supabase session
                   const { error: verifyError } = await supabase.auth.verifyOtp({
                     token_hash: data.token_hash,
                     type: "magiclink",
                   });
                   if (verifyError) {
-                    toast({ title: "Sign in failed", description: verifyError.message, variant: "destructive" });
+                    toast.error("Sign in failed", { description: verifyError.message });
                     return;
                   }
-                  toast({ title: "Phone verified!", description: "You're signed in." });
+                  toast.success("Signed in successfully!");
                   navigate("/dashboard");
                 } else {
-                  toast({ title: "Verification error", description: "Could not create session. Please try again.", variant: "destructive" });
+                  toast.error("Could not create session. Please try again.");
                   setOtpPhone("");
                 }
               }}
@@ -257,6 +257,19 @@ const Login = () => {
         <GoogleSignInButton />
         <OrDivider />
 
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full text-base py-6 gap-3"
+          size="lg"
+          onClick={() => setOtpMode(true)}
+        >
+          <Smartphone className="w-5 h-5" />
+          Sign in with Phone OTP
+        </Button>
+
+        <OrDivider />
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <Label>Email or Phone</Label>
@@ -286,10 +299,6 @@ const Login = () => {
           </button>
           <br />
           <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
-          <br />
-          <button className="text-sm text-primary font-medium flex items-center justify-center gap-1 mx-auto mt-1" onClick={() => setOtpMode(true)}>
-            <Smartphone className="w-4 h-4" /> Sign in with OTP
-          </button>
         </div>
       </div>
     </div>
@@ -297,4 +306,3 @@ const Login = () => {
 };
 
 export default Login;
-

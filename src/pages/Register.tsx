@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Shield, Heart, Plus, Trash2, User, ChevronLeft } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +32,7 @@ const GoogleSignInButton = ({ label = "Sign up with Google" }: { label?: string 
       redirect_uri: window.location.origin,
     });
     if (error) {
-      toast({ title: "Google sign-in failed", description: String(error), variant: "destructive" });
+      toast.error("Google sign-in failed", { description: String(error) });
     }
     setLoading(false);
   };
@@ -129,12 +129,12 @@ const Register = () => {
 
   const handleDetailsNext = () => {
     if (!fullName || !email || !password) {
-      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      toast.error("Please fill in all required fields");
       return;
     }
     const phoneError = validatePhone(phone);
     if (phoneError) {
-      toast({ title: "Invalid phone number", description: phoneError, variant: "destructive" });
+      toast.error("Invalid phone number", { description: phoneError });
       return;
     }
     // Go to OTP verification step
@@ -166,11 +166,11 @@ const Register = () => {
 
   const handleSubmit = async () => {
     if (!fullName || !email || !password) {
-      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      toast.error("Please fill in all required fields");
       return;
     }
     if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
-      toast({ title: "Primary guardian name, phone and email are required", description: "Guardian email is essential for emergency notifications.", variant: "destructive" });
+      toast.error("Primary guardian name, phone and email are required", { description: "Guardian email is essential for emergency notifications." });
       return;
     }
 
@@ -179,7 +179,7 @@ const Register = () => {
       for (const g of guardians.filter(g => g.email)) {
         const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
         if (typeof countResult === "number" && countResult >= 3) {
-          toast({ title: "Guardian limit reached", description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.`, variant: "destructive" });
+          toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
           return;
         }
       }
@@ -194,7 +194,7 @@ const Register = () => {
 
     if (error) {
       setLoading(false);
-      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+      toast.error("Registration failed", { description: error.message });
       return;
     }
 
@@ -242,7 +242,7 @@ const Register = () => {
     }
 
     setLoading(false);
-    toast({ title: "Account created!", description: "Check your email to verify your account." });
+    toast.success("Account created!", { description: "Check your email to verify your account." });
     navigate(selectedRole === "guardian" ? "/guardian" : "/dashboard");
   };
 

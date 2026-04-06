@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 interface OtpVerificationProps {
@@ -34,13 +34,13 @@ const OtpVerification = ({ phone, onVerified, onCancel }: OtpVerificationProps) 
         body: { action: "send", phone },
       });
       if (error || !data?.success) {
-        toast({ title: "Failed to send OTP", description: data?.result?.message || "Please try again.", variant: "destructive" });
+        toast.error("Failed to send OTP", { description: data?.result?.message || "Please try again." });
       } else {
-        toast({ title: "OTP sent", description: `A verification code was sent to ${phone}` });
+        toast.success(`OTP sent to ${phone}`);
         setResendTimer(30);
       }
     } catch {
-      toast({ title: "Error sending OTP", variant: "destructive" });
+      toast.error("Error sending OTP");
     }
     setSending(false);
   };
@@ -53,13 +53,13 @@ const OtpVerification = ({ phone, onVerified, onCancel }: OtpVerificationProps) 
         body: { action: "verify", phone, otp },
       });
       if (error || !data?.success) {
-        toast({ title: "Invalid OTP", description: "Please check the code and try again.", variant: "destructive" });
+        toast.error("Invalid OTP", { description: "Please check the code and try again." });
       } else {
-        toast({ title: "Phone verified!" });
+        toast.success("Phone verified!");
         onVerified(data);
       }
     } catch {
-      toast({ title: "Verification failed", variant: "destructive" });
+      toast.error("Verification failed");
     }
     setLoading(false);
   };
@@ -71,13 +71,13 @@ const OtpVerification = ({ phone, onVerified, onCancel }: OtpVerificationProps) 
         body: { action: "resend", phone },
       });
       if (!error && data?.success) {
-        toast({ title: "OTP resent" });
+        toast.success("OTP resent");
         setResendTimer(30);
       } else {
-        toast({ title: "Failed to resend", variant: "destructive" });
+        toast.error("Failed to resend OTP");
       }
     } catch {
-      toast({ title: "Resend failed", variant: "destructive" });
+      toast.error("Resend failed");
     }
     setSending(false);
   };
