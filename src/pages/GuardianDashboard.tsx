@@ -83,29 +83,80 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
   );
 };
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw";
+const GOOGLE_TILES_URL = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
 
 const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null }) => {
   const [expanded, setExpanded] = useState(false);
   const mapHeight = expanded ? 400 : 192;
-  const embedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${wardLocation.lat},${wardLocation.lng}&zoom=15`;
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${wardLocation.lat},${wardLocation.lng}`;
+
+  useEffect(() => {
+    const loadLeaflet = async () => {
+      // Load Leaflet CSS if not already loaded
+      if (!document.querySelector('link[href*="leaflet"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+      // Load Leaflet JS if not already loaded
+      if (!(window as any).L) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          script.onload = () => resolve();
+          script.onerror = () => reject();
+          document.head.appendChild(script);
+        });
+      }
+      const L = (window as any).L;
+      if (!mapContainerRef.current || mapInstanceRef.current) return;
+
+      const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([wardLocation.lat, wardLocation.lng], 15);
+      L.tileLayer(GOOGLE_TILES_URL, { maxZoom: 20, attribution: "" }).addTo(map);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      const marker = L.marker([wardLocation.lat, wardLocation.lng]).addTo(map);
+      mapInstanceRef.current = map;
+      markerRef.current = marker;
+    };
+    loadLeaflet();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update marker position when location changes
+  useEffect(() => {
+    const L = (window as any).L;
+    if (mapInstanceRef.current && markerRef.current && L) {
+      markerRef.current.setLatLng([wardLocation.lat, wardLocation.lng]);
+      mapInstanceRef.current.setView([wardLocation.lat, wardLocation.lng], mapInstanceRef.current.getZoom());
+    }
+  }, [wardLocation.lat, wardLocation.lng]);
+
+  // Invalidate size when expanded/collapsed
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      setTimeout(() => mapInstanceRef.current.invalidateSize(), 300);
+    }
+  }, [expanded]);
 
   return (
     <>
       <div className="bg-muted rounded-lg relative overflow-hidden transition-all duration-300" style={{ height: mapHeight }}>
-        <iframe
-          src={embedUrl}
-          className="w-full h-full border-0"
-          title="Ward Location"
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
+        <div ref={mapContainerRef} className="w-full h-full" />
         <Button
           size="icon"
           variant="secondary"
-          className="absolute top-2 right-2 z-10 h-7 w-7 shadow-md"
+          className="absolute top-2 right-2 z-[1000] h-7 w-7 shadow-md"
           onClick={() => setExpanded((e) => !e)}
         >
           {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
