@@ -1,75 +1,39 @@
 
 
-## Multi-fix Plan: Home/Work Quick-set, Guardian Map Enlarge, Google Maps Migration, and Frozen Destination Fix
+## Fix: Destination Auto-population and Home/Work Quick-set in MMJ
 
 ### Problem Analysis
 
-1. **Frozen destination input**: The `onBlur` handler uses `setTimeout(() => setInputFocused(false), 200)` which races with click handlers on the dropdown. When Google Places API loads slowly or errors, the input may appear unresponsive. Additionally, the `locationBias` type cast may cause runtime errors in some Google API versions.
+1. **No auto-population on focus**: When the destination input is focused with no text, the dropdown only shows saved destinations (`savedDests`). If the user has no saved destinations yet, nothing appears — feels broken. Need to show nearby/popular places automatically.
 
-2. **OpenStreetMap tiles still used everywhere**: Five files use OSM tile layers or embeds instead of Google Maps.
+2. **Set Home/Work unresponsive**: When "Set Home" or "Set Work" is tapped with no destination selected and no existing home/work saved, only a toast appears ("Search for a destination first"). This is easily missed and feels like the app is frozen. Need a more interactive flow.
 
-3. **No Home/Work quick-set**: Users must search every time for frequent locations.
-
-4. **Guardian location map not enlargeable**: The ward location on `GuardianDashboard.tsx` is a fixed 192px OSM iframe with no expand option.
-
----
-
-### Step 1 — Fix frozen destination input in MMJ
+### Plan
 
 **File: `src/pages/MapMyJourney.tsx`**
-- Increase `onBlur` timeout from 200ms to 300ms to prevent race with click handlers
-- Add a `mouseDown` handler on dropdown items using `onMouseDown` (fires before `onBlur`) instead of relying solely on `onClick`
-- Guard against `autocompleteService.current` being null more defensively
-- Add a clear button (X) to reset destination when text is present
 
-### Step 2 — Add Home & Work quick-set feature
+**Fix 1 — Auto-populate nearby places on focus**
+- When input is focused and empty, if there are no saved destinations, automatically trigger a Google Places nearby search using the user's `originPos`
+- Use `AutocompleteService.getPlacePredictions` with a short generic query (e.g., empty string won't work, so use the Places API `nearbySearch` or just show a "Type to search" prompt with popular category chips like "Restaurant", "Hospital", "Mall")
+- Simpler approach: lower the search threshold to 1 character, and when input is focused with no text and no saved dests, show placeholder suggestions by querying popular nearby POIs via `textSearch` or just display category quick-filter chips (Food, Hospital, Shopping, Station) that auto-fill the search
 
-**File: `src/hooks/useSavedDestinations.ts`**
-- Add a `label` concept: extend the hook to support `setHomeWork(type: "home" | "work", dest)` and `getHomeWork(type)`
-- Store Home/Work as special saved destinations with `is_favorite = true` and a convention: name prefixed with `🏠 Home:` or `🏢 Work:`
+**Recommended approach**: When input is focused and empty with no saved destinations, show quick-category chips (Home, Work, Restaurant, Hospital, Mall, Station). Tapping a chip fills the search with that term and triggers autocomplete. This gives immediate interactivity without requiring a separate API.
 
-**File: `src/pages/MapMyJourney.tsx`**
-- Add two quick-tap buttons (Home / Work) above the destination input
-- If Home/Work is set, tapping selects it immediately as destination
-- If not set, show a prompt to save current search result as Home/Work
-- Add a "Set as Home" / "Set as Work" option in the saved destinations dropdown
-
-**Database**: No schema changes needed — reuse `saved_destinations` table with name convention.
-
-### Step 3 — Replace all OpenStreetMap with Google Maps tiles
-
-Replace OSM tile URLs with Google Maps tile layer across all files. Since we already load the Google Maps JS API, use Google's raster tile endpoint or embed API.
-
-**Files to update:**
-- `src/pages/MapMyJourney.tsx` (2 TileLayer instances) — swap OSM URL to Google Maps tiles
-- `src/components/GuardianJourneyTracker.tsx` (1 TileLayer) — swap OSM URL
-- `src/components/NearbyFacilities.tsx` (1 L.tileLayer call) — swap OSM URL
-- `src/pages/GuardianDashboard.tsx` (1 iframe embed) — replace OSM iframe with Google Maps static/embed API using the existing API key
-
-Google Maps tile URL pattern:
-```
-https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}
-```
-This works directly with Leaflet's TileLayer — no library swap needed.
-
-### Step 4 — Add enlarge option to Guardian location map
-
-**File: `src/pages/GuardianDashboard.tsx`**
-- Replace the OSM iframe with a proper Google Maps embed using the API key
-- Add an expand/collapse button (Maximize2/Minimize2 icons) that toggles the map height between 192px and 400px
-- Add a "View in Google Maps" external link button
-
----
+**Fix 2 — Home/Work button behavior**
+- When "Set Home" or "Set Work" is tapped and neither home/work is saved nor a destination is selected:
+  - Focus the destination input
+  - Set a `pendingHomeWork` state (`"home" | "work" | null`)
+  - Show a visual indicator on the input: "Search to set as Home" / "Search to set as Work"
+  - When user then selects a destination from search results, automatically save it as Home/Work using `setHomeWork`, clear the `pendingHomeWork` state, and show success toast
 
 ### Files to modify
-- `src/pages/MapMyJourney.tsx` — fix frozen input, add Home/Work buttons, swap tiles
-- `src/hooks/useSavedDestinations.ts` — add Home/Work save/get methods
-- `src/components/GuardianJourneyTracker.tsx` — swap tiles
-- `src/components/NearbyFacilities.tsx` — swap tiles  
-- `src/pages/GuardianDashboard.tsx` — swap embed, add enlarge
+- `src/pages/MapMyJourney.tsx` — add category chips for empty state, add `pendingHomeWork` flow for Set Home/Work buttons
 
 ### Technical details
-- Google Maps raster tiles via `https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}` are compatible with Leaflet TileLayer
-- Home/Work stored as saved destinations with name prefix convention — no DB migration required
-- Frozen input fix uses `onMouseDown` + `preventDefault()` pattern to prevent blur before click registers
+- New state: `pendingHomeWork: "home" | "work" | null`
+- Category chips array: `[{label: "Restaurant", icon: ...}, {label: "Hospital"}, ...]`
+- Chip tap fills destination input text and calls `searchDestination(chipLabel)`
+- In `handleSelectDest`, check `pendingHomeWork` — if set, call `setHomeWork(type, dest)` and clear it
+- Add `inputRef` to programmatically focus the input when Set Home/Work is tapped without a destination
+- Update input placeholder dynamically when `pendingHomeWork` is active
 
