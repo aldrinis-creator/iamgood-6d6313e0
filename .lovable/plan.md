@@ -1,47 +1,97 @@
 
+Goal: make OTP delivery reliable instead of only “API accepted”, and remove blind spots so we can diagnose failures permanently.
 
-## Fix: OTP Workflow and Build Errors in Register.tsx
+What I found
+- The current backend only logs MSG91 send acceptance (`type: "success"` with a request_id). That does not prove the SMS was actually delivered.
+- The app has no delivery-status tracking, so when SMS is not received we cannot tell whether it was carrier failure, DLT scrub, throttling, or resend/session behavior.
+- The current resend path uses a fresh `/otp` send instead of MSG91’s documented retry endpoint, which can hurt consistency.
+- The current rate limit is in-memory inside the function, so it resets across cold starts and is not dependable.
+- The current UI shows generic errors and does not surface delivery-specific states.
+- Separately, `OrDivider` is causing the React ref warning because `Separator` likely uses `asChild`/ref expectations; this is not the SMS issue but should be cleaned up while touching auth screens.
 
-### Problem
+Implementation plan
 
-1. **Build error**: TypeScript reports `'title' does not exist` at 8 locations in `Register.tsx` — all are `toast.error()` / `toast.success()` calls. The code itself is correct sonner syntax, but the build system appears to be mis-resolving the `toast` type. This blocks the entire app.
+1. Harden the OTP backend function
+- Update `supabase/functions/send-otp/index.ts`.
+- Validate inputs strictly (`action`, `phone`, `otp`, `purpose`).
+- Normalize phone formatting in one place.
+- Keep `send` on MSG91 SendOTP.
+- Change `resend` to use MSG91’s documented retry endpoint (`/otp/retry`) with `retrytype=text`, with fallback messaging if MSG91 rejects retry.
+- Add a client-generated correlation id (`crqid`) when sending OTP if MSG91 supports it for webhook correlation.
+- Improve logging so each request records: normalized phone, action, request id, verification outcome, and provider error text.
+- Keep current login bridge behavior after successful verify (magic-link session generation), and keep registration verify as verification-only.
 
-2. **OTP registration flow**: During registration, the `send-otp` edge function's verify action tries to look up the user by phone (via `get_email_by_phone`) and returns `no_account: true` since the user doesn't exist yet. The current `handleOtpVerified` in Register ignores this, which is correct — BUT the edge function still wastes time trying to generate a magic link for a non-existent user.
+2. Replace fragile rate limiting with database-backed tracking
+- Add a new backend table for OTP attempts/logs, e.g. `otp_events` or `otp_requests`.
+- Store: phone hash or normalized phone, action, request id, status, failure_reason, created_at, delivery_time, verified flag.
+- Add RLS so users cannot browse this table directly; it exists for backend-only tracking.
+- Use backend queries in `send-otp` to enforce “max 3 sends/resends per phone per 10 minutes” durably.
+- This fixes the current in-memory limiter that can silently reset.
 
-3. **OTP login flow**: The Login page OTP flow depends on the edge function returning a `token_hash` after verification, then calling `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })`. This should work if the user exists and has a linked phone number in their profile.
+3. Add MSG91 delivery-report webhook ingestion
+- Create a backend function to receive MSG91 OTP delivery reports.
+- Persist webhook payload fields such as `requestId`, `status`, `failureReason`, `deliveryTime`, `telNum`, `DLT_TE_ID`, `verified`.
+- Match webhook events back to the original send using `requestId` (and `CRQID` if available).
+- This gives us real proof of Delivered vs Failed instead of assuming success from the initial API response.
 
-### Fix Plan
+4. Improve client-side OTP UX
+- Update `src/components/OtpVerification.tsx`.
+- Show clearer states:
+  - “Sending code…”
+  - “Code sent”
+  - “Couldn’t deliver SMS. Try resend in 30s”
+  - “Too many attempts. Wait 10 minutes”
+- Surface backend/provider error text when safe.
+- Keep resend disabled until timer ends, but if backend returns a known delivery failure, explain next steps instead of generic “Failed”.
+- Pass through correlation/request metadata only if needed for observability, not for security-sensitive auth.
 
-**File: `src/pages/Register.tsx`**
+5. Small auth-screen cleanup
+- Update `src/pages/Login.tsx` and `src/pages/Register.tsx` divider usage to remove the ref warning around `OrDivider`/`Separator`.
+- Keep this isolated from OTP logic, but it will clean noisy console output during testing.
 
-The build error is likely caused by a stale TypeScript type cache conflicting with the sonner types. To force correct resolution, change the toast import to use the re-exported `toast` from the project's own `@/components/ui/sonner` module instead of directly from `"sonner"`:
+6. Verification checklist after implementation
+- Test registration OTP send, verify, resend, and completion.
+- Test login OTP send, verify, session creation, and wrong-code handling.
+- Trigger 4 send attempts inside 10 minutes and confirm the 4th is blocked consistently across refreshes.
+- Confirm delivery webhook writes final status updates.
+- Confirm we can distinguish these cases in logs/data:
+  - API accepted but carrier failed
+  - DLT/template issue
+  - invalid phone
+  - rate-limited
+  - verified successfully
 
-```typescript
-// Line 10: Change from
-import { toast } from "sonner";
-// To
-import { toast } from "@/components/ui/sonner";
+Technical details
+```text
+Current flow:
+UI -> send-otp -> MSG91 SendOTP -> returns request_id -> UI says "OTP sent"
+
+Planned flow:
+UI -> send-otp -> DB log created -> MSG91 SendOTP/Retry
+                        |                |
+                        |                -> request_id saved
+                        v
+                 durable rate limit
+                        
+MSG91 delivery webhook -> otp delivery function -> DB status update
+                                         |
+                                         -> delivered / failed / reason
+
+Verify:
+UI -> send-otp verify -> MSG91 verify -> if login, create auth session
 ```
 
-This is a known pattern that avoids TypeScript type resolution ambiguity with the sonner package. No other changes needed to the toast calls themselves — they are all valid.
+Files likely to change
+- `supabase/functions/send-otp/index.ts`
+- new backend function for OTP delivery webhook
+- `src/components/OtpVerification.tsx`
+- `src/pages/Login.tsx`
+- `src/pages/Register.tsx`
+- new SQL migration for OTP event tracking table/policies
 
-**File: `supabase/functions/send-otp/index.ts`**
-
-Add a quick-return path for the verify action when the purpose is registration (phone-only verification without session creation). This can be done by accepting an optional `purpose` field in the request body:
-
-- When `purpose === "register"`, skip the user lookup and magic link generation after successful MSG91 OTP verification — just return `{ success: true, verified: true }`.
-- When `purpose` is absent or `"login"`, keep the existing behavior (look up user, generate magic link, return `token_hash`).
-
-**File: `src/components/OtpVerification.tsx`**
-
-Add an optional `purpose` prop (default: `"login"`) and pass it to the edge function in the verify request body. This lets the Register page pass `purpose="register"` to skip unnecessary user lookup.
-
-**File: `src/pages/Register.tsx` (OTP step)**
-
-Pass `purpose="register"` to the `OtpVerification` component at step 3.
-
-### Files to modify
-- `src/pages/Register.tsx` — fix toast import, pass `purpose="register"` to OtpVerification
-- `src/components/OtpVerification.tsx` — add `purpose` prop, include in verify request
-- `supabase/functions/send-otp/index.ts` — handle `purpose=register` to skip session generation
-
+Expected outcome
+- You will no longer be stuck with “MSG91 said success but no SMS”.
+- OTP sending will use proper resend semantics.
+- Rate limiting will be durable.
+- Delivery failures will become traceable with real reasons.
+- The UI will guide users properly when SMS is delayed or blocked.
