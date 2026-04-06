@@ -160,7 +160,7 @@ const Register = () => {
       toast.error("Please fill in all required fields");
       return;
     }
-  if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
+    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
       toast.error("Primary guardian name, phone and email are required", { description: "Guardian email is essential for emergency notifications." });
       return;
     }
@@ -184,13 +184,25 @@ const Register = () => {
       }
     }
 
+    const guardianRows = selectedRole === "user"
+      ? guardians
+          .filter((g) => g.name && g.phone)
+          .map((g, i) => ({
+            guardian_name: g.name.trim(),
+            guardian_phone: g.phone.replace(/\s/g, ""),
+            guardian_email: g.email?.trim() || null,
+            relation: g.relation || null,
+            is_primary: i === 0,
+          }))
+      : [];
+
     setLoading(true);
-    // Pass app_role in metadata so DB trigger sets it correctly
     const { data, error } = await signUp(email, password, { 
       full_name: fullName,
       app_role: selectedRole || "user",
       phone: phone.replace(/\s/g, ""),
       date_of_birth: dob || "",
+      guardians: guardianRows,
     });
 
     if (error) {
@@ -199,40 +211,16 @@ const Register = () => {
       return;
     }
 
-    const userId = data?.user?.id;
-    if (userId) {
-      // Wait briefly for the trigger to create the profile row
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Insert guardians only for user role
-      if (selectedRole === "user") {
-        const guardianRows = guardians
-          .filter((g) => g.name && g.phone)
-          .map((g, i) => ({
-            user_id: userId,
-            guardian_name: g.name,
-            guardian_phone: g.phone,
-            guardian_email: g.email || null,
-            relation: g.relation || null,
-            is_primary: i === 0,
-            status: "pending",
-          }));
-        if (guardianRows.length > 0) {
-          await supabase.from("guardians").insert(guardianRows);
-          
-          // Send invite emails to guardians with email
-          for (const g of guardianRows) {
-            if (g.guardian_email) {
-              sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
-            }
-          }
+    if (selectedRole === "user") {
+      for (const g of guardianRows) {
+        if (g.guardian_email) {
+          sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
         }
       }
+    }
 
-      // For guardian role, try to auto-link to any existing guardian records
-      if (selectedRole === "guardian") {
-        await supabase.rpc("link_guardian_user_id");
-      }
+    if (selectedRole === "guardian" && data?.user?.id) {
+      await supabase.rpc("link_guardian_user_id");
     }
 
     setLoading(false);
