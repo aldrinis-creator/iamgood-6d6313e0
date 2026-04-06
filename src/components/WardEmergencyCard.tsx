@@ -82,6 +82,23 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handleSetPrimary = async (guardianId: string) => {
+    // Remove primary from all guardians of this ward
+    const { error: clearError } = await supabase
+      .from("guardians")
+      .update({ is_primary: false })
+      .eq("user_id", wardUserId);
+    if (clearError) { toast.error("Failed to update primary guardian"); return; }
+    // Set new primary
+    const { error } = await supabase
+      .from("guardians")
+      .update({ is_primary: true })
+      .eq("id", guardianId);
+    if (error) { toast.error("Failed to update primary guardian"); return; }
+    toast.success("Primary guardian updated");
+    fetchData();
+  };
+
   const hospitalizations = medicalHistory.filter(h => h.type === "hospitalization");
   const surgeries = medicalHistory.filter(h => h.type === "surgery");
 
