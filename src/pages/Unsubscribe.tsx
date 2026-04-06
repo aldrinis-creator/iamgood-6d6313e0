@@ -89,7 +89,7 @@ const Unsubscribe = () => {
 
           {status === "success" && (
             <>
-              <CheckCircle className="mx-auto h-10 w-10 text-green-500" />
+              <CheckCircle className="mx-auto h-10 w-10 text-primary" />
               <h1 className="text-xl font-bold text-foreground">You've been unsubscribed</h1>
               <p className="text-muted-foreground text-sm">
                 You will no longer receive app notification emails. Important account and security emails will still be delivered.
