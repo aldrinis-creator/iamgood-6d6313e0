@@ -137,7 +137,7 @@ const EmergencyProfile = () => {
           </CardHeader>
           <CardContent className="space-y-2">
             <InfoRow label="Name" value={data.name} />
-            {data.dob && <InfoRow label="Date of Birth" value={new Date(data.dob).toLocaleDateString("en-IN")} />}
+            {data.dob && (() => { const age = Math.floor((Date.now() - new Date(data.dob).getTime()) / 31557600000); return <InfoRow label="Age" value={`${age} years`} />; })()}
             {data.gender && <InfoRow label="Gender" value={data.gender} capitalize />}
             {data.phone && <InfoRow label="Phone" value={data.phone} />}
             {data.blood_group && (

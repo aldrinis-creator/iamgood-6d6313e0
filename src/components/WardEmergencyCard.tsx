@@ -89,7 +89,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
       `🚨 EMERGENCY HEALTH CARD — ${wardName}`,
       "",
       health?.blood_group ? `Blood Group: ${health.blood_group}` : "",
-      profile?.date_of_birth ? `DOB: ${new Date(profile.date_of_birth).toLocaleDateString("en-IN")}` : "",
+      profile?.date_of_birth ? `Age: ${Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / 31557600000)} years` : "",
       profile?.phone ? `Phone: ${profile.phone}` : "",
       health?.allergies.length ? `⚠️ Allergies: ${health.allergies.join(", ")}` : "",
       health?.chronic_conditions.length ? `Conditions: ${health.chronic_conditions.join(", ")}` : "",
@@ -119,7 +119,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
     return `
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
 <div class="row"><span class="label">Name</span><span class="value">${wardName}</span></div>
-${profile?.date_of_birth ? `<div class="row"><span class="label">DOB</span><span class="value">${new Date(profile.date_of_birth).toLocaleDateString("en-IN")}</span></div>` : ""}
+${profile?.date_of_birth ? `<div class="row"><span class="label">Age</span><span class="value">${Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / 31557600000)} years</span></div>` : ""}
 ${profile?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${profile.gender}</span></div>` : ""}
 ${profile?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${profile.phone}</span></div>` : ""}
 ${h?.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${h.blood_group}</span></span></div>` : ""}
@@ -190,7 +190,7 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
             <Badge variant="destructive" className="text-sm px-3 py-1">{health.blood_group}</Badge>
           )}
           {profile?.date_of_birth && (
-            <span className="text-xs text-muted-foreground">DOB: {new Date(profile.date_of_birth).toLocaleDateString("en-IN")}</span>
+            <span className="text-xs text-muted-foreground">Age: {Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / 31557600000)} yrs</span>
           )}
           {profile?.phone && (
             <span className="text-xs text-muted-foreground">📞 {profile.phone}</span>
