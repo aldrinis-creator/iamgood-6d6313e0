@@ -129,7 +129,7 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLoc
   );
 };
 
-
+const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { toast } = useToast();
