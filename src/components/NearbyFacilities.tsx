@@ -521,7 +521,7 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       )}
 
       <p className="text-[10px] text-center text-muted-foreground">
-        Data from OpenStreetMap · Location used only for search
+        Data from Google Maps · Location used only for search
       </p>
 
       <AddFacilityDialog
