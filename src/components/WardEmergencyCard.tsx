@@ -60,7 +60,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
       supabase.from("profiles").select("date_of_birth, gender, phone").eq("id", wardUserId).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", wardUserId).maybeSingle(),
       supabase.from("medications").select("name, dosage, frequency, schedule_times").eq("user_id", wardUserId),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", wardUserId),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", wardUserId).order("is_primary", { ascending: false }),
       supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", wardUserId).order("start_date", { ascending: false }),
     ]);
 

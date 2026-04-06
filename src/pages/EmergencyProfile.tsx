@@ -18,7 +18,7 @@ interface EmergencyData {
   family_doctor_name: string | null;
   family_doctor_phone: string | null;
   medications: { name: string; dosage: string }[];
-  guardians: { name: string; phone: string; relation: string | null }[];
+  guardians: { name: string; phone: string; relation: string | null; is_primary: boolean }[];
   hospitalizations: { reason: string; hospital_name: string | null; start_date: string | null; end_date: string | null; treatment: string | null }[];
   surgeries: { reason: string; hospital_name: string | null; doctor_name: string | null; start_date: string | null }[];
 }
@@ -58,7 +58,7 @@ const EmergencyProfile = () => {
         supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
         supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
         supabase.from("medications").select("name, dosage").eq("user_id", userId),
-        supabase.from("guardians").select("guardian_name, guardian_phone, relation").eq("user_id", userId),
+        supabase.from("guardians").select("guardian_name, guardian_phone, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
         supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
       ]);
 
@@ -77,7 +77,7 @@ const EmergencyProfile = () => {
         family_doctor_name: h?.family_doctor_name || null,
         family_doctor_phone: h?.family_doctor_phone || null,
         medications: (medsRes.data || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
-        guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation })),
+        guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation, is_primary: !!g.is_primary })),
         hospitalizations: (historyRes.data || []).filter((h: any) => h.type === "hospitalization").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, start_date: h.start_date, end_date: h.end_date, treatment: h.treatment })),
         surgeries: (historyRes.data || []).filter((h: any) => h.type === "surgery").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, doctor_name: h.doctor_name, start_date: h.start_date })),
       });
@@ -240,7 +240,10 @@ const EmergencyProfile = () => {
               {data.guardians.map((g, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div>
-                    <p className="text-sm font-medium">{g.name}</p>
+                    <p className="text-sm font-medium flex items-center gap-1.5">
+                      {g.name}
+                      {g.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                    </p>
                     {g.relation && <p className="text-xs text-muted-foreground capitalize">{g.relation}</p>}
                   </div>
                   <a href={`tel:${g.phone}`} className="text-sm text-primary font-medium">{g.phone}</a>
