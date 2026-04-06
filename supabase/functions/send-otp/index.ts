@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
     const templateId = Deno.env.get("MSG91_OTP_TEMPLATE_ID");
 
     if (!authKey || !templateId) {
+      console.error("Missing config — MSG91_AUTH_KEY:", !!authKey, "MSG91_OTP_TEMPLATE_ID:", !!templateId);
       return new Response(
         JSON.stringify({ error: "MSG91 OTP not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -32,9 +33,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Ensure phone has country code
+    // Ensure phone has country code (strip + prefix, default to 91)
     const cleanPhone = phone.replace(/[\s-]/g, "");
-    const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone.slice(1) : cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+    const formattedPhone = cleanPhone.startsWith("+")
+      ? cleanPhone.slice(1)
+      : cleanPhone.startsWith("91")
+        ? cleanPhone
+        : `91${cleanPhone}`;
+
+    console.log(`[send-otp] action=${action || "send"}, phone=${formattedPhone}, templateId=${templateId}`);
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      authkey: authKey,
+    };
 
     let url: string;
     let method = "POST";
@@ -50,8 +62,8 @@ Deno.serve(async (req) => {
       url = `${MSG91_BASE}/otp/verify?otp=${otp}&mobile=${formattedPhone}`;
       method = "GET";
     } else if (action === "resend") {
-      // Send a fresh OTP instead of retry (retry fails if original session expired)
-      url = `${MSG91_BASE}/otp?template_id=${templateId}&mobile=${formattedPhone}`;
+      // Use retrytype=text for resend via SMS
+      url = `${MSG91_BASE}/otp/retry?retrytype=text&mobile=${formattedPhone}`;
       method = "POST";
     } else {
       // Default: send OTP
@@ -59,14 +71,16 @@ Deno.serve(async (req) => {
       method = "POST";
     }
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      authkey: authKey,
-    };
-
     const res = await fetch(url, { method, headers, body });
-    const result = await res.json();
-    console.log(`MSG91 OTP ${action || "send"} response:`, JSON.stringify(result));
+    const resultText = await res.text();
+    console.log(`[send-otp] MSG91 response (${res.status}):`, resultText);
+
+    let result: any;
+    try {
+      result = JSON.parse(resultText);
+    } catch {
+      result = { type: "error", message: resultText };
+    }
 
     const success = result.type === "success" || result.type === "otp_verified";
 
@@ -82,6 +96,8 @@ Deno.serve(async (req) => {
         // Look up email by phone
         const phoneWithPlus = `+${formattedPhone}`;
         const { data: email, error: rpcError } = await supabaseAdmin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
+
+        console.log(`[send-otp] get_email_by_phone(${phoneWithPlus}):`, email, rpcError);
 
         if (rpcError || !email) {
           return new Response(
@@ -107,6 +123,8 @@ Deno.serve(async (req) => {
         // Extract token_hash from the generated link
         const properties = linkData.properties;
         const tokenHash = properties?.hashed_token;
+
+        console.log(`[send-otp] Session generated for ${email}, tokenHash present: ${!!tokenHash}`);
 
         return new Response(
           JSON.stringify({
