@@ -7,6 +7,22 @@ const corsHeaders = {
 
 const MSG91_BASE = "https://control.msg91.com/api/v5";
 
+// In-memory rate limiter: max 3 OTP requests per phone per 10 minutes
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 3;
+const otpRequestLog = new Map<string, number[]>();
+
+function isRateLimited(phone: string): boolean {
+  const now = Date.now();
+  const timestamps = otpRequestLog.get(phone) || [];
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  otpRequestLog.set(phone, recent);
+  if (recent.length >= RATE_LIMIT_MAX) return true;
+  recent.push(now);
+  otpRequestLog.set(phone, recent);
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +58,15 @@ Deno.serve(async (req) => {
         : `91${cleanPhone}`;
 
     console.log(`[send-otp] action=${action || "send"}, phone=${formattedPhone}, templateId=${templateId}`);
+
+    // Rate-limit send and resend actions
+    if (action !== "verify" && isRateLimited(formattedPhone)) {
+      console.log(`[send-otp] Rate limited: ${formattedPhone}`);
+      return new Response(
+        JSON.stringify({ error: "Too many OTP requests. Please wait 10 minutes before trying again." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
