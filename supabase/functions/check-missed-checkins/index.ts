@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: "Processed missed check-ins",
-        missed: pendingCheckIns.length,
+        missed: uniqueCheckIns.length,
         notifications: notificationsCreated,
         emails: emailsSent,
         pushes: pushesSent,
