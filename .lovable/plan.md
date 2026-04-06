@@ -1,71 +1,47 @@
 
 
-## Fix: Destination Search Not Populating in Map My Journey
+## Fix: OTP Workflow and Build Errors in Register.tsx
 
-### Root Cause
+### Problem
 
-The Google Maps API key (`AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw`) likely has the Places API disabled or is quota-exhausted. The script loads successfully (so `autocompleteService.current` gets set), but `getPlacePredictions` returns a non-OK status like `REQUEST_DENIED` or `OVER_QUERY_LIMIT`.
+1. **Build error**: TypeScript reports `'title' does not exist` at 8 locations in `Register.tsx` — all are `toast.error()` / `toast.success()` calls. The code itself is correct sonner syntax, but the build system appears to be mis-resolving the `toast` type. This blocks the entire app.
 
-The Nominatim fallback *does* fire in this case (line 163-167), but it may also fail silently due to Nominatim's strict rate limiting and User-Agent requirements, or the `fetch` may be blocked by CSP in the preview environment.
+2. **OTP registration flow**: During registration, the `send-otp` edge function's verify action tries to look up the user by phone (via `get_email_by_phone`) and returns `no_account: true` since the user doesn't exist yet. The current `handleOtpVerified` in Register ignores this, which is correct — BUT the edge function still wastes time trying to generate a magic link for a non-existent user.
 
-The core problem: the search depends on two unreliable external APIs with no visible error feedback to the user.
+3. **OTP login flow**: The Login page OTP flow depends on the edge function returning a `token_hash` after verification, then calling `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })`. This should work if the user exists and has a linked phone number in their profile.
 
-### Fix
+### Fix Plan
 
-**File: `src/pages/MapMyJourney.tsx`** — Rewrite `searchDestination` to use **Nominatim as primary** search and Google Places as an optional enhancement. This removes dependency on the potentially broken API key for the core search flow.
+**File: `src/pages/Register.tsx`**
 
-1. **Make Nominatim the primary search** — call it directly without waiting for Google API
-2. **Add error visibility** — if both APIs fail, show a toast so the user knows something went wrong instead of silent failure
-3. **Remove the `autocompleteService.current` gate** — the current logic only falls back to Nominatim if Google isn't loaded; if Google IS loaded but returns errors, the fallback fires but may also fail silently
-4. **Add `countrycode=in` to Nominatim** — since this is an India-focused app, this improves result relevance and avoids ambiguous matches
+The build error is likely caused by a stale TypeScript type cache conflicting with the sonner types. To force correct resolution, change the toast import to use the re-exported `toast` from the project's own `@/components/ui/sonner` module instead of directly from `"sonner"`:
 
-The rewritten search function (lines 128-171):
 ```typescript
-const searchDestination = useCallback((query: string) => {
-  if (searchTimer.current) clearTimeout(searchTimer.current);
-  if (query.length < 1) { setSearchResults([]); return; }
-  
-  searchTimer.current = setTimeout(async () => {
-    // Primary: Nominatim (reliable, no API key needed)
-    try {
-      const params = new URLSearchParams({
-        format: "json", q: query, limit: "8", countrycodes: "in"
-      });
-      if (originPos) {
-        params.set("lat", String(originPos.lat));
-        params.set("lon", String(originPos.lng));
-      }
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, 
-        { headers: { "User-Agent": "CheckiN-App/1.0" } });
-      const data = await res.json();
-      if (data.length > 0) {
-        setSearchResults(data.map((d: any) => ({
-          place_id: d.place_id?.toString() || String(Math.random()),
-          description: d.display_name,
-          main_text: d.display_name.split(",")[0],
-          secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
-          lat: parseFloat(d.lat),
-          lng: parseFloat(d.lon),
-        })));
-        return;
-      }
-    } catch (e) { console.warn("[MMJ] Nominatim search failed:", e); }
-
-    // Fallback: Google Places (if loaded)
-    if (autocompleteService.current) {
-      // ... existing Google Places logic as secondary fallback
-    }
-    
-    // If both fail, inform user
-    if (searchResults.length === 0) {
-      toast.error("Could not find destinations. Try a different search.");
-    }
-  }, 300);
-}, [originPos]);
+// Line 10: Change from
+import { toast } from "sonner";
+// To
+import { toast } from "@/components/ui/sonner";
 ```
 
-5. Since results from Nominatim always include `lat`/`lng`, `handleSelectDest` will use the direct path (line 214-216) without needing `PlacesService.getDetails` — eliminating another potential failure point.
+This is a known pattern that avoids TypeScript type resolution ambiguity with the sonner package. No other changes needed to the toast calls themselves — they are all valid.
+
+**File: `supabase/functions/send-otp/index.ts`**
+
+Add a quick-return path for the verify action when the purpose is registration (phone-only verification without session creation). This can be done by accepting an optional `purpose` field in the request body:
+
+- When `purpose === "register"`, skip the user lookup and magic link generation after successful MSG91 OTP verification — just return `{ success: true, verified: true }`.
+- When `purpose` is absent or `"login"`, keep the existing behavior (look up user, generate magic link, return `token_hash`).
+
+**File: `src/components/OtpVerification.tsx`**
+
+Add an optional `purpose` prop (default: `"login"`) and pass it to the edge function in the verify request body. This lets the Register page pass `purpose="register"` to skip unnecessary user lookup.
+
+**File: `src/pages/Register.tsx` (OTP step)**
+
+Pass `purpose="register"` to the `OtpVerification` component at step 3.
 
 ### Files to modify
-- `src/pages/MapMyJourney.tsx` — rewrite `searchDestination` function (lines 128-171)
+- `src/pages/Register.tsx` — fix toast import, pass `purpose="register"` to OtpVerification
+- `src/components/OtpVerification.tsx` — add `purpose` prop, include in verify request
+- `supabase/functions/send-otp/index.ts` — handle `purpose=register` to skip session generation
 
