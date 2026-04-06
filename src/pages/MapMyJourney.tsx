@@ -131,42 +131,76 @@ const MapMyJourney = () => {
       setSearchResults([]);
       return;
     }
-    searchTimer.current = setTimeout(() => {
-      if (!autocompleteService.current) {
-        // Fallback to Nominatim if Google not loaded
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`, { headers: { "User-Agent": "CheckiN-App/1.0" } })
-          .then(r => r.json())
-          .then(data => setSearchResults(data.map((d: any) => ({ place_id: d.place_id, description: d.display_name, main_text: d.display_name.split(",")[0], secondary_text: d.display_name.split(",").slice(1).join(",").trim(), lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))))
-          .catch(() => setSearchResults([]));
+    searchTimer.current = setTimeout(async () => {
+      // Primary: Nominatim (no API key needed, reliable)
+      try {
+        const params = new URLSearchParams({
+          format: "json",
+          q: query,
+          limit: "8",
+          countrycodes: "in",
+        });
+        if (originPos) {
+          params.set("lat", String(originPos.lat));
+          params.set("lon", String(originPos.lng));
+        }
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?${params}`,
+          { headers: { "User-Agent": "CheckiN-App/1.0" } }
+        );
+        const data = await res.json();
+        if (data.length > 0) {
+          setSearchResults(
+            data.map((d: any) => ({
+              place_id: d.place_id?.toString() || String(Math.random()),
+              description: d.display_name,
+              main_text: d.display_name.split(",")[0],
+              secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
+              lat: parseFloat(d.lat),
+              lng: parseFloat(d.lon),
+            }))
+          );
+          return;
+        }
+      } catch (e) {
+        console.warn("[MMJ] Nominatim search failed:", e);
+      }
+
+      // Fallback: Google Places (if loaded)
+      if (autocompleteService.current) {
+        try {
+          const request: google.maps.places.AutocompletionRequest = {
+            input: query,
+            ...(originPos && {
+              location: new google.maps.LatLng(originPos.lat, originPos.lng),
+              radius: 50000,
+            }),
+          };
+          autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+              setSearchResults(
+                predictions.map((p) => ({
+                  place_id: p.place_id,
+                  description: p.description,
+                  main_text: p.structured_formatting.main_text,
+                  secondary_text: p.structured_formatting.secondary_text || "",
+                }))
+              );
+            } else {
+              toast.error("Could not find destinations. Try a different search.");
+              setSearchResults([]);
+            }
+          });
+        } catch {
+          toast.error("Could not find destinations. Try a different search.");
+          setSearchResults([]);
+        }
         return;
       }
 
-      const request: google.maps.places.AutocompletionRequest = {
-        input: query,
-        ...(originPos && {
-          location: new google.maps.LatLng(originPos.lat, originPos.lng),
-          radius: 50000,
-        }),
-      };
-
-      console.log("[MMJ] Google Places search:", query);
-      autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-          console.log("[MMJ] Google Places returned", predictions.length, "results");
-          setSearchResults(predictions.map(p => ({
-            place_id: p.place_id,
-            description: p.description,
-            main_text: p.structured_formatting.main_text,
-            secondary_text: p.structured_formatting.secondary_text || "",
-          })));
-        } else {
-          console.warn("[MMJ] Google Places failed, status:", status, "— falling back to Nominatim");
-          fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`, { headers: { "User-Agent": "CheckiN-App/1.0" } })
-            .then(r => r.json())
-            .then(data => setSearchResults(data.map((d: any) => ({ place_id: d.place_id, description: d.display_name, main_text: d.display_name.split(",")[0], secondary_text: d.display_name.split(",").slice(1).join(",").trim(), lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))))
-            .catch(() => setSearchResults([]));
-        }
-      });
+      // Both failed
+      toast.error("Could not find destinations. Try a different search.");
+      setSearchResults([]);
     }, 300);
   }, [originPos]);
 
