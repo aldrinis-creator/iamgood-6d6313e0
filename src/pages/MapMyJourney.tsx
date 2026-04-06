@@ -127,7 +127,7 @@ const MapMyJourney = () => {
   // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (query.length < 2) {
+    if (query.length < 1) {
       setSearchResults([]);
       return;
     }
@@ -194,11 +194,21 @@ const MapMyJourney = () => {
   }, [selectedDest, originPos, transportMode, fetchRoute]);
 
   const handleSelectDest = (result: SearchResult) => {
+    const finalize = (name: string, lat: number, lng: number) => {
+      setSelectedDest({ name, lat, lng });
+      setDestination(name.split(",")[0]);
+      setSearchResults([]);
+      // If pending Home/Work, save it
+      if (pendingHomeWork) {
+        setHomeWork(pendingHomeWork, { name, lat, lng });
+        toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} location saved!`);
+        setPendingHomeWork(null);
+      }
+    };
+
     // If we already have lat/lng (fallback mode), use directly
     if (result.lat && result.lng) {
-      setSelectedDest({ name: result.description, lat: result.lat, lng: result.lng });
-      setDestination(result.main_text);
-      setSearchResults([]);
+      finalize(result.description, result.lat, result.lng);
       return;
     }
     // Otherwise use PlacesService to get coordinates
@@ -207,13 +217,11 @@ const MapMyJourney = () => {
       { placeId: result.place_id, fields: ["geometry", "name", "formatted_address"] },
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          setSelectedDest({
-            name: place.formatted_address || result.description,
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          });
-          setDestination(result.main_text);
-          setSearchResults([]);
+          finalize(
+            place.formatted_address || result.description,
+            place.geometry.location.lat(),
+            place.geometry.location.lng(),
+          );
         } else {
           toast.error("Could not get location details");
         }
@@ -413,11 +421,15 @@ const MapMyJourney = () => {
                         const name = homeDest.name.replace("🏠 Home: ", "");
                         setSelectedDest({ name: homeDest.name, lat: homeDest.lat, lng: homeDest.lng });
                         setDestination(name.split(",")[0]);
-                      } else if (selectedDest) {
-                        setHomeWork("home", selectedDest);
-                        toast.success("Home location saved!");
+                        setPendingHomeWork(null);
                       } else {
-                        toast.info("Search for a destination first, then set as Home");
+                        setPendingHomeWork("home");
+                        setDestination("");
+                        setSelectedDest(null);
+                        setSearchResults([]);
+                        setInputFocused(true);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                        toast.info("Search and select a place to set as Home");
                       }
                     }}
                   >
@@ -433,11 +445,15 @@ const MapMyJourney = () => {
                         const name = workDest.name.replace("🏢 Work: ", "");
                         setSelectedDest({ name: workDest.name, lat: workDest.lat, lng: workDest.lng });
                         setDestination(name.split(",")[0]);
-                      } else if (selectedDest) {
-                        setHomeWork("work", selectedDest);
-                        toast.success("Work location saved!");
+                        setPendingHomeWork(null);
                       } else {
-                        toast.info("Search for a destination first, then set as Work");
+                        setPendingHomeWork("work");
+                        setDestination("");
+                        setSelectedDest(null);
+                        setSearchResults([]);
+                        setInputFocused(true);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                        toast.info("Search and select a place to set as Work");
                       }
                     }}
                   >
@@ -450,9 +466,10 @@ const MapMyJourney = () => {
                 <div className="space-y-2">
                   <Label>Destination</Label>
                   <div className="relative">
-                    <div className="relative">
+                     <div className="relative">
                       <Input
-                        placeholder="Search destination..."
+                        ref={inputRef}
+                        placeholder={pendingHomeWork ? `Search to set as ${pendingHomeWork === "home" ? "Home 🏠" : "Work 🏢"}...` : "Search destination..."}
                         value={destination}
                         onFocus={() => setInputFocused(true)}
                         onBlur={() => setTimeout(() => setInputFocused(false), 300)}
@@ -461,6 +478,7 @@ const MapMyJourney = () => {
                           searchDestination(e.target.value);
                           if (!e.target.value) setSelectedDest(null);
                         }}
+                        className={pendingHomeWork ? "ring-2 ring-primary" : ""}
                       />
                       {destination && (
                         <button
