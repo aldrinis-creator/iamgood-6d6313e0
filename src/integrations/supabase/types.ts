@@ -968,8 +968,10 @@ export type Database = {
           created_at: string
           delivery_status: string | null
           delivery_time: string | null
+          expires_at: string | null
           failure_reason: string | null
           id: string
+          otp_code: string | null
           phone: string
           request_id: string | null
           status: string
@@ -980,8 +982,10 @@ export type Database = {
           created_at?: string
           delivery_status?: string | null
           delivery_time?: string | null
+          expires_at?: string | null
           failure_reason?: string | null
           id?: string
+          otp_code?: string | null
           phone: string
           request_id?: string | null
           status?: string
@@ -992,8 +996,10 @@ export type Database = {
           created_at?: string
           delivery_status?: string | null
           delivery_time?: string | null
+          expires_at?: string | null
           failure_reason?: string | null
           id?: string
+          otp_code?: string | null
           phone?: string
           request_id?: string | null
           status?: string
