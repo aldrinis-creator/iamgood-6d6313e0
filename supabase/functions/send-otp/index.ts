@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action, phone, otp } = await req.json();
+    const { action, phone, otp, purpose } = await req.json();
 
     if (!phone) {
       return new Response(
@@ -84,8 +84,17 @@ Deno.serve(async (req) => {
 
     const success = result.type === "success" || result.type === "otp_verified";
 
-    // If OTP verification succeeded, generate a Supabase auth session
+    // If OTP verification succeeded, handle based on purpose
     if (action === "verify" && success) {
+      // For registration, just confirm verification — no session needed
+      if (purpose === "register") {
+        return new Response(
+          JSON.stringify({ success: true, verified: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // For login, generate a session via magic link
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
