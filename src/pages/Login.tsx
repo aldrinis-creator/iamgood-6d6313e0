@@ -53,9 +53,9 @@ const GoogleSignInButton = ({ label = "Sign in with Google" }: { label?: string 
 
 const OrDivider = () => (
   <div className="flex items-center gap-3 my-2">
-    <Separator className="flex-1" />
+    <div className="flex-1 h-px bg-border" />
     <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-    <Separator className="flex-1" />
+    <div className="flex-1 h-px bg-border" />
   </div>
 );
 
