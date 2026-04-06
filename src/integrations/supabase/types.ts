@@ -962,6 +962,45 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_events: {
+        Row: {
+          action: string
+          created_at: string
+          delivery_status: string | null
+          delivery_time: string | null
+          failure_reason: string | null
+          id: string
+          phone: string
+          request_id: string | null
+          status: string
+          verified: boolean
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          delivery_status?: string | null
+          delivery_time?: string | null
+          failure_reason?: string | null
+          id?: string
+          phone: string
+          request_id?: string | null
+          status?: string
+          verified?: boolean
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          delivery_status?: string | null
+          delivery_time?: string | null
+          failure_reason?: string | null
+          id?: string
+          phone?: string
+          request_id?: string | null
+          status?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       ppg_sessions: {
         Row: {
           avg_heart_rate: number | null

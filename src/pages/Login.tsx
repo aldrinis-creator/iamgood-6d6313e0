@@ -10,7 +10,7 @@ import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone } from "lucide-rea
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { Separator } from "@/components/ui/separator";
+
 import OtpVerification from "@/components/OtpVerification";
 
 const GoogleIcon = () => (
@@ -53,9 +53,9 @@ const GoogleSignInButton = ({ label = "Sign in with Google" }: { label?: string 
 
 const OrDivider = () => (
   <div className="flex items-center gap-3 my-2">
-    <Separator className="flex-1" />
+    <div className="flex-1 h-px bg-border" />
     <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-    <Separator className="flex-1" />
+    <div className="flex-1 h-px bg-border" />
   </div>
 );
 
