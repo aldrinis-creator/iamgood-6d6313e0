@@ -32,6 +32,7 @@ import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
 import GuardianMessages from "./pages/GuardianMessages";
 import MapMyJourney from "./pages/MapMyJourney";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
               {/* Public routes */}
               <Route path="/e/:token" element={<EmergencyProfile />} />
               <Route path="/install" element={<Install />} />
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="*" element={<NotFound />} />
