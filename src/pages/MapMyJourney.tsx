@@ -144,15 +144,15 @@ const MapMyJourney = () => {
       const request: google.maps.places.AutocompletionRequest = {
         input: query,
         ...(originPos && {
-          locationBias: {
-            center: { lat: originPos.lat, lng: originPos.lng },
-            radius: 50000,
-          } as any,
+          location: new google.maps.LatLng(originPos.lat, originPos.lng),
+          radius: 50000,
         }),
       };
 
+      console.log("[MMJ] Google Places search:", query);
       autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          console.log("[MMJ] Google Places returned", predictions.length, "results");
           setSearchResults(predictions.map(p => ({
             place_id: p.place_id,
             description: p.description,
@@ -160,7 +160,11 @@ const MapMyJourney = () => {
             secondary_text: p.structured_formatting.secondary_text || "",
           })));
         } else {
-          setSearchResults([]);
+          console.warn("[MMJ] Google Places failed, status:", status, "— falling back to Nominatim");
+          fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8`, { headers: { "User-Agent": "CheckiN-App/1.0" } })
+            .then(r => r.json())
+            .then(data => setSearchResults(data.map((d: any) => ({ place_id: d.place_id, description: d.display_name, main_text: d.display_name.split(",")[0], secondary_text: d.display_name.split(",").slice(1).join(",").trim(), lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))))
+            .catch(() => setSearchResults([]));
         }
       });
     }, 300);
