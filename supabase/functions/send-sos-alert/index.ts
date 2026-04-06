@@ -265,14 +265,14 @@ Deno.serve(async (req) => {
     // --- MSG91 WhatsApp alerts to guardians ---
     let msg91Sent = 0;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-    const msg91SosTemplate = Deno.env.get("MSG91_SOS_TEMPLATE_ID");
+    const MSG91_SOS_TEMPLATE = "69cff9f7759afeb3920ace04";
 
-    if (msg91AuthKey && msg91SosTemplate && guardianRows?.length) {
+    if (msg91AuthKey && guardianRows?.length) {
       const guardianPhones = guardianRows.map((g: any) => g.guardian_phone).filter(Boolean);
       const recipients = guardianPhones.map((phone: string) => {
         const clean = phone.replace(/[^0-9]/g, "");
         const mobile = clean.startsWith("91") ? clean : `91${clean}`;
-        return { mobiles: mobile, user_name: user_name || "User", message: message.substring(0, 500) };
+        return { mobiles: mobile, var1: user_name || "User" };
       });
 
       if (recipients.length > 0) {
@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
           const flowRes = await fetch("https://control.msg91.com/api/v5/flow", {
             method: "POST",
             headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
-            body: JSON.stringify({ template_id: msg91SosTemplate, short_url: "0", recipients }),
+            body: JSON.stringify({ template_id: MSG91_SOS_TEMPLATE, recipients }),
           });
           const flowResult = await flowRes.json();
           console.log("MSG91 SOS flow result:", JSON.stringify(flowResult));
