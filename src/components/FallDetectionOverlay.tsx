@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useFallDetection } from "@/hooks/useFallDetection";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -103,12 +103,20 @@ const FallDetectionOverlay = () => {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (countdownExpired) {
+    if (countdownExpired && !hasSentRef.current) {
+      hasSentRef.current = true;
       triggerSOS();
       sendFallAlerts();
       cancelFallAlert();
     }
   }, [countdownExpired, triggerSOS, sendFallAlerts, cancelFallAlert]);
+
+  // Reset guard when a new fall is detected
+  useEffect(() => {
+    if (fallDetected) {
+      hasSentRef.current = false;
+    }
+  }, [fallDetected]);
 
   // Auto-request iOS permission once when enabled
   useEffect(() => {
