@@ -246,9 +246,9 @@ const NearbyFacilities = ({ type, onBack }: Props) => {
       zoom: 5,
       zoomControl: false,
     });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-      maxZoom: 18,
+    L.tileLayer("https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+      attribution: "© Google",
+      maxZoom: 20,
     }).addTo(leafletMap.current);
     L.control.zoom({ position: "bottomright" }).addTo(leafletMap.current);
 

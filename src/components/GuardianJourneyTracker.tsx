@@ -365,8 +365,8 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
         <div className="relative rounded-lg overflow-hidden border border-border" style={{ height: mapHeight }}>
           <MapContainer center={mapCenter} zoom={14} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false} zoomControl={false}>
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; Google"
+              url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
             />
 
             {/* Initial fit bounds (only when no previous position tracked) */}

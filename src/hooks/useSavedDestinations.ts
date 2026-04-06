@@ -13,6 +13,9 @@ export interface SavedDestination {
   is_favorite: boolean;
 }
 
+const HOME_PREFIX = "🏠 Home: ";
+const WORK_PREFIX = "🏢 Work: ";
+
 export function useSavedDestinations() {
   const { user } = useAuth();
   const [destinations, setDestinations] = useState<SavedDestination[]>([]);
@@ -39,11 +42,9 @@ export function useSavedDestinations() {
   const saveDestination = useCallback(
     async (dest: { name: string; lat: number; lng: number; place_id?: string }) => {
       if (!user) return;
-      // Round coords to avoid floating point uniqueness issues
       const lat = Math.round(dest.lat * 1e6) / 1e6;
       const lng = Math.round(dest.lng * 1e6) / 1e6;
 
-      // Check if exists
       const { data: existing } = await supabase
         .from("saved_destinations")
         .select("id, use_count")
@@ -87,5 +88,43 @@ export function useSavedDestinations() {
     [fetchDestinations]
   );
 
-  return { destinations, loading, saveDestination, toggleFavorite, removeDestination };
+  // Home/Work helpers
+  const home = destinations.find((d) => d.name.startsWith(HOME_PREFIX));
+  const work = destinations.find((d) => d.name.startsWith(WORK_PREFIX));
+
+  const setHomeWork = useCallback(
+    async (type: "home" | "work", dest: { name: string; lat: number; lng: number; place_id?: string }) => {
+      if (!user) return;
+      const prefix = type === "home" ? HOME_PREFIX : WORK_PREFIX;
+      const prefixedName = `${prefix}${dest.name}`;
+      const lat = Math.round(dest.lat * 1e6) / 1e6;
+      const lng = Math.round(dest.lng * 1e6) / 1e6;
+
+      // Remove existing home/work entry
+      const existing = destinations.find((d) => d.name.startsWith(prefix));
+      if (existing) {
+        await supabase.from("saved_destinations").delete().eq("id", existing.id);
+      }
+
+      await supabase.from("saved_destinations").insert({
+        user_id: user.id,
+        name: prefixedName,
+        lat,
+        lng,
+        place_id: dest.place_id || null,
+        is_favorite: true,
+      });
+      fetchDestinations();
+    },
+    [user, destinations, fetchDestinations]
+  );
+
+  const getHomeWork = useCallback(
+    (type: "home" | "work"): SavedDestination | undefined => {
+      return type === "home" ? home : work;
+    },
+    [home, work]
+  );
+
+  return { destinations, loading, saveDestination, toggleFavorite, removeDestination, home, work, setHomeWork, getHomeWork };
 }
