@@ -137,27 +137,46 @@ const MapMyJourney = () => {
         const params = new URLSearchParams({
           format: "json",
           q: query,
-          limit: "8",
+          limit: "12",
           countrycodes: "in",
+          addressdetails: "1",
         });
         if (originPos) {
-          params.set("lat", String(originPos.lat));
-          params.set("lon", String(originPos.lng));
+          // Use viewbox to strongly bias results within ~50km of user
+          const delta = 0.45; // ~50km
+          params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
+          params.set("bounded", "0"); // prefer viewbox but allow outside
         }
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?${params}`,
           { headers: { "User-Agent": "CheckiN-App/1.0" } }
         );
-        const data = await res.json();
-        if (data.length > 0) {
+        const rawData: any[] = await res.json();
+        if (rawData.length > 0) {
+          // Sort by distance from origin (nearest first)
+          const withDist = rawData.map((d: any) => {
+            const dLat = parseFloat(d.lat);
+            const dLng = parseFloat(d.lon);
+            let dist = Infinity;
+            if (originPos) {
+              const R = 6371;
+              const dLatR = ((dLat - originPos.lat) * Math.PI) / 180;
+              const dLngR = ((dLng - originPos.lng) * Math.PI) / 180;
+              const a = Math.sin(dLatR / 2) ** 2 + Math.cos((originPos.lat * Math.PI) / 180) * Math.cos((dLat * Math.PI) / 180) * Math.sin(dLngR / 2) ** 2;
+              dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+            return { ...d, _lat: dLat, _lng: dLng, _dist: dist };
+          });
+          withDist.sort((a, b) => a._dist - b._dist);
+
           setSearchResults(
-            data.map((d: any) => ({
+            withDist.slice(0, 8).map((d: any) => ({
               place_id: d.place_id?.toString() || String(Math.random()),
               description: d.display_name,
               main_text: d.display_name.split(",")[0],
               secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
-              lat: parseFloat(d.lat),
-              lng: parseFloat(d.lon),
+              lat: d._lat,
+              lng: d._lng,
             }))
           );
           return;
