@@ -149,8 +149,24 @@ const Register = () => {
 
   const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
     try {
+      // Send branded guardian invitation via transactional email system
+      const baseUrl = "https://iamgood.lovable.app";
+      await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "guardian-invitation",
+          recipientEmail: guardianEmail,
+          idempotencyKey: `guardian-invite-${guardianEmail}-${Date.now()}`,
+          templateData: {
+            guardianName,
+            userName,
+            relation,
+            acceptLink: `${baseUrl}/register`,
+          },
+        },
+      });
+      // Also send WhatsApp/SMS via the old function (keeps MSG91 integration)
       await supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_email: guardianEmail, guardian_name: guardianName, user_name: userName, relation },
+        body: { guardian_name: guardianName, user_name: userName, relation },
       });
     } catch (e) {
       console.error("Failed to send guardian invite:", e);
