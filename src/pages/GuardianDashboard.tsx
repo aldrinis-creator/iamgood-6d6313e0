@@ -83,8 +83,53 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
   );
 };
 
+const GOOGLE_MAPS_API_KEY = "AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw";
 
-const GuardianDashboard = () => {
+const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null }) => {
+  const [expanded, setExpanded] = useState(false);
+  const mapHeight = expanded ? 400 : 192;
+  const embedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${wardLocation.lat},${wardLocation.lng}&zoom=15`;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${wardLocation.lat},${wardLocation.lng}`;
+
+  return (
+    <>
+      <div className="bg-muted rounded-lg relative overflow-hidden transition-all duration-300" style={{ height: mapHeight }}>
+        <iframe
+          src={embedUrl}
+          className="w-full h-full border-0"
+          title="Ward Location"
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+        <Button
+          size="icon"
+          variant="secondary"
+          className="absolute top-2 right-2 z-10 h-7 w-7 shadow-md"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+        </Button>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          {wardLocation.lat.toFixed(4)}° N, {wardLocation.lng.toFixed(4)}° E
+          {activeSOS && " • Auto-refreshing every 30s"}
+        </p>
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
+          <ExternalLink className="w-3 h-3" /> Open
+        </a>
+      </div>
+      {locationUpdatedAt && !activeSOS && (
+        <p className="text-[10px] text-muted-foreground text-center">
+          Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
+        </p>
+      )}
+    </>
+  );
+};
+
+
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { toast } = useToast();
