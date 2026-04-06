@@ -13,6 +13,9 @@ import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import OtpVerification from "@/components/OtpVerification";
+import PhoneInput from "@/components/PhoneInput";
+
+const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -74,7 +77,6 @@ const Register = () => {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [phoneCode, setPhoneCode] = useState("+91");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
@@ -115,29 +117,18 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
-  const validatePhone = (value: string): string | null => {
-    const digits = value.replace(/\D/g, "");
-    if (!digits) return "Phone number is required. You'll use it to sign in later.";
-    if (phoneCode === "+91" && !/^[6-9]\d{9}$/.test(digits)) {
-      return "Enter a valid 10-digit Indian mobile number (starting with 6-9).";
-    }
-    if (phoneCode !== "+91" && digits.length < 7) {
-      return "Enter a valid phone number.";
-    }
-    return null;
-  };
+  const phoneDigitCount = getDigitCount(phone);
+  const isPhoneValid = phoneDigitCount >= 10;
 
   const handleDetailsNext = () => {
     if (!fullName || !email || !password) {
       toast.error("Please fill in all required fields");
       return;
     }
-    const phoneError = validatePhone(phone);
-    if (phoneError) {
-      toast.error("Invalid phone number", { description: phoneError });
+    if (!isPhoneValid) {
+      toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
       return;
     }
-    // Go to OTP verification step
     setStep(3);
   };
 
@@ -169,9 +160,17 @@ const Register = () => {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
+  if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
       toast.error("Primary guardian name, phone and email are required", { description: "Guardian email is essential for emergency notifications." });
       return;
+    }
+    if (selectedRole === "user") {
+      for (const g of guardians.filter(g => g.phone)) {
+        if (getDigitCount(g.phone) < 10) {
+          toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has fewer than 10 digits in their phone number.` });
+          return;
+        }
+      }
     }
 
     // Check 3-ward limit for each nominated guardian with an email
@@ -204,9 +203,8 @@ const Register = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Update profile with phone, DOB
-      const fullPhone = `${phoneCode}${phone}`;
       await supabase.from("profiles").update({
-        phone: fullPhone,
+        phone: phone.replace(/\s/g, ""),
         date_of_birth: dob || null,
       }).eq("id", userId);
 
@@ -338,16 +336,15 @@ const Register = () => {
             </div>
             <div>
               <Label>Phone Number *</Label>
-              <div className="flex gap-2">
-                <Select value={phoneCode} onValueChange={setPhoneCode}>
-                  <SelectTrigger className="w-24 min-h-[48px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+91">+91</SelectItem>
-                    <SelectItem value="+1">+1</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="10-digit mobile number" className="flex-1 text-base min-h-[48px]" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" maxLength={10} />
-              </div>
+              <PhoneInput
+                value={phone}
+                onChange={setPhone}
+                placeholder="98765 43210"
+                className="min-h-[48px]"
+              />
+              {phone.trim().length > 0 && !isPhoneValid && (
+                <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
+              )}
             </div>
             <div>
               <Label>Email *</Label>
@@ -383,7 +380,6 @@ const Register = () => {
 
   // --- Step 3: OTP verification ---
   if (step === 3) {
-    const fullPhone = `${phoneCode}${phone}`;
     return (
       <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
         <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
@@ -401,7 +397,7 @@ const Register = () => {
 
           <div className="mt-8">
             <OtpVerification
-              phone={fullPhone}
+              phone={phone.replace(/\s/g, "")}
               purpose="register"
               onVerified={handleOtpVerified}
               onCancel={handleOtpCancel}
@@ -452,7 +448,14 @@ const Register = () => {
               </div>
               <div>
                 <Label className="text-xs">Phone *</Label>
-                <Input placeholder="Phone number" className="text-base min-h-[48px]" value={g.phone} onChange={(e) => updateGuardian(i, "phone", e.target.value)} />
+                <PhoneInput
+                  value={g.phone}
+                  onChange={(val) => updateGuardian(i, "phone", val)}
+                  placeholder="98765 43210"
+                />
+                {g.phone.trim().length > 0 && getDigitCount(g.phone) < 10 && (
+                  <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Email {i === 0 ? "*" : "(for notifications)"}</Label>
