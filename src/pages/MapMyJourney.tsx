@@ -490,6 +490,7 @@ const MapMyJourney = () => {
                             setSearchResults([]);
                             setRouteCoords([]);
                             setEta(null);
+                            setPendingHomeWork(null);
                           }}
                         >
                           <X className="w-4 h-4" />
