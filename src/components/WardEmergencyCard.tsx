@@ -39,6 +39,7 @@ interface MedicalHistoryEntry {
 }
 
 interface GuardianView {
+  id: string;
   guardian_name: string;
   guardian_phone: string;
   guardian_email: string | null;
@@ -60,7 +61,7 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
       supabase.from("profiles").select("date_of_birth, gender, phone").eq("id", wardUserId).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", wardUserId).maybeSingle(),
       supabase.from("medications").select("name, dosage, frequency, schedule_times").eq("user_id", wardUserId),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", wardUserId).order("is_primary", { ascending: false }),
+      supabase.from("guardians").select("id, guardian_name, guardian_phone, guardian_email, relation, is_primary").eq("user_id", wardUserId).order("is_primary", { ascending: false }),
       supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", wardUserId).order("start_date", { ascending: false }),
     ]);
 
@@ -251,8 +252,8 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
         {guardians.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Shield className="w-3 h-3" /> Emergency Contacts</p>
-            {guardians.map((g, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+            {guardians.map((g) => (
+              <div key={g.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
                 <div>
                   <span className="text-sm font-medium flex items-center gap-1.5">
                     {g.guardian_name}
@@ -260,7 +261,19 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
                   </span>
                   {g.relation && <p className="text-xs text-muted-foreground capitalize">{g.relation}</p>}
                 </div>
-                <a href={`tel:${g.guardian_phone}`} className="text-sm text-primary font-medium">{g.guardian_phone}</a>
+                <div className="flex items-center gap-2">
+                  {!g.is_primary && guardians.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[10px] px-2 text-muted-foreground hover:text-primary"
+                      onClick={() => handleSetPrimary(g.id)}
+                    >
+                      Set Primary
+                    </Button>
+                  )}
+                  <a href={`tel:${g.guardian_phone}`} className="text-sm text-primary font-medium">{g.guardian_phone}</a>
+                </div>
               </div>
             ))}
           </div>
