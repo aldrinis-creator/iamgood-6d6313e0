@@ -318,8 +318,6 @@ const Register = () => {
 
   // --- Step 1: Role selection ---
   if (step === 1) {
-  };
-
     return (
       <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
         <div className="w-full max-w-md space-y-6">
