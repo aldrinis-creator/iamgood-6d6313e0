@@ -200,6 +200,7 @@ ${surgeries.length ? `<div class="section"><div class="section-title">✂️ Pas
   if (!health && !profile) return null;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
