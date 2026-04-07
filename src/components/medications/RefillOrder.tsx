@@ -76,6 +76,31 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   );
   const [editingPharmacy, setEditingPharmacy] = useState(() => !localStorage.getItem(PHARMACY_STORAGE_KEY));
   const orderRef = useRef<HTMLDivElement>(null);
+  const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
+  const [markingReceived, setMarkingReceived] = useState(false);
+
+  const markReceived = async () => {
+    setMarkingReceived(true);
+    try {
+      for (const item of orderItems) {
+        if (item.med.id.startsWith("ja-")) continue;
+        const qty = receivedQtys[item.med.id] ?? item.med.total_quantity;
+        await supabase
+          .from("medications")
+          .update({ remaining_quantity: qty })
+          .eq("id", item.med.id);
+      }
+      toast.success("Stock updated successfully!");
+      setOrderConfirmed(false);
+      setOrderItems([]);
+      setReceivedQtys({});
+      load();
+      onRefillDone?.();
+    } catch {
+      toast.error("Failed to update stock");
+    }
+    setMarkingReceived(false);
+  };
 
   const load = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -549,6 +574,44 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
           <Button className="w-full" onClick={shareOrder}>
             <Share2 className="w-4 h-4 mr-2" /> Share Order
           </Button>
+
+          {/* Mark as Received */}
+          <Card className="border-primary/30">
+            <CardContent className="p-4 space-y-3">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Received Medications — Update Stock
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Once you receive the medicines, tap the button below to update stock levels. Edit quantities if needed.
+              </p>
+              {orderItems.filter(item => !item.med.id.startsWith("ja-")).map((item) => (
+                <div key={item.med.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex-1 truncate">{item.med.name}</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      className="w-20 h-8 text-center text-sm"
+                      value={receivedQtys[item.med.id] ?? item.med.total_quantity}
+                      onChange={(e) => setReceivedQtys(prev => ({ ...prev, [item.med.id]: parseInt(e.target.value) || 0 }))}
+                    />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setReceivedQtys(prev => ({ ...prev, [item.med.id]: item.med.total_quantity }))}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                className="w-full"
+                disabled={markingReceived}
+                onClick={markReceived}
+              >
+                {markingReceived ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                ✓ Received — Update Stock
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
