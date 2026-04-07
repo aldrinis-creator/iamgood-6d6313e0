@@ -1,13 +1,30 @@
 
 
-## Add Delete Confirmation Dialog to Medication List
+## Add Reasoning Effort Levels to Health-Tools Edge Function
 
-### Change — `src/components/medications/MedicationList.tsx`
+Enhance AI accuracy for complex medical queries by adding reasoning effort configuration per task type.
 
-1. Import `AlertDialog` components from `@/components/ui/alert-dialog`
-2. Add `deleteTarget` state (`Medication | null`) to track which medication is queued for deletion
-3. Change the trash button's `onClick` from calling `handleDelete(med.id)` directly to `setDeleteTarget(med)`
-4. Add an `AlertDialog` at the bottom of the component that shows the medication name and asks for confirmation before executing the delete
+### Design
 
-Same pattern already used in Appointments and Medical Documents.
+Map each `type` to an appropriate reasoning effort level and model tier:
+
+| Type | Model | Reasoning Effort | Rationale |
+|------|-------|-------------------|-----------|
+| `symptom_check` | `google/gemini-3.1-pro-preview` | `high` | Complex differential diagnosis |
+| `vitals_insights` | `google/gemini-3.1-pro-preview` | `high` | Pattern detection across multiple data streams |
+| `doctor_report` | `google/gemini-3.1-pro-preview` | `medium` | Structured report, moderate complexity |
+| `document_analysis` | `google/gemini-3-flash-preview` | `medium` | Extract + interpret values |
+| `medication_info` | `google/gemini-3-flash-preview` | `medium` | Drug info + interaction checks |
+| `prescription_scan` | `google/gemini-3-flash-preview` | `medium` | Structured JSON extraction |
+| `banned_check` | `google/gemini-2.5-flash-lite` | `low` | Simple classification |
+| `face_analysis` | `google/gemini-2.5-flash` | `low` | Vision analysis, straightforward |
+
+### Change — `supabase/functions/health-tools/index.ts`
+
+1. Add a `taskConfig` map defining `model` and `reasoning` effort per type
+2. Replace the hardcoded model selection with config-driven lookup
+3. Add `reasoning: { effort }` to the AI gateway request body when effort is set
+4. Keep vision model override for image payloads (use `google/gemini-2.5-flash` for vision tasks)
+
+This is a single-file change to the edge function — no client-side changes needed.
 
