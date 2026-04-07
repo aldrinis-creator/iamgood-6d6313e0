@@ -31,6 +31,7 @@ const GuardianReports = () => {
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [vitalData, setVitalData] = useState<any[]>([]);
   const [mealLogs, setMealLogs] = useState<any[]>([]);
+  const [journeyReports, setJourneyReports] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(!selectedWard);
@@ -61,6 +62,9 @@ const GuardianReports = () => {
     } else if (activeSection === "nutrition") {
       supabase.from("meal_logs").select("*").eq("user_id", wardUserId).gte("log_date", start).order("log_date")
         .then(({ data }) => setMealLogs(data || []));
+    } else if (activeSection === "journeys") {
+      supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
+        .then(({ data }) => setJourneyReports(data || []));
     }
   }, [wardUserId, activeSection]);
 
@@ -142,6 +146,7 @@ const GuardianReports = () => {
     { id: "activity", label: "Activity", icon: Activity },
     { id: "vitals", label: "Vitals", icon: Heart },
     { id: "nutrition", label: "Nutrition", icon: Utensils },
+    { id: "journeys", label: "Journeys", icon: Navigation },
   ];
 
   return (
