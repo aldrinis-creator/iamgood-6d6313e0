@@ -129,12 +129,21 @@ const MapMyJourney = () => {
   // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (abortRef.current) abortRef.current.abort();
+
     if (query.length < 1) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
+
+    setSearching(true);
+
     searchTimer.current = setTimeout(async () => {
-      // Primary: Nominatim (no API key needed, reliable)
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      // Primary: Nominatim
       try {
         const params = new URLSearchParams({
           format: "json",
@@ -144,18 +153,22 @@ const MapMyJourney = () => {
           addressdetails: "1",
         });
         if (originPos) {
-          // Use viewbox to strongly bias results within ~50km of user
-          const delta = 0.45; // ~50km
+          const delta = 0.45;
           params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
-          params.set("bounded", "0"); // prefer viewbox but allow outside
+          params.set("bounded", "0");
         }
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?${params}`,
-          { headers: { "User-Agent": "CheckiN-App/1.0" } }
+          {
+            headers: { "User-Agent": "CheckiN-App/1.0" },
+            signal: AbortSignal.any
+              ? AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
+              : controller.signal,
+          }
         );
+        if (controller.signal.aborted) return;
         const rawData: any[] = await res.json();
         if (rawData.length > 0) {
-          // Sort by distance from origin (nearest first)
           const withDist = rawData.map((d: any) => {
             const dLat = parseFloat(d.lat);
             const dLng = parseFloat(d.lon);
@@ -171,23 +184,29 @@ const MapMyJourney = () => {
           });
           withDist.sort((a, b) => a._dist - b._dist);
 
-          setSearchResults(
-            withDist.slice(0, 8).map((d: any) => ({
-              place_id: d.place_id?.toString() || String(Math.random()),
-              description: d.display_name,
-              main_text: d.display_name.split(",")[0],
-              secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
-              lat: d._lat,
-              lng: d._lng,
-            }))
-          );
+          if (!controller.signal.aborted) {
+            setSearchResults(
+              withDist.slice(0, 8).map((d: any) => ({
+                place_id: d.place_id?.toString() || String(Math.random()),
+                description: d.display_name,
+                main_text: d.display_name.split(",")[0],
+                secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
+                lat: d._lat,
+                lng: d._lng,
+              }))
+            );
+            setSearching(false);
+          }
           return;
         }
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.name === "AbortError") return;
         console.warn("[MMJ] Nominatim search failed:", e);
       }
 
-      // Fallback: Google Places (if loaded)
+      if (controller.signal.aborted) return;
+
+      // Fallback: Google Places (with 5s timeout)
       if (autocompleteService.current) {
         try {
           const request: google.maps.places.AutocompletionRequest = {
@@ -197,7 +216,15 @@ const MapMyJourney = () => {
               radius: 50000,
             }),
           };
+          const timeoutId = setTimeout(() => {
+            if (!controller.signal.aborted) {
+              setSearching(false);
+              setSearchResults([]);
+            }
+          }, 5000);
           autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+            clearTimeout(timeoutId);
+            if (controller.signal.aborted) return;
             if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
               setSearchResults(
                 predictions.map((p) => ({
@@ -208,20 +235,20 @@ const MapMyJourney = () => {
                 }))
               );
             } else {
-              toast.error("Could not find destinations. Try a different search.");
               setSearchResults([]);
             }
+            setSearching(false);
           });
         } catch {
-          toast.error("Could not find destinations. Try a different search.");
           setSearchResults([]);
+          setSearching(false);
         }
         return;
       }
 
       // Both failed
-      toast.error("Could not find destinations. Try a different search.");
       setSearchResults([]);
+      setSearching(false);
     }, 300);
   }, [originPos]);
 
