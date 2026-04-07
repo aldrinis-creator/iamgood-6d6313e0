@@ -107,10 +107,10 @@ const Appointments = () => {
             {filtered.map((apt) => {
               const isDueToday = isToday(parseISO(apt.start_date));
               return (
-              <Card key={apt.id} className={`p-4 space-y-3 ${isDueToday ? "border-destructive border-2 shadow-[0_0_8px_hsl(var(--destructive)/0.3)]" : ""}`}>
+              <Card key={apt.id} className={`p-4 space-y-3 overflow-hidden min-w-0 ${isDueToday ? "border-destructive border-2 shadow-[0_0_8px_hsl(var(--destructive)/0.3)]" : ""}`}>
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-base">{apt.title}</h3>
+                  <div className="space-y-1 min-w-0">
+                    <h3 className="font-semibold text-base break-words">{apt.title}</h3>
                     <Badge variant={apt.appointment_type === "online" ? "secondary" : "outline"} className="text-xs">
                       {apt.appointment_type === "online" ? "Online" : "In-Person"}
                     </Badge>
@@ -126,8 +126,8 @@ const Appointments = () => {
                 </div>
 
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
+                  <p className="flex items-center gap-1 flex-wrap">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
                     Starts {format(parseISO(apt.start_date), "EEE, MMM d")} at {apt.start_time?.slice(0, 5)}
                     {apt.end_date && ` — ends ${format(parseISO(apt.end_date), "MMM d")} at ${apt.end_time?.slice(0, 5)}`}
                   </p>
@@ -136,11 +136,11 @@ const Appointments = () => {
                   </p>
                 </div>
 
-                {apt.description && <p className="text-sm">{apt.description}</p>}
+                {apt.description && <p className="text-sm break-words">{apt.description}</p>}
 
                 {apt.location && (
-                  <p className="text-sm flex items-center gap-1 text-muted-foreground">
-                    <MapPin className="w-3.5 h-3.5" /> {apt.location}
+                  <p className="text-sm flex items-center gap-1 text-muted-foreground break-words">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" /> {apt.location}
                   </p>
                 )}
 
