@@ -164,7 +164,7 @@ const MedicalDocuments = () => {
                   <Download className="w-3 h-3" />
                 </Button>
               )}
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(r)}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(r)}>
                 <Trash2 className="w-3 h-3" />
               </Button>
             </div>
