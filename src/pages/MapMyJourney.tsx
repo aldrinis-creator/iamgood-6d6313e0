@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
@@ -92,10 +92,12 @@ const MapMyJourney = () => {
   const [eta, setEta] = useState<number | null>(null);
   const [originPos, setOriginPos] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
@@ -127,12 +129,21 @@ const MapMyJourney = () => {
   // Destination autocomplete via Google Places
   const searchDestination = useCallback((query: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (abortRef.current) abortRef.current.abort();
+
     if (query.length < 1) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
+
+    setSearching(true);
+
     searchTimer.current = setTimeout(async () => {
-      // Primary: Nominatim (no API key needed, reliable)
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      // Primary: Nominatim
       try {
         const params = new URLSearchParams({
           format: "json",
@@ -142,18 +153,22 @@ const MapMyJourney = () => {
           addressdetails: "1",
         });
         if (originPos) {
-          // Use viewbox to strongly bias results within ~50km of user
-          const delta = 0.45; // ~50km
+          const delta = 0.45;
           params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
-          params.set("bounded", "0"); // prefer viewbox but allow outside
+          params.set("bounded", "0");
         }
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?${params}`,
-          { headers: { "User-Agent": "CheckiN-App/1.0" } }
+          {
+            headers: { "User-Agent": "CheckiN-App/1.0" },
+            signal: AbortSignal.any
+              ? AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
+              : controller.signal,
+          }
         );
+        if (controller.signal.aborted) return;
         const rawData: any[] = await res.json();
         if (rawData.length > 0) {
-          // Sort by distance from origin (nearest first)
           const withDist = rawData.map((d: any) => {
             const dLat = parseFloat(d.lat);
             const dLng = parseFloat(d.lon);
@@ -169,23 +184,29 @@ const MapMyJourney = () => {
           });
           withDist.sort((a, b) => a._dist - b._dist);
 
-          setSearchResults(
-            withDist.slice(0, 8).map((d: any) => ({
-              place_id: d.place_id?.toString() || String(Math.random()),
-              description: d.display_name,
-              main_text: d.display_name.split(",")[0],
-              secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
-              lat: d._lat,
-              lng: d._lng,
-            }))
-          );
+          if (!controller.signal.aborted) {
+            setSearchResults(
+              withDist.slice(0, 8).map((d: any) => ({
+                place_id: d.place_id?.toString() || String(Math.random()),
+                description: d.display_name,
+                main_text: d.display_name.split(",")[0],
+                secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
+                lat: d._lat,
+                lng: d._lng,
+              }))
+            );
+            setSearching(false);
+          }
           return;
         }
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.name === "AbortError") return;
         console.warn("[MMJ] Nominatim search failed:", e);
       }
 
-      // Fallback: Google Places (if loaded)
+      if (controller.signal.aborted) return;
+
+      // Fallback: Google Places (with 5s timeout)
       if (autocompleteService.current) {
         try {
           const request: google.maps.places.AutocompletionRequest = {
@@ -195,7 +216,15 @@ const MapMyJourney = () => {
               radius: 50000,
             }),
           };
+          const timeoutId = setTimeout(() => {
+            if (!controller.signal.aborted) {
+              setSearching(false);
+              setSearchResults([]);
+            }
+          }, 5000);
           autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
+            clearTimeout(timeoutId);
+            if (controller.signal.aborted) return;
             if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
               setSearchResults(
                 predictions.map((p) => ({
@@ -206,20 +235,20 @@ const MapMyJourney = () => {
                 }))
               );
             } else {
-              toast.error("Could not find destinations. Try a different search.");
               setSearchResults([]);
             }
+            setSearching(false);
           });
         } catch {
-          toast.error("Could not find destinations. Try a different search.");
           setSearchResults([]);
+          setSearching(false);
         }
         return;
       }
 
       // Both failed
-      toast.error("Could not find destinations. Try a different search.");
       setSearchResults([]);
+      setSearching(false);
     }, 300);
   }, [originPos]);
 
@@ -548,7 +577,7 @@ const MapMyJourney = () => {
                         }}
                         className={pendingHomeWork ? "ring-2 ring-primary" : ""}
                       />
-                      {destination && (
+                      {destination && !searching && (
                         <button
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           onMouseDown={(e) => {
@@ -559,13 +588,22 @@ const MapMyJourney = () => {
                             setRouteCoords([]);
                             setEta(null);
                             setPendingHomeWork(null);
+                            if (abortRef.current) abortRef.current.abort();
                           }}
                         >
                           <X className="w-4 h-4" />
                         </button>
                       )}
+                      {searching && (
+                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
                     </div>
                     {/* Search results dropdown */}
+                    {inputFocused && destination.length > 0 && !searching && searchResults.length === 0 && !selectedDest && (
+                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg px-3 py-2.5">
+                        <p className="text-xs text-muted-foreground">No results found. Try a different search.</p>
+                      </div>
+                    )}
                     {searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {searchResults.map((r, i) => (

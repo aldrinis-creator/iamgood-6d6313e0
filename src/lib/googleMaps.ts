@@ -17,7 +17,10 @@ export function loadGoogleMapsAPI(): Promise<void> {
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps API"));
+    script.onerror = () => {
+      loadPromise = null;
+      reject(new Error("Failed to load Google Maps API"));
+    };
     document.head.appendChild(script);
   });
 
