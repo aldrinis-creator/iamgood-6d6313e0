@@ -60,6 +60,14 @@ export function useJourneyTracker() {
   const [routeDeviation, setRouteDeviation] = useState(false);
   const [expectedRoute, setExpectedRoute] = useState<[number, number][]>([]);
 
+  // Dismiss state for overlay alerts
+  const [arrivingSoonDismissed, setArrivingSoonDismissed] = useState(false);
+  const [routeDeviationDismissed, setRouteDeviationDismissed] = useState(false);
+
+  // Deviation tracking for report
+  const deviationCountRef = useRef(0);
+  const maxDeviationRef = useRef(0);
+
   const watchId = useRef<number | null>(null);
   const lastSaveTime = useRef(0);
   const checkInTimer = useRef<ReturnType<typeof setInterval>>();
@@ -81,7 +89,6 @@ export function useJourneyTracker() {
         .maybeSingle();
       if (data) {
         setActiveJourney(data as JourneyData);
-        // Fetch existing updates
         const { data: upd } = await supabase
           .from("journey_updates")
           .select("*")
@@ -103,13 +110,13 @@ export function useJourneyTracker() {
         const { latitude: lat, longitude: lng } = pos.coords;
         setCurrentPos({ lat, lng });
 
-        // Distance to destination
         const dist = haversine(lat, lng, activeJourney.destination_lat, activeJourney.destination_lng);
         setDistanceRemaining(dist);
 
         // Arriving soon < 500m
         if (dist < 500 && !arrivingSoon) {
           setArrivingSoon(true);
+          setArrivingSoonDismissed(false);
           notifyGuardians("🏁 Arriving Soon", `User is approaching ${activeJourney.destination_name}`);
         }
 
@@ -134,8 +141,14 @@ export function useJourneyTracker() {
           const routeDist = distanceToRoute(lat, lng, expectedRoute);
           const now2 = Date.now();
           if (routeDist > GEOFENCE_THRESHOLD_M) {
-            if (!routeDeviation) setRouteDeviation(true);
-            // Notify guardians max once every 5 minutes
+            if (!routeDeviation) {
+              setRouteDeviation(true);
+              setRouteDeviationDismissed(false);
+              deviationCountRef.current += 1;
+            }
+            if (routeDist > maxDeviationRef.current) {
+              maxDeviationRef.current = routeDist;
+            }
             if (now2 - deviationNotifiedAt.current > 5 * 60 * 1000) {
               deviationNotifiedAt.current = now2;
               notifyGuardians(
@@ -152,7 +165,7 @@ export function useJourneyTracker() {
           }
         }
 
-        // Save location every 15s for near-real-time guardian tracking
+        // Save location every 15s
         const now = Date.now();
         if (now - lastSaveTime.current >= 15000) {
           lastSaveTime.current = now;
@@ -218,6 +231,48 @@ export function useJourneyTracker() {
     );
   }, [session?.user?.id]);
 
+  const generateReport = async (journey: JourneyData, journeyUpdates: JourneyUpdate[]) => {
+    if (!session?.user?.id) return;
+    const endedAt = new Date().toISOString();
+    const startedAt = journey.started_at;
+
+    // Total duration
+    const totalDurationMin = (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000;
+
+    // Total distance from GPS updates
+    const validUpdates = journeyUpdates.filter(u => u.lat != null && u.lng != null);
+    let totalDistanceM = 0;
+    let breakDurationMin = 0;
+
+    for (let i = 1; i < validUpdates.length; i++) {
+      const prev = validUpdates[i - 1];
+      const curr = validUpdates[i];
+      const segDist = haversine(prev.lat!, prev.lng!, curr.lat!, curr.lng!);
+      totalDistanceM += segDist;
+
+      // Break detection: gap > 2 min AND distance < 20m
+      const gapMs = new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime();
+      if (gapMs > 2 * 60 * 1000 && segDist < 20) {
+        breakDurationMin += gapMs / 60000;
+      }
+    }
+
+    await supabase.from("journey_reports").insert({
+      journey_id: journey.id,
+      user_id: session.user.id,
+      started_at: startedAt,
+      ended_at: endedAt,
+      origin_name: journey.origin_name,
+      destination_name: journey.destination_name,
+      transport_mode: journey.transport_mode,
+      total_distance_m: Math.round(totalDistanceM),
+      total_duration_min: Math.round(totalDurationMin),
+      break_duration_min: Math.round(breakDurationMin),
+      deviation_count: deviationCountRef.current,
+      max_deviation_m: Math.round(maxDeviationRef.current),
+    });
+  };
+
   const startJourney = async (params: {
     destination_name: string;
     destination_lat: number;
@@ -238,7 +293,11 @@ export function useJourneyTracker() {
     setActiveJourney(journey);
     setUpdates([]);
     setArrivingSoon(false);
+    setArrivingSoonDismissed(false);
     setRouteDeviation(false);
+    setRouteDeviationDismissed(false);
+    deviationCountRef.current = 0;
+    maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     lastSaveTime.current = 0;
@@ -248,7 +307,6 @@ export function useJourneyTracker() {
       `User started a journey to ${params.destination_name} by ${params.transport_mode}. ETA: ${params.estimated_duration_min} min.`
     );
 
-    // Save initial location
     saveLocationUpdate(params.origin_lat, params.origin_lng);
 
     return journey;
@@ -256,6 +314,10 @@ export function useJourneyTracker() {
 
   const endJourney = async (status: "completed" | "auto_completed" = "completed") => {
     if (!activeJourney) return;
+
+    // Generate report before clearing state
+    await generateReport(activeJourney, updates);
+
     await supabase
       .from("journeys")
       .update({ status, ended_at: new Date().toISOString() })
@@ -271,8 +333,12 @@ export function useJourneyTracker() {
     setCurrentPos(null);
     setDistanceRemaining(null);
     setArrivingSoon(false);
+    setArrivingSoonDismissed(false);
     setRouteDeviation(false);
+    setRouteDeviationDismissed(false);
     setExpectedRoute([]);
+    deviationCountRef.current = 0;
+    maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     if (autoEndTimer.current) clearTimeout(autoEndTimer.current);
@@ -294,7 +360,11 @@ export function useJourneyTracker() {
     distanceRemaining,
     showCheckIn,
     arrivingSoon,
+    arrivingSoonDismissed,
+    setArrivingSoonDismissed,
     routeDeviation,
+    routeDeviationDismissed,
+    setRouteDeviationDismissed,
     startJourney,
     endJourney,
     respondCheckIn,

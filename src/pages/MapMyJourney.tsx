@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
+import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
+import JourneyReportCard from "@/components/JourneyReportCard";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
