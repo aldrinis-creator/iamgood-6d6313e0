@@ -654,9 +654,37 @@ const MapMyJourney = () => {
                 </Button>
               </CardContent>
             </Card>
+            {/* Journey History */}
+            {journeyReports.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <History className="w-4 h-4 text-muted-foreground" />
+                  Past Journeys
+                </h2>
+                {journeyReports.map((r) => (
+                  <JourneyReportCard key={r.id} report={r} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Journey Alert Overlays */}
+      {arrivingSoon && !arrivingSoonDismissed && (
+        <JourneyAlertOverlay
+          type="arriving"
+          message={`You are approaching ${activeJourney?.destination_name || "your destination"}.`}
+          onDismiss={() => setArrivingSoonDismissed(true)}
+        />
+      )}
+      {routeDeviation && !routeDeviationDismissed && (
+        <JourneyAlertOverlay
+          type="deviation"
+          message={`You have deviated from the expected route to ${activeJourney?.destination_name || "your destination"}.`}
+          onDismiss={() => setRouteDeviationDismissed(true)}
+        />
+      )}
 
       {/* Journey Check-in Popup */}
       <JourneyCheckInPopup
