@@ -1,70 +1,54 @@
+## Auto-Update Stock on Medication Refill
 
+### Current Behavior
 
-## Fix MMJ Destination Search: Wrong Results & No Location Bias
+When a refill order is confirmed and sent to the pharmacy, **no stock update happens**. The `confirmOrder` function only toggles a UI flag — it never writes to the `medications` table. This is intentional: the order is just a request sent via WhatsApp/PDF, not a delivery confirmation.
 
-### Root Cause Found
+### Recommended Approach
 
-The destination search returns locations outside the user's city because **the location bias is not working**. Here's why:
+Add a **"Mark as Received"** button that appears after the order has been sent. When tapped, it resets `remaining_quantity` to `total_quantity` for each ordered medication.
 
-The `AutocompleteService.getPlacePredictions()` in the legacy Google Maps JavaScript API uses `location` + `radius` properties — **not** `locationBias`. The current code passes `locationBias`, which is silently ignored by the API. This means every search runs with **no geographic bias at all**, returning results from anywhere in India.
+Automatically updating stock at order time would be incorrect — the user hasn't received the medicines yet.
 
-```text
-Current (broken):
-  locationBias: { center: {lat, lng}, radius: 50000 }   ← ignored by legacy API
+### Changes
 
-Correct:
-  location: new google.maps.LatLng(lat, lng)             ← proper bias point
-  radius: 50000                                           ← meters
-```
+#### 1. Add "Received" action to `RefillOrder.tsx` and `WardRefillOrder.tsx`
 
-### Do You Need a Paid Google Maps API?
+After the order is confirmed and sharing options are shown, add a prominent button: **"✓ Received — Update Stock" and allow User to update the stock levels with an edit button else let the current default stock level be updated when the button "Received - Update Stock" is tapped.**
 
-**No paid upgrade is needed.** The free tier of Google Maps Platform includes Places Autocomplete. However:
-- The API key must have **Places API** enabled in Google Cloud Console
-- The project must have **billing enabled** (Google requires a billing account even for the free $200/month credit)
-- Without billing, the API silently fails or returns empty results, causing the fallback to Nominatim (which has poor ranking)
+When clicked:
 
-The API key in the code (`AIzaSyDCeS7...`) may already work — the fix below will make location bias actually take effect, which should dramatically improve result relevance.
+- For each item in `orderItems`, update `medications` set `remaining_quantity = total_quantity` where `id = item.med.id`
+- Show a success toast
+- Reset the order state and reload medication data
 
-### Plan
+#### 2. Optional: partial quantity update
 
-#### 1. Fix location bias in `usePlaceAutocomplete.ts`
-
-Replace the incorrect `locationBias` property with the correct `location` + `radius` properties that the legacy `AutocompleteService` actually reads:
-
-```typescript
-const request: google.maps.places.AutocompletionRequest = {
-  input: query,
-  sessionToken: sessionToken.current!,
-  componentRestrictions: { country },
-  ...(origin && {
-    location: new google.maps.LatLng(origin.lat, origin.lng),
-    radius: 50000,
-  }),
-};
-```
-
-#### 2. Add error logging to diagnose API key issues
-
-Add a `console.warn` when Google returns a non-OK status so we can see if the API key is actually failing (e.g., `REQUEST_DENIED` means billing/API not enabled):
-
-```typescript
-if (status !== google.maps.places.PlacesServiceStatus.OK) {
-  console.warn("[PlaceAutocomplete] Google status:", status);
-}
-```
-
-#### 3. Add `strictBounds` option for tighter local results
-
-When the user has a known origin, pass `strictBounds: false` explicitly (default) but add the option so it can be toggled to `true` if users want only nearby results. This keeps far-away results deprioritized but not excluded.
+Instead of resetting to `total_quantity`, show an input per medication so the user can enter the actual quantity received (pre-filled with `total_quantity`).
 
 ### Files Changed
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePlaceAutocomplete.ts` | Fix `locationBias` → `location` + `radius`; add status logging |
 
-### Expected Result
+| File                                         | Change                                                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `src/components/medications/RefillOrder.tsx` | Add "Mark as Received" button after order confirmed; update `remaining_quantity` via Supabase |
+| `src/components/WardRefillOrder.tsx`         | Same "Mark as Received" flow for guardian orders                                              |
 
-After this fix, typing "Fortis" while in Mumbai will show Fortis hospitals in Mumbai first (not Delhi or Chennai). The location bias will actually work, making results feel local and relevant like Uber's search.
 
+### Technical Detail
+
+```typescript
+const markReceived = async () => {
+  for (const item of orderItems) {
+    await supabase.from("medications")
+      .update({ remaining_quantity: item.qty })
+      .eq("id", item.med.id);
+  }
+  toast.success("Stock updated!");
+  setOrderConfirmed(false);
+  setOrderItems([]);
+  load(); // refresh medication list
+};
+```
+
+&nbsp;
