@@ -7,6 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Share2, Bell, Hourglass } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
@@ -17,6 +21,7 @@ const Appointments = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today">("all");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments", session?.user?.id],
@@ -119,7 +124,7 @@ const Appointments = () => {
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(apt.id); setShowAdd(true); }}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(apt.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(apt.id)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -165,6 +170,26 @@ const Appointments = () => {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this appointment? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); setDeleteId(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AddAppointmentDialog
         open={showAdd}
