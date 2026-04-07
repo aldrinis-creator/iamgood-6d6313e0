@@ -18,7 +18,7 @@ interface UsePlaceAutocompleteOptions {
   country?: string;
 }
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw";
+const GOOGLE_GEOCODING_API_KEY = "AIzaSyAFMWZxjdj-uXJciP4Uf2HGJ_8ZnbP_QIo";
 
 export function usePlaceAutocomplete({
   origin,
@@ -146,7 +146,7 @@ export function usePlaceAutocomplete({
       try {
         const params = new URLSearchParams({
           address: query,
-          key: GOOGLE_MAPS_API_KEY,
+          key: GOOGLE_GEOCODING_API_KEY,
           region: country,
           language: "en",
         });
