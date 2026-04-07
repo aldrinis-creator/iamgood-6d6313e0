@@ -19,6 +19,7 @@ import useAutoSleepMode from "@/hooks/useAutoSleepMode";
 import ReminderOverlay from "@/components/ReminderOverlay";
 import useLocationSync from "@/hooks/useLocationSync";
 import SOSActiveBar from "@/components/SOSActiveBar";
+import useAbnormalPatternCheck from "@/hooks/useAbnormalPatternCheck";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -26,6 +27,7 @@ const UserOnlyHooks = () => {
   useAppointmentAlarms();
   useExerciseReminder();
   useLocationSync();
+  useAbnormalPatternCheck();
   return null;
 };
 

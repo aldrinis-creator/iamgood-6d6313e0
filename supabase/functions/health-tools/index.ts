@@ -116,8 +116,9 @@ const taskConfig: Record<string, { model: string; effort?: string }> = {
   document_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
   medication_info:   { model: "google/gemini-3-flash-preview", effort: "medium" },
   prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  banned_check:      { model: "google/gemini-2.5-flash-lite",  effort: "low" },
-  face_analysis:     { model: "google/gemini-2.5-flash",       effort: "low" },
+  banned_check:            { model: "google/gemini-2.5-flash-lite",  effort: "low" },
+  face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
+  wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
 };
 
 serve(async (req) => {
