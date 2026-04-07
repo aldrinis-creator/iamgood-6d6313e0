@@ -1,59 +1,48 @@
 
 
-## Add Missing Transactional Email Templates
+## Fix MMJ Destination Search Freezing
 
-### What We're Building
+### Root Cause Analysis
 
-Three new branded app email templates that trigger automatically from existing app flows:
+After reviewing the code, there are several issues causing the destination search to freeze and not populate:
 
-1. **Welcome Email** — sent after a user successfully signs in for the first time (post email verification)
-2. **Appointment Confirmation** — sent when a user creates a new appointment
-3. **Guardian Invitation** — migrate the existing `send-guardian-invite` edge function to use the branded transactional email system instead of raw Resend API calls
+1. **No request cancellation**: Each keystroke fires a new Nominatim fetch after 300ms, but previous in-flight requests are never aborted. Stale responses can overwrite newer results or pile up, causing UI jank.
 
-### Technical Plan
+2. **No fetch timeout**: The Nominatim API call has no timeout — if the server is slow or rate-limiting (common with Nominatim's usage policy), the request hangs indefinitely with no feedback.
 
-#### 1. Create three new React Email templates
+3. **Cached failed Google Maps promise**: In `googleMaps.ts`, if `loadGoogleMapsAPI()` fails, the rejected promise is cached in `loadPromise` and never retried. Every subsequent call immediately rejects, permanently breaking the Google Places fallback.
 
-All in `supabase/functions/_shared/transactional-email-templates/`:
+4. **No loading indicator**: Users see no visual feedback while search results are being fetched, making it appear frozen.
 
-- **`welcome.tsx`** — "Welcome to Check-iN" with navy `#1a365d` branding, C-iN badge, brief intro to the app
-  - Props: `{ name?: string }`
-  - Subject: "Welcome to Check-iN!"
+5. **Race conditions**: Without an abort mechanism, a slow response from search #1 can arrive after search #2's response and overwrite the correct results.
 
-- **`appointment-confirmation.tsx`** — Confirms appointment details
-  - Props: `{ name?: string, title?: string, date?: string, time?: string, doctorName?: string }`
-  - Subject: dynamic — `"Appointment confirmed: {title}"`
+### Plan
 
-- **`guardian-invitation.tsx`** — Branded guardian nomination invite with accept/reject links
-  - Props: `{ guardianName?: string, userName?: string, relation?: string, acceptLink?: string, rejectLink?: string }`
-  - Subject: dynamic — `"You've been nominated as a guardian for {userName}"`
+#### 1. Add AbortController to destination search (`MapMyJourney.tsx`)
 
-#### 2. Update registry.ts
+- Store an `AbortController` ref that gets aborted on each new search call
+- Pass `signal` to the Nominatim `fetch()` call
+- Add a 5-second timeout using `AbortSignal.timeout(5000)` combined with the user abort signal
+- Add a `searching` state boolean to show a spinner in the input field
+- Catch `AbortError` silently (expected behavior)
 
-Add all three templates to the `TEMPLATES` map.
+#### 2. Fix cached failed promise (`googleMaps.ts`)
 
-#### 3. Wire up triggers in existing code
+- Reset `loadPromise = null` inside the `.onerror` handler so the next call retries loading
 
-- **Welcome email**: In `AuthContext.tsx`, after the first successful sign-in (when `SIGNED_IN` event fires and profile exists), send once using idempotency key `welcome-{userId}`.
+#### 3. Add search loading indicator (`MapMyJourney.tsx`)
 
-- **Appointment confirmation**: In `AddAppointmentDialog.tsx`, after successful insert, invoke `send-transactional-email` with appointment details. Need user's email from auth session.
+- Show a small spinner inside the input when `searching` is true
+- Show "No results found" message when search completes with empty results
 
-- **Guardian invitation**: Update `send-guardian-invite/index.ts` to use the transactional email system internally (call `enqueue_email` with the branded template), OR update the client-side calls in `Register.tsx` and `Settings.tsx` to call `send-transactional-email` instead. The simpler approach: update the client calls to use `send-transactional-email` directly.
+#### 4. Add explicit timeout to Google Places fallback (`MapMyJourney.tsx`)
 
-#### 4. Deploy edge functions
-
-Redeploy `send-transactional-email` (picks up new templates from registry).
+- Wrap the `getPlacePredictions` callback in a timeout so it doesn't hang indefinitely
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/transactional-email-templates/welcome.tsx` | New template |
-| `supabase/functions/_shared/transactional-email-templates/appointment-confirmation.tsx` | New template |
-| `supabase/functions/_shared/transactional-email-templates/guardian-invitation.tsx` | New template |
-| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register 3 new templates |
-| `src/contexts/AuthContext.tsx` | Send welcome email on first sign-in |
-| `src/components/appointments/AddAppointmentDialog.tsx` | Send appointment confirmation email |
-| `src/pages/Register.tsx` | Switch guardian invite to transactional email |
-| `src/pages/Settings.tsx` | Switch guardian invite to transactional email |
+| `src/lib/googleMaps.ts` | Reset `loadPromise` on failure so retries work |
+| `src/pages/MapMyJourney.tsx` | Add AbortController, fetch timeout, searching state, loading UI, race condition fix |
 
