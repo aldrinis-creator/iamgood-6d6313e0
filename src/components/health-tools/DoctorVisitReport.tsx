@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -12,10 +12,13 @@ const DoctorVisitReport = () => {
   const { session } = useAuth();
   const [report, setReport] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const generateReport = async () => {
     if (!session?.user?.id) return;
     setLoading(true);
+    setSaved(false);
     try {
       const [profileRes, medsRes, activityRes, wellnessRes, faceRes] = await Promise.all([
         supabase.from("health_profile").select("*").eq("user_id", session.user.id).maybeSingle(),
@@ -47,6 +50,27 @@ const DoctorVisitReport = () => {
     }
   };
 
+  const saveToVault = async () => {
+    if (!session?.user?.id) { toast.error("Please log in to save"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: `Doctor Visit Report — ${new Date().toLocaleDateString("en-IN")}`,
+        record_type: "Doctor's Diagnosis",
+        description: report.substring(0, 50000),
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Your Report is saved in the Vault in Reports in the Doctor Visit Report tab");
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -71,6 +95,16 @@ const DoctorVisitReport = () => {
               content={report}
               category="Health Report"
             />
+            <Button
+              size="sm"
+              variant={saved ? "secondary" : "outline"}
+              className="w-full gap-1.5"
+              onClick={saveToVault}
+              disabled={saving || saved}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+              {saving ? "Saving..." : saved ? "Saved to Vault" : "Save to Vault"}
+            </Button>
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown>{report}</ReactMarkdown>
             </div>
