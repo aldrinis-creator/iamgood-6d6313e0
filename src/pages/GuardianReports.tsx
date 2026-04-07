@@ -299,6 +299,23 @@ const GuardianReports = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Journeys */}
+        {activeSection === "journeys" && (
+          <div className="space-y-3">
+            {journeyReports.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No journey reports yet
+                </CardContent>
+              </Card>
+            ) : (
+              journeyReports.map((r) => (
+                <JourneyReportCard key={r.id} report={r} />
+              ))
+            )}
+          </div>
+        )}
       </div>
     </AppLayout>
   );
