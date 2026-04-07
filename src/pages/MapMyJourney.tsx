@@ -104,6 +104,7 @@ const MapMyJourney = () => {
   const {
     results: searchResults,
     searching,
+    apiStatus,
     search: searchDestination,
     clear: clearSearch,
     resolveCoords,
@@ -463,6 +464,9 @@ const MapMyJourney = () => {
                     {inputFocused && destination.length > 0 && !searching && searchResults.length === 0 && !selectedDest && (
                       <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg px-3 py-2.5">
                         <p className="text-xs text-muted-foreground">No results found. Try a different search.</p>
+                        {apiStatus && (
+                          <p className="text-xs text-destructive mt-1">{apiStatus}</p>
+                        )}
                       </div>
                     )}
                     {searchResults.length > 0 && (
