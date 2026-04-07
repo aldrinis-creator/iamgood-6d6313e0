@@ -33,6 +33,7 @@ export function usePlaceAutocomplete({
 
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const geocoderService = useRef<google.maps.Geocoder | null>(null);
   const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const placesDiv = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -48,6 +49,7 @@ export function usePlaceAutocomplete({
         autocompleteService.current = new google.maps.places.AutocompleteService();
         if (!placesDiv.current) placesDiv.current = document.createElement("div");
         placesService.current = new google.maps.places.PlacesService(placesDiv.current);
+        geocoderService.current = new google.maps.Geocoder();
         sessionToken.current = new google.maps.places.AutocompleteSessionToken();
         setReady(true);
 
@@ -148,9 +150,9 @@ export function usePlaceAutocomplete({
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
-          console.log(`[PlaceSearch] Tier 2 (TextSearch) "${query}" → timeout`);
+          console.log(`[PlaceSearch] Tier 2 (TextSearch) "${query}" → timeout (8s)`);
           resolve([]);
-        }, 5000);
+        }, 8000);
 
         const request: google.maps.places.TextSearchRequest = {
           query,
@@ -197,42 +199,47 @@ export function usePlaceAutocomplete({
     [origin]
   );
 
-  /** Tier 3: Google Geocoding API (address-based lookup) */
+  /** Tier 3: Google Geocoding via JS SDK (no separate API key needed) */
   const geocodingSearch = useCallback(
-    async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
-      const apiKey = "AIzaSyAFMWZxjdj-uXJciP4Uf2HGJ_8ZnbP_QIo";
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}&region=${country}&language=en`;
+    (query: string, searchId: number): Promise<PlaceResult[]> => {
+      if (!geocoderService.current) return Promise.resolve([]);
 
-      try {
-        const res = await fetch(url, { signal });
-        const data = await res.json();
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → timeout`);
+          resolve([]);
+        }, 6000);
 
-        if (data.status === "REQUEST_DENIED") {
-          console.warn(`[PlaceSearch] Tier 3 (Geocoding) REQUEST_DENIED:`, data.error_message);
-          return [];
+        try {
+          geocoderService.current!.geocode(
+            { address: query, region: country },
+            (results, status) => {
+              clearTimeout(timeout);
+              if (searchId !== searchIdRef.current) { resolve([]); return; }
+
+              if (status === google.maps.GeocoderStatus.OK && results?.length) {
+                const mapped = results.slice(0, 5).map((r) => ({
+                  place_id: r.place_id,
+                  description: r.formatted_address,
+                  main_text: r.formatted_address.split(",")[0],
+                  secondary_text: r.formatted_address.split(",").slice(1, 3).join(",").trim(),
+                  lat: r.geometry.location.lat(),
+                  lng: r.geometry.location.lng(),
+                  source: "geocoding" as const,
+                }));
+                console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → ${mapped.length} results`);
+                resolve(mapped);
+              } else {
+                console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → 0 results (status: ${status})`);
+                resolve([]);
+              }
+            }
+          );
+        } catch {
+          clearTimeout(timeout);
+          resolve([]);
         }
-
-        if (data.status === "OK" && data.results?.length) {
-          const mapped = data.results.slice(0, 5).map((r: any) => ({
-            place_id: r.place_id,
-            description: r.formatted_address,
-            main_text: r.formatted_address.split(",")[0],
-            secondary_text: r.formatted_address.split(",").slice(1, 3).join(",").trim(),
-            lat: r.geometry.location.lat,
-            lng: r.geometry.location.lng,
-            source: "geocoding" as const,
-          }));
-          console.log(`[PlaceSearch] Tier 3 (Geocoding) "${query}" → ${mapped.length} results`);
-          return mapped;
-        }
-
-        console.log(`[PlaceSearch] Tier 3 (Geocoding) "${query}" → 0 results (status: ${data.status})`);
-        return [];
-      } catch (e: any) {
-        if (e?.name === "AbortError") throw e;
-        console.warn("[PlaceSearch] Tier 3 (Geocoding) error:", e);
-        return [];
-      }
+      });
     },
     [country]
   );
@@ -354,8 +361,8 @@ export function usePlaceAutocomplete({
 
           if (controller.signal.aborted) return;
 
-          // Tier 3: Google Geocoding API (address-based)
-          const geoResults = await geocodingSearch(query, controller.signal);
+          // Tier 3: Google Geocoder JS SDK
+          const geoResults = await geocodingSearch(query, searchId);
           if (searchId !== searchIdRef.current) return;
           if (geoResults.length > 0) {
             setResults(geoResults);
