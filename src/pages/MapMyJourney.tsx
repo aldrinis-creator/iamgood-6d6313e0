@@ -78,38 +78,26 @@ const MapMyJourney = () => {
 
   // Setup form state
   const [destination, setDestination] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedDest, setSelectedDest] = useState<{ name: string; lat: number; lng: number } | null>(null);
   const [transportMode, setTransportMode] = useState("car");
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
   const [eta, setEta] = useState<number | null>(null);
   const [originPos, setOriginPos] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
-  const placesDiv = useRef<HTMLDivElement | null>(null);
 
-  // Load Google Places API
-  useEffect(() => {
-    loadGoogleMapsAPI().then(() => {
-      autocompleteService.current = new google.maps.places.AutocompleteService();
-      // PlacesService needs a DOM element or map
-      if (!placesDiv.current) {
-        placesDiv.current = document.createElement("div");
-      }
-      placesService.current = new google.maps.places.PlacesService(placesDiv.current);
-    }).catch(() => {
-      console.warn("Google Places API failed to load, falling back to basic search");
-    });
-  }, []);
+  // Google-first place autocomplete hook
+  const {
+    results: searchResults,
+    searching,
+    search: searchDestination,
+    clear: clearSearch,
+    resolveCoords,
+  } = usePlaceAutocomplete({ origin: originPos });
 
   // Get user's current location on mount
   useEffect(() => {
@@ -118,132 +106,6 @@ const MapMyJourney = () => {
       () => toast.error("Location access needed for journey tracking")
     );
   }, []);
-
-  // Destination autocomplete via Google Places
-  const searchDestination = useCallback((query: string) => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (abortRef.current) abortRef.current.abort();
-
-    if (query.length < 1) {
-      setSearchResults([]);
-      setSearching(false);
-      return;
-    }
-
-    setSearching(true);
-
-    searchTimer.current = setTimeout(async () => {
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      // Primary: Nominatim
-      try {
-        const params = new URLSearchParams({
-          format: "json",
-          q: query,
-          limit: "12",
-          countrycodes: "in",
-          addressdetails: "1",
-        });
-        if (originPos) {
-          const delta = 0.45;
-          params.set("viewbox", `${originPos.lng - delta},${originPos.lat + delta},${originPos.lng + delta},${originPos.lat - delta}`);
-          params.set("bounded", "0");
-        }
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params}`,
-          {
-            headers: { "User-Agent": "CheckiN-App/1.0" },
-            signal: AbortSignal.any
-              ? AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
-              : controller.signal,
-          }
-        );
-        if (controller.signal.aborted) return;
-        const rawData: any[] = await res.json();
-        if (rawData.length > 0) {
-          const withDist = rawData.map((d: any) => {
-            const dLat = parseFloat(d.lat);
-            const dLng = parseFloat(d.lon);
-            let dist = Infinity;
-            if (originPos) {
-              const R = 6371;
-              const dLatR = ((dLat - originPos.lat) * Math.PI) / 180;
-              const dLngR = ((dLng - originPos.lng) * Math.PI) / 180;
-              const a = Math.sin(dLatR / 2) ** 2 + Math.cos((originPos.lat * Math.PI) / 180) * Math.cos((dLat * Math.PI) / 180) * Math.sin(dLngR / 2) ** 2;
-              dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            }
-            return { ...d, _lat: dLat, _lng: dLng, _dist: dist };
-          });
-          withDist.sort((a, b) => a._dist - b._dist);
-
-          if (!controller.signal.aborted) {
-            setSearchResults(
-              withDist.slice(0, 8).map((d: any) => ({
-                place_id: d.place_id?.toString() || String(Math.random()),
-                description: d.display_name,
-                main_text: d.display_name.split(",")[0],
-                secondary_text: d.display_name.split(",").slice(1, 3).join(",").trim(),
-                lat: d._lat,
-                lng: d._lng,
-              }))
-            );
-            setSearching(false);
-          }
-          return;
-        }
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
-        console.warn("[MMJ] Nominatim search failed:", e);
-      }
-
-      if (controller.signal.aborted) return;
-
-      // Fallback: Google Places (with 5s timeout)
-      if (autocompleteService.current) {
-        try {
-          const request: google.maps.places.AutocompletionRequest = {
-            input: query,
-            ...(originPos && {
-              location: new google.maps.LatLng(originPos.lat, originPos.lng),
-              radius: 50000,
-            }),
-          };
-          const timeoutId = setTimeout(() => {
-            if (!controller.signal.aborted) {
-              setSearching(false);
-              setSearchResults([]);
-            }
-          }, 5000);
-          autocompleteService.current.getPlacePredictions(request, (predictions, status) => {
-            clearTimeout(timeoutId);
-            if (controller.signal.aborted) return;
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-              setSearchResults(
-                predictions.map((p) => ({
-                  place_id: p.place_id,
-                  description: p.description,
-                  main_text: p.structured_formatting.main_text,
-                  secondary_text: p.structured_formatting.secondary_text || "",
-                }))
-              );
-            } else {
-              setSearchResults([]);
-            }
-            setSearching(false);
-          });
-        } catch {
-          setSearchResults([]);
-          setSearching(false);
-        }
-        return;
-      }
-
-      // Both failed
-      setSearchResults([]);
-      setSearching(false);
-    }, 300);
-  }, [originPos]);
 
   // Fetch route from OSRM
   const fetchRoute = useCallback(async (origin: { lat: number; lng: number }, dest: { lat: number; lng: number }, mode: string) => {
@@ -272,12 +134,11 @@ const MapMyJourney = () => {
     }
   }, [selectedDest, originPos, transportMode, fetchRoute]);
 
-  const handleSelectDest = (result: SearchResult) => {
+  const handleSelectDest = async (result: PlaceResult) => {
     const finalize = (name: string, lat: number, lng: number) => {
       setSelectedDest({ name, lat, lng });
       setDestination(name.split(",")[0]);
-      setSearchResults([]);
-      // If pending Home/Work, save it
+      clearSearch();
       if (pendingHomeWork) {
         setHomeWork(pendingHomeWork, { name, lat, lng });
         toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} location saved!`);
@@ -285,27 +146,13 @@ const MapMyJourney = () => {
       }
     };
 
-    // If we already have lat/lng (fallback mode), use directly
-    if (result.lat && result.lng) {
-      finalize(result.description, result.lat, result.lng);
-      return;
+    // Resolve coordinates (instant for Nominatim, getDetails for Google)
+    const coords = await resolveCoords(result);
+    if (coords) {
+      finalize(result.description, coords.lat, coords.lng);
+    } else {
+      toast.error("Could not get location details");
     }
-    // Otherwise use PlacesService to get coordinates
-    if (!placesService.current) return;
-    placesService.current.getDetails(
-      { placeId: result.place_id, fields: ["geometry", "name", "formatted_address"] },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          finalize(
-            place.formatted_address || result.description,
-            place.geometry.location.lat(),
-            place.geometry.location.lng(),
-          );
-        } else {
-          toast.error("Could not get location details");
-        }
-      }
-    );
   };
 
   const handleStartJourney = async () => {
