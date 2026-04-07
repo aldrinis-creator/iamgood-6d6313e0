@@ -1,65 +1,33 @@
-## Fix MMJ Destination Search — Locations Not Displaying
 
-### Diagnosis
 
-The screenshot shows "No results found" for "Runwal Elina" — a real residential complex in Mumbai. This means **both** Google Places and Nominatim are failing:
+## Update Google API Keys for MMJ Search
 
-1. **Google Places API is likely returning `REQUEST_DENIED**` — the hardcoded API key (`AIzaSyDCeS7...`) almost certainly does not have the **Places API** enabled in Google Cloud Console, or billing is not active. The `getPlacePredictions` call silently returns zero results, and the existing `console.warn` only fires in the browser console (not visible to you in the screenshot).
-2. **Nominatim can't find "Runwal Elina"** because it's a residential complex not well-indexed in OpenStreetMap. Nominatim is a geocoder for addresses/POIs in OSM data — it misses many Indian residential complexes and commercial landmarks.
+### Problem
+The codebase uses a single old API key (`AIzaSyDCeS7...`) for everything — Maps JS loading, Places Autocomplete, and Geocoding. You've now provided dedicated keys with the correct APIs enabled and billing linked.
 
-### What will actually fix this
+### Plan
 
-The Google API key issue is the #1 blocker. But since we can't guarantee the user will fix their Google Cloud Console setup, we need a **robust multi-fallback** approach:
-
-#### 1. Add Google Geocoding API as a second fallback
-
-The Geocoding API (`/maps/api/geocode/json`) is a **different API** from Places Autocomplete and is sometimes enabled when Places is not. It also handles partial place names well. Add it as a fallback between Google Places and Nominatim.
-
-```text
-Search order:
-  Google Places Autocomplete → Google Geocoding API → Nominatim
+#### 1. Update `src/lib/googleMaps.ts` — Use Places API key
+The Google Maps JS library loads the Places library, so it should use the **Places API key**:
+```
+AIzaSyDCeS7... → AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU
 ```
 
-#### 2. Add visible diagnostic feedback
+#### 2. Update `src/hooks/usePlaceAutocomplete.ts` — Use both keys
+- The `GOOGLE_MAPS_API_KEY` constant (used by the Geocoding REST call) should use the **Geocoding API key**: `AIzaSyAFMWZxjdj-uXJciP4Uf2HGJ_8ZnbP_QIo`
+- Add a separate `GOOGLE_PLACES_API_KEY` constant isn't needed here because the Places Autocomplete runs through the JS SDK (which already loaded with the Places key in step 1).
 
-When Google returns a non-OK status, show it in the dropdown (not just console) so the problem is immediately clear:
-
-- `REQUEST_DENIED` → show "Google Places unavailable — check API key"
-- `OVER_QUERY_LIMIT` → show "Search limit reached, try again shortly"
-
-This replaces the generic "No results found" with actionable info.
-
-#### 3. Improve Nominatim query for Indian landmarks
-
-Add a structured search variant: when the free-text search returns nothing, retry with `amenity` + city name appended (e.g., "Runwal Elina Mumbai") to improve hit rate for landmarks not well-tagged in OSM.
-
-#### 4. Surface Google API status on load
-
-When the Places service initializes, do a test query (e.g., empty `getPlacePredictions` with just the session token) to detect `REQUEST_DENIED` early and warn the user that search quality may be degraded.
+So effectively:
+- `googleMaps.ts`: key → `AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU` (Places key, loads JS + Places library)
+- `usePlaceAutocomplete.ts`: key → `AIzaSyAFMWZxjdj-uXJciP4Uf2HGJ_8ZnbP_QIo` (Geocoding key, used only for the REST geocoding fallback)
 
 ### Files Changed
 
-
-| File                                | Change                                                                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `src/hooks/usePlaceAutocomplete.ts` | Add Google Geocoding fallback; improve Nominatim retry with city context; surface API status in results |
-| `src/pages/MapMyJourney.tsx`        | Show diagnostic message when Google API is denied; style degraded-search warning                        |
-
+| File | Change |
+|------|--------|
+| `src/lib/googleMaps.ts` | Replace API key with Places key |
+| `src/hooks/usePlaceAutocomplete.ts` | Replace API key with Geocoding key |
 
 ### Expected Result
+Google Places Autocomplete and Geocoding fallback will both work with properly configured, billing-enabled keys. Destination search should return accurate, locally-biased results.
 
-- If Google Places API key works → fast, accurate Uber-like results
-- If Google Places fails but Geocoding works → still good results via geocoding
-- If both Google APIs fail → improved Nominatim with city-context retry
-- In all cases → clear feedback about what's happening instead of silent "No results"
-
-### Important Note for the User
-
-For best results, you should ensure your Google Cloud Console project has:
-
-1. **Places API** enabled
-2. **Geocoding API** enabled
-3. **Billing account** linked (required even for the free $200/month tier)
-
-Without these, Google search will always fall back to the lower-quality Nominatim engine.  
-  
