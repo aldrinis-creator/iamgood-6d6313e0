@@ -1,48 +1,32 @@
 
 
-## Fix "Runwal Elina" Not Found in MMJ Search
+## Recommendation: Keep Current Custom Implementation
 
-### Why It Fails
+### Why NOT to adopt `use-places-autocomplete`
 
-The map tiles being OpenStreetMap is **not** the issue — OSM is only the visual map layer. The search uses Google APIs first. Here's what's happening for "Runwal Elina":
+The `use-places-autocomplete` npm package is essentially a wrapper around the **same Google Places Autocomplete API** already used in your Tier 1. It would **not** fix the "Runwal Elina" problem — that query fails at the Autocomplete level regardless of wrapper.
 
-1. **Tier 1 (Google Places Autocomplete)** — Returns `ZERO_RESULTS` (not an error, so no console log). Google Places Autocomplete is optimized for businesses/POIs and often misses residential complexes.
-2. **Tier 2 (Google Geocoding API)** — Also returns nothing. The Geocoding API expects **addresses**, not place/building names. "Runwal Elina" is a name, not an address.
-3. **Tier 3 (Nominatim)** — OpenStreetMap doesn't have this complex indexed.
+Your current custom `usePlaceAutocomplete` hook is **more capable** because it has a 4-tier fallback chain:
 
-"Fortis Hospital" works because it's a well-known business/POI in Google's database.
-
-### Fix: Add Google Text Search as Tier 2
-
-Replace the Geocoding fallback with the **Google Places Text Search** endpoint (`places/findplacefromtext` or `place/textsearch`), which is designed for **place names** (not just addresses). This API finds residential complexes, buildings, and landmarks that Autocomplete misses.
-
-Additionally, add `console.log` statements at each tier so failures are diagnosable.
-
-### Changes
-
-| File | Change |
-|------|--------|
-| `src/hooks/usePlaceAutocomplete.ts` | Replace Geocoding tier with **Google Text Search** (`/maps/api/place/textsearch/json`) using the Places API key; add diagnostic `console.log` at each tier showing tier name, query, and result count |
-
-### Technical Detail
-
-```typescript
-// Tier 2: Google Places Text Search (finds building names, not just addresses)
-const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${PLACES_KEY}&region=in`;
-// With location bias:
-// &location=19.07,72.87&radius=50000
+```text
+Tier 1: Google Autocomplete  ← same as what the npm package does
+Tier 2: Google Text Search    ← finds buildings/landmarks by name
+Tier 3: Google Geocoding      ← address-based lookup
+Tier 4: Nominatim (OSM)       ← free fallback
 ```
 
-This uses the **same Places API key** that's already configured and billing-enabled. Text Search is part of the Places API, so no additional API enablement is needed.
+Adopting the npm package would mean losing Tiers 2–4 and going backward.
 
-### Expected Result
+### What I Suggest Instead
 
-- "Fortis Hospital" → found via Tier 1 (Google Autocomplete) ✓
-- "Runwal Elina" → found via Tier 2 (Google Text Search) ✓
-- Obscure locations → found via Tier 3 (Nominatim with city context) ✓
-- Console logs show which tier returned results for debugging
+The real question is: **does "Runwal Elina" work now with the Text Search tier we just added?** That's what needs testing. If it still fails, the issue is likely:
 
-### Important Note
+1. **CORS blocking** the Text Search JS SDK call (unlikely since it uses the loaded SDK, not REST)
+2. The Places API key doesn't have the **Places API (New)** or **Places API** enabled for Text Search specifically
 
-The Google Places Text Search API has a cost of ~$32 per 1,000 requests (vs $2.83 for Autocomplete). It's only called as a fallback when Autocomplete returns zero results, so cost impact is minimal.
+### Recommended Next Step
+
+Test the search in the live preview for "Runwal Elina" and check the browser console for `[PlaceSearch]` logs. The logs will show exactly which tier was attempted and what status was returned — that tells us precisely what to fix next.
+
+No code changes needed right now.
 
