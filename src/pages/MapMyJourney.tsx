@@ -13,8 +13,8 @@ import { useJourneyTracker } from "@/hooks/useJourneyTracker";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
 import StreetViewPanel from "@/components/StreetViewPanel";
-import { loadGoogleMapsAPI } from "@/lib/googleMaps";
 import { useSavedDestinations } from "@/hooks/useSavedDestinations";
+import { usePlaceAutocomplete, type PlaceResult } from "@/hooks/usePlaceAutocomplete";
 
 // Fix Leaflet default icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
