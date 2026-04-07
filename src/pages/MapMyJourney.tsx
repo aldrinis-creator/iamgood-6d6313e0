@@ -93,6 +93,7 @@ const MapMyJourney = () => {
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
+  const [journeyReports, setJourneyReports] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
 
