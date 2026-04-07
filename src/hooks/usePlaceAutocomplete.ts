@@ -8,7 +8,7 @@ export interface PlaceResult {
   secondary_text: string;
   lat?: number;
   lng?: number;
-  source: "google" | "textsearch" | "nominatim" | "saved";
+  source: "google" | "textsearch" | "geocoding" | "nominatim" | "saved";
 }
 
 interface UsePlaceAutocompleteOptions {
@@ -197,7 +197,47 @@ export function usePlaceAutocomplete({
     [origin]
   );
 
-  /** Tier 3: Nominatim with city-context retry */
+  /** Tier 3: Google Geocoding API (address-based lookup) */
+  const geocodingSearch = useCallback(
+    async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
+      const apiKey = "AIzaSyAFMWZxjdj-uXJciP4Uf2HGJ_8ZnbP_QIo";
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}&region=${country}&language=en`;
+
+      try {
+        const res = await fetch(url, { signal });
+        const data = await res.json();
+
+        if (data.status === "REQUEST_DENIED") {
+          console.warn(`[PlaceSearch] Tier 3 (Geocoding) REQUEST_DENIED:`, data.error_message);
+          return [];
+        }
+
+        if (data.status === "OK" && data.results?.length) {
+          const mapped = data.results.slice(0, 5).map((r: any) => ({
+            place_id: r.place_id,
+            description: r.formatted_address,
+            main_text: r.formatted_address.split(",")[0],
+            secondary_text: r.formatted_address.split(",").slice(1, 3).join(",").trim(),
+            lat: r.geometry.location.lat,
+            lng: r.geometry.location.lng,
+            source: "geocoding" as const,
+          }));
+          console.log(`[PlaceSearch] Tier 3 (Geocoding) "${query}" → ${mapped.length} results`);
+          return mapped;
+        }
+
+        console.log(`[PlaceSearch] Tier 3 (Geocoding) "${query}" → 0 results (status: ${data.status})`);
+        return [];
+      } catch (e: any) {
+        if (e?.name === "AbortError") throw e;
+        console.warn("[PlaceSearch] Tier 3 (Geocoding) error:", e);
+        return [];
+      }
+    },
+    [country]
+  );
+
+  /** Tier 4: Nominatim with city-context retry */
   const nominatimSearch = useCallback(
     async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
       const doSearch = async (q: string): Promise<any[]> => {
@@ -315,10 +355,21 @@ export function usePlaceAutocomplete({
 
           if (controller.signal.aborted) return;
 
-          // Tier 3: Nominatim with city-context retry
+          // Tier 3: Google Geocoding API (address-based)
+          const geoResults = await geocodingSearch(query, controller.signal);
+          if (searchId !== searchIdRef.current) return;
+          if (geoResults.length > 0) {
+            setResults(geoResults);
+            setSearching(false);
+            return;
+          }
+
+          if (controller.signal.aborted) return;
+
+          // Tier 4: Nominatim with city-context retry
           const nomResults = await nominatimSearch(query, controller.signal);
           if (searchId !== searchIdRef.current) return;
-          console.log(`[PlaceSearch] Tier 3 (Nominatim) "${query}" → ${nomResults.length} results`);
+          console.log(`[PlaceSearch] Tier 4 (Nominatim) "${query}" → ${nomResults.length} results`);
 
           setResults(nomResults);
         } catch (e: any) {
@@ -330,7 +381,7 @@ export function usePlaceAutocomplete({
         }
       }, debounceMs);
     },
-    [minChars, debounceMs, googleSearch, textSearch, nominatimSearch]
+    [minChars, debounceMs, googleSearch, textSearch, geocodingSearch, nominatimSearch]
   );
 
   const clear = useCallback(() => {
