@@ -1,5 +1,5 @@
-// FAQ data extracted from official PDF — update this file whenever FAQs change.
-// Generated from: 19March_MyHealthCompanion_FAQs.pdf (19 March 2026)
+// FAQ data — update this file whenever FAQs change.
+// Last updated: 2026-04-07
 
 export interface FaqItem {
   question: string;
@@ -12,7 +12,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-03-19";
+export const FAQ_VERSION = "2026-04-07";
 
 export const faqSections: FaqSection[] = [
   {
@@ -79,7 +79,7 @@ export const faqSections: FaqSection[] = [
       },
       {
         question: "How does the Guardian nomination process work?",
-        answer: "When you add a Guardian, they receive an SMS/WhatsApp invitation with a unique, token-based link. Using a 'silent consent' model, they have a one-hour window to reject the nomination. If they don't reject, a server-side job automatically transitions them to 'accepted' status and sends a celebratory confirmation."
+        answer: "When you add a Guardian, they receive an SMS/WhatsApp invitation along with a branded email invitation. Using a 'silent consent' model, they have a one-hour window to reject the nomination. If they don't reject, they are automatically accepted."
       },
       {
         question: "How am I notified when a Guardian responds?",
@@ -92,6 +92,10 @@ export const faqSections: FaqSection[] = [
       {
         question: "Where can I see my Primary Guardian?",
         answer: "Your Primary Guardian (Guardian 1) is prominently displayed in the My Profile 'View Details' tab. You can manage all your guardians in Settings → Guardians."
+      },
+      {
+        question: "How many wards can a Guardian manage?",
+        answer: "Each Guardian can manage up to 3 wards (users). If a Guardian already has 3 accepted wards, you'll be prompted to choose a different Guardian."
       },
     ],
   },
@@ -133,6 +137,10 @@ export const faqSections: FaqSection[] = [
         question: "How can Guardians respond to an SOS?",
         answer: "Guardians can reply 'SAFE' or 'OK' via SMS/WhatsApp to confirm you're okay and close the alert. All other Guardians are then notified that the alert has been resolved. Guardians can also track the SOS on a map via the Guardian Portal."
       },
+      {
+        question: "Can I share my Emergency Profile publicly?",
+        answer: "Yes! Go to Settings → Privacy → Public Emergency Profile. When enabled, a unique shareable link is generated. Anyone with the link can view your emergency-relevant details (blood type, allergies, conditions, emergency contacts) without needing an account."
+      },
     ],
   },
   {
@@ -162,6 +170,36 @@ export const faqSections: FaqSection[] = [
       {
         question: "Can the doctor reschedule via the confirmation link?",
         answer: "Yes! If the doctor selects 'Propose Reschedule', they can suggest a new date and time along with a note. You'll see the proposed date/time displayed on your appointment card."
+      },
+      {
+        question: "Do I receive an email confirmation when I create an appointment?",
+        answer: "Yes! A branded appointment confirmation email is automatically sent to your registered email address when you create a new appointment. The email includes the appointment title, date, time, and doctor's name."
+      },
+    ],
+  },
+  {
+    title: "Map My Journey",
+    icon: "map-pin",
+    items: [
+      {
+        question: "What is Map My Journey?",
+        answer: "Map My Journey is a safety feature that lets you share your real-time location with your guardians while traveling. Set a destination, start the journey, and your guardians can track your progress on a map."
+      },
+      {
+        question: "How do I start a journey?",
+        answer: "Go to Map My Journey from the navigation menu. Search for or select a destination, choose your transport mode, and tap 'Start Journey'. Your guardians will be notified that you're traveling."
+      },
+      {
+        question: "What are Saved Destinations?",
+        answer: "Frequently visited places are automatically saved for quick access. You can also mark destinations as favorites. The app tracks how many times you've visited each place."
+      },
+      {
+        question: "What are journey check-ins?",
+        answer: "While on a journey, the app periodically prompts you to confirm you're okay. These check-ins send your current location to guardians in real-time."
+      },
+      {
+        question: "Can my Guardian track my journey?",
+        answer: "Yes! Guardians can view your active journey on their Guardian Dashboard, including your current location, destination, estimated duration, and check-in responses."
       },
     ],
   },
@@ -210,6 +248,28 @@ export const faqSections: FaqSection[] = [
       {
         question: "Can I mute audio alerts?",
         answer: "Yes! Go to Settings → Alerts → Audio Alerts and toggle it off. You'll still receive vibration and push notifications."
+      },
+      {
+        question: "How do push notifications work?",
+        answer: "Push notifications are delivered via your browser's Web Push API even when the app is closed. Go to Settings → Alerts to enable or disable push notifications. You'll be asked for permission the first time you sign in."
+      },
+    ],
+  },
+  {
+    title: "Email Notifications",
+    icon: "mail",
+    items: [
+      {
+        question: "What email notifications does Check-iN send?",
+        answer: "Check-iN sends branded email notifications for key events: a Welcome email when you create your account, Appointment Confirmations when you schedule appointments, and Guardian Invitation emails when you nominate a new guardian."
+      },
+      {
+        question: "Can I unsubscribe from email notifications?",
+        answer: "Yes! Every email includes an unsubscribe link at the bottom. Clicking it takes you to a confirmation page. Once unsubscribed, you won't receive any further email notifications from Check-iN."
+      },
+      {
+        question: "I'm not receiving email notifications — what should I do?",
+        answer: "Check your spam or junk folder first. Emails are sent from noreply@www.futurewave.in. If you previously unsubscribed, you won't receive emails until you re-register. Contact support if the issue persists."
       },
     ],
   },
@@ -260,6 +320,24 @@ export const faqSections: FaqSection[] = [
     ],
   },
   {
+    title: "Jan Aushadhi — Affordable Medicines",
+    icon: "indian-rupee",
+    items: [
+      {
+        question: "What is Jan Aushadhi?",
+        answer: "Jan Aushadhi is an Indian government initiative providing quality generic medicines at affordable prices. Check-iN integrates a Jan Aushadhi alternative finder to help you save money on medications."
+      },
+      {
+        question: "How do I find Jan Aushadhi alternatives?",
+        answer: "In the Tablets section, tap the 'Jan Aushadhi Alternatives' button on any medication card. The app searches for equivalent generic medicines available at Jan Aushadhi Kendras, showing the MRP and potential savings."
+      },
+      {
+        question: "Can I find nearby Jan Aushadhi stores?",
+        answer: "Yes! The Jan Aushadhi feature includes a store locator that shows nearby Jan Aushadhi Kendras with their address, phone number, and distance from your location."
+      },
+    ],
+  },
+  {
     title: "Nutrition & Meal Advisor",
     icon: "utensils",
     items: [
@@ -282,6 +360,28 @@ export const faqSections: FaqSection[] = [
       {
         question: "What is post-workout recovery analysis?",
         answer: "After an activity session, the advisor cross-references your meal content with real-time activity data and wellness data to recommend optimal recovery nutrition."
+      },
+    ],
+  },
+  {
+    title: "Calorie & Meal Tracker",
+    icon: "flame",
+    items: [
+      {
+        question: "What is the Calorie Tracker?",
+        answer: "The Calorie Tracker helps you log your daily meals and monitor your calorie and macronutrient intake. View your daily totals for calories, protein, carbs, fats, and fiber against your personalized goals."
+      },
+      {
+        question: "How do I log a meal?",
+        answer: "Go to My Health → Calories tab. Tap 'Log Meal' and enter the meal name, type (Breakfast, Lunch, Dinner, or Snack), and individual food items with their nutritional values. You can also use the AI Nutrition Advisor to auto-analyze meals from photos."
+      },
+      {
+        question: "Can I set a daily calorie goal?",
+        answer: "Yes! Your daily calorie goal is set in your Nutrition Persona (Health Persona setup). The Calorie Tracker displays your progress against this goal with a visual progress bar."
+      },
+      {
+        question: "Can I view my meal history?",
+        answer: "Yes! The Calorie Tracker shows all logged meals for the selected date, organized by meal type. You can navigate between dates to review your eating patterns."
       },
     ],
   },
@@ -356,8 +456,34 @@ export const faqSections: FaqSection[] = [
         answer: "Record audio or video of medical consultations, or start a video call with a room code. Our AI analyzes the recording to generate a structured transcript, summary, symptoms list, and recommendations — exportable as PDF."
       },
       {
+        question: "What is the Doctor Visit Report?",
+        answer: "An AI-generated comprehensive report you can share with your doctor before a visit. It compiles your recent vitals, wellness scores, medication list, activity data, meal logs, care journal entries, and medical history into a single PDF."
+      },
+      {
+        question: "What is Emergency First Aid?",
+        answer: "A quick-reference AI-powered guide for common emergency situations. Describe the situation, and the AI provides step-by-step first aid instructions. This is not a substitute for calling emergency services."
+      },
+      {
         question: "Is my consultation data private?",
         answer: "Absolutely. All consultation recordings and analyses are stored securely and only accessible by you. The AI analysis includes a medical disclaimer."
+      },
+    ],
+  },
+  {
+    title: "Past Medical History",
+    icon: "clipboard-list",
+    items: [
+      {
+        question: "What is Past Medical History?",
+        answer: "A structured record of your medical past — including surgeries, hospitalizations, chronic conditions, injuries, and allergies. This data is used in Doctor Visit Reports and can be shared with healthcare providers."
+      },
+      {
+        question: "What types of records can I add?",
+        answer: "You can add records categorized as: Surgery, Hospitalization, Chronic Condition, Injury, Allergy, or Other. Each record includes details like doctor name, hospital, dates, treatment, medications, and advice."
+      },
+      {
+        question: "Is my medical history included in reports?",
+        answer: "Yes! Your past medical history is automatically included in the Doctor Visit Report, giving your doctor a comprehensive view of your health background."
       },
     ],
   },
@@ -430,6 +556,24 @@ export const faqSections: FaqSection[] = [
     ],
   },
   {
+    title: "Nearby Facilities",
+    icon: "map",
+    items: [
+      {
+        question: "What is the Nearby Facilities feature?",
+        answer: "Find hospitals, pharmacies, clinics, and other healthcare facilities near your current location using Google Maps. View addresses, phone numbers, and get directions instantly."
+      },
+      {
+        question: "Can I save facilities I visit often?",
+        answer: "Yes! You can add custom facilities with their name, type, address, and phone number. These are saved to your profile and appear alongside auto-detected nearby facilities."
+      },
+      {
+        question: "What types of facilities can I find?",
+        answer: "You can search for Hospitals, Pharmacies, Clinics, Diagnostic Labs, and Jan Aushadhi Kendras (government-subsidized medicine stores)."
+      },
+    ],
+  },
+  {
     title: "Secret Vault",
     icon: "lock",
     items: [
@@ -495,6 +639,10 @@ export const faqSections: FaqSection[] = [
         question: "How do I book an ambulance?",
         answer: "Use the Book Ambulance feature in My Health to quickly request emergency medical transport based on your location. Guardians can also book ambulances on your behalf through the Guardian Portal."
       },
+      {
+        question: "How much does an ambulance cost?",
+        answer: "The base fare is ₹1,500 for the first 5 km, with an additional ₹300 per km beyond that. A fare estimate is shown before you confirm the booking."
+      },
     ],
   },
   {
@@ -525,11 +673,37 @@ export const faqSections: FaqSection[] = [
       },
       {
         question: "How do I install the app on my phone?",
-        answer: "My Health Companion is a Progressive Web App (PWA). On your phone's browser, tap the 'Install' option in the menu. This adds the app to your home screen for quick access and enables background notifications."
+        answer: "Check-iN is a Progressive Web App (PWA). On your phone's browser, tap the 'Install' option in the menu. This adds the app to your home screen for quick access and enables background notifications."
       },
       {
         question: "Can I use the app on multiple devices?",
         answer: "Yes! Sign in with the same account on any device. Your data, preferences, and language settings sync automatically across all devices."
+      },
+      {
+        question: "Do I receive a Welcome email after signing up?",
+        answer: "Yes! After creating your account and verifying your email, you'll receive a branded Welcome email introducing you to Check-iN's key features."
+      },
+    ],
+  },
+  {
+    title: "Account & Login",
+    icon: "log-in",
+    items: [
+      {
+        question: "How do I sign up for Check-iN?",
+        answer: "Visit the registration page and choose your role (User or Guardian). Fill in your details, verify your phone number via OTP, and optionally nominate guardians. A verification email will be sent to your registered email address."
+      },
+      {
+        question: "Can I sign in with my phone number?",
+        answer: "Yes! On the login page, switch to the 'Phone' tab and enter your registered phone number. You'll receive a one-time password (OTP) via SMS to sign in."
+      },
+      {
+        question: "I forgot my password — how do I reset it?",
+        answer: "On the login page, tap 'Forgot Password?' and enter your email address. You'll receive a password reset link via email. Click the link to set a new password."
+      },
+      {
+        question: "I didn't receive the verification email — what do I do?",
+        answer: "On the login page, try signing in with your credentials. If your email isn't verified yet, a 'Resend Verification Email' option will appear. Check your spam/junk folder as well."
       },
     ],
   },
@@ -539,7 +713,7 @@ export const faqSections: FaqSection[] = [
     items: [
       {
         question: "What languages does the app support?",
-        answer: "My Health Companion supports 9 languages: English (default), Hindi, Marathi, Tamil, Bengali, Malayalam, Kannada, Konkani, and French."
+        answer: "Check-iN supports 9 languages: English (default), Hindi, Marathi, Tamil, Bengali, Malayalam, Kannada, Konkani, and French."
       },
       {
         question: "How do I change the app language?",
@@ -612,6 +786,20 @@ export const faqSections: FaqSection[] = [
     ],
   },
   {
+    title: "Subscription & Pricing",
+    icon: "credit-card",
+    items: [
+      {
+        question: "What subscription plans are available?",
+        answer: "Check-iN offers two plans: Basic at ₹99/month (core safety features, 2 guardians, basic health tools) and Pro at ₹199/month (all features, up to 5 guardians, advanced AI tools, priority support)."
+      },
+      {
+        question: "Is there a free trial?",
+        answer: "Check-iN's core safety features are available to try. Visit the Subscription page from the menu to view detailed plan comparisons and upgrade options."
+      },
+    ],
+  },
+  {
     title: "Privacy & Data Security",
     icon: "shield-lock",
     items: [
@@ -634,6 +822,10 @@ export const faqSections: FaqSection[] = [
       {
         question: "Where can I manage privacy settings?",
         answer: "Go to Settings → Privacy tab to control location sharing, health data sharing, and wellness score sharing preferences with your guardians."
+      },
+      {
+        question: "Does the app use cookies?",
+        answer: "Check-iN uses only essential cookies for authentication and session management. A cookie consent banner appears on your first visit. No third-party tracking cookies are used."
       },
     ],
   },
