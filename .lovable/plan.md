@@ -1,98 +1,122 @@
 
-## Make MMJ search feel like Uber
 
-### Short answer
-The current search is still frustrating because it is built around the wrong primary engine for type-ahead search. Right now MMJ still tries Nominatim first, which is a geocoder, not a premium autocomplete system. That means:
-- slower responses
-- worse ranking for partial queries
-- more wrong/misleading matches
-- Google Places only runs as a fallback, so users wait too long before the better results appear
+## MMJ Improvements: Google Maps, Deferred Map, Overlay Pop-ups, and Journey Reports
 
-If you want true “Uber-like” search, we should change the architecture, not just patch the current flow.
+### Overview
+Four changes to Map My Journey across both user and guardian apps.
 
-### What I would build
-#### 1. Make Google Places the primary live search
-Use Google autocomplete immediately on typing, with:
-- session token per search session
-- India country restriction
-- strong location bias around the user
-- min 2–3 characters before searching
-- 150–200ms debounce
+---
 
-This is the main step that will make search feel fast and relevant.
+### 1. Guardian App: Use Google Maps for MMJ Tracker
 
-#### 2. Stop using Nominatim as the first responder
-Keep Nominatim only as a fallback/backfill source, not the main search engine.
-That avoids the current delay and bad ranking.
+**Current**: `GuardianJourneyTracker.tsx` already uses Google raster tiles (`mt1.google.com/vt/lyrs=m`) via Leaflet — this is already Google Maps tiles.
 
-#### 3. Add Uber-style ranking layers
-Blend results in this order:
-1. Home / Work
-2. Recent & saved destinations
-3. Exact or prefix text matches near current location
-4. Google autocomplete predictions
-5. Fallback geocoder results only if needed
+**Change**: No change needed for map tiles. The guardian tracker already renders Google Maps.
 
-Also dedupe results so users do not see repeated variants of the same place.
+---
 
-#### 4. Remove the “wrong place” problem on selection
-For top predictions, fetch/cache coordinates early so selection feels instant.
-Add a stronger place-details path so the chosen result always resolves to the correct map point.
+### 2. User App: Show Map Only After Destination Selected
 
-#### 5. Improve the search UX
-- better empty state
-- “Searching…” feedback
-- keyboard navigation
-- clearer sections: Saved, Nearby, Search results
-- optional category shortcuts like Hospital, Station, Mall, Restaurant with nearby bias
+**Current**: `MapMyJourney.tsx` lines 607-624 always render the map preview when `originPos` is available, even before a destination is chosen.
 
-### What this will likely change in the codebase
-- `src/pages/MapMyJourney.tsx`
-  - replace current Nominatim-first flow with Google-first search pipeline
-  - add ranking, dedupe, caching, and prefetch logic
-  - improve result rendering and keyboard behavior
-- `src/lib/googleMaps.ts`
-  - keep the retry fix
-  - possibly extend loading to support more robust places usage
-- likely a new helper/hook
-  - e.g. `src/lib/placeSearch.ts` or `src/hooks/usePlaceAutocomplete.ts`
-  - centralize debounce, aborts, session token, cache, ranking
+**Change**: Wrap the map preview block so it only renders when `selectedDest` is truthy (destination has been selected and route fetched).
 
-### Important product decision
-There is a hard tradeoff here:
+| File | Change |
+|------|--------|
+| `src/pages/MapMyJourney.tsx` | Change line 607 condition from `{originPos && (` to `{originPos && selectedDest && routeCoords.length > 0 && (` |
 
-#### Option A: Uber-like quality
-Use Google Places as the primary provider.
-- Best speed
-- Best ranking
-- Best partial-query matching
-- Most realistic path to “feels like Uber”
+---
 
-#### Option B: Mostly free search
-Keep relying mainly on Nominatim/OpenStreetMap-style search.
-- Lower cost
-- But it will never consistently feel like Uber autocomplete
+### 3. Pop-ups Display Over Map / Current View
 
-Given your goal, I would recommend Option A.
+**Current**: `JourneyCheckInPopup` uses Radix `Dialog` which renders in a portal with an overlay — this already appears over the map. However, other alerts (arriving soon, route deviation) are inline badges, not actionable pop-ups.
 
-### Implementation plan
-1. Audit the current MMJ search flow and remove Nominatim-first behavior.
-2. Build a reusable autocomplete layer with debounce, abort, session tokens, cache, and location bias.
-3. Show local/saved/home/work matches before network results.
-4. Use Google predictions as the default live dropdown.
-5. Resolve and cache coordinates for top predictions to remove selection lag.
-6. Keep Nominatim only as fallback when Google has no useful result.
-7. Tune ranking rules for Indian address patterns and nearby relevance.
-8. Improve dropdown UX for speed, clarity, and mobile use.
+**Changes**:
+- The journey check-in popup already overlays the map correctly via `Dialog`. No change needed there.
+- Add a new **alert overlay** component for route deviation and arriving-soon alerts that renders as a fixed overlay (similar to `ReminderOverlay`) with an action button (e.g., "OK" / "Acknowledged") that dismisses the alert.
+- Wire `useJourneyTracker` to emit these alerts as state, and render the overlay in `MapMyJourney.tsx` on top of the map.
 
-### Expected result
-After this change, MMJ search should:
-- respond much faster
-- show more accurate nearby destinations
-- feel consistent while typing
-- behave much closer to ride-hailing search
+| File | Change |
+|------|--------|
+| `src/components/JourneyAlertOverlay.tsx` | New component: fixed overlay with alert message + dismiss button |
+| `src/pages/MapMyJourney.tsx` | Render `JourneyAlertOverlay` for arrivingSoon / routeDeviation with dismiss callbacks |
+| `src/hooks/useJourneyTracker.ts` | Add `arrivingSoonDismissed` and `routeDeviationDismissed` state so alerts show once and can be dismissed |
 
-### Technical notes
-- The current issue is not just timeout/race-condition related anymore; it is mostly a search-provider and ranking problem.
-- Nominatim is fine for backup geocoding, but not ideal for premium autocomplete UX.
-- To truly match Uber quality, the search stack needs to be Google-first with better ranking and caching.
+---
+
+### 4. Journey Completion Report
+
+When a journey ends (manual or auto), generate a summary report with:
+- Date/time stamp (start and end)
+- Total distance traveled (sum of haversine segments between GPS updates)
+- Total journey time
+- Break duration (gaps > 2 min between consecutive GPS updates where distance < 20m)
+- Route deviation events (count, max deviation in meters — from notifications or tracked state)
+
+**Storage**: Add a `journey_reports` table to persist the report data so both user and guardian can view it.
+
+**User view**: Show past journey reports in a new section on the MMJ page (below the setup form when no active journey).
+
+**Guardian view**: Add a "Journeys" tab/section to `GuardianReports.tsx` showing completed journey reports for the selected ward.
+
+#### Database Migration
+
+```sql
+CREATE TABLE public.journey_reports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  journey_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  started_at timestamptz NOT NULL,
+  ended_at timestamptz NOT NULL,
+  origin_name text,
+  destination_name text NOT NULL,
+  transport_mode text,
+  total_distance_m numeric NOT NULL DEFAULT 0,
+  total_duration_min numeric NOT NULL DEFAULT 0,
+  break_duration_min numeric NOT NULL DEFAULT 0,
+  deviation_count integer NOT NULL DEFAULT 0,
+  max_deviation_m numeric NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.journey_reports ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can select own journey_reports" ON public.journey_reports
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own journey_reports" ON public.journey_reports
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Guardians can view ward journey_reports" ON public.journey_reports
+  FOR SELECT TO authenticated USING (
+    EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = journey_reports.user_id)
+  );
+```
+
+#### Report Generation
+
+| File | Change |
+|------|--------|
+| `src/hooks/useJourneyTracker.ts` | In `endJourney()`, compute report metrics from `updates` array (distance, breaks, deviations) and insert into `journey_reports`. Track deviation count/max during journey. |
+| `src/pages/MapMyJourney.tsx` | When no active journey, fetch and display past `journey_reports` as a list of cards with date, distance, time, breaks, deviations. |
+| `src/pages/GuardianReports.tsx` | Add a "journeys" section to the report tabs. Fetch `journey_reports` for the selected ward and display them similarly. |
+
+#### Report Card UI (shared between user and guardian)
+
+| File | Change |
+|------|--------|
+| `src/components/JourneyReportCard.tsx` | New component displaying a single journey report: date/time, distance, duration, break time, deviation info. Reusable in both MMJ and Guardian Reports. |
+
+---
+
+### Files Changed Summary
+
+| File | Action |
+|------|--------|
+| `src/pages/MapMyJourney.tsx` | Defer map until destination selected; add alert overlay; add journey history section |
+| `src/hooks/useJourneyTracker.ts` | Track deviation metrics; generate report on journey end; add alert dismiss state |
+| `src/components/JourneyAlertOverlay.tsx` | New: fixed overlay for journey alerts with dismiss |
+| `src/components/JourneyReportCard.tsx` | New: reusable journey report card |
+| `src/pages/GuardianReports.tsx` | Add "Journeys" tab with journey report cards |
+| Database migration | New `journey_reports` table with RLS |
+
