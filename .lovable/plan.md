@@ -1,43 +1,44 @@
 
 
-## Fix "Runwal Elina" Search — All 3 Failing Tiers
+## Add "Save to Vault" for All Health Tool Reports
 
-The console logs reveal exactly why every tier after Autocomplete fails:
+### What Changes
 
-| Tier | Status | Root Cause |
-|------|--------|------------|
-| Tier 1 (Autocomplete) | ZERO_RESULTS | Google Autocomplete doesn't index "Runwal Elina" — expected, this is why we have fallbacks |
-| Tier 2 (TextSearch) | **Timeout (5s)** | The JS SDK `textSearch()` call never returns a callback. The API key likely doesn't have the **Places API** enabled for Text Search, so the request hangs silently instead of returning an error |
-| Tier 3 (Geocoding) | **REQUEST_DENIED** | Uses a different API key (`AIzaSyAFMWZxjdj...`) that has HTTP referer restrictions — Geocoding REST API requires unrestricted or server-side keys |
-| Tier 4 (Nominatim) | 0 results | OSM doesn't have "Runwal Elina" indexed |
+Add a "Save to Vault" button to every Health Tool that generates an AI report. After saving, show a toast: *"Your Report is saved in the Vault in Reports in the [Tool Name] tab"*. Also add `ReportShareButtons` (Print/WhatsApp/Email) where missing.
 
-### Fix Strategy
+### Components to Update
 
-**Use the Google Geocoding API via the JS SDK** instead of a REST API call. The Maps JS SDK (already loaded) includes a `google.maps.Geocoder` class that works with the same API key used for Autocomplete — no referer restriction issues. This eliminates the need for a separate Geocoding API key entirely.
+**1. `src/components/health-tools/DoctorVisitReport.tsx`**
+- Add a "Save to Vault" button below the report (same pattern as DocumentAnalyzer)
+- Save to `medical_records` with `record_type: "Doctor's Diagnosis"`, title including date
+- Add `ReportShareButtons` (already present ✅)
+- Toast: "Your Report is saved in the Vault in Reports in the Doctor Visit Report tab"
 
-For TextSearch timeout, increase timeout and add a diagnostic log so we can confirm whether the Places API is enabled on the key.
+**2. `src/components/health-tools/SymptomChecker.tsx`**
+- Add a "Save to Vault" button that appears once there's at least one assistant response
+- Concatenate the full chat history into a markdown string for saving
+- Save to `medical_records` with `record_type: "AI Analysis"`, title: "Symptom Check — [date]"
+- Add `ReportShareButtons` for the conversation
+- Toast: "Your Report is saved in the Vault in Reports in the Symptom Checker tab"
 
-### Changes — `src/hooks/usePlaceAutocomplete.ts`
+**3. `src/components/health-tools/MedicationInfo.tsx`**
+- Add "Save to Vault" button when drug search `result` or `bannedResult` is present
+- Save to `medical_records` with `record_type: "AI Analysis"`, title: "Medication Info — [drug name] — [date]"
+- Add `ReportShareButtons` for each result
+- Toast: "Your Report is saved in the Vault in Reports in the Medication Info tab"
 
-1. **Add a Geocoder ref** alongside the existing PlacesService ref, initialized in the same `useEffect`
-2. **Replace Tier 3 (REST Geocoding)** with `google.maps.Geocoder.geocode()` JS SDK call — uses the same API key as the loaded Maps script, no referer issues
-3. **Increase Tier 2 timeout** from 5s to 8s and log when the callback fires vs times out, to diagnose whether TextSearch is truly unsupported or just slow
-4. **Remove the hardcoded Geocoding API key** (`AIzaSyAFMWZxjdj...`) — no longer needed
+**4. `src/components/health-tools/DocumentAnalyzer.tsx`**
+- Update existing toast from "Saved to Medical Vault" to "Your Report is saved in the Vault in Reports in the Document Analyzer tab"
 
-### Technical Detail
+### Implementation Pattern (shared across all)
 
-```text
-BEFORE (Tier 3):
-  fetch("https://maps.googleapis.com/maps/api/geocode/json?address=...&key=SEPARATE_KEY")
-  → REQUEST_DENIED (referer restrictions)
+Each component gets:
+- `saving` and `saved` boolean state
+- `saveToVault` async function that inserts into `medical_records`
+- A button: Save icon → Spinner → Checkmark
+- `useAuth` import for `user.id`
+- Consistent toast message referencing the tool name
 
-AFTER (Tier 3):
-  new google.maps.Geocoder().geocode({ address: query, region: "in" })
-  → Uses the same key loaded with the Maps JS SDK — no restrictions
-```
-
-### Expected Outcome
-- "Runwal Elina" → found via Tier 3 (JS SDK Geocoder) even when Tier 2 times out
-- Tier 2 timeout increased to 8s for better chance of success
-- No separate API key needed for Geocoding
+### No Database Changes Required
+The `medical_records` table already supports these inserts with existing RLS policies.
 
