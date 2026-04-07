@@ -8,7 +8,8 @@ export interface PlaceResult {
   secondary_text: string;
   lat?: number;
   lng?: number;
-  source: "google" | "textsearch" | "photon" | "nominatim" | "saved";
+  source: "google" | "textsearch" | "photon" | "nominatim" | "saved" | "fuzzy";
+  isFuzzy?: boolean;
 }
 
 interface UsePlaceAutocompleteOptions {
@@ -332,7 +333,60 @@ export function usePlaceAutocomplete({
     [origin, country]
   );
 
-  /** Main search — 4-tier fallback */
+  /** Tier 5: Fuzzy partial search — retry with first word + location bias */
+  const fuzzySearch = useCallback(
+    async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
+      const words = query.trim().split(/\s+/);
+      if (words.length < 1) return [];
+
+      // Try progressively: first word, first two words, etc. (but shorter than original)
+      const attempts: string[] = [];
+      if (words.length >= 2) attempts.push(words[0]);
+      if (words.length >= 3) attempts.push(words.slice(0, 2).join(" "));
+
+      for (const partial of attempts) {
+        if (signal.aborted) return [];
+        try {
+          const params = new URLSearchParams({ q: partial, lang: "en", limit: "6" });
+          if (origin) {
+            params.set("lat", String(origin.lat));
+            params.set("lon", String(origin.lng));
+          }
+          const res = await fetch(`https://photon.komoot.io/api/?${params}`, {
+            signal,
+            headers: { "User-Agent": "CheckiN-App/1.0" },
+          });
+          const data = await res.json();
+          if (data?.features?.length) {
+            const mapped: PlaceResult[] = data.features.slice(0, 6).map((f: any) => {
+              const props = f.properties || {};
+              const mainText = props.name || props.street || partial;
+              const secondaryText = [props.city, props.state, props.country].filter(Boolean).join(", ");
+              return {
+                place_id: `fuzzy_${props.osm_id || Math.random()}`,
+                description: [props.name, props.street, props.city, props.state].filter(Boolean).join(", "),
+                main_text: mainText,
+                secondary_text: secondaryText,
+                lat: f.geometry?.coordinates?.[1],
+                lng: f.geometry?.coordinates?.[0],
+                source: "fuzzy" as const,
+                isFuzzy: true,
+              };
+            });
+            console.log(`[PlaceSearch] Tier 5 (Fuzzy) "${partial}" → ${mapped.length} results`);
+            return mapped;
+          }
+        } catch (e: any) {
+          if (e?.name === "AbortError") throw e;
+        }
+      }
+      console.log(`[PlaceSearch] Tier 5 (Fuzzy) "${query}" → 0 results`);
+      return [];
+    },
+    [origin]
+  );
+
+  /** Main search — 5-tier fallback */
   const search = useCallback(
     (query: string) => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -388,7 +442,18 @@ export function usePlaceAutocomplete({
           if (searchId !== searchIdRef.current) return;
           console.log(`[PlaceSearch] Tier 4 (Nominatim) "${query}" → ${nomResults.length} results`);
 
-          setResults(nomResults);
+          if (nomResults.length > 0) {
+            setResults(nomResults);
+            setSearching(false);
+            return;
+          }
+
+          if (controller.signal.aborted) return;
+
+          // Tier 5: Fuzzy partial search
+          const fuzzyResults = await fuzzySearch(query, controller.signal);
+          if (searchId !== searchIdRef.current) return;
+          setResults(fuzzyResults);
         } catch (e: any) {
           if (e?.name === "AbortError") return;
           console.warn("[PlaceAutocomplete] search error:", e);
@@ -398,7 +463,7 @@ export function usePlaceAutocomplete({
         }
       }, debounceMs);
     },
-    [minChars, debounceMs, googleSearch, newPlacesSearch, photonSearch, nominatimSearch]
+    [minChars, debounceMs, googleSearch, newPlacesSearch, photonSearch, nominatimSearch, fuzzySearch]
   );
 
   const clear = useCallback(() => {
