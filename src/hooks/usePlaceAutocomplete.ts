@@ -8,7 +8,7 @@ export interface PlaceResult {
   secondary_text: string;
   lat?: number;
   lng?: number;
-  source: "google" | "textsearch" | "geocoding" | "nominatim" | "saved";
+  source: "google" | "textsearch" | "photon" | "nominatim" | "saved";
 }
 
 interface UsePlaceAutocompleteOptions {
@@ -17,8 +17,6 @@ interface UsePlaceAutocompleteOptions {
   debounceMs?: number;
   country?: string;
 }
-
-
 
 export function usePlaceAutocomplete({
   origin,
@@ -29,45 +27,40 @@ export function usePlaceAutocomplete({
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [ready, setReady] = useState(false);
-  const [apiStatus, setApiStatus] = useState<string | null>(null); // diagnostic message
+  const [apiStatus, setApiStatus] = useState<string | null>(null);
 
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
-  const geocoderService = useRef<google.maps.Geocoder | null>(null);
   const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const placesDiv = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController | null>(null);
   const searchIdRef = useRef(0);
   const coordCache = useRef<Map<string, { lat: number; lng: number }>>(new Map());
-  const googleAvailableRef = useRef(true); // track if Google Places works
+  const googleAvailableRef = useRef(true);
 
-  // Init Google Places + test availability
   useEffect(() => {
     loadGoogleMapsAPI()
       .then(() => {
         autocompleteService.current = new google.maps.places.AutocompleteService();
         if (!placesDiv.current) placesDiv.current = document.createElement("div");
         placesService.current = new google.maps.places.PlacesService(placesDiv.current);
-        geocoderService.current = new google.maps.Geocoder();
         sessionToken.current = new google.maps.places.AutocompleteSessionToken();
         setReady(true);
 
-        // Test query to detect REQUEST_DENIED early
         autocompleteService.current.getPlacePredictions(
           { input: "test", sessionToken: sessionToken.current!, componentRestrictions: { country } },
           (_predictions, status) => {
             if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
               googleAvailableRef.current = false;
               setApiStatus("Google Places API unavailable — using fallback search");
-              console.warn("[PlaceAutocomplete] Google Places REQUEST_DENIED — API key may not have Places API enabled or billing active");
+              console.warn("[PlaceAutocomplete] Google Places REQUEST_DENIED");
             } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
               setApiStatus("Search limit reached, try again shortly");
             } else {
               googleAvailableRef.current = true;
               setApiStatus(null);
             }
-            // Refresh token after test query
             sessionToken.current = new google.maps.places.AutocompleteSessionToken();
           }
         );
@@ -143,108 +136,120 @@ export function usePlaceAutocomplete({
     [origin, country]
   );
 
-  /** Tier 2: Google Places Text Search (finds building names, landmarks, residential complexes) */
-  const textSearch = useCallback(
-    (query: string, searchId: number): Promise<PlaceResult[]> => {
-      if (!placesService.current) return Promise.resolve([]);
+  /** Tier 2: Google Places New API (searchByText) — modern Promise-based, no callback hang */
+  const newPlacesSearch = useCallback(
+    async (query: string, searchId: number): Promise<PlaceResult[]> => {
+      try {
+        // Check if the new Places API is available
+        const PlaceClass = (google?.maps?.places as any)?.Place;
+        if (!PlaceClass?.searchByText) {
+          console.log(`[PlaceSearch] Tier 2 (Places New) — API not available, skipping`);
+          return [];
+        }
 
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          console.log(`[PlaceSearch] Tier 2 (TextSearch) "${query}" → timeout (8s)`);
-          resolve([]);
-        }, 8000);
-
-        const request: google.maps.places.TextSearchRequest = {
-          query,
-          ...(origin && {
-            location: new google.maps.LatLng(origin.lat, origin.lng),
-            radius: 50000,
-          }),
+        const request: any = {
+          textQuery: query,
+          fields: ["displayName", "location", "formattedAddress", "id"],
+          maxResultCount: 6,
+          region: country,
         };
 
-        try {
-          placesService.current!.textSearch(request, (results, status) => {
-            clearTimeout(timeout);
-            if (searchId !== searchIdRef.current) { resolve([]); return; }
-
-            if (status === google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
-              console.warn(`[PlaceSearch] Tier 2 (TextSearch) REQUEST_DENIED`);
-              resolve([]);
-              return;
-            }
-
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-              const mapped = results.slice(0, 6).map((r) => ({
-                place_id: r.place_id || `ts_${Math.random()}`,
-                description: r.formatted_address || r.name || query,
-                main_text: r.name || r.formatted_address?.split(",")[0] || query,
-                secondary_text: r.formatted_address?.split(",").slice(1, 3).join(",").trim() || "",
-                lat: r.geometry?.location?.lat(),
-                lng: r.geometry?.location?.lng(),
-                source: "textsearch" as const,
-              }));
-              console.log(`[PlaceSearch] Tier 2 (TextSearch) "${query}" → ${mapped.length} results`);
-              resolve(mapped);
-            } else {
-              console.log(`[PlaceSearch] Tier 2 (TextSearch) "${query}" → 0 results (status: ${status})`);
-              resolve([]);
-            }
-          });
-        } catch {
-          clearTimeout(timeout);
-          resolve([]);
+        if (origin) {
+          request.locationBias = {
+            center: { lat: origin.lat, lng: origin.lng },
+            radius: 50000,
+          };
         }
-      });
+
+        const response = await Promise.race([
+          PlaceClass.searchByText(request),
+          new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+        ]);
+
+        if (searchId !== searchIdRef.current) return [];
+        if (!response || !(response as any).places?.length) {
+          console.log(`[PlaceSearch] Tier 2 (Places New) "${query}" → 0 results`);
+          return [];
+        }
+
+        const places = (response as any).places;
+        const mapped: PlaceResult[] = places.slice(0, 6).map((p: any) => ({
+          place_id: p.id || `newp_${Math.random()}`,
+          description: p.formattedAddress || p.displayName || query,
+          main_text: p.displayName || p.formattedAddress?.split(",")[0] || query,
+          secondary_text: p.formattedAddress?.split(",").slice(1, 3).join(",").trim() || "",
+          lat: p.location?.lat?.() ?? p.location?.lat,
+          lng: p.location?.lng?.() ?? p.location?.lng,
+          source: "textsearch" as const,
+        }));
+        console.log(`[PlaceSearch] Tier 2 (Places New) "${query}" → ${mapped.length} results`);
+        return mapped;
+      } catch (e: any) {
+        if (e?.message === "timeout") {
+          console.log(`[PlaceSearch] Tier 2 (Places New) "${query}" → timeout (8s)`);
+        } else {
+          console.log(`[PlaceSearch] Tier 2 (Places New) "${query}" → error: ${e?.message || e}`);
+        }
+        return [];
+      }
+    },
+    [origin, country]
+  );
+
+  /** Tier 3: Photon geocoder (by Komoot) — free, better POI coverage */
+  const photonSearch = useCallback(
+    async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          lang: "en",
+          limit: "6",
+        });
+        if (origin) {
+          params.set("lat", String(origin.lat));
+          params.set("lon", String(origin.lng));
+        }
+
+        const res = await fetch(`https://photon.komoot.io/api/?${params}`, {
+          signal,
+          headers: { "User-Agent": "CheckiN-App/1.0" },
+        });
+        const data = await res.json();
+
+        if (!data?.features?.length) {
+          console.log(`[PlaceSearch] Tier 3 (Photon) "${query}" → 0 results`);
+          return [];
+        }
+
+        const mapped: PlaceResult[] = data.features.slice(0, 6).map((f: any) => {
+          const props = f.properties || {};
+          const nameParts = [props.name, props.street, props.city, props.state].filter(Boolean);
+          const mainText = props.name || props.street || query;
+          const secondaryText = [props.city, props.state, props.country].filter(Boolean).join(", ");
+
+          return {
+            place_id: `photon_${props.osm_id || Math.random()}`,
+            description: nameParts.join(", "),
+            main_text: mainText,
+            secondary_text: secondaryText,
+            lat: f.geometry?.coordinates?.[1],
+            lng: f.geometry?.coordinates?.[0],
+            source: "photon" as const,
+          };
+        });
+
+        console.log(`[PlaceSearch] Tier 3 (Photon) "${query}" → ${mapped.length} results`);
+        return mapped;
+      } catch (e: any) {
+        if (e?.name === "AbortError") throw e;
+        console.log(`[PlaceSearch] Tier 3 (Photon) "${query}" → error: ${e?.message || e}`);
+        return [];
+      }
     },
     [origin]
   );
 
-  /** Tier 3: Google Geocoding via JS SDK (no separate API key needed) */
-  const geocodingSearch = useCallback(
-    (query: string, searchId: number): Promise<PlaceResult[]> => {
-      if (!geocoderService.current) return Promise.resolve([]);
-
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → timeout`);
-          resolve([]);
-        }, 6000);
-
-        try {
-          geocoderService.current!.geocode(
-            { address: query, region: country },
-            (results, status) => {
-              clearTimeout(timeout);
-              if (searchId !== searchIdRef.current) { resolve([]); return; }
-
-              if (status === google.maps.GeocoderStatus.OK && results?.length) {
-                const mapped = results.slice(0, 5).map((r) => ({
-                  place_id: r.place_id,
-                  description: r.formatted_address,
-                  main_text: r.formatted_address.split(",")[0],
-                  secondary_text: r.formatted_address.split(",").slice(1, 3).join(",").trim(),
-                  lat: r.geometry.location.lat(),
-                  lng: r.geometry.location.lng(),
-                  source: "geocoding" as const,
-                }));
-                console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → ${mapped.length} results`);
-                resolve(mapped);
-              } else {
-                console.log(`[PlaceSearch] Tier 3 (Geocoder SDK) "${query}" → 0 results (status: ${status})`);
-                resolve([]);
-              }
-            }
-          );
-        } catch {
-          clearTimeout(timeout);
-          resolve([]);
-        }
-      });
-    },
-    [country]
-  );
-
-  /** Tier 4: Nominatim with city-context retry */
+  /** Tier 4: Nominatim with India context + city-context retry */
   const nominatimSearch = useCallback(
     async (query: string, signal: AbortSignal): Promise<PlaceResult[]> => {
       const doSearch = async (q: string): Promise<any[]> => {
@@ -267,9 +272,16 @@ export function usePlaceAutocomplete({
         return res.json();
       };
 
-      let data = await doSearch(query);
+      // Always try with "India" context first
+      const queryWithContext = query.toLowerCase().includes("india") ? query : `${query} India`;
+      let data = await doSearch(queryWithContext);
 
-      // If no results, retry with city context from reverse geocoding
+      // If contextualized query failed, try original
+      if (!data.length && queryWithContext !== query) {
+        data = await doSearch(query);
+      }
+
+      // If still no results, retry with city context from reverse geocoding
       if (!data.length && origin) {
         try {
           const revRes = await fetch(
@@ -320,7 +332,7 @@ export function usePlaceAutocomplete({
     [origin, country]
   );
 
-  /** Main search — 3-tier fallback */
+  /** Main search — 4-tier fallback */
   const search = useCallback(
     (query: string) => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -340,20 +352,19 @@ export function usePlaceAutocomplete({
         abortRef.current = controller;
 
         try {
-          // Phase 1: Tier 1 + Tier 2 in parallel
-          const [googleResults, textResults] = await Promise.all([
+          // Phase 1: Tier 1 (Autocomplete) + Tier 2 (Places New API) in parallel
+          const [googleResults, newPlacesResults] = await Promise.all([
             googleSearch(query, searchId),
-            textSearch(query, searchId),
+            newPlacesSearch(query, searchId),
           ]);
           if (searchId !== searchIdRef.current) return;
 
-          // Merge: Autocomplete first, then unique Text Search results
           const seenDescriptions = new Set(googleResults.map(r => r.description));
-          const uniqueTextResults = textResults.filter(r => !seenDescriptions.has(r.description));
-          const mergedResults = [...googleResults, ...uniqueTextResults].slice(0, 8);
+          const uniqueNewResults = newPlacesResults.filter(r => !seenDescriptions.has(r.description));
+          const mergedResults = [...googleResults, ...uniqueNewResults].slice(0, 8);
 
           if (mergedResults.length > 0) {
-            console.log(`[PlaceSearch] Phase 1 merged: ${googleResults.length} autocomplete + ${uniqueTextResults.length} textsearch`);
+            console.log(`[PlaceSearch] Phase 1 merged: ${googleResults.length} autocomplete + ${uniqueNewResults.length} new places`);
             setResults(mergedResults);
             setSearching(false);
             return;
@@ -361,18 +372,18 @@ export function usePlaceAutocomplete({
 
           if (controller.signal.aborted) return;
 
-          // Tier 3: Google Geocoder JS SDK
-          const geoResults = await geocodingSearch(query, searchId);
+          // Tier 3: Photon geocoder
+          const photonResults = await photonSearch(query, controller.signal);
           if (searchId !== searchIdRef.current) return;
-          if (geoResults.length > 0) {
-            setResults(geoResults);
+          if (photonResults.length > 0) {
+            setResults(photonResults);
             setSearching(false);
             return;
           }
 
           if (controller.signal.aborted) return;
 
-          // Tier 4: Nominatim with city-context retry
+          // Tier 4: Nominatim with India context + city retry
           const nomResults = await nominatimSearch(query, controller.signal);
           if (searchId !== searchIdRef.current) return;
           console.log(`[PlaceSearch] Tier 4 (Nominatim) "${query}" → ${nomResults.length} results`);
@@ -387,7 +398,7 @@ export function usePlaceAutocomplete({
         }
       }, debounceMs);
     },
-    [minChars, debounceMs, googleSearch, textSearch, geocodingSearch, nominatimSearch]
+    [minChars, debounceMs, googleSearch, newPlacesSearch, photonSearch, nominatimSearch]
   );
 
   const clear = useCallback(() => {
