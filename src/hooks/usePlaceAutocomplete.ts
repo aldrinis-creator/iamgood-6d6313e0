@@ -107,6 +107,7 @@ export function usePlaceAutocomplete({
                   }))
                 );
               } else {
+                console.warn("[PlaceAutocomplete] Google status:", status);
                 resolve([]);
               }
             }
