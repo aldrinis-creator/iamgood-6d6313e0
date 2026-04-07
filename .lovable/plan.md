@@ -1,32 +1,29 @@
 
 
-## Recommendation: Keep Current Custom Implementation
+## Fix "Runwal Elina" Not Found
 
-### Why NOT to adopt `use-places-autocomplete`
+### Root Cause
 
-The `use-places-autocomplete` npm package is essentially a wrapper around the **same Google Places Autocomplete API** already used in your Tier 1. It would **not** fix the "Runwal Elina" problem — that query fails at the Autocomplete level regardless of wrapper.
+The 4-tier chain runs **sequentially** — each tier waits for the previous one to complete and return zero results before trying the next. With the 180ms debounce plus network latency, typing additional characters can abort the entire chain before Tier 2 (Text Search) even executes. Additionally, appending `" India"` to the Text Search query may dilute results for specific building names.
 
-Your current custom `usePlaceAutocomplete` hook is **more capable** because it has a 4-tier fallback chain:
+### Fix
+
+**File: `src/hooks/usePlaceAutocomplete.ts`**
+
+1. **Run Tier 1 + Tier 2 in parallel** — Fire both Google Autocomplete and Text Search simultaneously. Merge results, preferring Autocomplete when it returns hits. This ensures Text Search always gets a chance to run, even for queries where Autocomplete returns ZERO_RESULTS.
+
+2. **Remove `" India"` suffix from Text Search query** — Use location bias (origin lat/lng + radius) instead. Appending "India" can cause Google to miss specific building names like "Runwal Elina".
+
+3. **Only fall to Tier 3/4 if both Tier 1+2 returned nothing** — Keep Geocoding and Nominatim as sequential fallbacks.
+
+### Code Change Summary
 
 ```text
-Tier 1: Google Autocomplete  ← same as what the npm package does
-Tier 2: Google Text Search    ← finds buildings/landmarks by name
-Tier 3: Google Geocoding      ← address-based lookup
-Tier 4: Nominatim (OSM)       ← free fallback
+BEFORE:  Tier 1 → wait → Tier 2 → wait → Tier 3 → wait → Tier 4
+AFTER:   [Tier 1 + Tier 2] parallel → wait → Tier 3 → wait → Tier 4
 ```
 
-Adopting the npm package would mean losing Tiers 2–4 and going backward.
-
-### What I Suggest Instead
-
-The real question is: **does "Runwal Elina" work now with the Text Search tier we just added?** That's what needs testing. If it still fails, the issue is likely:
-
-1. **CORS blocking** the Text Search JS SDK call (unlikely since it uses the loaded SDK, not REST)
-2. The Places API key doesn't have the **Places API (New)** or **Places API** enabled for Text Search specifically
-
-### Recommended Next Step
-
-Test the search in the live preview for "Runwal Elina" and check the browser console for `[PlaceSearch]` logs. The logs will show exactly which tier was attempted and what status was returned — that tells us precisely what to fix next.
-
-No code changes needed right now.
+- In `textSearch`: change `query + " India"` → just `query`
+- In `search`: replace sequential Tier 1 then Tier 2 with `Promise.all([googleSearch, textSearch])`, then merge/deduplicate results (Autocomplete results first, then Text Search results not already present)
+- Keep Tier 3 (Geocoding) and Tier 4 (Nominatim) as sequential fallbacks only when parallel tiers return nothing
 
