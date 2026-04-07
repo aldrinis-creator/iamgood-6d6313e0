@@ -78,10 +78,8 @@ export function usePlaceAutocomplete({
           sessionToken: sessionToken.current!,
           componentRestrictions: { country },
           ...(origin && {
-            locationBias: {
-              center: { lat: origin.lat, lng: origin.lng },
-              radius: 50000,
-            } as any,
+            location: new google.maps.LatLng(origin.lat, origin.lng),
+            radius: 50000,
           }),
         };
 
@@ -109,6 +107,7 @@ export function usePlaceAutocomplete({
                   }))
                 );
               } else {
+                console.warn("[PlaceAutocomplete] Google status:", status);
                 resolve([]);
               }
             }
