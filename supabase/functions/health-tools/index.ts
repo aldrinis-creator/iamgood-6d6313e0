@@ -109,6 +109,17 @@ Respond with a JSON object:
 Only respond with the JSON object, no markdown.`,
 };
 
+const taskConfig: Record<string, { model: string; effort?: string }> = {
+  symptom_check:     { model: "google/gemini-3.1-pro-preview", effort: "high" },
+  vitals_insights:   { model: "google/gemini-3.1-pro-preview", effort: "high" },
+  doctor_report:     { model: "google/gemini-3.1-pro-preview", effort: "medium" },
+  document_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
+  medication_info:   { model: "google/gemini-3-flash-preview", effort: "medium" },
+  prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
+  banned_check:      { model: "google/gemini-2.5-flash-lite",  effort: "low" },
+  face_analysis:     { model: "google/gemini-2.5-flash",       effort: "low" },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -127,14 +138,13 @@ serve(async (req) => {
       });
     }
 
-    // Build messages array - handle image payloads for vision
+    const config = taskConfig[type] || { model: "google/gemini-3-flash-preview" };
+    let model = config.model;
     let messages: any[];
-    let model = "google/gemini-3-flash-preview";
 
     if (typeof payload === "object" && payload?.image) {
-      // Vision mode: use multimodal model with image
+      // Vision mode: always use gemini-2.5-flash for multimodal
       model = "google/gemini-2.5-flash";
-      const imageDataUrl = payload.image as string;
 
       let visionPrompt = "Please read and analyze this image.";
       if (type === "prescription_scan") {
@@ -150,24 +160,26 @@ serve(async (req) => {
           role: "user",
           content: [
             { type: "text", text: visionPrompt },
-            { type: "image_url", image_url: { url: imageDataUrl } },
+            { type: "image_url", image_url: { url: payload.image as string } },
           ],
         },
       ];
     } else {
-      // Text mode
       const MAX_PAYLOAD_CHARS = 20000;
       let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
-
       if (userMessage.length > MAX_PAYLOAD_CHARS) {
         userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";
         console.log(`Payload truncated to ${MAX_PAYLOAD_CHARS} chars`);
       }
-
       messages = [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ];
+    }
+
+    const requestBody: any = { model, messages };
+    if (config.effort) {
+      requestBody.reasoning = { effort: config.effort };
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -176,7 +188,7 @@ serve(async (req) => {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model, messages }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
