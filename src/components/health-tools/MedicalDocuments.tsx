@@ -33,7 +33,7 @@ const MedicalDocuments = () => {
   const [title, setTitle] = useState("");
   const [recordType, setRecordType] = useState("Lab Report");
   const [file, setFile] = useState<File | null>(null);
-
+  const [deleteTarget, setDeleteTarget] = useState<MedicalRecord | null>(null);
   const fetchRecords = useCallback(async () => {
     if (!session?.user?.id) return;
     const { data } = await supabase
