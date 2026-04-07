@@ -2,7 +2,7 @@
 
 let loadPromise: Promise<void> | null = null;
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyDCeS7oubdcbYDt46e1vXeP3vrfLJGaOCw";
+const GOOGLE_MAPS_API_KEY = "AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU";
 
 export function loadGoogleMapsAPI(): Promise<void> {
   if (loadPromise) return loadPromise;
