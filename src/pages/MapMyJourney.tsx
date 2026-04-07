@@ -92,10 +92,12 @@ const MapMyJourney = () => {
   const [eta, setEta] = useState<number | null>(null);
   const [originPos, setOriginPos] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
