@@ -146,7 +146,7 @@ export function usePlaceAutocomplete({
       try {
         const params = new URLSearchParams({
           address: query,
-          key: GOOGLE_MAPS_API_KEY,
+          key: GOOGLE_GEOCODING_API_KEY,
           region: country,
           language: "en",
         });
