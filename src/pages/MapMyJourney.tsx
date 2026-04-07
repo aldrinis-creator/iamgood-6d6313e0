@@ -577,7 +577,7 @@ const MapMyJourney = () => {
                         }}
                         className={pendingHomeWork ? "ring-2 ring-primary" : ""}
                       />
-                      {destination && (
+                      {destination && !searching && (
                         <button
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           onMouseDown={(e) => {
@@ -588,13 +588,22 @@ const MapMyJourney = () => {
                             setRouteCoords([]);
                             setEta(null);
                             setPendingHomeWork(null);
+                            if (abortRef.current) abortRef.current.abort();
                           }}
                         >
                           <X className="w-4 h-4" />
                         </button>
                       )}
+                      {searching && (
+                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
                     </div>
                     {/* Search results dropdown */}
+                    {inputFocused && destination.length > 0 && !searching && searchResults.length === 0 && !selectedDest && (
+                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg px-3 py-2.5">
+                        <p className="text-xs text-muted-foreground">No results found. Try a different search.</p>
+                      </div>
+                    )}
                     {searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {searchResults.map((r, i) => (
