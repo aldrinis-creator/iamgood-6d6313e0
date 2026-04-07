@@ -1,16 +1,13 @@
 
 
-## Fix Text Wrapping in Appointment Cards
+## Add Delete Confirmation Dialog to Medication List
 
-Several text elements in the appointment cards lack wrapping constraints, causing long titles, descriptions, and location text to overflow on narrow screens.
+### Change — `src/components/medications/MedicationList.tsx`
 
-### Changes — `src/pages/Appointments.tsx`
+1. Import `AlertDialog` components from `@/components/ui/alert-dialog`
+2. Add `deleteTarget` state (`Medication | null`) to track which medication is queued for deletion
+3. Change the trash button's `onClick` from calling `handleDelete(med.id)` directly to `setDeleteTarget(med)`
+4. Add an `AlertDialog` at the bottom of the component that shows the medication name and asks for confirmation before executing the delete
 
-1. **Title** (line 113): Add `break-words` to `<h3>` so long appointment titles wrap instead of overflowing
-2. **Description** (line 139): Add `break-words` to the description `<p>`
-3. **Location** (line 143): Add `break-words` to the location `<p>`
-4. **Date/time line** (line 129): Add `flex-wrap` so the start/end date text wraps on small cards
-5. **Card container**: Add `overflow-hidden` and `min-w-0` to the Card to enforce text containment
-
-These are all single-class additions — no structural changes needed.
+Same pattern already used in Appointments and Medical Documents.
 
