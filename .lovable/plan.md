@@ -1,122 +1,70 @@
 
 
-## MMJ Improvements: Google Maps, Deferred Map, Overlay Pop-ups, and Journey Reports
+## Fix MMJ Destination Search: Wrong Results & No Location Bias
 
-### Overview
-Four changes to Map My Journey across both user and guardian apps.
+### Root Cause Found
 
----
+The destination search returns locations outside the user's city because **the location bias is not working**. Here's why:
 
-### 1. Guardian App: Use Google Maps for MMJ Tracker
+The `AutocompleteService.getPlacePredictions()` in the legacy Google Maps JavaScript API uses `location` + `radius` properties — **not** `locationBias`. The current code passes `locationBias`, which is silently ignored by the API. This means every search runs with **no geographic bias at all**, returning results from anywhere in India.
 
-**Current**: `GuardianJourneyTracker.tsx` already uses Google raster tiles (`mt1.google.com/vt/lyrs=m`) via Leaflet — this is already Google Maps tiles.
+```text
+Current (broken):
+  locationBias: { center: {lat, lng}, radius: 50000 }   ← ignored by legacy API
 
-**Change**: No change needed for map tiles. The guardian tracker already renders Google Maps.
-
----
-
-### 2. User App: Show Map Only After Destination Selected
-
-**Current**: `MapMyJourney.tsx` lines 607-624 always render the map preview when `originPos` is available, even before a destination is chosen.
-
-**Change**: Wrap the map preview block so it only renders when `selectedDest` is truthy (destination has been selected and route fetched).
-
-| File | Change |
-|------|--------|
-| `src/pages/MapMyJourney.tsx` | Change line 607 condition from `{originPos && (` to `{originPos && selectedDest && routeCoords.length > 0 && (` |
-
----
-
-### 3. Pop-ups Display Over Map / Current View
-
-**Current**: `JourneyCheckInPopup` uses Radix `Dialog` which renders in a portal with an overlay — this already appears over the map. However, other alerts (arriving soon, route deviation) are inline badges, not actionable pop-ups.
-
-**Changes**:
-- The journey check-in popup already overlays the map correctly via `Dialog`. No change needed there.
-- Add a new **alert overlay** component for route deviation and arriving-soon alerts that renders as a fixed overlay (similar to `ReminderOverlay`) with an action button (e.g., "OK" / "Acknowledged") that dismisses the alert.
-- Wire `useJourneyTracker` to emit these alerts as state, and render the overlay in `MapMyJourney.tsx` on top of the map.
-
-| File | Change |
-|------|--------|
-| `src/components/JourneyAlertOverlay.tsx` | New component: fixed overlay with alert message + dismiss button |
-| `src/pages/MapMyJourney.tsx` | Render `JourneyAlertOverlay` for arrivingSoon / routeDeviation with dismiss callbacks |
-| `src/hooks/useJourneyTracker.ts` | Add `arrivingSoonDismissed` and `routeDeviationDismissed` state so alerts show once and can be dismissed |
-
----
-
-### 4. Journey Completion Report
-
-When a journey ends (manual or auto), generate a summary report with:
-- Date/time stamp (start and end)
-- Total distance traveled (sum of haversine segments between GPS updates)
-- Total journey time
-- Break duration (gaps > 2 min between consecutive GPS updates where distance < 20m)
-- Route deviation events (count, max deviation in meters — from notifications or tracked state)
-
-**Storage**: Add a `journey_reports` table to persist the report data so both user and guardian can view it.
-
-**User view**: Show past journey reports in a new section on the MMJ page (below the setup form when no active journey).
-
-**Guardian view**: Add a "Journeys" tab/section to `GuardianReports.tsx` showing completed journey reports for the selected ward.
-
-#### Database Migration
-
-```sql
-CREATE TABLE public.journey_reports (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  journey_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  started_at timestamptz NOT NULL,
-  ended_at timestamptz NOT NULL,
-  origin_name text,
-  destination_name text NOT NULL,
-  transport_mode text,
-  total_distance_m numeric NOT NULL DEFAULT 0,
-  total_duration_min numeric NOT NULL DEFAULT 0,
-  break_duration_min numeric NOT NULL DEFAULT 0,
-  deviation_count integer NOT NULL DEFAULT 0,
-  max_deviation_m numeric NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.journey_reports ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can select own journey_reports" ON public.journey_reports
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own journey_reports" ON public.journey_reports
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Guardians can view ward journey_reports" ON public.journey_reports
-  FOR SELECT TO authenticated USING (
-    EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = journey_reports.user_id)
-  );
+Correct:
+  location: new google.maps.LatLng(lat, lng)             ← proper bias point
+  radius: 50000                                           ← meters
 ```
 
-#### Report Generation
+### Do You Need a Paid Google Maps API?
+
+**No paid upgrade is needed.** The free tier of Google Maps Platform includes Places Autocomplete. However:
+- The API key must have **Places API** enabled in Google Cloud Console
+- The project must have **billing enabled** (Google requires a billing account even for the free $200/month credit)
+- Without billing, the API silently fails or returns empty results, causing the fallback to Nominatim (which has poor ranking)
+
+The API key in the code (`AIzaSyDCeS7...`) may already work — the fix below will make location bias actually take effect, which should dramatically improve result relevance.
+
+### Plan
+
+#### 1. Fix location bias in `usePlaceAutocomplete.ts`
+
+Replace the incorrect `locationBias` property with the correct `location` + `radius` properties that the legacy `AutocompleteService` actually reads:
+
+```typescript
+const request: google.maps.places.AutocompletionRequest = {
+  input: query,
+  sessionToken: sessionToken.current!,
+  componentRestrictions: { country },
+  ...(origin && {
+    location: new google.maps.LatLng(origin.lat, origin.lng),
+    radius: 50000,
+  }),
+};
+```
+
+#### 2. Add error logging to diagnose API key issues
+
+Add a `console.warn` when Google returns a non-OK status so we can see if the API key is actually failing (e.g., `REQUEST_DENIED` means billing/API not enabled):
+
+```typescript
+if (status !== google.maps.places.PlacesServiceStatus.OK) {
+  console.warn("[PlaceAutocomplete] Google status:", status);
+}
+```
+
+#### 3. Add `strictBounds` option for tighter local results
+
+When the user has a known origin, pass `strictBounds: false` explicitly (default) but add the option so it can be toggled to `true` if users want only nearby results. This keeps far-away results deprioritized but not excluded.
+
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useJourneyTracker.ts` | In `endJourney()`, compute report metrics from `updates` array (distance, breaks, deviations) and insert into `journey_reports`. Track deviation count/max during journey. |
-| `src/pages/MapMyJourney.tsx` | When no active journey, fetch and display past `journey_reports` as a list of cards with date, distance, time, breaks, deviations. |
-| `src/pages/GuardianReports.tsx` | Add a "journeys" section to the report tabs. Fetch `journey_reports` for the selected ward and display them similarly. |
+| `src/hooks/usePlaceAutocomplete.ts` | Fix `locationBias` → `location` + `radius`; add status logging |
 
-#### Report Card UI (shared between user and guardian)
+### Expected Result
 
-| File | Change |
-|------|--------|
-| `src/components/JourneyReportCard.tsx` | New component displaying a single journey report: date/time, distance, duration, break time, deviation info. Reusable in both MMJ and Guardian Reports. |
-
----
-
-### Files Changed Summary
-
-| File | Action |
-|------|--------|
-| `src/pages/MapMyJourney.tsx` | Defer map until destination selected; add alert overlay; add journey history section |
-| `src/hooks/useJourneyTracker.ts` | Track deviation metrics; generate report on journey end; add alert dismiss state |
-| `src/components/JourneyAlertOverlay.tsx` | New: fixed overlay for journey alerts with dismiss |
-| `src/components/JourneyReportCard.tsx` | New: reusable journey report card |
-| `src/pages/GuardianReports.tsx` | Add "Journeys" tab with journey report cards |
-| Database migration | New `journey_reports` table with RLS |
+After this fix, typing "Fortis" while in Mumbai will show Fortis hospitals in Mumbai first (not Delhi or Chennai). The location bias will actually work, making results feel local and relevant like Uber's search.
 
