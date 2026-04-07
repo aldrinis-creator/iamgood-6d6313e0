@@ -1,44 +1,53 @@
 
 
-## Add "Save to Vault" for All Health Tool Reports
+## Fix "Runwal Elina" Search — Revised Approach
 
-### What Changes
+### Problem
+The Google API key (`AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU`) only has the **Places Autocomplete** API enabled. TextSearch and Geocoding APIs are not enabled, causing their callbacks to silently hang (timeout). Nominatim doesn't index "Runwal Elina" either.
 
-Add a "Save to Vault" button to every Health Tool that generates an AI report. After saving, show a toast: *"Your Report is saved in the Vault in Reports in the [Tool Name] tab"*. Also add `ReportShareButtons` (Print/WhatsApp/Email) where missing.
+### Root Cause Summary
 
-### Components to Update
+| Tier | Result | Why |
+|------|--------|-----|
+| Tier 1 (Autocomplete) | 0 results | Google doesn't index "Runwal Elina" in autocomplete |
+| Tier 2 (TextSearch) | Timeout 8s | API not enabled on key — callback never fires |
+| Tier 3 (Geocoder SDK) | Timeout 6s | API not enabled on key — callback never fires |
+| Tier 4 (Nominatim) | 0 results | OSM doesn't have this building indexed |
 
-**1. `src/components/health-tools/DoctorVisitReport.tsx`**
-- Add a "Save to Vault" button below the report (same pattern as DocumentAnalyzer)
-- Save to `medical_records` with `record_type: "Doctor's Diagnosis"`, title including date
-- Add `ReportShareButtons` (already present ✅)
-- Toast: "Your Report is saved in the Vault in Reports in the Doctor Visit Report tab"
+### Solution
 
-**2. `src/components/health-tools/SymptomChecker.tsx`**
-- Add a "Save to Vault" button that appears once there's at least one assistant response
-- Concatenate the full chat history into a markdown string for saving
-- Save to `medical_records` with `record_type: "AI Analysis"`, title: "Symptom Check — [date]"
-- Add `ReportShareButtons` for the conversation
-- Toast: "Your Report is saved in the Vault in Reports in the Symptom Checker tab"
+Since TextSearch and Geocoding APIs are not enabled on the key and cannot be fixed from code, we need a different approach:
 
-**3. `src/components/health-tools/MedicationInfo.tsx`**
-- Add "Save to Vault" button when drug search `result` or `bannedResult` is present
-- Save to `medical_records` with `record_type: "AI Analysis"`, title: "Medication Info — [drug name] — [date]"
-- Add `ReportShareButtons` for each result
-- Toast: "Your Report is saved in the Vault in Reports in the Medication Info tab"
+**1. Use Google Places New API (`google.maps.places.Place.searchByText`)** — the console warns that `PlacesService` is legacy. The new `Place` class API may work with the existing key since it's part of the Places API (New), not a separate API. This is the modern replacement Google recommends.
 
-**4. `src/components/health-tools/DocumentAnalyzer.tsx`**
-- Update existing toast from "Saved to Medical Vault" to "Your Report is saved in the Vault in Reports in the Document Analyzer tab"
+**2. Improve Nominatim search** — append "India" to queries and also try searching with the user's detected city name upfront (not just as a retry).
 
-### Implementation Pattern (shared across all)
+**3. Add a 5th tier: Photon geocoder** — Photon (by Komoot) indexes more POI data than Nominatim and may have "Runwal Elina". It's free and doesn't require an API key.
 
-Each component gets:
-- `saving` and `saved` boolean state
-- `saveToVault` async function that inserts into `medical_records`
-- A button: Save icon → Spinner → Checkmark
-- `useAuth` import for `user.id`
-- Consistent toast message referencing the tool name
+### Changes — `src/hooks/usePlaceAutocomplete.ts`
 
-### No Database Changes Required
-The `medical_records` table already supports these inserts with existing RLS policies.
+1. **Replace Tier 2 (TextSearch)** with `google.maps.places.Place.searchByText()` — the new Places API. Uses `includedType`, returns a Promise (no callback hanging). Falls back gracefully if not available.
+
+2. **Replace Tier 3 (Geocoder SDK)** with **Photon geocoder** (`https://photon.komoot.io/api/?q=...&lang=en&limit=5`) — free, no API key, better POI coverage than Nominatim.
+
+3. **Enhance Tier 4 (Nominatim)** — always append country context ("India") to the initial search, not just on retry.
+
+4. **Remove dead code** — remove `geocoderService` ref and `geocodingSearch` callback since the Geocoding API doesn't work with this key.
+
+### Technical Detail
+
+```text
+BEFORE:
+  Tier 2: placesService.textSearch() → hangs forever (API not enabled)
+  Tier 3: geocoderService.geocode() → hangs forever (API not enabled)
+  Tier 4: Nominatim → 0 results for "Runwal Elina"
+
+AFTER:
+  Tier 2: google.maps.places.Place.searchByText() → new API, may work
+  Tier 3: Photon geocoder (photon.komoot.io) → better POI coverage
+  Tier 4: Nominatim with "Runwal Elina India" → better context
+```
+
+### Expected Outcome
+"Runwal Elina" should be found via either the new Places API (Tier 2) or Photon geocoder (Tier 3), both of which have better coverage for residential complexes in India.
 
