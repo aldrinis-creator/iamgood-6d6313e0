@@ -3,26 +3,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Pill, AlertTriangle, Loader2, Info } from "lucide-react";
+import { Search, AlertTriangle, Loader2, Info, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 const commonSearches = ["Paracetamol", "Metformin", "Amoxicillin", "Omeprazole", "Cetirizine", "Azithromycin"];
 
 const MedicationInfo = () => {
+  const { session } = useAuth();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState("");
   const [bannedResult, setBannedResult] = useState("");
   const [bannedQuery, setBannedQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [bannedLoading, setBannedLoading] = useState(false);
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [savedSearch, setSavedSearch] = useState(false);
+  const [savingBanned, setSavingBanned] = useState(false);
+  const [savedBanned, setSavedBanned] = useState(false);
 
   const searchMedication = async (name?: string) => {
     const q = name || query;
     if (!q.trim()) return;
     setLoading(true);
     setResult("");
+    setSavedSearch(false);
     try {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "medication_info", payload: q },
@@ -42,22 +50,15 @@ const MedicationInfo = () => {
     if (!q.trim()) return;
     setBannedLoading(true);
     setBannedResult("");
+    setSavedBanned(false);
     try {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "banned_check", payload: q },
       });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
-      // Parse the JSON response for banned check
       try {
         const parsed = JSON.parse(data.response);
-        const statusColors: Record<string, string> = {
-          banned: "text-destructive",
-          restricted: "text-orange-500",
-          warning: "text-yellow-600",
-          safe: "text-success",
-          unknown: "text-muted-foreground",
-        };
         setBannedResult(JSON.stringify(parsed));
       } catch {
         setBannedResult(data.response);
@@ -66,6 +67,53 @@ const MedicationInfo = () => {
       toast.error("Check failed");
     } finally {
       setBannedLoading(false);
+    }
+  };
+
+  const saveSearchToVault = async () => {
+    if (!session?.user?.id) { toast.error("Please log in to save"); return; }
+    setSavingSearch(true);
+    try {
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: `Medication Info — ${query} — ${new Date().toLocaleDateString("en-IN")}`,
+        record_type: "AI Analysis",
+        description: result.substring(0, 50000),
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSavedSearch(true);
+      toast.success("Your Report is saved in the Vault in Reports in the Medication Info tab");
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  const saveBannedToVault = async () => {
+    if (!session?.user?.id) { toast.error("Please log in to save"); return; }
+    setSavingBanned(true);
+    try {
+      let content = bannedResult;
+      try {
+        const parsed = JSON.parse(bannedResult);
+        content = `**Status:** ${parsed.status}\n\n${parsed.details}\n\n${parsed.alternatives?.length ? `**Alternatives:** ${parsed.alternatives.join(", ")}` : ""}`;
+      } catch { /* use raw */ }
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: `Banned Check — ${bannedQuery} — ${new Date().toLocaleDateString("en-IN")}`,
+        record_type: "AI Analysis",
+        description: content.substring(0, 50000),
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSavedBanned(true);
+      toast.success("Your Report is saved in the Vault in Reports in the Medication Info tab");
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSavingBanned(false);
     }
   };
 
@@ -101,6 +149,19 @@ const MedicationInfo = () => {
     }
   };
 
+  const SaveButton = ({ saving, saved, onClick }: { saving: boolean; saved: boolean; onClick: () => void }) => (
+    <Button
+      size="sm"
+      variant={saved ? "secondary" : "outline"}
+      className="w-full gap-1.5"
+      onClick={onClick}
+      disabled={saving || saved}
+    >
+      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+      {saving ? "Saving..." : saved ? "Saved to Vault" : "Save to Vault"}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
       <Card className="border-primary/20 bg-primary/5">
@@ -132,7 +193,16 @@ const MedicationInfo = () => {
             ))}
           </div>
           {result && (
-            <Card><CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown>{result}</ReactMarkdown></CardContent></Card>
+            <div className="space-y-2">
+              <Card><CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown>{result}</ReactMarkdown></CardContent></Card>
+              <ReportShareButtons
+                title="Medication Info Report"
+                subtitle={`Drug: ${query}`}
+                content={result}
+                category="Health Report"
+              />
+              <SaveButton saving={savingSearch} saved={savedSearch} onClick={saveSearchToVault} />
+            </div>
           )}
         </TabsContent>
 
@@ -150,6 +220,17 @@ const MedicationInfo = () => {
             ))}
           </div>
           {renderBannedResult()}
+          {bannedResult && (
+            <div className="space-y-2">
+              <ReportShareButtons
+                title="Banned Drug Check"
+                subtitle={`Drug: ${bannedQuery}`}
+                content={bannedResult}
+                category="Health Report"
+              />
+              <SaveButton saving={savingBanned} saved={savedBanned} onClick={saveBannedToVault} />
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

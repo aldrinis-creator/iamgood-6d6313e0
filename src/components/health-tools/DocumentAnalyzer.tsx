@@ -200,7 +200,7 @@ const DocumentAnalyzer = () => {
       });
       if (error) throw error;
       setSaved(true);
-      toast.success("Saved to Medical Vault");
+      toast.success("Your Report is saved in the Vault in Reports in the Document Analyzer tab");
     } catch (err: any) {
       console.error("Vault save error:", err);
       toast.error(`Failed to save: ${err?.message || "Unknown error"}`);

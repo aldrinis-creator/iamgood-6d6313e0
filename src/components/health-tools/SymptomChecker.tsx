@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Send, Loader2, Stethoscope, Bot, User } from "lucide-react";
+import { AlertTriangle, Send, Loader2, Stethoscope, Bot, User, Save, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import ReportShareButtons from "@/components/ReportShareButtons";
 
 interface Message {
   role: "user" | "assistant";
@@ -13,9 +15,12 @@ interface Message {
 }
 
 const SymptomChecker = () => {
+  const { session } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,6 +33,7 @@ const SymptomChecker = () => {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
+    setSaved(false);
 
     try {
       const history = [...messages, userMsg].map((m) => `${m.role}: ${m.content}`).join("\n");
@@ -41,6 +47,32 @@ const SymptomChecker = () => {
       toast.error("Failed to get response");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const chatAsMarkdown = () =>
+    messages.map((m) => `**${m.role === "user" ? "You" : "AI"}:** ${m.content}`).join("\n\n---\n\n");
+
+  const hasAssistantMessage = messages.some((m) => m.role === "assistant");
+
+  const saveToVault = async () => {
+    if (!session?.user?.id) { toast.error("Please log in to save"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("medical_records").insert({
+        user_id: session.user.id,
+        title: `Symptom Check — ${new Date().toLocaleDateString("en-IN")}`,
+        record_type: "AI Analysis",
+        description: chatAsMarkdown().substring(0, 50000),
+        record_date: new Date().toISOString().split("T")[0],
+      });
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Your Report is saved in the Vault in Reports in the Symptom Checker tab");
+    } catch (err: any) {
+      toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -120,6 +152,30 @@ const SymptomChecker = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Share & Save */}
+      {hasAssistantMessage && (
+        <Card>
+          <CardContent className="p-3 space-y-2">
+            <ReportShareButtons
+              title="Symptom Check Report"
+              subtitle="AI Symptom Assessment"
+              content={chatAsMarkdown()}
+              category="Health Report"
+            />
+            <Button
+              size="sm"
+              variant={saved ? "secondary" : "outline"}
+              className="w-full gap-1.5"
+              onClick={saveToVault}
+              disabled={saving || saved}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+              {saving ? "Saving..." : saved ? "Saved to Vault" : "Save to Vault"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <p className="text-xs text-muted-foreground text-center">
         ⚠️ This is not a medical diagnosis. Always consult a qualified healthcare professional.
