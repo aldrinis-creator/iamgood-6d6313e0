@@ -1,54 +1,65 @@
-## Auto-Update Stock on Medication Refill
+## Fix MMJ Destination Search — Locations Not Displaying
 
-### Current Behavior
+### Diagnosis
 
-When a refill order is confirmed and sent to the pharmacy, **no stock update happens**. The `confirmOrder` function only toggles a UI flag — it never writes to the `medications` table. This is intentional: the order is just a request sent via WhatsApp/PDF, not a delivery confirmation.
+The screenshot shows "No results found" for "Runwal Elina" — a real residential complex in Mumbai. This means **both** Google Places and Nominatim are failing:
 
-### Recommended Approach
+1. **Google Places API is likely returning `REQUEST_DENIED**` — the hardcoded API key (`AIzaSyDCeS7...`) almost certainly does not have the **Places API** enabled in Google Cloud Console, or billing is not active. The `getPlacePredictions` call silently returns zero results, and the existing `console.warn` only fires in the browser console (not visible to you in the screenshot).
+2. **Nominatim can't find "Runwal Elina"** because it's a residential complex not well-indexed in OpenStreetMap. Nominatim is a geocoder for addresses/POIs in OSM data — it misses many Indian residential complexes and commercial landmarks.
 
-Add a **"Mark as Received"** button that appears after the order has been sent. When tapped, it resets `remaining_quantity` to `total_quantity` for each ordered medication.
+### What will actually fix this
 
-Automatically updating stock at order time would be incorrect — the user hasn't received the medicines yet.
+The Google API key issue is the #1 blocker. But since we can't guarantee the user will fix their Google Cloud Console setup, we need a **robust multi-fallback** approach:
 
-### Changes
+#### 1. Add Google Geocoding API as a second fallback
 
-#### 1. Add "Received" action to `RefillOrder.tsx` and `WardRefillOrder.tsx`
+The Geocoding API (`/maps/api/geocode/json`) is a **different API** from Places Autocomplete and is sometimes enabled when Places is not. It also handles partial place names well. Add it as a fallback between Google Places and Nominatim.
 
-After the order is confirmed and sharing options are shown, add a prominent button: **"✓ Received — Update Stock" and allow User to update the stock levels with an edit button else let the current default stock level be updated when the button "Received - Update Stock" is tapped.**
+```text
+Search order:
+  Google Places Autocomplete → Google Geocoding API → Nominatim
+```
 
-When clicked:
+#### 2. Add visible diagnostic feedback
 
-- For each item in `orderItems`, update `medications` set `remaining_quantity = total_quantity` where `id = item.med.id`
-- Show a success toast
-- Reset the order state and reload medication data
+When Google returns a non-OK status, show it in the dropdown (not just console) so the problem is immediately clear:
 
-#### 2. Optional: partial quantity update
+- `REQUEST_DENIED` → show "Google Places unavailable — check API key"
+- `OVER_QUERY_LIMIT` → show "Search limit reached, try again shortly"
 
-Instead of resetting to `total_quantity`, show an input per medication so the user can enter the actual quantity received (pre-filled with `total_quantity`).
+This replaces the generic "No results found" with actionable info.
+
+#### 3. Improve Nominatim query for Indian landmarks
+
+Add a structured search variant: when the free-text search returns nothing, retry with `amenity` + city name appended (e.g., "Runwal Elina Mumbai") to improve hit rate for landmarks not well-tagged in OSM.
+
+#### 4. Surface Google API status on load
+
+When the Places service initializes, do a test query (e.g., empty `getPlacePredictions` with just the session token) to detect `REQUEST_DENIED` early and warn the user that search quality may be degraded.
 
 ### Files Changed
 
 
-| File                                         | Change                                                                                        |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `src/components/medications/RefillOrder.tsx` | Add "Mark as Received" button after order confirmed; update `remaining_quantity` via Supabase |
-| `src/components/WardRefillOrder.tsx`         | Same "Mark as Received" flow for guardian orders                                              |
+| File                                | Change                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/hooks/usePlaceAutocomplete.ts` | Add Google Geocoding fallback; improve Nominatim retry with city context; surface API status in results |
+| `src/pages/MapMyJourney.tsx`        | Show diagnostic message when Google API is denied; style degraded-search warning                        |
 
 
-### Technical Detail
+### Expected Result
 
-```typescript
-const markReceived = async () => {
-  for (const item of orderItems) {
-    await supabase.from("medications")
-      .update({ remaining_quantity: item.qty })
-      .eq("id", item.med.id);
-  }
-  toast.success("Stock updated!");
-  setOrderConfirmed(false);
-  setOrderItems([]);
-  load(); // refresh medication list
-};
-```
+- If Google Places API key works → fast, accurate Uber-like results
+- If Google Places fails but Geocoding works → still good results via geocoding
+- If both Google APIs fail → improved Nominatim with city-context retry
+- In all cases → clear feedback about what's happening instead of silent "No results"
 
-&nbsp;
+### Important Note for the User
+
+For best results, you should ensure your Google Cloud Console project has:
+
+1. **Places API** enabled
+2. **Geocoding API** enabled
+3. **Billing account** linked (required even for the free $200/month tier)
+
+Without these, Google search will always fall back to the lower-quality Nominatim engine.  
+  
