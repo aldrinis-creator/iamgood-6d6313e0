@@ -352,7 +352,7 @@ const MapMyJourney = () => {
                         setPendingHomeWork("home");
                         setDestination("");
                         setSelectedDest(null);
-                        setSearchResults([]);
+                        clearSearch();
                         setInputFocused(true);
                         setTimeout(() => inputRef.current?.focus(), 50);
                         toast.info("Search and select a place to set as Home");
@@ -376,7 +376,7 @@ const MapMyJourney = () => {
                         setPendingHomeWork("work");
                         setDestination("");
                         setSelectedDest(null);
-                        setSearchResults([]);
+                        clearSearch();
                         setInputFocused(true);
                         setTimeout(() => inputRef.current?.focus(), 50);
                         toast.info("Search and select a place to set as Work");
@@ -424,11 +424,10 @@ const MapMyJourney = () => {
                             e.preventDefault();
                             setDestination("");
                             setSelectedDest(null);
-                            setSearchResults([]);
+                            clearSearch();
                             setRouteCoords([]);
                             setEta(null);
                             setPendingHomeWork(null);
-                            if (abortRef.current) abortRef.current.abort();
                           }}
                         >
                           <X className="w-4 h-4" />
