@@ -471,6 +471,11 @@ const MapMyJourney = () => {
                     )}
                     {searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {searchResults.some(r => r.isFuzzy) && (
+                          <div className="px-3 py-1.5 bg-muted/50 border-b border-border">
+                            <p className="text-xs text-muted-foreground italic">No exact match found. Showing similar places nearby.</p>
+                          </div>
+                        )}
                         {searchResults.map((r, i) => (
                           <button
                             key={r.place_id || i}
