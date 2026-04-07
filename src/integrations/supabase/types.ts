@@ -205,6 +205,7 @@ export type Database = {
           responded_at: string | null
           response: string | null
           scheduled_at: string
+          sentiment_data: Json | null
           status: string
           user_id: string
         }
@@ -215,6 +216,7 @@ export type Database = {
           responded_at?: string | null
           response?: string | null
           scheduled_at: string
+          sentiment_data?: Json | null
           status?: string
           user_id: string
         }
@@ -225,6 +227,7 @@ export type Database = {
           responded_at?: string | null
           response?: string | null
           scheduled_at?: string
+          sentiment_data?: Json | null
           status?: string
           user_id?: string
         }

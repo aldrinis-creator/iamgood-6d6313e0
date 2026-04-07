@@ -107,6 +107,22 @@ Respond with a JSON object:
   "recommendations": ["list of actionable tips"]
 }
 Only respond with the JSON object, no markdown.`,
+
+  wellness_voice_checkin: `You are a compassionate wellness check-in assistant. Given a transcript of a user's spoken response about how they are feeling, analyze:
+1. Overall sentiment (positive, neutral, negative)
+2. Mood score (1-10, where 10 is excellent)
+3. Signs of confusion, distress, physical weakness, or disorientation
+4. Any health concerns mentioned
+
+Respond with a JSON object:
+{
+  "sentiment": "positive" | "neutral" | "negative",
+  "mood_score": 1-10,
+  "concerns": ["list of detected concerns, empty if none"],
+  "follow_up_needed": true/false,
+  "summary": "brief empathetic one-line summary"
+}
+Only respond with the JSON object, no markdown.`,
 };
 
 const taskConfig: Record<string, { model: string; effort?: string }> = {
@@ -116,8 +132,9 @@ const taskConfig: Record<string, { model: string; effort?: string }> = {
   document_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
   medication_info:   { model: "google/gemini-3-flash-preview", effort: "medium" },
   prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  banned_check:      { model: "google/gemini-2.5-flash-lite",  effort: "low" },
-  face_analysis:     { model: "google/gemini-2.5-flash",       effort: "low" },
+  banned_check:            { model: "google/gemini-2.5-flash-lite",  effort: "low" },
+  face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
+  wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
 };
 
 serve(async (req) => {

@@ -1,0 +1,1 @@
+ALTER TABLE public.check_ins ADD COLUMN IF NOT EXISTS sentiment_data jsonb DEFAULT NULL;
