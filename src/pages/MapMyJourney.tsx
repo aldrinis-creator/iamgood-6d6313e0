@@ -114,6 +114,18 @@ const MapMyJourney = () => {
     );
   }, []);
 
+  // Fetch journey reports when no active journey
+  useEffect(() => {
+    if (activeJourney || !session?.user?.id) return;
+    supabase
+      .from("journey_reports")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("ended_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => setJourneyReports(data || []));
+  }, [activeJourney, session?.user?.id]);
+
   // Fetch route from OSRM
   const fetchRoute = useCallback(async (origin: { lat: number; lng: number }, dest: { lat: number; lng: number }, mode: string) => {
     const osrmProfile = TRANSPORT_MODES.find((m) => m.value === mode)?.osrm || "driving";
@@ -610,8 +622,8 @@ const MapMyJourney = () => {
                   </Card>
                 )}
 
-                {/* Map Preview */}
-                {originPos && (
+                {/* Map Preview — only after destination selected */}
+                {originPos && selectedDest && routeCoords.length > 0 && (
                   <div className="rounded-lg overflow-hidden border border-border" style={{ height: 250 }}>
                     <MapContainer center={[originPos.lat, originPos.lng]} zoom={12} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                       <TileLayer
@@ -620,9 +632,7 @@ const MapMyJourney = () => {
                       />
                       <FitBounds bounds={mapBounds} />
                       <Marker position={[originPos.lat, originPos.lng]} icon={userIcon} />
-                      {selectedDest && (
-                        <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />
-                      )}
+                      <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />
                       {routeCoords.length > 1 && (
                         <Polyline positions={routeCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3, dashArray: "8 4" }} />
                       )}
