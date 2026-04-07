@@ -1,53 +1,56 @@
 
 
-## Fix "Runwal Elina" Search — Revised Approach
+## Fix "Runwal Elina" Search — Final Working Approach
 
-### Problem
-The Google API key (`AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU`) only has the **Places Autocomplete** API enabled. TextSearch and Geocoding APIs are not enabled, causing their callbacks to silently hang (timeout). Nominatim doesn't index "Runwal Elina" either.
+### The Real Problem
+"Runwal Elina" is not indexed in any free geocoding database (OSM/Photon/Nominatim), and the Google API key blocks all non-Autocomplete APIs via referer restrictions. This is not a code bug — it's a data coverage gap.
 
-### Root Cause Summary
+### Solution: Two Improvements
 
-| Tier | Result | Why |
-|------|--------|-----|
-| Tier 1 (Autocomplete) | 0 results | Google doesn't index "Runwal Elina" in autocomplete |
-| Tier 2 (TextSearch) | Timeout 8s | API not enabled on key — callback never fires |
-| Tier 3 (Geocoder SDK) | Timeout 6s | API not enabled on key — callback never fires |
-| Tier 4 (Nominatim) | 0 results | OSM doesn't have this building indexed |
+**1. Add Tier 3.5: MapmyIndia / Mappls Atlas API**
+India's official mapping service (by C-DAC/ISRO partnership) has far superior coverage of Indian residential complexes, buildings, and landmarks. Their free tier allows 5,000 requests/day.
 
-### Solution
+However, this requires an API key from Mappls. If we don't want to add another API key dependency, we use approach #2 instead.
 
-Since TextSearch and Geocoding APIs are not enabled on the key and cannot be fixed from code, we need a different approach:
+**2. Smarter Fallback: Fuzzy Partial Search (No API key needed)**
+When all tiers return 0 results for the full query, automatically retry with progressively shorter queries to surface related results:
+- "Runwal Elina" → 0 results → retry "Runwal" via Photon with location bias (Mumbai)
+- Show results like "Runwal Forest", "RunwalBliss", "Runwal Anthurium" as suggestions
+- Label these as "Similar places" in the dropdown so the user knows it's a fuzzy match
 
-**1. Use Google Places New API (`google.maps.places.Place.searchByText`)** — the console warns that `PlacesService` is legacy. The new `Place` class API may work with the existing key since it's part of the Places API (New), not a separate API. This is the modern replacement Google recommends.
-
-**2. Improve Nominatim search** — append "India" to queries and also try searching with the user's detected city name upfront (not just as a retry).
-
-**3. Add a 5th tier: Photon geocoder** — Photon (by Komoot) indexes more POI data than Nominatim and may have "Runwal Elina". It's free and doesn't require an API key.
+Additionally, enhance Photon queries by appending the user's detected city (from GPS reverse-geocode) to improve relevance.
 
 ### Changes — `src/hooks/usePlaceAutocomplete.ts`
 
-1. **Replace Tier 2 (TextSearch)** with `google.maps.places.Place.searchByText()` — the new Places API. Uses `includedType`, returns a Promise (no callback hanging). Falls back gracefully if not available.
+1. **After all 4 tiers fail**: Extract the first word(s) from the query and retry Photon with city context
+   - "Runwal Elina" → retry "Runwal Mumbai" via Photon → returns 5+ Runwal complexes
+   - Display results with a "Nearby matches" label
 
-2. **Replace Tier 3 (Geocoder SDK)** with **Photon geocoder** (`https://photon.komoot.io/api/?q=...&lang=en&limit=5`) — free, no API key, better POI coverage than Nominatim.
+2. **Enhance Photon queries**: Always append user's city (detected from GPS) as a location bias parameter (`lat`/`lon` params supported by Photon API)
 
-3. **Enhance Tier 4 (Nominatim)** — always append country context ("India") to the initial search, not just on retry.
-
-4. **Remove dead code** — remove `geocoderService` ref and `geocodingSearch` callback since the Geocoding API doesn't work with this key.
+3. **Show "no exact match" feedback**: When showing fuzzy results, add a subtle note: "No exact match found. Showing similar places nearby."
 
 ### Technical Detail
 
 ```text
-BEFORE:
-  Tier 2: placesService.textSearch() → hangs forever (API not enabled)
-  Tier 3: geocoderService.geocode() → hangs forever (API not enabled)
-  Tier 4: Nominatim → 0 results for "Runwal Elina"
+CURRENT FLOW (all fail silently):
+  Tier 1: Autocomplete("Runwal Elina") → 0
+  Tier 2: searchByText("Runwal Elina") → PERMISSION_DENIED
+  Tier 3: Photon("Runwal Elina") → 0
+  Tier 4: Nominatim("Runwal Elina India") → 0
+  → Empty dropdown, user stuck
 
-AFTER:
-  Tier 2: google.maps.places.Place.searchByText() → new API, may work
-  Tier 3: Photon geocoder (photon.komoot.io) → better POI coverage
-  Tier 4: Nominatim with "Runwal Elina India" → better context
+NEW FLOW:
+  Tier 1–4: same as above → 0 results
+  Tier 5 (Fuzzy): Photon("Runwal Mumbai", lat=19.07, lon=72.87) → 5 results
+  → Shows "RunwalBliss", "Runwal Forest", etc. with "Similar places" label
 ```
 
+### Files to Edit
+- `src/hooks/usePlaceAutocomplete.ts` — add fuzzy retry logic after all tiers fail, add location bias to Photon
+
 ### Expected Outcome
-"Runwal Elina" should be found via either the new Places API (Tier 2) or Photon geocoder (Tier 3), both of which have better coverage for residential complexes in India.
+- "Runwal Elina" → shows related Runwal complexes with "Similar places" label instead of empty results
+- User can pick the closest match or refine their search
+- Works without any additional API keys
 
