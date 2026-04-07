@@ -153,7 +153,7 @@ export function usePlaceAutocomplete({
         }, 5000);
 
         const request: google.maps.places.TextSearchRequest = {
-          query: query + " India",
+          query,
           ...(origin && {
             location: new google.maps.LatLng(origin.lat, origin.lng),
             radius: 50000,
@@ -333,22 +333,21 @@ export function usePlaceAutocomplete({
         abortRef.current = controller;
 
         try {
-          // Tier 1: Google Places
-          const googleResults = await googleSearch(query, searchId);
+          // Phase 1: Tier 1 + Tier 2 in parallel
+          const [googleResults, textResults] = await Promise.all([
+            googleSearch(query, searchId),
+            textSearch(query, searchId),
+          ]);
           if (searchId !== searchIdRef.current) return;
-          if (googleResults.length > 0) {
-            setResults(googleResults);
-            setSearching(false);
-            return;
-          }
 
-          if (controller.signal.aborted) return;
+          // Merge: Autocomplete first, then unique Text Search results
+          const seenDescriptions = new Set(googleResults.map(r => r.description));
+          const uniqueTextResults = textResults.filter(r => !seenDescriptions.has(r.description));
+          const mergedResults = [...googleResults, ...uniqueTextResults].slice(0, 8);
 
-          // Tier 2: Google Text Search (finds buildings, landmarks, residential complexes)
-          const textResults = await textSearch(query, searchId);
-          if (searchId !== searchIdRef.current) return;
-          if (textResults.length > 0) {
-            setResults(textResults);
+          if (mergedResults.length > 0) {
+            console.log(`[PlaceSearch] Phase 1 merged: ${googleResults.length} autocomplete + ${uniqueTextResults.length} textsearch`);
+            setResults(mergedResults);
             setSearching(false);
             return;
           }
