@@ -65,6 +65,7 @@ function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
 }
 
 const MapMyJourney = () => {
+  const { session } = useAuth();
   const {
     activeJourney,
     updates,
