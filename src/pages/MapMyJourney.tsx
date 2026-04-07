@@ -104,6 +104,7 @@ const MapMyJourney = () => {
   const {
     results: searchResults,
     searching,
+    apiStatus,
     search: searchDestination,
     clear: clearSearch,
     resolveCoords,
