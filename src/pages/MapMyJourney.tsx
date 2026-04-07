@@ -49,14 +49,7 @@ const TRANSPORT_MODES = [
   { value: "auto", label: "Auto", icon: Car, osrm: "driving" },
 ];
 
-interface SearchResult {
-  place_id: string;
-  description: string;
-  main_text: string;
-  secondary_text: string;
-  lat?: number;
-  lng?: number;
-}
+// SearchResult type removed — using PlaceResult from usePlaceAutocomplete
 
 // Component to fit map bounds
 function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
