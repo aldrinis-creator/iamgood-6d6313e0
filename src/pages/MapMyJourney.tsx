@@ -9,7 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
+import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
+import JourneyReportCard from "@/components/JourneyReportCard";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
 import StreetViewPanel from "@/components/StreetViewPanel";
@@ -61,6 +65,7 @@ function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
 }
 
 const MapMyJourney = () => {
+  const { session } = useAuth();
   const {
     activeJourney,
     updates,
@@ -68,7 +73,11 @@ const MapMyJourney = () => {
     distanceRemaining,
     showCheckIn,
     arrivingSoon,
+    arrivingSoonDismissed,
+    setArrivingSoonDismissed,
     routeDeviation,
+    routeDeviationDismissed,
+    setRouteDeviationDismissed,
     startJourney,
     endJourney,
     respondCheckIn,
@@ -87,6 +96,7 @@ const MapMyJourney = () => {
   const [showStreetView, setShowStreetView] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
+  const [journeyReports, setJourneyReports] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
 
@@ -106,6 +116,18 @@ const MapMyJourney = () => {
       () => toast.error("Location access needed for journey tracking")
     );
   }, []);
+
+  // Fetch journey reports when no active journey
+  useEffect(() => {
+    if (activeJourney || !session?.user?.id) return;
+    supabase
+      .from("journey_reports")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("ended_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => setJourneyReports(data || []));
+  }, [activeJourney, session?.user?.id]);
 
   // Fetch route from OSRM
   const fetchRoute = useCallback(async (origin: { lat: number; lng: number }, dest: { lat: number; lng: number }, mode: string) => {
@@ -603,8 +625,8 @@ const MapMyJourney = () => {
                   </Card>
                 )}
 
-                {/* Map Preview */}
-                {originPos && (
+                {/* Map Preview — only after destination selected */}
+                {originPos && selectedDest && routeCoords.length > 0 && (
                   <div className="rounded-lg overflow-hidden border border-border" style={{ height: 250 }}>
                     <MapContainer center={[originPos.lat, originPos.lng]} zoom={12} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                       <TileLayer
@@ -613,9 +635,7 @@ const MapMyJourney = () => {
                       />
                       <FitBounds bounds={mapBounds} />
                       <Marker position={[originPos.lat, originPos.lng]} icon={userIcon} />
-                      {selectedDest && (
-                        <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />
-                      )}
+                      <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />
                       {routeCoords.length > 1 && (
                         <Polyline positions={routeCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3, dashArray: "8 4" }} />
                       )}
@@ -634,9 +654,37 @@ const MapMyJourney = () => {
                 </Button>
               </CardContent>
             </Card>
+            {/* Journey History */}
+            {journeyReports.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <History className="w-4 h-4 text-muted-foreground" />
+                  Past Journeys
+                </h2>
+                {journeyReports.map((r) => (
+                  <JourneyReportCard key={r.id} report={r} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Journey Alert Overlays */}
+      {arrivingSoon && !arrivingSoonDismissed && (
+        <JourneyAlertOverlay
+          type="arriving"
+          message={`You are approaching ${activeJourney?.destination_name || "your destination"}.`}
+          onDismiss={() => setArrivingSoonDismissed(true)}
+        />
+      )}
+      {routeDeviation && !routeDeviationDismissed && (
+        <JourneyAlertOverlay
+          type="deviation"
+          message={`You have deviated from the expected route to ${activeJourney?.destination_name || "your destination"}.`}
+          onDismiss={() => setRouteDeviationDismissed(true)}
+        />
+      )}
 
       {/* Journey Check-in Popup */}
       <JourneyCheckInPopup

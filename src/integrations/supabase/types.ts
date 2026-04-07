@@ -614,6 +614,57 @@ export type Database = {
         }
         Relationships: []
       }
+      journey_reports: {
+        Row: {
+          break_duration_min: number
+          created_at: string
+          destination_name: string
+          deviation_count: number
+          ended_at: string
+          id: string
+          journey_id: string
+          max_deviation_m: number
+          origin_name: string | null
+          started_at: string
+          total_distance_m: number
+          total_duration_min: number
+          transport_mode: string | null
+          user_id: string
+        }
+        Insert: {
+          break_duration_min?: number
+          created_at?: string
+          destination_name: string
+          deviation_count?: number
+          ended_at: string
+          id?: string
+          journey_id: string
+          max_deviation_m?: number
+          origin_name?: string | null
+          started_at: string
+          total_distance_m?: number
+          total_duration_min?: number
+          transport_mode?: string | null
+          user_id: string
+        }
+        Update: {
+          break_duration_min?: number
+          created_at?: string
+          destination_name?: string
+          deviation_count?: number
+          ended_at?: string
+          id?: string
+          journey_id?: string
+          max_deviation_m?: number
+          origin_name?: string | null
+          started_at?: string
+          total_distance_m?: number
+          total_duration_min?: number
+          transport_mode?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       journey_updates: {
         Row: {
           check_in_response: string | null

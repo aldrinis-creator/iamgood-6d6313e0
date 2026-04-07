@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import ReportShareButtons from "@/components/ReportShareButtons";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
+import JourneyReportCard from "@/components/JourneyReportCard";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys";
 
 const GuardianReports = () => {
   const { session } = useAuth();
@@ -30,6 +31,7 @@ const GuardianReports = () => {
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [vitalData, setVitalData] = useState<any[]>([]);
   const [mealLogs, setMealLogs] = useState<any[]>([]);
+  const [journeyReports, setJourneyReports] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(!selectedWard);
@@ -60,6 +62,9 @@ const GuardianReports = () => {
     } else if (activeSection === "nutrition") {
       supabase.from("meal_logs").select("*").eq("user_id", wardUserId).gte("log_date", start).order("log_date")
         .then(({ data }) => setMealLogs(data || []));
+    } else if (activeSection === "journeys") {
+      supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
+        .then(({ data }) => setJourneyReports(data || []));
     }
   }, [wardUserId, activeSection]);
 
@@ -141,6 +146,7 @@ const GuardianReports = () => {
     { id: "activity", label: "Activity", icon: Activity },
     { id: "vitals", label: "Vitals", icon: Heart },
     { id: "nutrition", label: "Nutrition", icon: Utensils },
+    { id: "journeys", label: "Journeys", icon: Navigation },
   ];
 
   return (
@@ -292,6 +298,23 @@ const GuardianReports = () => {
               </ChartContainer>
             </CardContent>
           </Card>
+        )}
+
+        {/* Journeys */}
+        {activeSection === "journeys" && (
+          <div className="space-y-3">
+            {journeyReports.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No journey reports yet
+                </CardContent>
+              </Card>
+            ) : (
+              journeyReports.map((r) => (
+                <JourneyReportCard key={r.id} report={r} />
+              ))
+            )}
+          </div>
         )}
       </div>
     </AppLayout>
