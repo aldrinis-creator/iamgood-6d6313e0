@@ -108,6 +108,9 @@ const MedicalVaultContent = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
 
+  // --- View Record Dialog ---
+  const [viewingRecord, setViewingRecord] = useState<MedicalRecord | null>(null);
+
   // --- Records Tab ---
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
