@@ -12,6 +12,8 @@ import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
 import JourneyReportCard from "@/components/JourneyReportCard";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
 import StreetViewPanel from "@/components/StreetViewPanel";
