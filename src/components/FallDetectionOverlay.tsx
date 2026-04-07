@@ -7,7 +7,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FallDetectionOverlay = () => {
-  const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled } = useFallDetection();
+  const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled, fallConfidence } = useFallDetection();
   const { triggerSOS } = useApp();
   const { session } = useAuth();
   const hasSentRef = useRef(false);
@@ -38,12 +38,11 @@ const FallDetectionOverlay = () => {
     };
     const guardians = gRes.data || [];
 
-    // Build message
-    let msg = `🚨 FALL DETECTED — SOS ALERT from ${userName}!`;
+    const confidenceLabel = fallConfidence >= 0.8 ? "High" : fallConfidence >= 0.6 ? "Moderate" : "Low";
+    let msg = `🚨 FALL DETECTED (${confidenceLabel} confidence) — SOS ALERT from ${userName}!`;
     if (phone) msg += `\n📞 Phone: ${phone}`;
     if (dob) msg += `\n🎂 DOB: ${dob}`;
 
-    // Try to get location
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
@@ -62,11 +61,7 @@ const FallDetectionOverlay = () => {
     msg += "\n\n⚠️ A fall was detected. Please respond immediately!";
 
     const guardianEmails = guardians.map((g) => g.guardian_email).filter(Boolean) as string[];
-
     const guardianPhones = guardians.map((g) => g.guardian_phone).filter(Boolean) as string[];
-
-    // Send all alerts via edge function (MSG91 WhatsApp + email + push)
-    // Fallback to wa.me only if edge function fails
 
     try {
       const { data: result } = await supabase.functions.invoke("send-sos-alert", {
@@ -80,7 +75,6 @@ const FallDetectionOverlay = () => {
           user_name: userName,
         },
       });
-      // If MSG91 didn't send WhatsApp, fallback to wa.me
       if (!result?.msg91Sent) {
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
@@ -92,7 +86,6 @@ const FallDetectionOverlay = () => {
       }
     } catch (e) {
       console.error("Failed to send fall detection alerts:", e);
-      // Fallback to wa.me links
       guardians.forEach((g, i) => {
         const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
         const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
@@ -101,7 +94,7 @@ const FallDetectionOverlay = () => {
         }, i * 500);
       });
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fallConfidence]);
 
   useEffect(() => {
     if (countdownExpired && !hasSentRef.current) {
@@ -112,14 +105,12 @@ const FallDetectionOverlay = () => {
     }
   }, [countdownExpired, triggerSOS, sendFallAlerts, cancelFallAlert]);
 
-  // Reset guard when a new fall is detected
   useEffect(() => {
     if (fallDetected) {
       hasSentRef.current = false;
     }
   }, [fallDetected]);
 
-  // Auto-request iOS permission once when enabled
   useEffect(() => {
     if (enabled && permissionState === "unknown") {
       requestPermission();
@@ -129,6 +120,8 @@ const FallDetectionOverlay = () => {
   if (!fallDetected) return null;
 
   const progress = (countdown / 15) * 100;
+  const confidencePercent = Math.round(fallConfidence * 100);
+  const confidenceLabel = fallConfidence >= 0.8 ? "High" : fallConfidence >= 0.6 ? "Moderate" : "Low";
 
   return (
     <div className="fixed inset-0 z-[100] bg-destructive/95 flex flex-col items-center justify-center text-destructive-foreground p-6 animate-in fade-in duration-300">
@@ -137,6 +130,13 @@ const FallDetectionOverlay = () => {
       </div>
 
       <h1 className="text-2xl font-bold mb-2">Fall Detected!</h1>
+      
+      <div className="bg-destructive-foreground/10 rounded-lg px-4 py-2 mb-4">
+        <p className="text-sm font-medium">
+          Confidence: {confidenceLabel} ({confidencePercent}%)
+        </p>
+      </div>
+
       <p className="text-center text-sm opacity-90 mb-8 max-w-xs">
         A fall has been detected. Emergency SOS will trigger automatically unless you cancel.
       </p>
