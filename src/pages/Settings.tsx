@@ -13,6 +13,7 @@ import {
   Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import SafeZoneEditor from "@/components/SafeZoneEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
