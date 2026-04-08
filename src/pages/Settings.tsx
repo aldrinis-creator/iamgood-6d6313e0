@@ -312,8 +312,22 @@ const Settings = () => {
       toast.error("Name and phone are required");
       return;
     }
-    if (guardians.length >= 5) {
-      toast.error("Maximum 5 guardians allowed");
+    // Dynamic guardian limit based on plan
+    const { getGuardianLimit } = await import("@/lib/featureGating");
+    const { useSubscription } = await import("@/hooks/useSubscription");
+    // We can't use hooks here, so check the subscription table directly
+    const { data: subData } = await supabase
+      .from("subscriptions")
+      .select("plan_type, status")
+      .eq("user_id", session.user.id)
+      .eq("status", "active")
+      .order("expires_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const currentPlan = subData?.plan_type || "free";
+    const limit = getGuardianLimit(currentPlan);
+    if (guardians.length >= limit) {
+      toast.error(`Your plan allows ${limit} guardian(s). Upgrade for more.`);
       return;
     }
     // Check if this guardian already monitors 3 users
@@ -746,14 +760,26 @@ const Settings = () => {
                           onCheckedChange={() => toggleVaultNominee(g.id, g.is_vault_nominee)}
                         />
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="text-xs gap-1">
-                          <Phone className="w-3 h-3" /> SMS/WhatsApp
-                        </Button>
-                        <Button variant="outline" size="sm" className="text-xs gap-1">
-                          <Mail className="w-3 h-3" /> Email
-                        </Button>
-                      </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => {
+                          supabase.functions.invoke("send-guardian-invite", {
+                            body: { guardian_name: g.guardian_name, user_name: session?.user?.email, relation: g.relation, guardian_phone: g.guardian_phone, guardian_email: g.guardian_email },
+                          }).then(({ data }) => {
+                            if (data?.rate_limited) {
+                              toast.info("Invite was already sent recently. Please wait.");
+                            } else {
+                              toast.success(`Invite re-sent to ${g.guardian_name}`);
+                            }
+                          }).catch(() => toast.error("Failed to re-send"));
+                        }}
+                      >
+                        <Mail className="w-3 h-3" /> Re-send Invite
+                      </Button>
+                    </div>
                     </div>
                   </div>
                 ))}

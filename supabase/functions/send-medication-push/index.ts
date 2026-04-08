@@ -137,23 +137,23 @@ serve(async (req) => {
 
     const now = new Date();
     const currentHour = String(now.getHours()).padStart(2, "0");
-    const currentMinute = now.getMinutes();
+    const currentMinute = String(now.getMinutes()).padStart(2, "0");
+    const currentTimeStr = `${currentHour}:${currentMinute}`;
 
-    // Only send in first 2 minutes of the hour
-    if (currentMinute >= 2) {
-      return new Response(JSON.stringify({ message: "Not in notification window" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Build a ±2 minute window of valid schedule times
+    const validTimes: string[] = [];
+    for (let offset = -2; offset <= 2; offset++) {
+      const d = new Date(now.getTime() + offset * 60000);
+      const h = String(d.getHours()).padStart(2, "0");
+      const m = String(d.getMinutes()).padStart(2, "0");
+      validTimes.push(`${h}:${m}`);
     }
 
-    const currentTime = `${currentHour}:00`;
-
-    // Get all medications scheduled for this hour with alarms enabled
+    // Get all medications with alarms enabled
     const { data: medications, error: medErr } = await supabase
       .from("medications")
       .select("id, user_id, name, dosage, schedule_times, alarm_enabled")
-      .eq("alarm_enabled", true)
-      .contains("schedule_times", [currentTime]);
+      .eq("alarm_enabled", true);
 
     if (medErr) {
       console.error("Error fetching medications:", medErr);
@@ -163,23 +163,33 @@ serve(async (req) => {
       });
     }
 
-    if (!medications || medications.length === 0) {
+    // Filter medications that have any schedule_time within our ±2min window
+    const matchingMeds = (medications || []).filter((med: any) => {
+      if (!med.schedule_times || !Array.isArray(med.schedule_times)) return false;
+      return med.schedule_times.some((t: string) => validTimes.includes(t));
+    });
+
+    if (matchingMeds.length === 0) {
       return new Response(JSON.stringify({ message: "No medications due", sent: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Group by user
-    const userMeds = new Map<string, string[]>();
-    for (const med of medications) {
+    const userMeds = new Map<string, Array<{ name: string; id: string }>>();
+    for (const med of matchingMeds) {
       const list = userMeds.get(med.user_id) || [];
+      list.push({ name: med.name, id: med.id });
+      userMeds.set(med.user_id, list);
+    }
       list.push(med.name);
       userMeds.set(med.user_id, list);
     }
 
     let sentCount = 0;
 
-    for (const [userId, medNames] of userMeds) {
+
+    for (const [userId, meds] of userMeds) {
       // Get push subscriptions for this user
       const { data: subs } = await supabase
         .from("push_subscriptions")
@@ -188,13 +198,17 @@ serve(async (req) => {
 
       if (!subs || subs.length === 0) continue;
 
+      const medNames = meds.map(m => m.name);
       const payload = {
         title: "💊 Medication Reminder",
         body: medNames.length === 1
           ? `Time to take ${medNames[0]}`
           : `Time to take: ${medNames.join(", ")}`,
-        tag: `med-${currentHour}`,
+        tag: `med-${currentHour}-${currentMinute}`,
         url: "/my-health",
+        type: "medication",
+        medication_id: meds[0].id,
+        user_id: userId,
       };
 
       for (const sub of subs) {

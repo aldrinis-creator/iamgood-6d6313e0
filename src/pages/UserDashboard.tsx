@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
+import OnboardingWizard from "@/components/OnboardingWizard";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
   { mode: "active", icon: Sun, label: "Active", description: "Check-iNs running" },
@@ -63,6 +64,9 @@ const UserDashboard = () => {
 
   const [showSleepDialog, setShowSleepDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem("onboarding_complete");
+  });
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Notify all guardians about mode change
@@ -301,6 +305,13 @@ const UserDashboard = () => {
         currentConfig={settings.checkOutConfig}
         onSave={handleCheckOutSave}
       />
+
+      {showOnboarding && (
+        <OnboardingWizard
+          open={showOnboarding}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
     </AppLayout>
   );
 };

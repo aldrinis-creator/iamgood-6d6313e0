@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2, Save, Check } from "lucide-react";
+import { FileText, Loader2, Save, Check, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
+import UpgradeDialog from "@/components/UpgradeDialog";
 
 const DoctorVisitReport = () => {
   const { session } = useAuth();
@@ -14,6 +16,7 @@ const DoctorVisitReport = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { gate, upgradeDialogOpen, upgradeFeature, requiredPlan, upgradeDescription, closeUpgradeDialog } = useFeatureGate();
 
   const generateReport = async () => {
     if (!session?.user?.id) return;
@@ -89,12 +92,24 @@ const DoctorVisitReport = () => {
       {report && (
         <Card>
           <CardContent className="p-4 space-y-3">
-            <ReportShareButtons
-              title="Doctor Visit Report"
-              subtitle="Comprehensive Health Summary"
-              content={report}
-              category="Health Report"
-            />
+            <div className="space-y-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-1.5"
+                onClick={() => gate("PDF Export", () => {})}
+              >
+                <Lock className="w-3.5 h-3.5" /> Share / Export
+              </Button>
+              <div onClick={(e) => { e.preventDefault(); gate("PDF Export", () => {}); }}>
+                <ReportShareButtons
+                  title="Doctor Visit Report"
+                  subtitle="Comprehensive Health Summary"
+                  content={report}
+                  category="Health Report"
+                />
+              </div>
+            </div>
             <Button
               size="sm"
               variant={saved ? "secondary" : "outline"}
@@ -111,6 +126,14 @@ const DoctorVisitReport = () => {
           </CardContent>
         </Card>
       )}
+
+      <UpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={closeUpgradeDialog}
+        featureName={upgradeFeature}
+        requiredPlan={requiredPlan}
+        description={upgradeDescription}
+      />
     </div>
   );
 };
