@@ -1038,6 +1038,13 @@ export type Database = {
             referencedRelation: "guardians"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notifications_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_ward_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       nutrition_personas: {
@@ -1629,6 +1636,54 @@ export type Database = {
           guardian_phone?: string | null
           is_primary?: boolean | null
           relation?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      guardians_ward_safe: {
+        Row: {
+          created_at: string | null
+          guardian_email: string | null
+          guardian_name: string | null
+          guardian_phone: string | null
+          guardian_user_id: string | null
+          id: string | null
+          is_primary: boolean | null
+          is_vault_nominee: boolean | null
+          nominated_at: string | null
+          nomination_expires_at: string | null
+          relation: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_user_id?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_vault_nominee?: boolean | null
+          nominated_at?: string | null
+          nomination_expires_at?: string | null
+          relation?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_user_id?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_vault_nominee?: boolean | null
+          nominated_at?: string | null
+          nomination_expires_at?: string | null
+          relation?: string | null
+          status?: string | null
           user_id?: string | null
         }
         Relationships: []
