@@ -55,7 +55,7 @@ const EmergencyProfile = () => {
         supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
         supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
         supabase.from("medications").select("name, dosage").eq("user_id", userId),
-        supabase.from("guardians_emergency_safe" as any).select("guardian_name, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
+        supabase.from("guardians_emergency_safe" as any).select("guardian_name, guardian_phone, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
         supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
       ]);
 
