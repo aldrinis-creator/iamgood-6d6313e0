@@ -9,7 +9,7 @@ const sections = [
   { heading: "Limitation of Liability", content: "To the maximum extent permitted by law, Check-iN and its affiliates shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service. Our total liability shall not exceed the amount you paid for the service in the preceding 12 months." },
   { heading: "Termination", content: "We reserve the right to suspend or terminate your account if you violate these terms. You may delete your account at any time through the Settings page. Upon termination, your data will be handled in accordance with our Privacy Policy." },
   { heading: "Governing Law", content: "These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India." },
-  { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at support@checkin-app.in." },
+  { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at checkin_support@futurewave.in." },
 ];
 
 const TermsOfService = () => (
