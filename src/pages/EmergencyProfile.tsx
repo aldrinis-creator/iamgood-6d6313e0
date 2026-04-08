@@ -43,12 +43,12 @@ const EmergencyProfile = () => {
       if (!token) { setNotFound(true); setLoading(false); return; }
 
       // Look up token via secure RPC (prevents token enumeration)
-      const { data: userId, error: tokenErr } = await supabase
+      const { data: tokenResult, error: tokenErr } = await supabase
         .rpc("lookup_emergency_token" as any, { _token: token })
         .maybeSingle();
 
-      if (tokenErr || !userId?.user_id) { setNotFound(true); setLoading(false); return; }
-      const uid = userId.user_id;
+      if (tokenErr || !tokenResult) { setNotFound(true); setLoading(false); return; }
+      const userId = (tokenResult as any).user_id as string;
 
       // Fetch all data in parallel (anon RLS allows it for active tokens)
       const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
