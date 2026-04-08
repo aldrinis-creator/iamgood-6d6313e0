@@ -14,7 +14,7 @@ interface UpgradeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   featureName: string | null;
-  requiredPlan: "basic" | "pro";
+  requiredPlan: "free" | "basic" | "pro";
   description?: string;
 }
 
