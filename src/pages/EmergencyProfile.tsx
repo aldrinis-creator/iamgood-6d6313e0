@@ -42,16 +42,13 @@ const EmergencyProfile = () => {
     const fetchProfile = async () => {
       if (!token) { setNotFound(true); setLoading(false); return; }
 
-      // Look up token (anon can read active tokens)
-      const { data: tokenRow, error: tokenErr } = await supabase
-        .from("emergency_share_tokens" as any)
-        .select("user_id")
-        .eq("token", token)
-        .eq("is_active", true)
+      // Look up token via secure RPC (prevents token enumeration)
+      const { data: userId, error: tokenErr } = await supabase
+        .rpc("lookup_emergency_token" as any, { _token: token })
         .maybeSingle();
 
-      if (tokenErr || !tokenRow) { setNotFound(true); setLoading(false); return; }
-      const userId = (tokenRow as any).user_id;
+      if (tokenErr || !userId?.user_id) { setNotFound(true); setLoading(false); return; }
+      const uid = userId.user_id;
 
       // Fetch all data in parallel (anon RLS allows it for active tokens)
       const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
