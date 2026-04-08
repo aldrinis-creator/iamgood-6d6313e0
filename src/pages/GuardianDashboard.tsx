@@ -85,7 +85,9 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
 
 const GOOGLE_TILES_URL = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
 
-const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null }) => {
+interface SafeZone { id: string; name: string; lat: number; lng: number; radius_m: number; enabled: boolean; }
+
+const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones = [] }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null; safeZones?: SafeZone[] }) => {
   const [expanded, setExpanded] = useState(false);
   const mapHeight = expanded ? 400 : 192;
   const mapContainerRef = useRef<HTMLDivElement>(null);
