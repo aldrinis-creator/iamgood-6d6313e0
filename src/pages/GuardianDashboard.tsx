@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert } from "lucide-react";
+import { haversineDistance } from "@/lib/haversine";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -666,8 +667,12 @@ const GuardianDashboard = () => {
                 </div>
                 <div>
                   <p className="font-semibold">{wardName}</p>
-                  {wardPauseMode === "active" && (
-                    <p className="text-xs text-success font-medium">● Online — Safe</p>
+                  {wardPauseMode === "active" && (() => {
+                    const outsideZone = wardSafeZones.length > 0 && wardLocation && !wardSafeZones.some(z => haversineDistance(wardLocation.lat, wardLocation.lng, z.lat, z.lng) <= z.radius_m);
+                    return outsideZone
+                      ? <p className="text-xs text-destructive font-medium flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Outside Safe Zone</p>
+                      : <p className="text-xs text-success font-medium">● Online — Safe</p>;
+                  })()}
                   )}
                   {wardPauseMode === "sleep" && (
                     <p className="text-xs text-primary font-medium">
