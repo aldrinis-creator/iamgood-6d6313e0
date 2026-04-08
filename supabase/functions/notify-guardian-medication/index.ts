@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       read: false,
     }));
 
-    await supabase.from("notifications").insert(notifications);
+    await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
 
     // MSG91 WhatsApp notification for medication
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");

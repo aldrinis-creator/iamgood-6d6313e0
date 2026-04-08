@@ -29,12 +29,12 @@ export default function useAbnormalPatternCheck() {
         }
 
         if (data?.anomalies_detected && data?.summary) {
-          // Create in-app notification
-          await supabase.from("notifications").insert({
-            user_id: uid,
-            title: "Health Pattern Alert",
-            message: data.summary,
-            type: "anomaly",
+          // Create in-app notification (deduped)
+          await supabase.rpc("insert_notification_deduped", {
+            p_user_id: uid,
+            p_title: "Health Pattern Alert",
+            p_message: data.summary,
+            p_type: "anomaly",
           });
 
           // Notify guardians if critical
@@ -56,7 +56,9 @@ export default function useAbnormalPatternCheck() {
                 }));
 
               if (guardianNotifications.length > 0) {
-                await supabase.from("notifications").insert(guardianNotifications);
+                await supabase.rpc("insert_notifications_deduped", {
+                  p_notifications: guardianNotifications,
+                });
               }
             }
           }

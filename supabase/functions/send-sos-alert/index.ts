@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
         message: `Emergency SOS alert from ${user_name || "User"}. Check email and WhatsApp for details.`,
         type: "sos_alert",
       }));
-      await supabase.from("notifications").insert(notifRows);
+      await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
     }
 
     // --- Push notifications to guardians ---

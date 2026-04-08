@@ -95,7 +95,9 @@ export default function useLocationSync() {
           read: false,
         }));
 
-        await supabase.from("notifications").insert(notifications);
+        await supabase.rpc("insert_notifications_deduped", {
+          p_notifications: notifications,
+        });
         lastZoneAlertRef.current = new Date().toISOString();
       } catch {
         // Silently ignore errors in background check

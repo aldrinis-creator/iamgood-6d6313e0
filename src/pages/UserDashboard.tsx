@@ -86,7 +86,7 @@ const UserDashboard = () => {
       type: "mode_change",
     }));
 
-    const { error } = await supabase.from("notifications").insert(notifications);
+    const { error } = await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
     if (error) console.error("Failed to notify guardians:", error);
   }, [session?.user?.id]);
 

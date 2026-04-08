@@ -220,15 +220,15 @@ export function useJourneyTracker() {
       .select("id")
       .eq("user_id", session.user.id);
     if (!guardians?.length) return;
-    await supabase.from("notifications").insert(
-      guardians.map((g) => ({
+    await supabase.rpc("insert_notifications_deduped", {
+      p_notifications: guardians.map((g) => ({
         user_id: session.user.id,
         guardian_id: g.id,
         title,
         message,
         type,
-      }))
-    );
+      })),
+    });
   }, [session?.user?.id]);
 
   const generateReport = async (journey: JourneyData, journeyUpdates: JourneyUpdate[]) => {

@@ -198,7 +198,7 @@ const CheckInDialog = ({ open, onClose, onConfirmOk }: CheckInDialogProps) => {
               type: "wellness_alert",
             }));
           if (notifications.length) {
-            await supabase.from("notifications").insert(notifications);
+            await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
           }
         }
       }

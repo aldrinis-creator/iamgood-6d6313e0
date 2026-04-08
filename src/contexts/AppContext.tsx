@@ -140,7 +140,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           message: `${currentUserName} has marked themselves as safe. The SOS alert has been cancelled.`,
           type: "sos_resolved",
         }));
-        await supabase.from("notifications").insert(notifRows);
+        await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
 
         // Send "all clear" via edge function (email/push/WhatsApp)
         const guardianEmails = guardianRows.map((g: any) => g.guardian_email).filter(Boolean);
