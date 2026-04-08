@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Crown, ExternalLink } from "lucide-react";
+import { Check, Star, Crown, ExternalLink, Gift } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
@@ -12,19 +12,41 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const plans = [
   {
+    key: "free",
+    name: "Free",
+    icon: Gift,
+    monthly: 0,
+    yearly: 0,
+    features: [
+      "SOS Emergency Alert",
+      "1 Guardian",
+      "Emergency Profile",
+      "Emergency First Aid Guides",
+      "Basic Vitals (manual)",
+    ],
+    excluded: [
+      "Medication Manager",
+      "Activity Tracking",
+      "Medical Vault",
+      "AI Health Tools",
+      "Advanced Vitals",
+    ],
+  },
+  {
     key: "basic",
     name: "Basic",
     icon: Star,
     monthly: 99,
     yearly: 999,
     features: [
+      "Everything in Free",
       "3 Daily Check-iNs",
-      "SOS Emergency Alert",
-      "1 Guardian",
-      "Medical Vault",
+      "Medication Manager",
+      "Basic Activity Tracking",
+      "Medical Vault (view)",
       "Basic Inactivity Alerts",
     ],
-    excluded: ["Advanced Geofencing", "Priority Ambulance", "AI Fall Detection", "5 Guardians", "Weekly Reports"],
+    excluded: ["AI Health Tools", "5 Guardians", "Advanced Vitals", "Priority Ambulance"],
   },
   {
     key: "pro",
@@ -34,15 +56,17 @@ const plans = [
     yearly: 1999,
     popular: true,
     features: [
+      "Everything in Basic",
       "Unlimited Check-iNs",
-      "SOS Emergency Alert",
       "Up to 5 Guardians",
-      "Medical Vault + PDF Export",
-      "Advanced Geofencing",
-      "Priority Ambulance Booking",
-      "AI Fall Detection",
-      "AI Inactivity Detection",
-      "Weekly Safety Reports",
+      "AI Symptom Checker",
+      "Document Analyzer",
+      "Face Scan & Vitals",
+      "Nutrition Advisor (AI)",
+      "Priority Ambulance",
+      "Wellness AI Insights",
+      "PDF Export / Sharing",
+      "Journey Geofencing",
     ],
     excluded: [],
   },
@@ -55,7 +79,6 @@ const Subscription = () => {
   const { subscription, isActive, loading } = useSubscription();
   const queryClient = useQueryClient();
 
-  // Handle return from futurewave.in
   useEffect(() => {
     const status = searchParams.get("status");
     if (status === "success") {
@@ -69,7 +92,7 @@ const Subscription = () => {
   }, [searchParams, setSearchParams, queryClient]);
 
   const handleChoosePlan = (planKey: string) => {
-    if (!user) return;
+    if (!user || planKey === "free") return;
     const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success`);
     const cancelUrl = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
     const url = `https://futurewave.in/pay?plan=${planKey}&billing=${billing}&user_id=${user.id}&app_callback=${callbackUrl}&cancel_url=${cancelUrl}`;
@@ -86,7 +109,6 @@ const Subscription = () => {
           </p>
         </div>
 
-        {/* Active Subscription Banner */}
         {isActive && subscription && (
           <Card className="border-2 border-success bg-success/5">
             <CardContent className="py-3 px-4 flex items-center justify-between">
@@ -103,7 +125,6 @@ const Subscription = () => {
           </Card>
         )}
 
-        {/* Billing Toggle */}
         <div className="flex justify-center">
           <div className="bg-muted rounded-lg p-1 flex">
             <button
@@ -125,9 +146,11 @@ const Subscription = () => {
           </div>
         </div>
 
-        {/* Plans */}
         {plans.map((plan) => {
-          const isCurrentPlan = isActive && subscription?.plan_type === plan.key;
+          const isCurrentPlan =
+            (plan.key === "free" && !isActive) ||
+            (isActive && subscription?.plan_type === plan.key);
+          const isFree = plan.key === "free";
           return (
             <Card key={plan.key} className={plan.popular ? "border-2 border-primary relative" : ""}>
               {plan.popular && (
@@ -147,11 +170,13 @@ const Subscription = () => {
                 </CardTitle>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold">
-                    ₹{billing === "monthly" ? plan.monthly : plan.yearly}
+                    {isFree ? "Free" : `₹${billing === "monthly" ? plan.monthly : plan.yearly}`}
                   </span>
-                  <span className="text-sm text-muted-foreground">
-                    /{billing === "monthly" ? "mo" : "yr"}
-                  </span>
+                  {!isFree && (
+                    <span className="text-sm text-muted-foreground">
+                      /{billing === "monthly" ? "mo" : "yr"}
+                    </span>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -169,22 +194,28 @@ const Subscription = () => {
                     </div>
                   ))}
                 </div>
-                <Button
-                  className={`w-full ${plan.popular ? "bg-primary" : ""}`}
-                  variant={plan.popular ? "default" : "outline"}
-                  size="lg"
-                  disabled={isCurrentPlan || loading}
-                  onClick={() => handleChoosePlan(plan.key)}
-                >
-                  {isCurrentPlan ? (
-                    "Current Plan"
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      {plan.popular ? "Go Pro" : "Choose Basic"}
-                      <ExternalLink className="w-4 h-4" />
-                    </span>
-                  )}
-                </Button>
+                {isFree ? (
+                  <Button className="w-full" variant="outline" size="lg" disabled>
+                    {isCurrentPlan ? "Current Plan" : "Free Forever"}
+                  </Button>
+                ) : (
+                  <Button
+                    className={`w-full ${plan.popular ? "bg-primary" : ""}`}
+                    variant={plan.popular ? "default" : "outline"}
+                    size="lg"
+                    disabled={isCurrentPlan || loading}
+                    onClick={() => handleChoosePlan(plan.key)}
+                  >
+                    {isCurrentPlan ? (
+                      "Current Plan"
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        {plan.popular ? "Go Pro" : "Choose Basic"}
+                        <ExternalLink className="w-4 h-4" />
+                      </span>
+                    )}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
