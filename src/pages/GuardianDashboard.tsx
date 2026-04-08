@@ -121,6 +121,17 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones =
       L.tileLayer(GOOGLE_TILES_URL, { maxZoom: 20, attribution: "" }).addTo(map);
       L.control.zoom({ position: "bottomright" }).addTo(map);
       const marker = L.marker([wardLocation.lat, wardLocation.lng]).addTo(map);
+      // Render safe zone circles
+      safeZones.filter(z => z.enabled).forEach((zone) => {
+        L.circle([zone.lat, zone.lng], {
+          radius: zone.radius_m,
+          color: "#6366f1",
+          fillColor: "#6366f1",
+          fillOpacity: 0.08,
+          dashArray: "8 6",
+          weight: 2,
+        }).addTo(map).bindTooltip(zone.name, { permanent: false });
+      });
       mapInstanceRef.current = map;
       markerRef.current = marker;
     };
