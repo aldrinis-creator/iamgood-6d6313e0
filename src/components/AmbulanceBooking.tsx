@@ -61,11 +61,11 @@ const AmbulanceBooking = () => {
     const msg = encodeURIComponent(
       `🚑 AMBULANCE REQUEST\n\nPatient: ${patientName || "N/A"}\nContact: ${contactNumber || "N/A"}\nEmergency: ${emergencyType || "Not specified"}\nLocation: ${locStr}`
     );
-    window.open(`https://wa.me/911800102129?text=${msg}`, "_blank");
+    window.open(`https://wa.me/917045868482?text=${msg}`, "_blank");
   };
 
   const callHelpline = () => {
-    window.open("tel:18001021298", "_self");
+    window.open("tel:+917045868482", "_self");
   };
 
   if (!showForm) {
@@ -204,7 +204,7 @@ const AmbulanceBooking = () => {
                 className="w-full font-semibold py-5"
                 size="lg"
               >
-                <Phone className="w-5 h-5 mr-2" /> Call Helpline: 1800 102 1298
+                <Phone className="w-5 h-5 mr-2" /> Call Helpline: +91 7045868482
               </Button>
             </div>
 

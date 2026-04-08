@@ -173,11 +173,11 @@ const Help = () => {
                 <div className="space-y-2">
                   <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-sm font-medium">Email Support</p>
-                    <p className="text-sm text-primary">support@myhealthcompanion.in</p>
+                    <p className="text-sm text-primary">checkin_support@futurewave.in</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-sm font-medium">WhatsApp Support</p>
-                    <p className="text-sm text-primary">+91 98765 43210</p>
+                    <p className="text-sm text-primary">+91 7045868482</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-sm font-medium">Response Time</p>
@@ -212,7 +212,7 @@ const Help = () => {
               { heading: "Data Sharing", content: "We share your information only with your designated guardians, emergency services when you trigger an SOS, and service providers who assist in delivering our services. All third parties are bound by confidentiality agreements." },
               { heading: "Data Security", content: "We implement industry-standard security measures including encryption, secure servers, and access controls to protect your personal and medical data. Your medical vault data is encrypted at rest and in transit." },
               { heading: "Your Rights", content: "You have the right to access, correct, or delete your personal data. You can export your data or request account deletion through the Settings page. We will respond to your requests within 30 days." },
-              { heading: "Contact Us", content: "If you have questions about this Privacy Policy, please contact us at privacy@checkin-app.in." },
+              { heading: "Contact Us", content: "If you have questions about this Privacy Policy, please contact us at checkin_support@futurewave.in." },
             ].map((s) => (
               <section key={s.heading} className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
@@ -237,7 +237,7 @@ const Help = () => {
               { heading: "Limitation of Liability", content: "To the maximum extent permitted by law, Check-iN and its affiliates shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service." },
               { heading: "Termination", content: "We reserve the right to suspend or terminate your account if you violate these terms. You may delete your account at any time through the Settings page." },
               { heading: "Governing Law", content: "These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India." },
-              { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at support@checkin-app.in." },
+              { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at checkin_support@futurewave.in." },
             ].map((s) => (
               <section key={s.heading} className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
