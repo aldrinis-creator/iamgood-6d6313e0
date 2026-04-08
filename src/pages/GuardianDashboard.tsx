@@ -305,6 +305,14 @@ const GuardianDashboard = () => {
     } else {
       setActiveSOS(null);
     }
+
+    // Fetch ward's safe zones
+    const { data: zones } = await supabase
+      .from("safe_zones" as any)
+      .select("*")
+      .eq("user_id", wardId)
+      .eq("enabled", true);
+    if (zones) setWardSafeZones(zones as unknown as SafeZone[]);
   }, [session?.user?.id, selectedWard]);
 
   const fetchWardSettings = useCallback(async (wId: string) => {
