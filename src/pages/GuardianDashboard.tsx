@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert } from "lucide-react";
+import { haversineDistance } from "@/lib/haversine";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,7 +86,9 @@ const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { ti
 
 const GOOGLE_TILES_URL = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
 
-const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null }) => {
+interface SafeZone { id: string; name: string; lat: number; lng: number; radius_m: number; enabled: boolean; }
+
+const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones = [] }: { wardLocation: { lat: number; lng: number }; activeSOS: boolean; locationUpdatedAt: string | null; safeZones?: SafeZone[] }) => {
   const [expanded, setExpanded] = useState(false);
   const mapHeight = expanded ? 400 : 192;
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -119,6 +122,17 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt }: { wardLoc
       L.tileLayer(GOOGLE_TILES_URL, { maxZoom: 20, attribution: "" }).addTo(map);
       L.control.zoom({ position: "bottomright" }).addTo(map);
       const marker = L.marker([wardLocation.lat, wardLocation.lng]).addTo(map);
+      // Render safe zone circles
+      safeZones.filter(z => z.enabled).forEach((zone) => {
+        L.circle([zone.lat, zone.lng], {
+          radius: zone.radius_m,
+          color: "#6366f1",
+          fillColor: "#6366f1",
+          fillOpacity: 0.08,
+          dashArray: "8 6",
+          weight: 2,
+        }).addTo(map).bindTooltip(zone.name, { permanent: false });
+      });
       mapInstanceRef.current = map;
       markerRef.current = marker;
     };
@@ -202,6 +216,7 @@ const GuardianDashboard = () => {
   const [wardBattery, setWardBattery] = useState<number | null>(null);
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
+  const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
@@ -291,6 +306,14 @@ const GuardianDashboard = () => {
     } else {
       setActiveSOS(null);
     }
+
+    // Fetch ward's safe zones
+    const { data: zones } = await supabase
+      .from("safe_zones" as any)
+      .select("*")
+      .eq("user_id", wardId)
+      .eq("enabled", true);
+    if (zones) setWardSafeZones(zones as unknown as SafeZone[]);
   }, [session?.user?.id, selectedWard]);
 
   const fetchWardSettings = useCallback(async (wId: string) => {
@@ -644,9 +667,12 @@ const GuardianDashboard = () => {
                 </div>
                 <div>
                   <p className="font-semibold">{wardName}</p>
-                  {wardPauseMode === "active" && (
-                    <p className="text-xs text-success font-medium">● Online — Safe</p>
-                  )}
+                  {wardPauseMode === "active" && (() => {
+                    const outsideZone = wardSafeZones.length > 0 && wardLocation && !wardSafeZones.some(z => haversineDistance(wardLocation.lat, wardLocation.lng, z.lat, z.lng) <= z.radius_m);
+                    return outsideZone
+                      ? <p className="text-xs text-destructive font-medium flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Outside Safe Zone</p>
+                      : <p className="text-xs text-success font-medium">● Online — Safe</p>;
+                  })()}
                   {wardPauseMode === "sleep" && (
                     <p className="text-xs text-primary font-medium">
                       😴 Sleep Mode {wardPauseDetails.sleepTo ? `— until ${wardPauseDetails.sleepTo}` : ""}
@@ -718,7 +744,7 @@ const GuardianDashboard = () => {
               </div>
             ) : wardLocation ? (
               <div className="space-y-2">
-                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} />
+                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
                 {!activeSOS && (
                   <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
                     <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
