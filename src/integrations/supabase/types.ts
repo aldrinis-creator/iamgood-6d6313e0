@@ -1612,18 +1612,21 @@ export type Database = {
       guardians_emergency_safe: {
         Row: {
           guardian_name: string | null
+          guardian_phone: string | null
           is_primary: boolean | null
           relation: string | null
           user_id: string | null
         }
         Insert: {
           guardian_name?: string | null
+          guardian_phone?: string | null
           is_primary?: boolean | null
           relation?: string | null
           user_id?: string | null
         }
         Update: {
           guardian_name?: string | null
+          guardian_phone?: string | null
           is_primary?: boolean | null
           relation?: string | null
           user_id?: string | null
