@@ -19,6 +19,27 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Rate-limit: check if invite was sent < 1 hour ago
+    if (guardian_email || guardian_phone) {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      let query = supabase.from("guardians").select("nominated_at").gte("nominated_at", oneHourAgo);
+      if (guardian_email) query = query.eq("guardian_email", guardian_email);
+      else query = query.eq("guardian_phone", guardian_phone);
+
+      const { data: recentInvites } = await query;
+      if (recentInvites && recentInvites.length > 0) {
+        return new Response(
+          JSON.stringify({ message: "Invite already sent recently. Please wait before re-sending.", rate_limited: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const relationText = relation ? ` (${relation})` : "";
     const subject = `${user_name} has nominated you as their Guardian on Check-iN`;
 

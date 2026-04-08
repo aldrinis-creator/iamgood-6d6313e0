@@ -67,23 +67,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.warning("Location unavailable — SOS sent without coordinates");
     }
 
-    const { data, error } = await supabase
-      .from("sos_events")
-      .insert({
-        user_id: session.user.id,
-        latitude: coords?.latitude ?? null,
-        longitude: coords?.longitude ?? null,
-        trigger_type: "manual",
-        status: "active",
-      })
-      .select("id")
-      .single();
+    const sosPayload = {
+      user_id: session.user.id,
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+      trigger_type: "manual",
+      status: "active",
+    };
 
-    if (error) {
-      console.error("Failed to create SOS event:", error);
-      toast.error("Failed to record SOS event");
-    } else if (data) {
-      setActiveSosId(data.id);
+    try {
+      const { data, error } = await supabase
+        .from("sos_events")
+        .insert(sosPayload)
+        .select("id")
+        .single();
+
+      if (error) {
+        throw error;
+      } else if (data) {
+        setActiveSosId(data.id);
+      }
+    } catch (err) {
+      console.error("Failed to create SOS event (may be offline):", err);
+      // Queue for offline sync
+      try {
+        const { queueSOS } = await import("@/lib/offlineQueue");
+        await queueSOS(sosPayload);
+        toast.warning("You're offline — SOS queued and will send when reconnected");
+        // Register background sync
+        if ("serviceWorker" in navigator && "SyncManager" in window) {
+          const reg = await navigator.serviceWorker.ready;
+          await (reg as any).sync.register("sos-sync");
+        }
+      } catch (queueErr) {
+        console.error("Failed to queue SOS:", queueErr);
+        toast.error("Failed to record SOS event");
+      }
     }
   }, [session?.user?.id]);
 

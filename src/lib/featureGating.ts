@@ -25,6 +25,9 @@ export const FEATURE_TIERS: Record<string, PlanTier> = {
   "Wellness": "pro",
   "Ambulance": "pro",
   "Vitals": "pro",
+  "Geofencing": "pro",
+  "PDF Export": "pro",
+  "Guardian Limit": "basic",
 };
 
 export const FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -43,6 +46,9 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   "Activity": "Track daily activity, steps, and exercise.",
   "Vault": "Store and organize your medical records securely.",
   "Services": "Access nearby health services and facilities.",
+  "Geofencing": "Set geofence alerts for route deviation monitoring during journeys.",
+  "PDF Export": "Export and share health reports as PDF documents.",
+  "Guardian Limit": "Add more guardians to your safety network.",
 };
 
 const TIER_RANK: Record<PlanTier, number> = { free: 0, basic: 1, pro: 2 };
@@ -54,4 +60,15 @@ export function canAccessFeature(
   const requiredTier = FEATURE_TIERS[feature] ?? "free";
   const userTier = (userPlan as PlanTier) ?? "free";
   return TIER_RANK[userTier] >= TIER_RANK[requiredTier];
+}
+
+/** Returns the maximum number of guardians allowed for a given plan */
+export function getGuardianLimit(plan: string | null): number {
+  const tier = (plan as PlanTier) ?? "free";
+  switch (tier) {
+    case "free": return 1;
+    case "basic": return 3;
+    case "pro": return 5;
+    default: return 1;
+  }
 }
