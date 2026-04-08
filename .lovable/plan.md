@@ -1,71 +1,124 @@
 
 
-## Build Freemium Gating System
+## Comprehensive App Hardening: 5-Point Implementation Plan
 
-### Overview
+### Summary
 
-Create a reusable `UpgradeDialog` component and a feature-tier map. Free users see all features but premium ones show an upgrade prompt on tap. SOS and basic check-ins remain always free.
+Five workstreams: (1) enforce freemium gating across remaining pages, (2) build a first-time onboarding wizard, (3) harden PWA for offline SOS, (4) polish guardian invitation flow, (5) make push notifications reliable when the app is backgrounded.
 
-### Feature Tier Map
+---
 
-| Always Free | Basic | Pro Only |
-|---|---|---|
-| SOS button + alerts | 3 daily check-ins | Unlimited check-ins |
-| 1 guardian link | Medical Vault (view) | Up to 5 guardians |
-| Emergency profile | Basic activity tracking | AI Fall Detection |
-| Emergency First Aid | Medication manager | AI Symptom Checker |
-| Basic vitals (manual) | — | Document Analyzer |
-| — | — | Doctor Visit Report |
-| — | — | PDF export / sharing |
-| — | — | Nutrition Advisor (AI) |
-| — | — | Face Scan |
-| — | — | Tele-Consult |
-| — | — | Wellness AI insights |
-| — | — | Priority Ambulance |
-| — | — | Journey geofencing |
+### 1. Enforce Freemium Gating Across the Full App
 
-### Components
+**Current state**: `useFeatureGate` and `UpgradeDialog` exist but are only wired into `MyHealth.tsx`. Guardian limits, journey geofencing, ambulance priority, and PDF exports are ungated.
 
-**1. `src/components/UpgradeDialog.tsx`** (new)
-- Reusable dialog showing feature name, benefit description, and tier required (Basic/Pro)
-- "View Plans" button navigates to `/subscription`
-- Accepts props: `open`, `onOpenChange`, `featureName`, `requiredPlan` ("basic" | "pro"), `description`
+**Changes**:
 
-**2. `src/lib/featureGating.ts`** (new)
-- `FEATURE_TIERS` map: feature label → required plan ("free", "basic", "pro")
-- `canAccessFeature(plan: string | null, feature: string): boolean` helper
-- Centralizes all gating logic in one place
+| File | Change |
+|------|--------|
+| `src/components/GuardianTab.tsx` | Before adding a guardian, check count: free users limited to 1, basic to 3, pro to 5. Show `UpgradeDialog` if at limit. |
+| `src/pages/Settings.tsx` | Same guardian limit check in `addGuardian()`. |
+| `src/pages/MapMyJourney.tsx` | Gate the geofence/alert radius feature behind Pro. Free/Basic users can track journeys but not set geofence alerts. |
+| `src/components/AmbulanceBooking.tsx` | Add a "Priority" badge for Pro users. Free/Basic still get standard booking. |
+| `src/lib/reportPdf.ts` | Gate `generatePdf()` calls: wrap in `canAccessFeature` check in callers (`DoctorVisitReport`, `ReportShareButtons`). |
+| `src/lib/featureGating.ts` | Add entries: `"Guardian Limit"`, `"Geofencing"`, `"PDF Export"`. Add a `getGuardianLimit(plan)` helper returning 1/3/5. |
 
-**3. `src/hooks/useFeatureGate.ts`** (new)
-- Wraps `useSubscription` + `canAccessFeature`
-- Returns `{ canAccess(feature): boolean, gate(feature, callback): void }` where `gate` either runs the callback or opens the upgrade dialog
+---
 
-### Integration Points
+### 2. First-Time User Onboarding Wizard
 
-**`src/pages/MyHealth.tsx`** — Add lock icon overlay on gated tool cards. On click, show `UpgradeDialog` instead of opening the tool. Free tools open normally.
+**New file**: `src/components/OnboardingWizard.tsx`
 
-**`src/components/health-tools/SymptomChecker.tsx`**, **`DocumentAnalyzer.tsx`**, **`DoctorVisitReport.tsx`**, **`NutritionAdvisor.tsx`**, **`FaceScan.tsx`**, **`TeleConsult.tsx`** — No changes needed; gating happens at the MyHealth grid level before the component renders.
+A 4-step modal shown once after first login (tracked via `localStorage` key `onboarding_complete`):
 
-**`src/components/GuardianTab.tsx`** — Gate adding more than 1 guardian for free users.
+1. **Welcome** — name greeting, app value prop
+2. **Add Guardian** — inline form to add first guardian (pre-filled from registration if available)
+3. **Set Check-In Times** — pick morning/afternoon/evening check-in schedule
+4. **Emergency Profile** — prompt to fill blood type, allergies, emergency contact
 
-**`src/pages/MapMyJourney.tsx`** — Gate geofencing features for non-Pro users.
+Each step has skip/next. On completion, sets `localStorage` flag and navigates to dashboard.
 
-**`src/components/AmbulanceBooking.tsx`** — Show "Priority" badge for Pro, standard booking for all.
+**Integration**: Render `<OnboardingWizard />` in `src/pages/UserDashboard.tsx`, shown conditionally when flag is unset and user role is `"user"`.
 
-### Files Changed/Created
+---
+
+### 3. Harden PWA for Offline SOS
+
+**Goal**: SOS button works even without internet; queues the event and syncs when back online.
+
+| File | Change |
+|------|--------|
+| `public/sw-push.js` | Add `sync` event listener for `"sos-sync"` tag. On sync, read queued SOS from IndexedDB and POST to Supabase. Add `fetch` event listener to cache the emergency profile page for offline access. |
+| `src/contexts/AppContext.tsx` | In `triggerSOS()`, wrap the Supabase insert in a try/catch. On network failure, store SOS payload in IndexedDB and register a Background Sync (`navigator.serviceWorker.ready.then(r => r.sync.register("sos-sync"))`). |
+| New: `src/lib/offlineQueue.ts` | IndexedDB helpers: `queueSOS(payload)`, `dequeueAllSOS()`, `isOffline()`. |
+| `src/components/AppLayout.tsx` | Add a small offline indicator banner when `navigator.onLine === false`. |
+
+---
+
+### 4. Polish Guardian Invitation Flow
+
+| File | Change |
+|------|--------|
+| `src/pages/Settings.tsx` | Add "Re-send Invite" button next to pending guardians. Calls `send-guardian-invite` edge function again. Add real-time subscription on `guardians` table to update status badges (pending → accepted) without refresh. |
+| `src/components/GuardianTab.tsx` | Same re-send + realtime subscription. Show `nominated_at` timestamp and "Expires in X hours" for pending invites. |
+| `supabase/functions/send-guardian-invite/index.ts` | Add idempotency: skip if an invite was sent < 1 hour ago (check `nominated_at`). Return a clear message if rate-limited. |
+
+---
+
+### 5. Push Notification Reliability (CRITICAL)
+
+**Problem**: Current medication/check-in reminders rely on in-app hooks (`useMedicationAlarms`, `useCheckInAudio`) that only fire when the app tab is active. The `send-medication-push` edge function exists but only matches exact hour times (e.g. `08:00`), missing schedules like `08:30`.
+
+**Service Worker Enhancements** (`public/sw-push.js`):
+
+- Add `notificationclose` event to track dismissed reminders
+- Add action buttons to notifications: "Taken" and "Snooze 15 min"
+- On "Taken" action click, POST to Supabase to mark the medication log as taken (using stored anon key + user token from IndexedDB)
+- On "Snooze", schedule a local notification after 15 minutes using `setTimeout` within `waitUntil`
+
+**Edge Function Fix** (`supabase/functions/send-medication-push/index.ts`):
+
+- Remove the `currentMinute >= 2` early-return guard
+- Instead, match medications where ANY `schedule_times` entry falls within the current cron window (±2 minutes of now), not just exact hour matches
+- This makes 08:30, 14:45 etc. schedules work correctly
+
+**New Edge Function**: `supabase/functions/send-checkin-push/index.ts`
+
+- Mirrors `send-medication-push` but for check-in reminders
+- Queries `check_ins` with `status = 'pending'` and `scheduled_at` within the next 5 minutes
+- Sends push notification to the user's subscriptions
+- Schedule via pg_cron every minute
+
+**Push Payload Enhancement** (`send-medication-push` and `send-checkin-push`):
+
+- Include `medication_id`, `log_id`, and `user_id` in the push data payload so the service worker can act on "Taken" clicks without opening the app
+- Add `actions` field for notification action buttons
+
+**Client-side** (`src/hooks/usePushSubscription.ts`):
+
+- On subscribe, also store `user_id` and auth token in IndexedDB so the service worker can authenticate API calls for "Taken" actions
+
+---
+
+### Files Summary
 
 | Action | File |
-|---|---|
-| Create | `src/components/UpgradeDialog.tsx` |
-| Create | `src/lib/featureGating.ts` |
-| Create | `src/hooks/useFeatureGate.ts` |
-| Modify | `src/pages/MyHealth.tsx` (lock icons + gate) |
-| Modify | `src/pages/Subscription.tsx` (add Free tier column) |
-
-### UX Details
-
-- Locked features show a small `Lock` icon on the card
-- Tapping opens an upgrade dialog with: feature name, one-line benefit, required tier badge, and "View Plans" CTA
-- Active subscribers see no locks
-- Free tier column added to Subscription page so users understand what they get without paying
+|--------|------|
+| Modify | `src/lib/featureGating.ts` — add guardian limit helper, new feature keys |
+| Modify | `src/components/GuardianTab.tsx` — guardian limit gating + realtime + re-send |
+| Modify | `src/pages/Settings.tsx` — guardian limit gating + re-send + realtime |
+| Modify | `src/pages/MapMyJourney.tsx` — gate geofencing |
+| Modify | `src/components/AmbulanceBooking.tsx` — Pro priority badge |
+| Modify | `src/components/health-tools/DoctorVisitReport.tsx` — gate PDF export |
+| Create | `src/components/OnboardingWizard.tsx` — 4-step wizard |
+| Modify | `src/pages/UserDashboard.tsx` — render onboarding wizard |
+| Create | `src/lib/offlineQueue.ts` — IndexedDB SOS queue |
+| Modify | `src/contexts/AppContext.tsx` — offline SOS fallback |
+| Modify | `src/components/AppLayout.tsx` — offline indicator |
+| Modify | `public/sw-push.js` — action buttons, sync handler, offline SOS |
+| Modify | `supabase/functions/send-medication-push/index.ts` — fix time matching |
+| Create | `supabase/functions/send-checkin-push/index.ts` — check-in push |
+| Modify | `supabase/functions/send-guardian-invite/index.ts` — rate-limit re-sends |
+| Modify | `src/hooks/usePushSubscription.ts` — store auth in IndexedDB |
+| SQL | Schedule `send-checkin-push` via pg_cron every minute |
 
