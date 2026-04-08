@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
                   pushPayload,
                   VAPID_PUBLIC_KEY,
                   vapidPrivateKey,
-                  "mailto:admin@checkin.app"
+                  "mailto:checkin_support@futurewave.in"
                 );
                 if (res.status === 200 || res.status === 201) {
                   pushSent++;

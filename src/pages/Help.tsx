@@ -212,7 +212,7 @@ const Help = () => {
               { heading: "Data Sharing", content: "We share your information only with your designated guardians, emergency services when you trigger an SOS, and service providers who assist in delivering our services. All third parties are bound by confidentiality agreements." },
               { heading: "Data Security", content: "We implement industry-standard security measures including encryption, secure servers, and access controls to protect your personal and medical data. Your medical vault data is encrypted at rest and in transit." },
               { heading: "Your Rights", content: "You have the right to access, correct, or delete your personal data. You can export your data or request account deletion through the Settings page. We will respond to your requests within 30 days." },
-              { heading: "Contact Us", content: "If you have questions about this Privacy Policy, please contact us at privacy@checkin-app.in." },
+              { heading: "Contact Us", content: "If you have questions about this Privacy Policy, please contact us at checkin_support@futurewave.in." },
             ].map((s) => (
               <section key={s.heading} className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
