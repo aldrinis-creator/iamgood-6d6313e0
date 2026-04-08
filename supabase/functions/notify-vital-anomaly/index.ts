@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       message,
       type: "vital_anomaly",
     }));
-    await supabase.from("notifications").insert(notifRows);
+    await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
 
     // Send email via Resend if configured
     const resendKey = Deno.env.get("RESEND_API_KEY");

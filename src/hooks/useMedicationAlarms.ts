@@ -139,7 +139,9 @@ const useMedicationAlarms = () => {
           type: "medication_reminder",
           read: false,
         }));
-        await supabase.from("notifications").insert(notifications);
+        await supabase.rpc("insert_notifications_deduped", {
+          p_notifications: notifications,
+        });
       }
     }
 

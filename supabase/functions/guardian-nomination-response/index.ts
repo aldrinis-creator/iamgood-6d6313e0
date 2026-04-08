@@ -62,12 +62,12 @@ Deno.serve(async (req) => {
 
     // If rejected, create notification for the User
     if (action === "reject") {
-      await supabase.from("notifications").insert({
-        user_id: guardian.user_id,
-        guardian_id: guardian.id,
-        type: "nomination_rejected",
-        title: "Guardian Rejected Nomination",
-        message: `${guardian.guardian_name} has rejected your guardian nomination.`,
+      await supabase.rpc("insert_notification_deduped", {
+        p_user_id: guardian.user_id,
+        p_title: "Guardian Rejected Nomination",
+        p_message: `${guardian.guardian_name} has rejected your guardian nomination.`,
+        p_type: "nomination_rejected",
+        p_guardian_id: guardian.id,
       });
     }
 

@@ -477,7 +477,7 @@ const GuardianDashboard = () => {
         message: `${resolverName} has resolved your SOS alert.`,
         type: "sos_resolved",
       }];
-      await supabase.from("notifications").insert(notifRows);
+      await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
     }
   };
 
