@@ -1632,6 +1632,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      insert_notification_deduped: {
+        Args: {
+          p_guardian_id?: string
+          p_message: string
+          p_title: string
+          p_type?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       link_guardian_user_id: { Args: never; Returns: undefined }
       move_to_dlq: {
         Args: {
