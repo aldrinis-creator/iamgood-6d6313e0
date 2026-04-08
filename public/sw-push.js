@@ -1,6 +1,62 @@
-// Service Worker for Push Notifications + Offline SOS Sync
+// Service Worker for Push Notifications + Offline SOS Sync + Emergency Profile Cache
 const SUPABASE_URL = "https://magnrdegcegxdtgapyez.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZ25yZGVnY2VneGR0Z2FweWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTI5MTYsImV4cCI6MjA4OTQyODkxNn0.GEsHJs4uD-UVrdlgepE6nbjZBmjDICGZ4sR6a3zMv48";
+
+const EMERGENCY_CACHE = "emergency-profile-v1";
+
+// Cache emergency profile pages and their API data on fetch
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Cache navigation requests to /e/:token (emergency profile pages)
+  const isEmergencyPage = url.pathname.startsWith("/e/") && event.request.mode === "navigate";
+  // Cache Supabase REST API calls made by the emergency profile page
+  const isEmergencyApi = url.origin === SUPABASE_URL && url.pathname.startsWith("/rest/v1/");
+
+  if (isEmergencyPage || isEmergencyApi) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Clone and cache successful responses
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(EMERGENCY_CACHE).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => {
+          // Serve from cache when offline
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            // For navigation, try serving the app shell
+            if (isEmergencyPage) {
+              return caches.match("/index.html") || new Response("Offline – emergency profile unavailable", {
+                status: 503,
+                headers: { "Content-Type": "text/plain" },
+              });
+            }
+            return new Response("{}", { status: 503, headers: { "Content-Type": "application/json" } });
+          });
+        })
+    );
+    return;
+  }
+});
+
+// Cache the app shell on install for offline navigation fallback
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(EMERGENCY_CACHE).then((cache) => cache.addAll(["/index.html"])).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== EMERGENCY_CACHE).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
 
 // IndexedDB helpers for service worker context
 function openDB() {
