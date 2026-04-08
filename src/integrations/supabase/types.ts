@@ -1277,6 +1277,42 @@ export type Database = {
         }
         Relationships: []
       }
+      safe_zones: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          lat: number
+          lng: number
+          name: string
+          radius_m: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lat: number
+          lng: number
+          name: string
+          radius_m?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+          radius_m?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_destinations: {
         Row: {
           created_at: string
