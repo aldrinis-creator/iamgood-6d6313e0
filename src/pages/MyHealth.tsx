@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +19,8 @@ import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
+import UpgradeDialog from "@/components/UpgradeDialog";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -60,7 +62,6 @@ const toolComponents: Record<string, React.FC> = {
   "Nutrition": NutritionAdvisor,
   "Wellness": WellnessTracker,
   "Services": HealthServices,
-  
   "Vitals": VitalsMonitor,
 };
 
@@ -69,6 +70,7 @@ const MyHealth = () => {
   const navigate = useNavigate();
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
+  const { canAccess, gate, upgradeDialogOpen, upgradeFeature, requiredPlan, upgradeDescription, closeUpgradeDialog } = useFeatureGate();
 
   useEffect(() => {
     const tool = searchParams.get("tool");
@@ -77,6 +79,18 @@ const MyHealth = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  const handleToolClick = (label: string) => {
+    if (label === "Vault") {
+      gate("Vault", () => navigate("/medical-vault"));
+    } else {
+      gate(label, () => setSelectedTool(label));
+    }
+  };
+
+  const handleSubToolClick = (label: string) => {
+    gate(label, () => setSelectedSubTool(label));
+  };
 
   if (selectedSubTool) {
     const SubToolComponent = subToolComponents[selectedSubTool];
@@ -114,22 +128,36 @@ const MyHealth = () => {
             <ArrowLeft className="w-4 h-4" /> Health Tools
           </Button>
           <div className="space-y-2">
-            {healthToolsSubItems.map((item) => (
-              <Card key={item.label} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedSubTool(item.label)}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <item.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))}
+            {healthToolsSubItems.map((item) => {
+              const locked = !canAccess(item.label);
+              return (
+                <Card key={item.label} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleSubToolClick(item.label)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <item.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                    {locked ? (
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
+        <UpgradeDialog
+          open={upgradeDialogOpen}
+          onOpenChange={(open) => !open && closeUpgradeDialog()}
+          featureName={upgradeFeature}
+          requiredPlan={requiredPlan}
+          description={upgradeDescription}
+        />
       </AppLayout>
     );
   }
@@ -139,20 +167,33 @@ const MyHealth = () => {
       <div className="p-4 space-y-4">
         <h1 className="text-xl font-bold">My Health</h1>
         <div className="grid grid-cols-3 gap-3">
-          {healthTools.map((tool) => (
-            <button
-              key={tool.label}
-              onClick={() => tool.label === "Vault" ? navigate("/medical-vault") : setSelectedTool(tool.label)}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
-            >
-              <div className={`w-12 h-12 rounded-full ${tool.color} flex items-center justify-center`}>
-                <tool.icon className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-medium text-center">{tool.label}</span>
-            </button>
-          ))}
+          {healthTools.map((tool) => {
+            const locked = !canAccess(tool.label);
+            return (
+              <button
+                key={tool.label}
+                onClick={() => handleToolClick(tool.label)}
+                className="relative flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
+              >
+                <div className={`w-12 h-12 rounded-full ${tool.color} flex items-center justify-center`}>
+                  <tool.icon className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-medium text-center">{tool.label}</span>
+                {locked && (
+                  <Lock className="absolute top-2 right-2 w-3.5 h-3.5 text-muted-foreground" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
+      <UpgradeDialog
+        open={upgradeDialogOpen}
+        onOpenChange={(open) => !open && closeUpgradeDialog()}
+        featureName={upgradeFeature}
+        requiredPlan={requiredPlan}
+        description={upgradeDescription}
+      />
     </AppLayout>
   );
 };
