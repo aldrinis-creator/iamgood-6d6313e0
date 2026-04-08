@@ -47,7 +47,11 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
 
   const userName = profile?.full_name || "there";
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (step === 2) {
+      // Save selected check-in preset to user_settings
+      await saveCheckInTimes();
+    }
     if (step < 3) setStep(step + 1);
     else handleFinish();
   };
@@ -55,6 +59,30 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const handleSkip = () => {
     if (step < 3) setStep(step + 1);
     else handleFinish();
+  };
+
+  const saveCheckInTimes = async () => {
+    if (!session?.user?.id) return;
+    const preset = CHECK_IN_PRESETS[selectedPreset];
+    if (!preset || preset.times.length === 0) return;
+    try {
+      const { data: existing } = await supabase
+        .from("user_settings")
+        .select("id, settings")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      const currentSettings = (existing?.settings as Record<string, unknown>) || {};
+      const newSettings = { ...currentSettings, checkInTimes: preset.times };
+
+      if (existing) {
+        await supabase.from("user_settings").update({ settings: newSettings }).eq("id", existing.id);
+      } else {
+        await supabase.from("user_settings").insert({ user_id: session.user.id, settings: newSettings });
+      }
+    } catch (e) {
+      console.error("Failed to save check-in times:", e);
+    }
   };
 
   const handleFinish = () => {

@@ -31,6 +31,7 @@ const healthTools = [
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
+  { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
 ];
@@ -62,6 +63,7 @@ const toolComponents: Record<string, React.FC> = {
   "Nutrition": NutritionAdvisor,
   "Wellness": WellnessTracker,
   "Services": HealthServices,
+  "Face Scan": FaceScan,
   "Vitals": VitalsMonitor,
 };
 
