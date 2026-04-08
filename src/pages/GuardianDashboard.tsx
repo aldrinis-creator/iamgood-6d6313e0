@@ -740,7 +740,7 @@ const GuardianDashboard = () => {
               </div>
             ) : wardLocation ? (
               <div className="space-y-2">
-                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} />
+                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
                 {!activeSOS && (
                   <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
                     <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
