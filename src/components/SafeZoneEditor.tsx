@@ -330,7 +330,7 @@ export default function SafeZoneEditor() {
       <UpgradeDialog
         open={upgradeDialogOpen}
         onOpenChange={closeUpgradeDialog}
-        feature={upgradeFeature || ""}
+        featureName={upgradeFeature}
         requiredPlan={requiredPlan}
         description={upgradeDescription}
       />
