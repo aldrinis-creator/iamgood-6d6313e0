@@ -215,6 +215,7 @@ const GuardianDashboard = () => {
   const [wardBattery, setWardBattery] = useState<number | null>(null);
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
+  const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
