@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Settings } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Settings, WifiOff } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import NavTabs from "@/components/NavTabs";
@@ -34,12 +34,29 @@ const UserOnlyHooks = () => {
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
   const [showCookieSettings, setShowCookieSettings] = useState(false);
+  const [offline, setOffline] = useState(!navigator.onLine);
   useAutoSleepMode();
+
+  useEffect(() => {
+    const onOnline = () => setOffline(false);
+    const onOffline = () => setOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
         {role === "user" && <UserOnlyHooks />}
+        {offline && (
+          <div className="bg-warning text-warning-foreground text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
+            <WifiOff className="w-3.5 h-3.5" /> You're offline — SOS will queue and send when reconnected
+          </div>
+        )}
         <SOSActiveBar />
         <PwaInstallBanner />
         <AppHeader />

@@ -8,6 +8,7 @@ import {
   unsubscribeFromPush,
   getExistingSubscription,
 } from "@/lib/pushNotifications";
+import { storeAuthForSW } from "@/lib/offlineQueue";
 import { toast } from "sonner";
 
 const usePushSubscription = () => {
@@ -70,6 +71,15 @@ const usePushSubscription = () => {
     } else {
       toast.success("Push notifications enabled!");
       setIsSubscribed(true);
+      // Store auth in IndexedDB for service worker actions
+      try {
+        const accessToken = session.access_token;
+        if (accessToken) {
+          await storeAuthForSW(session.user.id, accessToken);
+        }
+      } catch (e) {
+        console.warn("Failed to store auth for SW:", e);
+      }
     }
     setLoading(false);
   };

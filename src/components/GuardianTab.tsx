@@ -4,10 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Trash2, Mail } from "lucide-react";
+import { Loader2, Trash2, Mail, Lock, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PhoneInput from "@/components/PhoneInput";
+import { useSubscription } from "@/hooks/useSubscription";
+import { getGuardianLimit } from "@/lib/featureGating";
+import UpgradeDialog from "@/components/UpgradeDialog";
+import { formatDistanceToNow } from "date-fns";
 
 interface Guardian {
   id: string;
@@ -27,6 +32,10 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [resending, setResending] = useState<string | null>(null);
+  const { plan } = useSubscription();
+  const guardianLimit = getGuardianLimit(plan);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -57,6 +66,19 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const phoneDigitCount = phone.replace(/[^\d]/g, "").length;
   const isPhoneValid = phoneDigitCount >= 10;
 
+  const handleResendInvite = async (g: Guardian) => {
+    setResending(g.id);
+    try {
+      await supabase.functions.invoke("send-guardian-invite", {
+        body: { guardian_name: g.guardian_name, user_name: "User", relation: g.relation, guardian_phone: g.guardian_phone, guardian_email: g.guardian_email },
+      });
+      toast.success(`Invite re-sent to ${g.guardian_name}`);
+    } catch {
+      toast.error("Failed to re-send invite");
+    }
+    setResending(null);
+  };
+
   const handleAdd = async () => {
     if (!userId || !name.trim() || !phone.trim() || !email.trim()) {
       toast.error("Name, phone and email are required for emergency notifications");
@@ -64,6 +86,10 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     }
     if (!isPhoneValid) {
       toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+      return;
+    }
+    if (guardians.length >= guardianLimit) {
+      setShowUpgrade(true);
       return;
     }
     setAdding(true);
@@ -114,32 +140,46 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
             </div>
           ) : guardians.length > 0 ? (
             guardians.map((g) => (
-              <div key={g.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div>
-                  <p className="font-medium text-sm">{g.guardian_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {g.relation && `${g.relation} • `}{g.guardian_phone}
-                  </p>
-                  {g.guardian_email && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Mail className="w-3 h-3" />
-                      {g.guardian_email}
+              <div key={g.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">{g.guardian_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {g.relation && `${g.relation} • `}{g.guardian_phone}
                     </p>
-                  )}
+                    {g.guardian_email && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Mail className="w-3 h-3" />
+                        {g.guardian_email}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {g.is_primary && (
+                      <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">Primary</span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleDelete(g.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {g.is_primary && (
-                    <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">Primary</span>
-                  )}
+                {g.guardian_email && (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => handleDelete(g.id)}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1 w-full"
+                    disabled={resending === g.id}
+                    onClick={() => handleResendInvite(g)}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {resending === g.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Re-send Invite
                   </Button>
-                </div>
+                )}
               </div>
             ))
           ) : (
@@ -180,12 +220,34 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
               </div>
             </div>
           ) : (
-            <Button variant="outline" className="w-full" onClick={() => setShowForm(true)}>
-              + Add Guardian
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (guardians.length >= guardianLimit) {
+                  setShowUpgrade(true);
+                } else {
+                  setShowForm(true);
+                }
+              }}
+            >
+              {guardians.length >= guardianLimit ? (
+                <><Lock className="w-4 h-4 mr-1" /> Add Guardian ({guardians.length}/{guardianLimit})</>
+              ) : (
+                `+ Add Guardian (${guardians.length}/${guardianLimit})`
+              )}
             </Button>
           )}
         </CardContent>
       </Card>
+
+      <UpgradeDialog
+        open={showUpgrade}
+        onOpenChange={setShowUpgrade}
+        featureName="Guardian Limit"
+        requiredPlan={plan === "free" ? "basic" : "pro"}
+        description={`Your current plan allows ${guardianLimit} guardian(s). Upgrade to add more.`}
+      />
     </TabsContent>
   );
 };
