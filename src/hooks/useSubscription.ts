@@ -20,7 +20,7 @@ export function useSubscription() {
         .maybeSingle();
 
       if (error) throw error;
-      return data as {
+      return data as unknown as {
         id: string;
         plan_type: string;
         billing_cycle: string;
