@@ -23,7 +23,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
-type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "language" | "access" | "privacy";
+type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
 interface Guardian {
   id: string;
@@ -288,6 +288,7 @@ const Settings = () => {
     { id: "checkin", label: "Check-In" },
     { id: "appts", label: "Appts" },
     { id: "guardians", label: "Guardians" },
+    { id: "safety", label: "Safety" },
     { id: "language", label: "Language" },
     { id: "access", label: "Access" },
     { id: "privacy", label: "Privacy" },
@@ -882,6 +883,13 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* ============ SAFETY ZONES TAB ============ */}
+        {activeTab === "safety" && (
+          <div className="space-y-4">
+            <SafeZoneEditor />
           </div>
         )}
 
