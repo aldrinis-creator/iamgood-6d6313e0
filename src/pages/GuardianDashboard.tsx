@@ -673,7 +673,6 @@ const GuardianDashboard = () => {
                       ? <p className="text-xs text-destructive font-medium flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Outside Safe Zone</p>
                       : <p className="text-xs text-success font-medium">● Online — Safe</p>;
                   })()}
-                  )}
                   {wardPauseMode === "sleep" && (
                     <p className="text-xs text-primary font-medium">
                       😴 Sleep Mode {wardPauseDetails.sleepTo ? `— until ${wardPauseDetails.sleepTo}` : ""}
