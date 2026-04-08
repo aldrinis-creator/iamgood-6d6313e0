@@ -1,12 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Crown } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Check, Star, Crown, ExternalLink } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useQueryClient } from "@tanstack/react-query";
 
 const plans = [
   {
+    key: "basic",
     name: "Basic",
     icon: Star,
     monthly: 99,
@@ -21,6 +27,7 @@ const plans = [
     excluded: ["Advanced Geofencing", "Priority Ambulance", "AI Fall Detection", "5 Guardians", "Weekly Reports"],
   },
   {
+    key: "pro",
     name: "Pro",
     icon: Crown,
     monthly: 199,
@@ -43,8 +50,31 @@ const plans = [
 
 const Subscription = () => {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { subscription, isActive, loading } = useSubscription();
+  const queryClient = useQueryClient();
+
+  // Handle return from futurewave.in
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status === "success") {
+      toast.success("Payment successful! Your subscription is now active.");
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      setSearchParams({}, { replace: true });
+    } else if (status === "cancelled") {
+      toast.info("Payment was cancelled.");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, queryClient]);
+
+  const handleChoosePlan = (planKey: string) => {
+    if (!user) return;
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success`);
+    const cancelUrl = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
+    const url = `https://futurewave.in/pay?plan=${planKey}&billing=${billing}&user_id=${user.id}&app_callback=${callbackUrl}&cancel_url=${cancelUrl}`;
+    window.location.href = url;
+  };
 
   return (
     <AppLayout>
@@ -55,6 +85,23 @@ const Subscription = () => {
             Upgrade for advanced safety features and peace of mind.
           </p>
         </div>
+
+        {/* Active Subscription Banner */}
+        {isActive && subscription && (
+          <Card className="border-2 border-success bg-success/5">
+            <CardContent className="py-3 px-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">
+                  Active: {subscription.plan_type === "pro" ? "Pro" : "Basic"} ({subscription.billing_cycle})
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Expires {new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              </div>
+              <Badge variant="secondary" className="bg-success/20 text-success border-0">Active</Badge>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Billing Toggle */}
         <div className="flex justify-center">
@@ -79,91 +126,73 @@ const Subscription = () => {
         </div>
 
         {/* Plans */}
-        {plans.map((plan) => (
-          <Card key={plan.name} className={plan.popular ? "border-2 border-primary relative" : ""}>
-            {plan.popular && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full">
-                Most Popular
-              </span>
-            )}
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="flex items-center gap-2">
-                <plan.icon className="w-5 h-5 text-primary" />
-                {plan.name}
-              </CardTitle>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold">
-                  ₹{billing === "monthly" ? plan.monthly : plan.yearly}
+        {plans.map((plan) => {
+          const isCurrentPlan = isActive && subscription?.plan_type === plan.key;
+          return (
+            <Card key={plan.key} className={plan.popular ? "border-2 border-primary relative" : ""}>
+              {plan.popular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full">
+                  Most Popular
                 </span>
-                <span className="text-sm text-muted-foreground">
-                  /{billing === "monthly" ? "mo" : "yr"}
+              )}
+              {isCurrentPlan && (
+                <span className="absolute -top-3 right-4 bg-success text-white text-xs px-3 py-1 rounded-full">
+                  Current Plan
                 </span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                {plan.features.map((f) => (
-                  <div key={f} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-success shrink-0" />
-                    {f}
-                  </div>
-                ))}
-                {plan.excluded.map((f) => (
-                  <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground line-through">
-                    <span className="w-4 h-4 shrink-0" />
-                    {f}
-                  </div>
-                ))}
-              </div>
-              <Button
-                className={`w-full ${plan.popular ? "bg-primary" : ""}`}
-                variant={plan.popular ? "default" : "outline"}
-                size="lg"
-                onClick={() => {
-                  setSelectedPlan(plan.name);
-                  setShowCheckout(true);
-                }}
-              >
-                {plan.popular ? "Go Pro" : "Choose Basic"}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+              )}
+              <CardHeader className="pb-2 pt-4">
+                <CardTitle className="flex items-center gap-2">
+                  <plan.icon className="w-5 h-5 text-primary" />
+                  {plan.name}
+                </CardTitle>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold">
+                    ₹{billing === "monthly" ? plan.monthly : plan.yearly}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    /{billing === "monthly" ? "mo" : "yr"}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  {plan.features.map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-success shrink-0" />
+                      {f}
+                    </div>
+                  ))}
+                  {plan.excluded.map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground line-through">
+                      <span className="w-4 h-4 shrink-0" />
+                      {f}
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  className={`w-full ${plan.popular ? "bg-primary" : ""}`}
+                  variant={plan.popular ? "default" : "outline"}
+                  size="lg"
+                  disabled={isCurrentPlan || loading}
+                  onClick={() => handleChoosePlan(plan.key)}
+                >
+                  {isCurrentPlan ? (
+                    "Current Plan"
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      {plan.popular ? "Go Pro" : "Choose Basic"}
+                      <ExternalLink className="w-4 h-4" />
+                    </span>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
 
-        {/* Mock Razorpay Checkout */}
-        <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Razorpay Checkout</DialogTitle>
-              <DialogDescription>
-                Complete your {selectedPlan} subscription
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 p-4 bg-muted rounded-lg">
-              <div className="flex justify-between text-sm">
-                <span>Plan</span>
-                <span className="font-semibold">{selectedPlan} ({billing})</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Amount</span>
-                <span className="font-semibold">
-                  ₹{selectedPlan === "Pro"
-                    ? billing === "monthly" ? "199" : "1,999"
-                    : billing === "monthly" ? "99" : "999"
-                  }
-                </span>
-              </div>
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground text-center">
-                  🔒 Secured by Razorpay • This is a demo checkout
-                </p>
-              </div>
-              <Button className="w-full bg-primary" size="lg" onClick={() => setShowCheckout(false)}>
-                Pay Now (Demo)
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <p className="text-xs text-center text-muted-foreground px-4">
+          You'll be redirected to our secure payment page at futurewave.in to complete your purchase.
+        </p>
       </div>
     </AppLayout>
   );
