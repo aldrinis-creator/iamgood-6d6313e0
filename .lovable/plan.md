@@ -1,94 +1,71 @@
 
 
-## Build Subscription Infrastructure with Website Payment Redirect
+## Build Freemium Gating System
 
 ### Overview
 
-Replace the mock Razorpay checkout dialog with a redirect to `futurewave.in`, and build the backend infrastructure to track subscription status via a secure webhook.
+Create a reusable `UpgradeDialog` component and a feature-tier map. Free users see all features but premium ones show an upgrade prompt on tap. SOS and basic check-ins remain always free.
 
-### Architecture
+### Feature Tier Map
 
-```text
-┌─────────────┐    redirect     ┌──────────────────┐
-│  Check-iN   │ ──────────────► │  futurewave.in   │
-│  App (PWA)  │  ?plan&billing  │  /pay?...        │
-│             │                 │  (Razorpay here) │
-│             │ ◄────────────── │                  │
-│             │  redirect back  └───────┬──────────┘
-│             │  /subscription?status   │
-└──────┬──────┘                         │ POST webhook
-       │                                ▼
-       │ useSubscription()    ┌──────────────────┐
-       └─────────────────────►│  Edge Function   │
-         reads subscriptions  │  confirm-payment │
-                              │  (HMAC verified) │
-                              └──────────────────┘
-```
+| Always Free | Basic | Pro Only |
+|---|---|---|
+| SOS button + alerts | 3 daily check-ins | Unlimited check-ins |
+| 1 guardian link | Medical Vault (view) | Up to 5 guardians |
+| Emergency profile | Basic activity tracking | AI Fall Detection |
+| Emergency First Aid | Medication manager | AI Symptom Checker |
+| Basic vitals (manual) | — | Document Analyzer |
+| — | — | Doctor Visit Report |
+| — | — | PDF export / sharing |
+| — | — | Nutrition Advisor (AI) |
+| — | — | Face Scan |
+| — | — | Tele-Consult |
+| — | — | Wellness AI insights |
+| — | — | Priority Ambulance |
+| — | — | Journey geofencing |
 
-### 1. Database — `subscriptions` table
+### Components
 
-Create a `subscriptions` table:
+**1. `src/components/UpgradeDialog.tsx`** (new)
+- Reusable dialog showing feature name, benefit description, and tier required (Basic/Pro)
+- "View Plans" button navigates to `/subscription`
+- Accepts props: `open`, `onOpenChange`, `featureName`, `requiredPlan` ("basic" | "pro"), `description`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| user_id | uuid | NOT NULL |
-| plan_type | text | `basic` or `pro` |
-| billing_cycle | text | `monthly` or `yearly` |
-| status | text | `active`, `expired`, `cancelled` (default `active`) |
-| amount_paise | integer | Amount in paise |
-| razorpay_payment_id | text | Nullable, from webhook |
-| razorpay_order_id | text | Nullable |
-| starts_at | timestamptz | Default now() |
-| expires_at | timestamptz | Computed from billing cycle |
-| created_at | timestamptz | Default now() |
-| updated_at | timestamptz | Default now() |
+**2. `src/lib/featureGating.ts`** (new)
+- `FEATURE_TIERS` map: feature label → required plan ("free", "basic", "pro")
+- `canAccessFeature(plan: string | null, feature: string): boolean` helper
+- Centralizes all gating logic in one place
 
-RLS policies:
-- Users can SELECT their own subscriptions
-- No client INSERT/UPDATE/DELETE — only the webhook edge function (service role) writes
+**3. `src/hooks/useFeatureGate.ts`** (new)
+- Wraps `useSubscription` + `canAccessFeature`
+- Returns `{ canAccess(feature): boolean, gate(feature, callback): void }` where `gate` either runs the callback or opens the upgrade dialog
 
-### 2. Edge Function — `confirm-payment`
+### Integration Points
 
-`supabase/functions/confirm-payment/index.ts`
+**`src/pages/MyHealth.tsx`** — Add lock icon overlay on gated tool cards. On click, show `UpgradeDialog` instead of opening the tool. Free tools open normally.
 
-- Accepts POST with: `user_id`, `plan_type`, `billing_cycle`, `amount_paise`, `razorpay_payment_id`, `razorpay_order_id`, `signature`
-- Verifies HMAC signature using a shared `PAYMENT_WEBHOOK_SECRET` to ensure only `futurewave.in` can call it
-- Inserts/upserts into `subscriptions` table with computed `expires_at`
-- Returns `{ success: true }`
-- Uses service role client to bypass RLS
+**`src/components/health-tools/SymptomChecker.tsx`**, **`DocumentAnalyzer.tsx`**, **`DoctorVisitReport.tsx`**, **`NutritionAdvisor.tsx`**, **`FaceScan.tsx`**, **`TeleConsult.tsx`** — No changes needed; gating happens at the MyHealth grid level before the component renders.
 
-Requires a new secret: `PAYMENT_WEBHOOK_SECRET` (a shared key you also configure on futurewave.in)
+**`src/components/GuardianTab.tsx`** — Gate adding more than 1 guardian for free users.
 
-### 3. Client Hook — `src/hooks/useSubscription.ts`
+**`src/pages/MapMyJourney.tsx`** — Gate geofencing features for non-Pro users.
 
-- Queries `subscriptions` table for current user where `status = 'active'` and `expires_at > now()`
-- Returns `{ plan, isActive, isPro, isBasic, loading, subscription }`
-- Can be used anywhere in the app to gate premium features
-
-### 4. Subscription Page Update — `src/pages/Subscription.tsx`
-
-- Remove the mock Razorpay dialog
-- Show current subscription status if active (plan name, expiry date, badge)
-- "Choose Plan" button opens `https://futurewave.in/pay?plan=basic&billing=monthly&user_id=xxx&app_callback=<encoded-return-url>` in the same window
-- Handle `?status=success` / `?status=cancelled` query params on return to show toast feedback
-- If already subscribed to a plan, show "Current Plan" badge and disable that button
-
-### 5. Config — `supabase/config.toml`
-
-Add `verify_jwt = false` for `confirm-payment` (webhook called externally, uses HMAC instead).
+**`src/components/AmbulanceBooking.tsx`** — Show "Priority" badge for Pro, standard booking for all.
 
 ### Files Changed/Created
 
 | Action | File |
-|--------|------|
-| Create | Migration for `subscriptions` table + RLS |
-| Create | `supabase/functions/confirm-payment/index.ts` |
-| Create | `src/hooks/useSubscription.ts` |
-| Modify | `src/pages/Subscription.tsx` |
-| Modify | `supabase/config.toml` |
+|---|---|
+| Create | `src/components/UpgradeDialog.tsx` |
+| Create | `src/lib/featureGating.ts` |
+| Create | `src/hooks/useFeatureGate.ts` |
+| Modify | `src/pages/MyHealth.tsx` (lock icons + gate) |
+| Modify | `src/pages/Subscription.tsx` (add Free tier column) |
 
-### Secret Required
+### UX Details
 
-Before implementation, you will need to provide a `PAYMENT_WEBHOOK_SECRET` — a random string that you also configure on `futurewave.in` to sign webhook requests. This ensures only your website can confirm payments.
+- Locked features show a small `Lock` icon on the card
+- Tapping opens an upgrade dialog with: feature name, one-line benefit, required tier badge, and "View Plans" CTA
+- Active subscribers see no locks
+- Free tier column added to Subscription page so users understand what they get without paying
 
