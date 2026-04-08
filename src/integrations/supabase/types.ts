@@ -1642,6 +1642,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      insert_notifications_deduped: {
+        Args: { p_notifications: Json }
+        Returns: undefined
+      }
       link_guardian_user_id: { Args: never; Returns: undefined }
       move_to_dlq: {
         Args: {
