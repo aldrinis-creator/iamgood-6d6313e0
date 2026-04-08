@@ -1,65 +1,70 @@
 
 
-## Go-Live Readiness Assessment
+## App Store & Play Store Migration Plan
 
-### Status: NOT YET READY — 3 Critical Security Issues
+Your Check-iN app is currently a PWA (Progressive Web App). To publish it on the Apple App Store and Google Play Store, you need to wrap it in a native shell using **Capacitor** — a bridge that runs your existing web app inside a native iOS/Android container.
 
-The app is feature-complete, but the security scan found **3 error-level vulnerabilities** that must be fixed before launch. These are real attack vectors, not theoretical concerns.
+### What I Will Do (in Lovable)
 
----
+1. **Install Capacitor dependencies** — `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`, `@capacitor/android`
+2. **Initialize Capacitor** — create `capacitor.config.ts` with your app ID (`app.lovable.c08453f9a77243a6ab7c53dcaa1d84f2`) and name (`Check-iN`), configured for live reload from the sandbox during development
+3. **Adjust Vite config** — set `base: './'` for native file:// loading compatibility
+4. **Add native plugin wrappers** (optional, as needed) — e.g., `@capacitor/push-notifications` for native push, `@capacitor/geolocation` for background location
 
-### Critical Issues to Fix
+### What You Need To Do (on your machine)
 
-**1. Emergency share tokens are publicly enumerable**
-- The RLS policy on `emergency_share_tokens` lets anonymous users SELECT all active tokens — meaning anyone can discover every active emergency share and access linked health data.
-- **Fix**: Tighten the USING clause so the caller must already know the token (e.g., `token = current_setting('request.headers')::json->>'x-share-token'` or filter by token value passed as a query parameter).
+| Requirement | iOS | Android |
+|---|---|---|
+| **Computer** | Mac (required) | Mac, Windows, or Linux |
+| **IDE** | Xcode 15+ (free from Mac App Store) | Android Studio (free download) |
+| **Developer Account** | Apple Developer Program — **$99/year** | Google Play Console — **$25 one-time** |
+| **Device or Emulator** | iPhone simulator (in Xcode) or physical device | Android emulator (in Android Studio) or physical device |
 
-**2. Guardian nomination tokens exposed via emergency share**
-- The anon policy on `guardians` for emergency shares returns `nomination_token`, `guardian_phone`, and `guardian_email`. An attacker could steal nomination tokens and fraudulently accept guardian invitations.
-- **Fix**: Create a restrictive column list or a database view for emergency share reads that excludes `nomination_token`, `guardian_phone`, and `guardian_email`.
+### Steps You'll Run Locally
 
-**3. Realtime channels have no authorization**
-- Any authenticated user can subscribe to any Realtime channel (e.g., another user's notifications or journey updates).
-- **Fix**: Add RLS policies on Realtime or use private channels with server-side token validation.
+```text
+1. Export project to GitHub (via Lovable "Export to GitHub" button)
+2. git clone <your-repo> && cd <your-repo>
+3. npm install
+4. npx cap add ios          ← adds native iOS project
+5. npx cap add android      ← adds native Android project
+6. npm run build            ← build the web app
+7. npx cap sync             ← copy web assets into native projects
+8. npx cap open ios         ← opens Xcode
+9. npx cap open android     ← opens Android Studio
+```
 
----
+### App Store Submission Checklist
 
-### Warnings (Should Fix, Not Blockers)
+**Apple App Store:**
+- App icon: 1024×1024 PNG (no transparency, no rounded corners)
+- Screenshots: at least 1 set for iPhone 6.7" display
+- Privacy policy URL (you have this: `/privacy-policy`)
+- App description, keywords, category (Health & Fitness / Medical)
+- Review may take 1-3 days; Apple may ask about health data handling
 
-| Issue | Fix |
-|-------|-----|
-| 4 functions with mutable `search_path` | Add `SET search_path = 'public'` to `enqueue_email`, `read_email_batch`, `delete_email`, `move_to_dlq` |
-| Leaked password protection disabled | Enable via auth configuration |
-| OTP codes stored in plaintext | Hash OTP codes instead of storing raw values |
+**Google Play Store:**
+- App icon: 512×512 PNG
+- Feature graphic: 1024×500 PNG
+- Screenshots: at least 2 phone screenshots
+- Privacy policy URL
+- Data safety form (declare what data you collect)
+- Review typically takes hours to 1 day
 
----
+### Important Considerations
 
-### What's Already Good
+- **Push Notifications**: Your current web push will need to be supplemented with native push via `@capacitor/push-notifications` + Firebase Cloud Messaging (Android) and APNs (iOS). I can set this up in the codebase.
+- **Background Location**: For geofencing to work when the app is closed, you'll need `@capacitor/geolocation` with background mode — requires additional App Store justification for Apple.
+- **App Store Review**: Apple scrutinizes health/emergency apps. Your emergency disclaimer and "not a replacement for 112" language is good — keep it prominent.
+- **Deep Links**: Your emergency profile share links (`/e/:token`) will need Universal Links (iOS) and App Links (Android) configuration.
 
-- All core features working (SOS, check-ins, medications, geofencing, journeys)
-- Notification deduplication and 48-hour cleanup in place
-- Role-based routing and feature gating functional
-- Edge functions deployed and operational
-- PWA with offline emergency profile caching
-- Email infrastructure on custom domain
+### Cost Summary
 
----
+| Item | Cost |
+|---|---|
+| Apple Developer Account | $99/year |
+| Google Play Developer Account | $25 one-time |
+| Lovable (your existing plan) | Current plan |
 
-### Recommended Go-Live Plan
-
-| Step | Action |
-|------|--------|
-| 1 | Fix the 3 critical RLS/security issues (migration + policy updates) |
-| 2 | Fix the 4 `search_path` warnings |
-| 3 | Enable leaked password protection |
-| 4 | Run security scan again to confirm clean |
-| 5 | Publish |
-
-### Files to Modify
-
-- 1 SQL migration to tighten `emergency_share_tokens`, `guardians` anon policies, and fix function search paths
-- Auth configuration for leaked password protection
-- No frontend code changes needed
-
-Shall I proceed with these security fixes?
+Shall I proceed with the Capacitor setup in the codebase?
 
