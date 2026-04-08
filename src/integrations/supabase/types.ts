@@ -1038,6 +1038,13 @@ export type Database = {
             referencedRelation: "guardians"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notifications_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_ward_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       nutrition_personas: {
@@ -1609,7 +1616,78 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      guardians_emergency_safe: {
+        Row: {
+          guardian_name: string | null
+          guardian_phone: string | null
+          is_primary: boolean | null
+          relation: string | null
+          user_id: string | null
+        }
+        Insert: {
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          is_primary?: boolean | null
+          relation?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          is_primary?: boolean | null
+          relation?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      guardians_ward_safe: {
+        Row: {
+          created_at: string | null
+          guardian_email: string | null
+          guardian_name: string | null
+          guardian_phone: string | null
+          guardian_user_id: string | null
+          id: string | null
+          is_primary: boolean | null
+          is_vault_nominee: boolean | null
+          nominated_at: string | null
+          nomination_expires_at: string | null
+          relation: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_user_id?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_vault_nominee?: boolean | null
+          nominated_at?: string | null
+          nomination_expires_at?: string | null
+          relation?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          guardian_email?: string | null
+          guardian_name?: string | null
+          guardian_phone?: string | null
+          guardian_user_id?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          is_vault_nominee?: boolean | null
+          nominated_at?: string | null
+          nomination_expires_at?: string | null
+          relation?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       delete_email: {
@@ -1647,6 +1725,12 @@ export type Database = {
         Returns: undefined
       }
       link_guardian_user_id: { Args: never; Returns: undefined }
+      lookup_emergency_token: {
+        Args: { _token: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
