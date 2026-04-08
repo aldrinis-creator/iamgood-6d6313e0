@@ -182,9 +182,6 @@ serve(async (req) => {
       list.push({ name: med.name, id: med.id });
       userMeds.set(med.user_id, list);
     }
-      list.push(med.name);
-      userMeds.set(med.user_id, list);
-    }
 
     let sentCount = 0;
 
