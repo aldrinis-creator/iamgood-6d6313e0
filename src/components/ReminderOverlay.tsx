@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
-import { ensureAudioReady } from "@/lib/audioAlerts";
+import { ensureAudioReady, playVoiceReminder, playChime } from "@/lib/audioAlerts";
 import { toast } from "sonner";
 
 export type ReminderType = "checkin" | "medication" | "appointment" | "exercise";
@@ -61,7 +61,17 @@ const ReminderOverlay = () => {
     snoozeCountRef.current.set(key, used);
 
     if (used >= MAX_SNOOZES) {
-      toast.info("Maximum snoozes reached. Please take action.");
+      if (reminder.type === "medication") {
+        // Escalation: urgent audio + guardian nudge
+        playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
+        playChime();
+        if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+        toast.warning("Medication not taken — your guardian has been notified.", { duration: 6000 });
+        // Dispatch event for useMedicationAlarms to notify guardians immediately
+        window.dispatchEvent(new CustomEvent("app:medication-snooze-exhausted", { detail: reminder }));
+      } else {
+        toast.info("Maximum snoozes reached. Please take action.");
+      }
       dismiss();
       return;
     }

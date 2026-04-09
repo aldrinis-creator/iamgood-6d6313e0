@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -25,10 +25,29 @@ interface HealthPassportTrendProps {
   userId: string;
 }
 
+const AUTO_COLLAPSE_MS = 5 * 60_000; // 5 minutes
+
 const HealthPassportTrend = ({ userId }: HealthPassportTrendProps) => {
   const [period, setPeriod] = useState<Period>("daily");
   const [data, setData] = useState<TrendPoint[]>([]);
   const [open, setOpen] = useState(false);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const resetCollapseTimer = useCallback(() => {
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    if (open) {
+      collapseTimerRef.current = setTimeout(() => setOpen(false), AUTO_COLLAPSE_MS);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      resetCollapseTimer();
+    } else if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+    }
+    return () => { if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current); };
+  }, [open, resetCollapseTimer]);
 
   useEffect(() => {
     if (!userId || !open) return;
@@ -112,7 +131,7 @@ const HealthPassportTrend = ({ userId }: HealthPassportTrendProps) => {
         <span>Score Trend</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-3 pt-2">
+      <CollapsibleContent className="space-y-3 pt-2" onMouseEnter={resetCollapseTimer} onTouchStart={resetCollapseTimer}>
         <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <TabsList className="grid w-full grid-cols-3 h-8">
             <TabsTrigger value="daily" className="text-xs">Daily</TabsTrigger>
