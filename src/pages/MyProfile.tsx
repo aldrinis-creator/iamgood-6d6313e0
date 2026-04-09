@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { formatScheduleTime } from "@/lib/istTime";
 import {
   User, Phone, Calendar, Scale, Ruler, Heart, Shield,
   Save, Edit, ShieldCheck, Stethoscope,

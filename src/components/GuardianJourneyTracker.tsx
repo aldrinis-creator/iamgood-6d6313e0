@@ -9,6 +9,7 @@ import { MapPin, Clock, Navigation, Maximize2, Minimize2, AlertTriangle, Gauge, 
 import { supabase } from "@/integrations/supabase/client";
 import "leaflet/dist/leaflet.css";
 import StreetViewPanel from "@/components/StreetViewPanel";
+import { formatISTTime } from "@/lib/istTime";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

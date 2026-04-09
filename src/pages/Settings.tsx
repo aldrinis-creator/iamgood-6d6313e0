@@ -20,7 +20,8 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import PhoneInput from "@/components/PhoneInput";
 import usePushSubscription from "@/hooks/usePushSubscription";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
 

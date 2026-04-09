@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Volume2, Pill, Bell } from "lucide-react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { formatScheduleTime } from "@/lib/istTime";
 import { toast } from "sonner";
 
 interface Medication {

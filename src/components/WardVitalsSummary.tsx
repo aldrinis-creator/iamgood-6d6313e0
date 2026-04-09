@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { formatISTDateShort } from "@/lib/istTime";
 
 interface Props {
   wardUserId: string;

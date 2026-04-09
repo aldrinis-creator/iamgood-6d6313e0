@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import OnboardingWizard from "@/components/OnboardingWizard";
+import { formatISTTime } from "@/lib/istTime";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
   { mode: "active", icon: Sun, label: "Active", description: "Check-iNs running" },

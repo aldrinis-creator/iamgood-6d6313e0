@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Pill, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { formatScheduleTime } from "@/lib/istTime";
 
 interface Medication {
   id: string;
