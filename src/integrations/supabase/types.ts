@@ -503,6 +503,48 @@ export type Database = {
         }
         Relationships: []
       }
+      health_passport_scores: {
+        Row: {
+          activity: number
+          checkin: number
+          created_at: string
+          id: string
+          medications: number
+          nutrition: number
+          overall: number
+          score_date: string
+          user_id: string
+          vitals: number
+          wellness: number
+        }
+        Insert: {
+          activity?: number
+          checkin?: number
+          created_at?: string
+          id?: string
+          medications?: number
+          nutrition?: number
+          overall?: number
+          score_date?: string
+          user_id: string
+          vitals?: number
+          wellness?: number
+        }
+        Update: {
+          activity?: number
+          checkin?: number
+          created_at?: string
+          id?: string
+          medications?: number
+          nutrition?: number
+          overall?: number
+          score_date?: string
+          user_id?: string
+          vitals?: number
+          wellness?: number
+        }
+        Relationships: []
+      }
       health_profile: {
         Row: {
           allergies: string[] | null
