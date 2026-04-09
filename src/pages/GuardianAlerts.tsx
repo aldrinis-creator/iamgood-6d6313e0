@@ -7,7 +7,7 @@ import { Bell, AlertTriangle, Heart, Pill, Activity, Filter, Trash2 } from "luci
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 import { playVoiceReminder, playChime } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
@@ -182,7 +182,7 @@ const GuardianAlerts = () => {
                         </div>
                         <p className="text-xs text-muted-foreground">{n.message}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          {format(new Date(n.created_at), "dd MMM yyyy, hh:mm a")}
+                          {formatISTDateTime(n.created_at)}
                         </p>
                       </div>
                       {!n.read && (

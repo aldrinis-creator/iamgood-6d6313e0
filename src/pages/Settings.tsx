@@ -20,7 +20,8 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import PhoneInput from "@/components/PhoneInput";
 import usePushSubscription from "@/hooks/usePushSubscription";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
@@ -247,7 +248,7 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
               <div key={r.id} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{TYPE_LABELS[r.request_type] || r.request_type}</p>
-                  <p className="text-xs text-muted-foreground">{format(new Date(r.created_at), "dd MMM yyyy, HH:mm")}</p>
+                  <p className="text-xs text-muted-foreground">{formatISTDateTime(r.created_at)}</p>
                 </div>
                 {r.status === "completed" ? (
                   <Badge variant="outline" className="text-xs gap-1 text-success border-success/30">

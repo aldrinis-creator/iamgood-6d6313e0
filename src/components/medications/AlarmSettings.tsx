@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Volume2, Pill, Bell } from "lucide-react";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
+import { formatScheduleTime } from "@/lib/istTime";
 import { toast } from "sonner";
 
 interface Medication {
@@ -112,11 +113,7 @@ const AlarmSettings = () => {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Times: {med.schedule_times.map((t) => {
-                const [h, m] = t.split(":").map(Number);
-                const d = new Date(); d.setHours(h, m);
-                return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-              }).join(", ")}
+              Times: {med.schedule_times.map((t) => formatScheduleTime(t)).join(", ")}
             </p>
           </CardContent>
         </Card>

@@ -13,6 +13,7 @@ import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
 import JourneyReportCard from "@/components/JourneyReportCard";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatISTTime } from "@/lib/istTime";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import "leaflet/dist/leaflet.css";
@@ -293,7 +294,7 @@ const MapMyJourney = () => {
                       .slice(-3)
                       .map((u) => (
                         <p key={u.id} className="text-xs text-muted-foreground">
-                          {new Date(u.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatISTTime(u.created_at)}
                           : {u.check_in_response}
                         </p>
                       ))}

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Pill, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { formatScheduleTime } from "@/lib/istTime";
 
 interface Medication {
   id: string;
@@ -195,11 +196,7 @@ const MedicationList = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{med.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {med.dosage} · {med.schedule_times.map((t) => {
-                    const [h, m] = t.split(":").map(Number);
-                    const d = new Date(); d.setHours(h, m);
-                    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-                  }).join(", ")}
+                  {med.dosage} · {med.schedule_times.map((t) => formatScheduleTime(t)).join(", ")}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-muted-foreground">

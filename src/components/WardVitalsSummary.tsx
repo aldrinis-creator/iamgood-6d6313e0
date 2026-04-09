@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { formatISTDateShort } from "@/lib/istTime";
 
 interface Props {
   wardUserId: string;
@@ -42,7 +43,7 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
   const todayWellness = wellness.find(w => w.log_date === today);
 
   const chartData = activities.map(a => ({
-    date: new Date(a.log_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+    date: formatISTDateShort(a.log_date),
     hr: a.heart_rate || 0,
     spo2: a.spo2 || 0,
   }));

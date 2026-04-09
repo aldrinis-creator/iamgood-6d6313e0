@@ -5,7 +5,7 @@ import { MessageCircle, Check, CheckCheck, ArrowUpRight, ArrowDownLeft } from "l
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDistanceToNow } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 import UserPingDialog from "@/components/UserPingDialog";
 
 interface Ping {
@@ -165,7 +165,7 @@ const Messages = () => {
                         </div>
                       )}
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        {formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}
+                        {formatISTDateTime(p.created_at)}
                       </p>
                     </div>
                     {p.read && <Check className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-1" />}

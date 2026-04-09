@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Check } from "lucide-react";
-import { format } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 
 interface Ping {
   id: string;
@@ -88,7 +88,7 @@ const GuardianMessages = () => {
                   <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
                     <p className="text-sm">{p.message}</p>
                     <p className="text-[10px] opacity-70 text-right mt-1">
-                      {format(new Date(p.created_at), "dd MMM, hh:mm a")}
+                      {formatISTDateTime(p.created_at)}
                     </p>
                   </div>
                 </div>
@@ -99,7 +99,7 @@ const GuardianMessages = () => {
                       <p className="text-sm">{p.reply_message}</p>
                       <div className="flex items-center gap-1 mt-1">
                         <p className="text-[10px] text-muted-foreground">
-                          {p.replied_at ? format(new Date(p.replied_at), "dd MMM, hh:mm a") : ""}
+                          {p.replied_at ? formatISTDateTime(p.replied_at) : ""}
                         </p>
                         <Check className="w-3 h-3 text-primary" />
                       </div>

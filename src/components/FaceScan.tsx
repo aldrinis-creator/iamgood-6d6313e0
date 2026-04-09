@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 
 const SCAN_DURATION = 30;
 const CALIBRATION_DURATION = 3;
@@ -638,7 +638,7 @@ const FaceScan = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
-                        {format(new Date(scan.scanned_at), "MMM d, h:mm a")}
+                        {formatISTDateTime(scan.scanned_at)}
                       </span>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteScan(scan.id)}>
                         <Trash2 className="w-3 h-3 text-muted-foreground" />

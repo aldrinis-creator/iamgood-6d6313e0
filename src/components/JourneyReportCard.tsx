@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { MapPin, Clock, Coffee, AlertTriangle, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { formatISTDateTime, formatISTTime } from "@/lib/istTime";
 
 interface JourneyReport {
   id: string;
@@ -38,7 +38,7 @@ const JourneyReportCard = ({ report }: { report: JourneyReport }) => {
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Calendar className="w-3 h-3" />
-          {format(new Date(report.started_at), "dd MMM yyyy, hh:mm a")} → {format(new Date(report.ended_at), "hh:mm a")}
+          {formatISTDateTime(report.started_at)} → {formatISTTime(report.ended_at)}
         </div>
 
         <div className="grid grid-cols-2 gap-2">

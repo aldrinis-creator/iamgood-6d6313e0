@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getISTHour } from "@/lib/istTime";
 
 const AppHeader = () => {
   const { userName, role } = useApp();
@@ -15,7 +16,7 @@ const AppHeader = () => {
   const todayApptCount = useTodayAppointments();
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
+    const hour = getISTHour();
     if (hour < 12) return "Good Morning";
     if (hour < 17) return "Good Afternoon";
     return "Good Evening";
