@@ -5,12 +5,43 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ensureAudioReady } from "@/lib/audioAlerts";
+
+const playFallAlarm = (): (() => void) => {
+  let stopped = false;
+  let timeout: ReturnType<typeof setTimeout>;
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+  const beep = () => {
+    if (stopped || ctx.state === "closed") return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.25);
+    timeout = setTimeout(beep, 600);
+  };
+
+  beep();
+
+  return () => {
+    stopped = true;
+    clearTimeout(timeout);
+    ctx.close().catch(() => {});
+  };
+};
 
 const FallDetectionOverlay = () => {
   const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled, fallConfidence } = useFallDetection();
   const { triggerSOS } = useApp();
   const { session } = useAuth();
   const hasSentRef = useRef(false);
+  const stopAlarmRef = useRef<(() => void) | null>(null);
 
   const sendFallAlerts = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -105,10 +136,22 @@ const FallDetectionOverlay = () => {
     }
   }, [countdownExpired, triggerSOS, sendFallAlerts, cancelFallAlert]);
 
+  // Start/stop alarm sound when fall is detected/dismissed
   useEffect(() => {
     if (fallDetected) {
       hasSentRef.current = false;
+      ensureAudioReady().then(() => {
+        stopAlarmRef.current = playFallAlarm();
+      });
+      if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+    } else {
+      stopAlarmRef.current?.();
+      stopAlarmRef.current = null;
     }
+    return () => {
+      stopAlarmRef.current?.();
+      stopAlarmRef.current = null;
+    };
   }, [fallDetected]);
 
   useEffect(() => {

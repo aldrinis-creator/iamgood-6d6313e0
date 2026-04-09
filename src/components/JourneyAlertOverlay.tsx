@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { AlertTriangle, Flag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 
 interface JourneyAlertOverlayProps {
   type: "arriving" | "deviation";
@@ -9,6 +11,15 @@ interface JourneyAlertOverlayProps {
 
 const JourneyAlertOverlay = ({ type, message, onDismiss }: JourneyAlertOverlayProps) => {
   const isDeviation = type === "deviation";
+
+  useEffect(() => {
+    if (isDeviation) {
+      playVoiceReminder("Warning. Route deviation detected.");
+    } else {
+      playChime();
+    }
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
