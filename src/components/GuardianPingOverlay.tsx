@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageCircle, Heart, Send, X } from "lucide-react";
+import { playChime } from "@/lib/audioAlerts";
 
 interface Ping {
   id: string;
@@ -54,6 +55,7 @@ const GuardianPingOverlay = () => {
         const p = payload.new as Ping;
         setPing(p);
         setVisible(true);
+        playChime();
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       })
       .subscribe();
