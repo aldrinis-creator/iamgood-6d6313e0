@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings";
+import HealthPassportTrend from "./HealthPassportTrend";
 
 interface CategoryScore {
   name: string;
@@ -42,7 +43,7 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes, mealLogsRes, nutritionPersonaRes] = await Promise.all([
+    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes, mealLogsRes, nutritionPersonaRes, faceScanRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes, heart_rate, spo2, bp_systolic, bp_diastolic, temperature_c, glucose_mg_dl").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
       supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", wardUserId).eq("log_date", yesterdayStr).maybeSingle(),
@@ -51,6 +52,7 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("meal_logs").select("total_calories, total_protein_g").eq("user_id", wardUserId).eq("log_date", today),
       supabase.from("nutrition_personas").select("daily_calorie_goal").eq("user_id", wardUserId).maybeSingle(),
+      supabase.from("face_scans").select("heart_rate, stress_score").eq("user_id", wardUserId).gte("scanned_at", `${today}T00:00:00`).order("scanned_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     // 1. Check-iN
@@ -98,19 +100,29 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       ? Math.round(Math.min(logs.filter(l => l.status === "taken").length / totalDoses, 1) * 100)
       : 100;
 
-    // 5. Vitals Score
+    // 5. Vitals Score — with face scan fallback
+    const faceScan = faceScanRes.data;
     let vitalsScore = 0;
-    if (act) {
-      const hr = act.heart_rate ?? 0;
+    if (act || faceScan) {
+      const hr = (act?.heart_rate ?? 0) || (faceScan?.heart_rate ?? 0);
       if (hr > 0) vitalsScore += (hr >= 50 && hr <= 100) ? 20 : 10;
-      const spo2 = Number(act.spo2) || 0;
+
+      const spo2 = Number(act?.spo2) || 0;
       if (spo2 > 0) vitalsScore += spo2 > 95 ? 20 : spo2 > 90 ? 10 : 5;
-      const sys = act.bp_systolic; const dia = act.bp_diastolic;
+
+      const sys = act?.bp_systolic; const dia = act?.bp_diastolic;
       if (sys && dia) vitalsScore += (sys >= 90 && sys <= 140 && dia >= 60 && dia <= 90) ? 20 : 10;
-      const temp = Number(act.temperature_c);
+
+      const temp = Number(act?.temperature_c);
       if (temp > 0) vitalsScore += (temp >= 36 && temp <= 37.5) ? 20 : 10;
-      const glu = act.glucose_mg_dl;
+
+      const glu = act?.glucose_mg_dl;
       if (glu && glu > 0) vitalsScore += (glu >= 70 && glu <= 140) ? 20 : 10;
+
+      if (faceScan?.stress_score != null && faceScan.stress_score > 0) {
+        const stressNorm = Math.max(0, 100 - faceScan.stress_score);
+        if (!sys && !dia) vitalsScore += Math.round((stressNorm / 100) * 20);
+      }
     }
 
     // 6. Nutrition Score
@@ -137,6 +149,19 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 6);
     setCategories(newCategories);
     setOverallScore(overall);
+
+    // Persist daily score (guardian upserts on behalf — RLS allows owner only, so this is a silent no-op for guardians which is fine)
+    await supabase.from("health_passport_scores").upsert({
+      user_id: wardUserId,
+      score_date: today,
+      overall,
+      checkin: checkInScore,
+      activity: activityScore,
+      wellness: wellnessScore,
+      medications: medScore,
+      vitals: vitalsScore,
+      nutrition: nutritionScore,
+    }, { onConflict: "user_id,score_date" }).then(() => {});
   }, [wardUserId]);
 
   useEffect(() => {
@@ -198,6 +223,8 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
             </div>
           ))}
         </div>
+
+        <HealthPassportTrend userId={wardUserId} />
       </CardContent>
     </Card>
   );
