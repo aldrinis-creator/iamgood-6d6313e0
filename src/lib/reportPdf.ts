@@ -107,8 +107,8 @@ function getLetterheadCss(): string {
 
 function buildHtml(opts: ReportOptions): string {
   const now = new Date();
-  const date = opts.date || now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-  const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  const date = opts.date || now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
   const bodyHtml = markdownToHtml(opts.content);
 
   return `<!DOCTYPE html>
@@ -146,8 +146,8 @@ export function buildLetterheadHtml(opts: {
   includeDisclaimer?: boolean;
 }): string {
   const now = new Date();
-  const date = now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-  const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  const date = now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const time = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
 
   return `<!DOCTYPE html>
 <html>
