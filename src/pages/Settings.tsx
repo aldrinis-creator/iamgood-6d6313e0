@@ -247,7 +247,7 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
               <div key={r.id} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{TYPE_LABELS[r.request_type] || r.request_type}</p>
-                  <p className="text-xs text-muted-foreground">{format(new Date(r.created_at), "dd MMM yyyy, HH:mm")}</p>
+                  <p className="text-xs text-muted-foreground">{formatISTDateTime(r.created_at)}</p>
                 </div>
                 {r.status === "completed" ? (
                   <Badge variant="outline" className="text-xs gap-1 text-success border-success/30">

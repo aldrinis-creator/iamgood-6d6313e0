@@ -165,7 +165,7 @@ const UserDashboard = () => {
     updateSetting("pauseMode", "sleep");
     setShowSleepDialog(false);
     toast.success(`${userName} entered Sleep Mode 🌙 (${schedule.from} – ${schedule.to})`);
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const now = formatISTTime(new Date());
     notifyGuardians(
       "🌙 Sleep Mode Activated",
       `${userName} entered Sleep Mode at ${now}. Check-iNs paused until ${schedule.to}.`
@@ -179,7 +179,7 @@ const UserDashboard = () => {
     setShowCheckOutDialog(false);
     toast.success(`${userName} checked out 🚪`);
     const returnTime = config.endsAt
-      ? new Date(config.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      ? formatISTTime(config.endsAt)
       : "unknown";
     const reasonText = config.reason ? ` Reason: ${config.reason}.` : "";
     notifyGuardians(
@@ -226,7 +226,7 @@ const UserDashboard = () => {
             {/* Show active checkout info */}
             {pauseMode === "checked-out" && settings.checkOutConfig?.endsAt && (
               <p className="text-xs text-success text-center">
-                🚪 Returns at {new Date(settings.checkOutConfig.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                🚪 Returns at {formatISTTime(settings.checkOutConfig.endsAt)}
                 {settings.checkOutConfig.reason ? ` • ${settings.checkOutConfig.reason}` : ""}
               </p>
             )}

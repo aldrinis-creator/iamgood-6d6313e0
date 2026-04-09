@@ -293,7 +293,7 @@ const MapMyJourney = () => {
                       .slice(-3)
                       .map((u) => (
                         <p key={u.id} className="text-xs text-muted-foreground">
-                          {new Date(u.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatISTTime(u.created_at)}
                           : {u.check_in_response}
                         </p>
                       ))}

@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Check } from "lucide-react";
-import { format } from "date-fns";
+import { formatISTDateTime } from "@/lib/istTime";
 
 interface Ping {
   id: string;

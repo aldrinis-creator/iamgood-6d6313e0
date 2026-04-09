@@ -638,7 +638,7 @@ const FaceScan = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
-                        {format(new Date(scan.scanned_at), "MMM d, h:mm a")}
+                        {formatISTDateTime(scan.scanned_at)}
                       </span>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteScan(scan.id)}>
                         <Trash2 className="w-3 h-3 text-muted-foreground" />

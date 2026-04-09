@@ -857,11 +857,7 @@ const ProfileContent = () => {
                       {med.dosage} · {FREQUENCIES[med.frequency] || med.frequency}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {med.schedule_times.map((t) => {
-                        const [h, m] = t.split(":").map(Number);
-                        const d = new Date(); d.setHours(h, m);
-                        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-                      }).join(", ")}
+                      {med.schedule_times.map((t) => formatScheduleTime(t)).join(", ")}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[11px] text-muted-foreground">

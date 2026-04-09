@@ -195,11 +195,7 @@ const MedicationList = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{med.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {med.dosage} · {med.schedule_times.map((t) => {
-                    const [h, m] = t.split(":").map(Number);
-                    const d = new Date(); d.setHours(h, m);
-                    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-                  }).join(", ")}
+                  {med.dosage} · {med.schedule_times.map((t) => formatScheduleTime(t)).join(", ")}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-muted-foreground">

@@ -21,7 +21,8 @@ import GuardianJourneyTracker from "@/components/GuardianJourneyTracker";
 import GuardianPingDialog from "@/components/GuardianPingDialog";
 import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatISTDateTime, formatISTTime, formatISTDate } from "@/lib/istTime";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
@@ -516,7 +517,7 @@ const GuardianDashboard = () => {
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
-    return format(new Date(lastActiveAt), "dd MMM");
+    return formatISTDate(lastActiveAt);
   };
 
   const handleCallUser = (type: "whatsapp" | "phone" | "flash") => {
@@ -603,7 +604,7 @@ const GuardianDashboard = () => {
                 </h3>
               </div>
               <p className="text-sm text-destructive">
-                {wardName} triggered SOS at {format(new Date(activeSOS.triggered_at), "dd MMM yyyy, hh:mm a")}
+                {wardName} triggered SOS at {formatISTDateTime(activeSOS.triggered_at)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Type: {activeSOS.trigger_type} {activeSOS.isStale ? "• Over 2 hours ago" : "• Location updates every 30s"}
@@ -638,7 +639,7 @@ const GuardianDashboard = () => {
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">{n.title}</p>
                     <span className="text-[10px] text-muted-foreground">
-                      {format(new Date(n.created_at), "hh:mm a")}
+                      {formatISTTime(n.created_at)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">{n.message}</p>
@@ -720,7 +721,7 @@ const GuardianDashboard = () => {
               </div>
               <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <p className="text-sm font-semibold">{format(new Date(), "hh:mm a")}</p>
+                <p className="text-sm font-semibold">{formatISTTime(new Date())}</p>
                 <p className="text-[10px] text-muted-foreground">Now</p>
               </div>
             </div>
