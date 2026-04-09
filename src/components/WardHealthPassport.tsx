@@ -31,6 +31,7 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     { name: "Medications", score: 0, max: 100 },
     { name: "Vitals", score: 0, max: 100 },
     { name: "Nutrition", score: 0, max: 100 },
+    { name: "Face Scan", score: 0, max: 100 },
   ]);
   const [overallScore, setOverallScore] = useState(0);
 
@@ -137,6 +138,17 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
     const proteinCalPct = totalCalToday > 0 ? (totalProteinToday * 4 / totalCalToday) * 100 : 0;
     if (proteinCalPct >= 10) nutritionScore += 25;
 
+    // 7. Face Scan score
+    let faceScanScore = 0;
+    if (faceScan) {
+      faceScanScore += 40;
+      const fsHr = faceScan.heart_rate ?? 0;
+      if (fsHr >= 50 && fsHr <= 100) faceScanScore += 30;
+      else if (fsHr > 0) faceScanScore += 15;
+      if (faceScan.stress_score != null && faceScan.stress_score < 50) faceScanScore += 30;
+      else if (faceScan.stress_score != null && faceScan.stress_score < 75) faceScanScore += 15;
+    }
+
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
@@ -144,9 +156,10 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       { name: "Medications", score: medScore, max: 100 },
       { name: "Vitals", score: vitalsScore, max: 100 },
       { name: "Nutrition", score: nutritionScore, max: 100 },
+      { name: "Face Scan", score: faceScanScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 6);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 7);
     setCategories(newCategories);
     setOverallScore(overall);
 

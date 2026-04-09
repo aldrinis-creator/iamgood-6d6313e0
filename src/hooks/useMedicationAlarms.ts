@@ -163,11 +163,21 @@ const useMedicationAlarms = () => {
     };
     document.addEventListener("visibilitychange", onVisible);
 
+    // Listen for snooze-exhausted escalation from ReminderOverlay
+    const onSnoozeExhausted = () => {
+      if (session?.user?.id) {
+        // Notify guardians immediately about missed medication
+        notifyGuardiansMissed(session.user.id, "Medication (snooze exhausted)", new Date().toISOString());
+      }
+    };
+    window.addEventListener("app:medication-snooze-exhausted", onSnoozeExhausted);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("app:medication-snooze-exhausted", onSnoozeExhausted);
     };
-  }, [check]);
+  }, [check, session?.user?.id]);
 };
 
 export default useMedicationAlarms;
