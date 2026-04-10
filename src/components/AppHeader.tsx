@@ -5,6 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
+import useRefillDue from "@/hooks/useRefillDue";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getISTHour } from "@/lib/istTime";
 
@@ -14,6 +15,7 @@ const AppHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const todayApptCount = useTodayAppointments();
+  const refillDue = useRefillDue();
 
   const getGreeting = () => {
     const hour = getISTHour();
@@ -68,7 +70,7 @@ const AppHeader = () => {
           {[
             { label: "Home", path: "/dashboard" },
             { label: "Appointments", path: "/appointments", glow: todayApptCount > 0 },
-            { label: "My Health", path: "/my-health" },
+            { label: "My Health", path: "/my-health", glow: refillDue },
             { label: "Help", path: "/help" },
           ].map((tab) => (
             <button

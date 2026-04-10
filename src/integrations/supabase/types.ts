@@ -981,6 +981,39 @@ export type Database = {
           },
         ]
       }
+      medication_orders: {
+        Row: {
+          created_at: string
+          doctor_name: string | null
+          hospital_name: string | null
+          id: string
+          items: Json
+          ordered_by: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name?: string | null
+          hospital_name?: string | null
+          id?: string
+          items?: Json
+          ordered_by: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string | null
+          hospital_name?: string | null
+          id?: string
+          items?: Json
+          ordered_by?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       medications: {
         Row: {
           alarm_enabled: boolean

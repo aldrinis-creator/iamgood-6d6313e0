@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
+import useRefillDue from "@/hooks/useRefillDue";
 
 const NavTabs = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const NavTabs = () => {
   const { session } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const todayApptCount = useTodayAppointments();
+  const refillDue = useRefillDue();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
@@ -67,7 +69,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health" },
+    { icon: Heart, label: "My Health", path: "/my-health", badge: refillDue ? 1 : 0 },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
@@ -123,10 +125,10 @@ const NavTabs = () => {
               }`}
             >
               <div className="relative">
-                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""} ${badge > 0 && tab.label === "Appointments" ? "text-destructive" : ""}`} />
+                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""} ${badge > 0 && (tab.label === "Appointments" || tab.label === "My Health") ? "text-destructive" : ""}`} />
                 {badge > 0 && (
-                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center ${tab.label === "Appointments" ? "animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]" : "animate-pulse"}`}>
-                    {badge > 9 ? "9+" : badge}
+                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center ${(tab.label === "Appointments" || tab.label === "My Health") ? "animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]" : "animate-pulse"}`}>
+                    {tab.label === "My Health" ? "!" : badge > 9 ? "9+" : badge}
                   </span>
                 )}
               </div>
