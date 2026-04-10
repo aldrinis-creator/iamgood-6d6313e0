@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ interface WardRefillOrderProps {
 }
 
 const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
+  const { session } = useAuth();
   const [meds, setMeds] = useState<Medication[]>([]);
   const [lowStockMeds, setLowStockMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,10 +96,29 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     setOrderItems((prev) => prev.filter((o) => o.med.id !== id));
   };
 
-  const confirmOrder = () => {
+  const confirmOrder = async () => {
     if (orderItems.length === 0) {
       toast.error("Add medications to your order first");
       return;
+    }
+    // Persist order to medication_orders table
+    if (session?.user?.id) {
+      try {
+        const items = orderItems.map(item => ({
+          name: item.med.name,
+          dosage: item.med.dosage,
+          qty: item.qty,
+          med_id: item.med.id,
+        }));
+        await supabase.from("medication_orders" as any).insert({
+          user_id: wardUserId,
+          ordered_by: session.user.id,
+          items,
+          status: "ordered",
+        });
+      } catch (e) {
+        console.error("Failed to persist order", e);
+      }
     }
     setOrderConfirmed(true);
     setTimeout(() => orderRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
