@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Check, CheckCheck, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { MessageCircle, Check, CheckCheck, ArrowUpRight, ArrowDownLeft, Clock } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -143,6 +143,7 @@ const Messages = () => {
             <MessageCircle className="w-12 h-12 mx-auto text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">No messages yet</p>
             <p className="text-xs text-muted-foreground">Ping your guardian or wait for their messages</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-2">Messages auto-expire after 7 days</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -175,6 +176,11 @@ const Messages = () => {
             ))}
           </div>
         )}
+
+        <div className="flex items-center justify-center gap-1.5 pt-2 pb-1">
+          <Clock className="w-3 h-3 text-muted-foreground/50" />
+          <p className="text-[10px] text-muted-foreground/50">Messages auto-expire after 7 days</p>
+        </div>
       </div>
     </AppLayout>
   );

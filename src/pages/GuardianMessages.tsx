@@ -5,7 +5,7 @@ import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import AppLayout from "@/components/AppLayout";
 import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, Check } from "lucide-react";
+import { MessageCircle, Check, Clock } from "lucide-react";
 import { formatISTDateTime } from "@/lib/istTime";
 
 interface Ping {
@@ -112,6 +112,11 @@ const GuardianMessages = () => {
             </Card>
           ))
         )}
+
+        <div className="flex items-center justify-center gap-1.5 pt-2 pb-1">
+          <Clock className="w-3 h-3 text-muted-foreground/50" />
+          <p className="text-[10px] text-muted-foreground/50">Messages auto-expire after 7 days</p>
+        </div>
       </div>
     </AppLayout>
   );
