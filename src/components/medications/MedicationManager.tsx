@@ -65,15 +65,7 @@ const MedicationManager = () => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
-        <Pill className="w-5 h-5 text-primary" />
-        Medication Manager
-      </h2>
-
-      {/* Today's Schedule — always visible */}
-      <TodaySchedule />
-
-      {/* Manage Medications — collapsible */}
+      {/* Manage Medications — collapsible, now on top */}
       <Collapsible open={manageOpen} onOpenChange={setManageOpen}>
         <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm font-medium">
           <Settings className="w-4 h-4 text-muted-foreground" />
@@ -123,6 +115,14 @@ const MedicationManager = () => {
           </Tabs>
         </CollapsibleContent>
       </Collapsible>
+
+      <h2 className="text-lg font-semibold flex items-center gap-2">
+        <Pill className="w-5 h-5 text-primary" />
+        Medication Manager
+      </h2>
+
+      {/* Today's Schedule */}
+      <TodaySchedule />
     </div>
   );
 };

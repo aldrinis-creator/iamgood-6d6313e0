@@ -21,6 +21,7 @@ import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
+import useRefillDue from "@/hooks/useRefillDue";
 
 const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
@@ -73,6 +74,7 @@ const MyHealth = () => {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
   const { canAccess, gate, upgradeDialogOpen, upgradeFeature, requiredPlan, upgradeDescription, closeUpgradeDialog } = useFeatureGate();
+  const refillDue = useRefillDue();
 
   useEffect(() => {
     const tool = searchParams.get("tool");
@@ -175,7 +177,11 @@ const MyHealth = () => {
               <button
                 key={tool.label}
                 onClick={() => handleToolClick(tool.label)}
-                className="relative flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/30 transition-all"
+                className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                  tool.label === "Tablets" && refillDue
+                    ? "border-destructive ring-2 ring-destructive shadow-[0_0_12px_hsl(var(--destructive))]"
+                    : "border-border hover:border-primary/30"
+                }`}
               >
                 <div className={`w-12 h-12 rounded-full ${tool.color} flex items-center justify-center`}>
                   <tool.icon className="w-6 h-6" />
