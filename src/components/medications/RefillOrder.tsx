@@ -297,8 +297,80 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   if (loading) return <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>;
 
+  const markGuardianOrderReceived = async (order: any) => {
+    setMarkingOrderReceived(order.id);
+    try {
+      await supabase
+        .from("medication_orders" as any)
+        .update({ status: "received" })
+        .eq("id", order.id);
+      // Update stock for items that have valid med_ids
+      const items = order.items as any[];
+      for (const item of items) {
+        if (item.med_id && !item.med_id.startsWith("ja-")) {
+          const med = allMeds.find(m => m.id === item.med_id);
+          if (med) {
+            await supabase
+              .from("medications")
+              .update({ remaining_quantity: med.total_quantity })
+              .eq("id", med.id);
+          }
+        }
+      }
+      setGuardianOrders(prev => prev.filter(o => o.id !== order.id));
+      toast.success("Marked as received & stock updated!");
+      load();
+      onRefillDone?.();
+    } catch {
+      toast.error("Failed to update");
+    }
+    setMarkingOrderReceived(null);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Guardian-placed Orders */}
+      {guardianOrders.length > 0 && (
+        <div className="space-y-2">
+          {guardianOrders.map((order: any) => (
+            <Card key={order.id} className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-semibold text-primary">
+                    Guardian Order from {order.orderer_name}
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your guardian ordered these medications for you.
+                </p>
+                <div className="space-y-1">
+                  {(order.items as any[]).map((item: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-border last:border-0">
+                      <span>{item.name} — {item.dosage}</span>
+                      <Badge variant="secondary" className="text-[10px]">Qty: {item.qty}</Badge>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Ordered on {new Date(order.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  disabled={markingOrderReceived === order.id}
+                  onClick={() => markGuardianOrderReceived(order)}
+                >
+                  {markingOrderReceived === order.id
+                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    : <CheckCircle className="w-4 h-4 mr-2" />}
+                  ✓ Received — Update Stock
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
       {/* Banned Warnings */}
       {Object.keys(bannedMap).length > 0 && (
         <Card className="border-destructive/30 bg-destructive/5">
