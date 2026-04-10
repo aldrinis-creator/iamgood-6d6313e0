@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   AlertTriangle, ShoppingCart, Package, ShieldAlert, Loader2,
-  CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera
+  CheckCircle, MessageCircle, FileText, Share2, Pencil, X, Camera, UserCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -61,6 +61,10 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const [checkingBanned, setCheckingBanned] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Guardian orders state
+  const [guardianOrders, setGuardianOrders] = useState<any[]>([]);
+  const [markingOrderReceived, setMarkingOrderReceived] = useState<string | null>(null);
+
   // Order flow state
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [showDoctorForm, setShowDoctorForm] = useState(false);
@@ -78,6 +82,35 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const orderRef = useRef<HTMLDivElement>(null);
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
+
+  // Fetch guardian-placed orders
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const fetchOrders = async () => {
+      const { data } = await supabase
+        .from("medication_orders" as any)
+        .select("*")
+        .eq("user_id", session.user.id)
+        .eq("status", "ordered")
+        .order("created_at", { ascending: false });
+      if (data) {
+        // Fetch orderer names
+        const enriched = await Promise.all((data as any[]).map(async (order: any) => {
+          if (order.ordered_by !== session.user.id) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", order.ordered_by)
+              .single();
+            return { ...order, orderer_name: profile?.full_name || "Guardian" };
+          }
+          return { ...order, orderer_name: null };
+        }));
+        setGuardianOrders(enriched.filter((o: any) => o.ordered_by !== session.user.id));
+      }
+    };
+    fetchOrders();
+  }, [session?.user?.id]);
 
   const markReceived = async () => {
     setMarkingReceived(true);
