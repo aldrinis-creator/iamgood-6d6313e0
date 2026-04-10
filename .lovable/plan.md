@@ -1,54 +1,75 @@
 
 
-## Three Fixes: Face Scan in Health Passport, Trend Auto-Collapse, and Medication Escalation
+## Three Changes: Red Glow for Refill Due, Reorder Manage Bar, Guardian Order Sync
 
-### Issue 1: No Visible Face Scan in Health Passport
+### 1. Red border/glow on "My Health" tab and bottom nav when refill is due
 
-Face scan data IS currently used as a fallback inside the "Vitals" score calculation (lines 122-144 of HealthPassport.tsx), but there is no separate visible row for it. The user sees 6 categories: Check-iN, Activity, Wellness, Medications, Vitals, Nutrition — with no mention of "Face Scan."
+**Current**: The Appointments tab glows red when there are due appointments. My Health has no such indicator.
 
-**Fix**: Add a 7th category row called "Face Scan" that scores based on whether the user completed a scan today (has a `face_scans` record) and the quality of results (HR in healthy range, low stress). The overall score denominator changes from 6 to 7. Same change in `WardHealthPassport.tsx`.
+**Fix**: Create a shared hook `useRefillDue` that checks `medications` for any low-stock items. Use it in:
+- `AppHeader.tsx` — add `glow` property to the "My Health" tab (same red ring + pulse dot as Appointments)
+- `NavTabs.tsx` — add a badge/red icon treatment to the "My Health" bottom tab
+- `MyHealth.tsx` — add red border to the "Tablets" grid button when refill is due
 
-### Issue 2: Score Trend Auto-Collapse After Inactivity
+### 2. Move "Manage Medications" collapsible bar above "Medication Manager" heading
 
-Currently the "Score Trend" collapsible stays open indefinitely until manually closed.
+**Current order**: Header → TodaySchedule → Manage Medications collapsible
 
-**Fix**: Add a 5-minute inactivity timer to `HealthPassportTrend.tsx`. When the section is opened, start a timer. If no user interaction (tab switch, hover) occurs within 5 minutes, auto-collapse it. Reset the timer on any interaction.
+**New order**: Manage Medications collapsible → Header → TodaySchedule
 
-### Issue 3: Medication — No Escalation After 3 Reminder Snoozes
+This puts the management actions at the top for quicker access.
 
-Current behavior when a medication reminder fires:
-- `useMedicationAlarms` shows a `ReminderOverlay` (fires once per slot)
-- User can snooze the overlay 3 times (5 min each)
-- After 3rd snooze, overlay dismisses with a generic toast: "Maximum snoozes reached"
-- **No escalated audio alert fires**
-- **No guardian nudge is sent at that moment**
+### 3. Guardian refill order visibility for the User
 
-The guardian notification only happens later when `useMedicationAlarms` detects the dose is 60+ minutes overdue and writes a "missed" log. That's a separate path, not tied to the 3-snooze exhaustion.
+**Problem**: When a guardian places a refill order via `WardRefillOrder`, there's no record — it's purely local state. The user's Tablets dashboard has no idea.
 
-**Fix**: In `ReminderOverlay.tsx`, when `used >= MAX_SNOOZES` for a medication reminder:
-1. Play an escalated audio alert (urgent chime + voice: "You have not taken your medication after 3 reminders")
-2. Call `notify-guardian-medication` edge function with status "missed" immediately (don't wait for the 60-min detection)
-3. Show a more prominent toast ("Medication not taken — your guardian has been notified")
+**Fix**: 
+- Create a new `medication_orders` table to persist orders placed by either user or guardian
+- When guardian confirms an order in `WardRefillOrder`, insert a row into `medication_orders` with `ordered_by` (guardian's user_id), `user_id` (ward's user_id), items, and status
+- In the user's `RefillOrder` component, query `medication_orders` for pending/confirmed orders and display a card showing "Your guardian ordered these medications" with order details
+- Add RLS so users can see orders for their own `user_id` and guardians can insert/view orders for their wards
 
----
-
-### Files to Modify
+### Files to modify
 
 | File | Change |
 |------|--------|
-| `src/components/HealthPassport.tsx` | Add "Face Scan" as 7th category; adjust overall to /7 |
-| `src/components/WardHealthPassport.tsx` | Same Face Scan category addition |
-| `src/components/HealthPassportTrend.tsx` | Add 5-min inactivity auto-collapse timer |
-| `src/components/ReminderOverlay.tsx` | On 3rd snooze for medication: play escalated audio + notify guardians |
+| `src/hooks/useRefillDue.ts` | **New** — shared hook checking medications low stock |
+| `src/components/AppHeader.tsx` | Add red glow to "My Health" tab when refill due |
+| `src/components/NavTabs.tsx` | Add red icon/badge to "My Health" bottom tab when refill due |
+| `src/pages/MyHealth.tsx` | Add red border to "Tablets" button when refill due |
+| `src/components/medications/MedicationManager.tsx` | Move Manage Medications collapsible above the header |
+| **DB migration** | Create `medication_orders` table with RLS |
+| `src/components/WardRefillOrder.tsx` | Persist order to `medication_orders` on confirm |
+| `src/components/medications/RefillOrder.tsx` | Show guardian-placed orders card |
 
 ### Technical Detail
 
-**Face Scan scoring** (0-100):
-- 40 points for having any scan today
-- 30 points for HR in healthy range (50-100 bpm)
-- 30 points for low stress (stress_score < 50)
+**`medication_orders` table schema**:
+```sql
+CREATE TABLE public.medication_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,           -- the ward/user whose meds are ordered
+  ordered_by uuid NOT NULL,        -- who placed the order (user or guardian)
+  items jsonb NOT NULL DEFAULT '[]',
+  status text NOT NULL DEFAULT 'ordered',  -- ordered, received
+  doctor_name text,
+  hospital_name text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.medication_orders ENABLE ROW LEVEL SECURITY;
+-- Users see their own orders
+CREATE POLICY "Users can view own orders" ON public.medication_orders FOR SELECT TO authenticated USING (auth.uid() = user_id);
+-- Users can update own orders (mark received)
+CREATE POLICY "Users can update own orders" ON public.medication_orders FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+-- Guardians can insert for wards
+CREATE POLICY "Guardians can insert ward orders" ON public.medication_orders FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = medication_orders.user_id AND g.status = 'accepted'));
+-- Guardians can view ward orders
+CREATE POLICY "Guardians can view ward orders" ON public.medication_orders FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = medication_orders.user_id AND g.status = 'accepted'));
+-- Users can insert own orders
+CREATE POLICY "Users can insert own orders" ON public.medication_orders FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+```
 
-**Trend auto-collapse**: `useEffect` with a `setTimeout(5 * 60_000)` that calls `setOpen(false)`. Reset on `period` change or mouse enter. Clear on unmount/close.
+**`useRefillDue` hook**: Queries `medications` where `remaining_quantity <= low_stock_threshold` for current user; returns `boolean`. Subscribes to realtime changes on `medications` table.
 
-**Medication escalation**: Extract the guardian notification call into a shared helper. When `used >= MAX_SNOOZES` and `reminder.type === "medication"`, call `playVoiceReminder("You have not taken your medication...")`, then fire the edge function. The user's ID is not available in ReminderOverlay, so we dispatch a custom event `app:medication-snooze-exhausted` that `useMedicationAlarms` listens for and handles the guardian notification.
+**Guardian order card in user's RefillOrder**: Shows pending orders with items list, ordered-by name (fetched from profiles), and a "Mark as Received" action that updates both the order status and medication stock quantities.
 
