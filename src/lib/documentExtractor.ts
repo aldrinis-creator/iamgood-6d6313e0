@@ -5,6 +5,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 
 const MAX_PAGES = 10;
 
+function withTimeout<T>(promise: Promise<T>, ms: number, msg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(msg)), ms)),
+  ]);
+}
+
 export function isPDF(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
@@ -23,7 +30,11 @@ export function isDocument(file: File): boolean {
 
 export async function extractTextFromPDF(file: File): Promise<{ text: string; hasText: boolean }> {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await withTimeout(
+    pdfjsLib.getDocument({ data: arrayBuffer }).promise,
+    15000,
+    "PDF loading timed out. Try a smaller file or paste the text manually."
+  );
   const pageCount = Math.min(pdf.numPages, MAX_PAGES);
   let fullText = "";
 
@@ -43,9 +54,13 @@ export async function extractTextFromPDF(file: File): Promise<{ text: string; ha
 
 export async function renderPDFPageToImage(file: File, pageNum = 1): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await withTimeout(
+    pdfjsLib.getDocument({ data: arrayBuffer }).promise,
+    15000,
+    "PDF loading timed out"
+  );
   const page = await pdf.getPage(pageNum);
-  const scale = 2; // High resolution
+  const scale = 1.5;
   const viewport = page.getViewport({ scale });
 
   const canvas = document.createElement("canvas");
@@ -54,7 +69,7 @@ export async function renderPDFPageToImage(file: File, pageNum = 1): Promise<str
   const ctx = canvas.getContext("2d")!;
 
   await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-  return canvas.toDataURL("image/jpeg", 0.85);
+  return canvas.toDataURL("image/jpeg", 0.7);
 }
 
 export async function extractTextFromDOCX(file: File): Promise<string> {
