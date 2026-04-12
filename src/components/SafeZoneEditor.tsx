@@ -56,7 +56,7 @@ function SafeZoneAddForm({
   const markerRef = useRef<any>(null);
 
   const { destinations, home, work } = useSavedDestinations();
-  const { results, searching, search, resolveCoords, clearResults } = usePlaceAutocomplete({
+  const { results, searching, search, resolveCoords, clear: clearResults } = usePlaceAutocomplete({
     origin: newLat && newLng ? { lat: newLat, lng: newLng } : null,
     minChars: 2,
   });
@@ -84,7 +84,7 @@ function SafeZoneAddForm({
     let lat = result.lat;
     let lng = result.lng;
     if (!lat || !lng) {
-      const coords = await resolveCoords(result.place_id, result.description);
+      const coords = await resolveCoords(result);
       if (coords) {
         lat = coords.lat;
         lng = coords.lng;
