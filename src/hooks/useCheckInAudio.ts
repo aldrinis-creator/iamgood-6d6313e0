@@ -6,6 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 
+// Guardian notifications are handled exclusively by the server-side
+// check-missed-checkins cron. The client only handles user-facing alerts.
+
 const CHECK_IN_HOURS = [7, 12, 19];
 const POST_GRACE_INTERVAL_MIN = 10;
 const POST_GRACE_MAX_REMINDERS = 3;
