@@ -632,14 +632,14 @@ const GuardianDashboard = () => {
           );
           if (anomalyAlerts.length === 0) return null;
           return (
-            <Card className="border-amber-400/50 bg-amber-50 dark:bg-amber-950/20">
+            <Card className="border-warning bg-warning/10">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  <h3 className="font-semibold text-sm text-amber-800 dark:text-amber-300">Health Pattern Alert</h3>
+                  <AlertTriangle className="w-5 h-5 text-warning-foreground" />
+                  <h3 className="font-semibold text-sm text-warning-foreground">Health Pattern Alert</h3>
                 </div>
                 {anomalyAlerts.map(a => (
-                  <div key={a.id} className="p-3 rounded-lg bg-amber-100/50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 space-y-1">
+                  <div key={a.id} className="p-3 rounded-lg bg-warning/5 border border-warning/30 space-y-1">
                     <p className="text-sm text-foreground">{a.message}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
