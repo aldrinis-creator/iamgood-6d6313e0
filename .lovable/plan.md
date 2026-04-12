@@ -1,32 +1,48 @@
 
 
-## Retain Dismiss Button + Fix Medication Navigation
+## Reorder Dashboard & Make Health Passport Collapsible
 
-### Changes to `src/components/ReminderOverlay.tsx`
+### Current order
+1. Mode Selector
+2. Map My Journey card
+3. Check-In Card
+4. Health Passport
+5. How It Works accordion
+6. AI Health Companion
 
-1. **Re-add Dismiss button** — A secondary "Dismiss" button below the action button. Clicking it closes the overlay early (non-acknowledgment), so the auto-repeat cycle continues at 5-min intervals. It calls `dismiss(false)` and also schedules the next repeat if under max shows.
+### New order
+1. Mode Selector
+2. Check-In Card
+3. Map My Journey card ← moved below Check-In
+4. Health Passport (inside an Accordion, collapsed by default) ← made collapsible
+5. How It Works accordion
+6. AI Health Companion
 
-2. **Fix "View Medications" navigation** — Currently navigates to `/my-health` which shows the health tools grid, not the medications page directly. Change to `/my-health?tool=Tablets` so the `MyHealth` component auto-opens the `MedicationManager` via its existing `useSearchParams` logic (lines 78-82 of `MyHealth.tsx` already handle `?tool=` param).
+### Changes in `src/pages/UserDashboard.tsx`
 
-### Implementation details
+Rearrange the JSX blocks (lines 237–254):
 
-**Dismiss button behavior:**
-- Clears the auto-dismiss timer
-- Hides overlay with animation
-- Schedules next repeat at 5-min interval (same as auto-dismiss behavior) if show count < MAX_SHOWS
-- Does NOT mark as acknowledged — cycle continues
+```tsx
+{/* Check-In Card */}
+<CheckInCard />
 
-**Navigation fix:**
-```typescript
-// Before
-window.location.href = "/my-health";
+{/* Map My Journey */}
+<Card className="cursor-pointer hover:shadow-md ..." onClick={() => navigate("/journey")}>
+  ...
+</Card>
 
-// After  
-window.location.href = "/my-health?tool=Tablets";
+{/* Health Passport — collapsible */}
+<Accordion type="single" collapsible>
+  <AccordionItem value="health-passport">
+    <AccordionTrigger className="text-accessible font-semibold">
+      Health Passport
+    </AccordionTrigger>
+    <AccordionContent>
+      <HealthPassport />
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
 ```
 
-### Single file modified
-| File | Change |
-|------|--------|
-| `src/components/ReminderOverlay.tsx` | Add Dismiss button with `handleDismiss`, update medication navigation to `/my-health?tool=Tablets` |
+Single file change, pure reorder + wrap in existing `Accordion` component.
 
