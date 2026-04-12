@@ -1,75 +1,61 @@
+## Fix: Triple SMS for Missed Medication and Correct Escalation Flow
+
+### Root Cause — 3 Separate Notification Paths
+
+When a medication is missed, THREE independent paths all fire guardian notifications:
+
+1. `**useMedicationAlarms.ts` line 119** — 60-min missed-dose detection writes a "missed" log and calls `notifyGuardiansMissed`
+2. `**useMedicationAlarms.ts` line 170** — Listens for `app:medication-snooze-exhausted` event (from ReminderOverlay after 3 snoozes) and calls `notifyGuardiansMissed` again
+3. `**TodaySchedule.tsx` line 245** — `autoMarkMissed()` calls `notifyGuardians` with status "missed" when TodaySchedule's own snooze limit is hit
+
+All three can fire for the same dose slot → 3 SMS messages.
+
+### Desired Flow (per the user's specification)
+
+```text
+Medication time → Initial reminder fires
+    ↓
+1-hour grace period (user can take medication anytime)
+    ↓
+After 60 minutes if not taken:
+    Reminder 1 fires → wait 10 min
+    Reminder 2 fires → wait 10 min
+    Reminder 3 fires → wait 10 min
+    ↓
+If still not taken after 3 post-grace reminders:
+    → Send ONE missed medication SMS to guardian
+    → Play escalated audio alert to user
+    → Write "missed" log
+```
+
+### Changes
 
 
-## Three Changes: Red Glow for Refill Due, Reorder Manage Bar, Guardian Order Sync
+| File                                           | Change                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/hooks/useMedicationAlarms.ts`             | At 60-min mark: instead of immediately writing "missed" log + SMS, start a 3-reminder sequence at 10-min intervals. Only after all 3 are exhausted, write the missed log and send ONE guardian notification. Remove the separate `app:medication-snooze-exhausted` listener (no longer needed as a separate path). |
+| `src/components/ReminderOverlay.tsx`           | Change snooze interval from 5 min to 10 min. Remove the `app:medication-snooze-exhausted` event dispatch — the escalation is now handled entirely by `useMedicationAlarms`.                                                                                                                                        |
+| `src/components/medications/TodaySchedule.tsx` | Remove the `notifyGuardians(..., "missed", ...)` call from `autoMarkMissed()`. TodaySchedule should only write the database log, not send SMS. The alarm hook handles SMS.                                                                                                                                         |
 
-### 1. Red border/glow on "My Health" tab and bottom nav when refill is due
-
-**Current**: The Appointments tab glows red when there are due appointments. My Health has no such indicator.
-
-**Fix**: Create a shared hook `useRefillDue` that checks `medications` for any low-stock items. Use it in:
-- `AppHeader.tsx` — add `glow` property to the "My Health" tab (same red ring + pulse dot as Appointments)
-- `NavTabs.tsx` — add a badge/red icon treatment to the "My Health" bottom tab
-- `MyHealth.tsx` — add red border to the "Tablets" grid button when refill is due
-
-### 2. Move "Manage Medications" collapsible bar above "Medication Manager" heading
-
-**Current order**: Header → TodaySchedule → Manage Medications collapsible
-
-**New order**: Manage Medications collapsible → Header → TodaySchedule
-
-This puts the management actions at the top for quicker access.
-
-### 3. Guardian refill order visibility for the User
-
-**Problem**: When a guardian places a refill order via `WardRefillOrder`, there's no record — it's purely local state. The user's Tablets dashboard has no idea.
-
-**Fix**: 
-- Create a new `medication_orders` table to persist orders placed by either user or guardian
-- When guardian confirms an order in `WardRefillOrder`, insert a row into `medication_orders` with `ordered_by` (guardian's user_id), `user_id` (ward's user_id), items, and status
-- In the user's `RefillOrder` component, query `medication_orders` for pending/confirmed orders and display a card showing "Your guardian ordered these medications" with order details
-- Add RLS so users can see orders for their own `user_id` and guardians can insert/view orders for their wards
-
-### Files to modify
-
-| File | Change |
-|------|--------|
-| `src/hooks/useRefillDue.ts` | **New** — shared hook checking medications low stock |
-| `src/components/AppHeader.tsx` | Add red glow to "My Health" tab when refill due |
-| `src/components/NavTabs.tsx` | Add red icon/badge to "My Health" bottom tab when refill due |
-| `src/pages/MyHealth.tsx` | Add red border to "Tablets" button when refill due |
-| `src/components/medications/MedicationManager.tsx` | Move Manage Medications collapsible above the header |
-| **DB migration** | Create `medication_orders` table with RLS |
-| `src/components/WardRefillOrder.tsx` | Persist order to `medication_orders` on confirm |
-| `src/components/medications/RefillOrder.tsx` | Show guardian-placed orders card |
 
 ### Technical Detail
 
-**`medication_orders` table schema**:
-```sql
-CREATE TABLE public.medication_orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,           -- the ward/user whose meds are ordered
-  ordered_by uuid NOT NULL,        -- who placed the order (user or guardian)
-  items jsonb NOT NULL DEFAULT '[]',
-  status text NOT NULL DEFAULT 'ordered',  -- ordered, received
-  doctor_name text,
-  hospital_name text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.medication_orders ENABLE ROW LEVEL SECURITY;
--- Users see their own orders
-CREATE POLICY "Users can view own orders" ON public.medication_orders FOR SELECT TO authenticated USING (auth.uid() = user_id);
--- Users can update own orders (mark received)
-CREATE POLICY "Users can update own orders" ON public.medication_orders FOR UPDATE TO authenticated USING (auth.uid() = user_id);
--- Guardians can insert for wards
-CREATE POLICY "Guardians can insert ward orders" ON public.medication_orders FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = medication_orders.user_id AND g.status = 'accepted'));
--- Guardians can view ward orders
-CREATE POLICY "Guardians can view ward orders" ON public.medication_orders FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM guardians g WHERE g.guardian_user_id = auth.uid() AND g.user_id = medication_orders.user_id AND g.status = 'accepted'));
--- Users can insert own orders
-CREATE POLICY "Users can insert own orders" ON public.medication_orders FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-```
+**useMedicationAlarms** new logic at the 60-min detection point:
 
-**`useRefillDue` hook**: Queries `medications` where `remaining_quantity <= low_stock_threshold` for current user; returns `boolean`. Subscribes to realtime changes on `medications` table.
+- Track a `postGraceReminders` ref: `Map<string, number>` (slot key → reminder count)
+- At 60 min past: if count < 3, show a `ReminderOverlay`, increment count, and DON'T write missed log yet
+- At 90 min (count 1), 100 min (count 2), 110 min (count 3): each `check()` cycle re-fires
+- After count reaches 3 and another 10 min passes with no "taken" log: write missed log, call `notifyGuardiansMissed` ONCE, play escalated audio
 
-**Guardian order card in user's RefillOrder**: Shows pending orders with items list, ordered-by name (fetched from profiles), and a "Mark as Received" action that updates both the order status and medication stock quantities.
+**ReminderOverlay** changes:
 
+- `SNOOZE_MS` from `5 * 60_000` to `10 * 60_000`
+- Remove the `window.dispatchEvent(new CustomEvent("app:medication-snooze-exhausted"))` line — the overlay still shows the 3-snooze UI but doesn't trigger SMS independently
+
+**TodaySchedule** changes:
+
+- In `autoMarkMissed()`, remove the `notifyGuardians(...)` call on line 245. Keep the database insert/update for the missed log.
+
+This ensures exactly ONE SMS is sent, only after the full escalation sequence (1 hour grace + 3 reminders at 10-min intervals = ~90 minutes after scheduled time).  
+  
+Do this for all MIssed Medications, Check-iNs
