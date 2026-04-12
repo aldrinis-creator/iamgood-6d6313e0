@@ -26,7 +26,6 @@ async function hmacVerify(secret: string, payload: string, signature: string) {
   const computed = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  // Constant-time comparison
   if (computed.length !== signature.length) return false;
   let diff = 0;
   for (let i = 0; i < computed.length; i++) {
@@ -60,9 +59,9 @@ Deno.serve(async (req) => {
       razorpay_payment_id,
       razorpay_order_id,
       signature,
+      coupon_code,
     } = body;
 
-    // Validate required fields
     if (!user_id || !plan_type || !billing_cycle || !signature) {
       return jsonRes({ error: "Missing required fields" }, 400);
     }
@@ -75,7 +74,6 @@ Deno.serve(async (req) => {
       return jsonRes({ error: "Invalid billing_cycle" }, 400);
     }
 
-    // Build the payload string that was signed (sorted keys for determinism)
     const signPayload = JSON.stringify({
       amount_paise: amount_paise || 0,
       billing_cycle,
@@ -90,7 +88,6 @@ Deno.serve(async (req) => {
       return jsonRes({ error: "Invalid signature" }, 403);
     }
 
-    // Compute expires_at
     const now = new Date();
     const expiresAt = new Date(now);
     if (billing_cycle === "monthly") {
@@ -111,7 +108,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user_id)
       .eq("status", "active");
 
-    // Insert new subscription
+    // Insert new subscription with optional coupon_code
     const { error } = await supabase.from("subscriptions").insert({
       user_id,
       plan_type,
@@ -122,11 +119,38 @@ Deno.serve(async (req) => {
       starts_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       status: "active",
+      coupon_code: coupon_code || null,
     });
 
     if (error) {
       console.error("Insert error:", error);
       return jsonRes({ error: "Failed to record subscription" }, 500);
+    }
+
+    // Increment coupon used_count if a coupon was used
+    if (coupon_code) {
+      const { error: couponErr } = await supabase.rpc("increment_coupon_usage", {
+        _code: coupon_code,
+      });
+      // If the RPC doesn't exist yet, fall back to a direct update
+      if (couponErr) {
+        await supabase
+          .from("coupons")
+          .update({ used_count: supabase.rpc ? undefined : 0 })
+          .eq("code", coupon_code);
+        // Simple increment via raw update
+        const { data: couponData } = await supabase
+          .from("coupons")
+          .select("used_count")
+          .eq("code", coupon_code)
+          .maybeSingle();
+        if (couponData) {
+          await supabase
+            .from("coupons")
+            .update({ used_count: couponData.used_count + 1 })
+            .eq("code", coupon_code);
+        }
+      }
     }
 
     return jsonRes({ success: true });
