@@ -104,13 +104,27 @@ const ReminderOverlay = () => {
 
   // No manual dismiss — only action button or auto-dismiss stops the overlay
 
+  const handleDismiss = () => {
+    if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+    setVisible(false);
+    setTimeout(() => setReminder(null), 300);
+    // Schedule next repeat if under max shows
+    if (reminder) {
+      const key = getReminderKey(reminder);
+      const count = showCountRef.current.get(key) || 1;
+      if (count < MAX_SHOWS) {
+        scheduleRepeat(reminder);
+      }
+    }
+  };
+
   const handleAction = () => {
     ensureAudioReady();
     dismiss(true); // acknowledged
     if (reminder?.type === "checkin") {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {
-      window.location.href = "/my-health";
+      window.location.href = "/my-health?tool=Tablets";
     } else if (reminder?.type === "appointment") {
       window.location.href = "/appointments";
     } else if (reminder?.type === "exercise") {
@@ -173,6 +187,14 @@ const ReminderOverlay = () => {
         >
           <Icon className="w-8 h-8 fill-current" />
           {actionLabel}
+        </button>
+
+        {/* Dismiss — closes overlay but cycle continues */}
+        <button
+          onClick={handleDismiss}
+          className="w-full py-3 rounded-xl border border-border text-muted-foreground text-lg font-medium hover:bg-muted transition-colors active:scale-[0.98]"
+        >
+          Dismiss
         </button>
 
       </div>
