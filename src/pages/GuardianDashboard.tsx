@@ -624,6 +624,38 @@ const GuardianDashboard = () => {
           </Card>
         )}
 
+        {/* Health Pattern Alerts (last 24h) */}
+        {(() => {
+          const now24h = Date.now() - 24 * 60 * 60 * 1000;
+          const anomalyAlerts = notifications.filter(
+            n => n.type === "anomaly" && new Date(n.created_at).getTime() > now24h
+          );
+          if (anomalyAlerts.length === 0) return null;
+          return (
+            <Card className="border-warning bg-warning/10">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="w-5 h-5 text-warning-foreground" />
+                  <h3 className="font-semibold text-sm text-warning-foreground">Health Pattern Alert</h3>
+                </div>
+                {anomalyAlerts.map(a => (
+                  <div key={a.id} className="p-3 rounded-lg bg-warning/5 border border-warning/30 space-y-1">
+                    <p className="text-sm text-foreground">{a.message}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+                    </p>
+                    {!a.read && (
+                      <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(a.id)}>
+                        Dismiss
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* Notification Alerts */}
         {unreadCount > 0 && (
           <Card className="border-destructive/30 bg-destructive/5">

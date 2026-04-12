@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Heart, Pill, CalendarClock, AlarmClock, X, Dumbbell } from "lucide-react";
+import { Heart, Pill, CalendarClock, X, Dumbbell } from "lucide-react";
 import { ensureAudioReady, playVoiceReminder, playChime } from "@/lib/audioAlerts";
 import { toast } from "sonner";
 
@@ -19,70 +19,104 @@ export const showReminderOverlay = (data: ReminderData) => {
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
 
-const SNOOZE_MS = 10 * 60_000; // 10 minutes
-const MAX_SNOOZES = 3;
+const AUTO_DISMISS_MS = 30_000; // 30 seconds
+const REPEAT_INTERVAL_MS = 5 * 60_000; // 5 minutes
+const MAX_SHOWS = 3;
 
 const getReminderKey = (data: ReminderData) => `${data.type}:${data.title}:${data.message}`;
 
 const ReminderOverlay = () => {
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
-  const [snoozesLeft, setSnoozesLeft] = useState(MAX_SNOOZES);
-  const snoozeTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const snoozeCountRef = useRef<Map<string, number>>(new Map());
+  const autoDismissRef = useRef<ReturnType<typeof setTimeout>>();
+  const repeatTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const showCountRef = useRef<Map<string, number>>(new Map());
+  const acknowledgedRef = useRef<Set<string>>(new Set());
+
+  const dismiss = useCallback((acknowledged: boolean = false) => {
+    if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+    setVisible(false);
+
+    if (acknowledged && reminder) {
+      acknowledgedRef.current.add(getReminderKey(reminder));
+    }
+
+    setTimeout(() => setReminder(null), 300);
+  }, [reminder]);
+
+  const scheduleRepeat = useCallback((data: ReminderData) => {
+    if (repeatTimerRef.current) clearTimeout(repeatTimerRef.current);
+    repeatTimerRef.current = setTimeout(() => {
+      const key = getReminderKey(data);
+      if (acknowledgedRef.current.has(key)) return;
+      showReminderOverlay(data);
+    }, REPEAT_INTERVAL_MS);
+  }, []);
 
   const handleEvent = useCallback((e: Event) => {
     const data = (e as CustomEvent<ReminderData>).detail;
     const key = getReminderKey(data);
-    const used = snoozeCountRef.current.get(key) || 0;
-    setSnoozesLeft(MAX_SNOOZES - used);
-    setReminder(data);
-    setVisible(true);
-    ensureAudioReady();
-  }, []);
 
-  useEffect(() => {
-    window.addEventListener(REMINDER_EVENT, handleEvent);
-    return () => {
-      window.removeEventListener(REMINDER_EVENT, handleEvent);
-      if (snoozeTimerRef.current) clearTimeout(snoozeTimerRef.current);
-    };
-  }, [handleEvent]);
+    // If already acknowledged, don't show again
+    if (acknowledgedRef.current.has(key)) return;
 
-  const dismiss = () => {
-    setVisible(false);
-    setTimeout(() => setReminder(null), 300);
-  };
+    const count = (showCountRef.current.get(key) || 0) + 1;
+    showCountRef.current.set(key, count);
 
-  const handleSnooze = () => {
-    if (!reminder) return;
-    const key = getReminderKey(reminder);
-    const used = (snoozeCountRef.current.get(key) || 0) + 1;
-    snoozeCountRef.current.set(key, used);
-
-    if (used >= MAX_SNOOZES) {
-      if (reminder.type === "medication") {
-        // Escalation: urgent audio + guardian nudge
+    if (count > MAX_SHOWS) {
+      // Escalation
+      if (data.type === "medication") {
         playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
         playChime();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
         toast.warning("Medication not taken — your guardian will be notified.", { duration: 6000 });
       } else {
-        toast.info("Maximum snoozes reached. Please take action.");
+        toast.info("Maximum reminders reached. Please take action.");
       }
-      dismiss();
+      showCountRef.current.delete(key);
       return;
     }
 
-    const snoozedReminder = { ...reminder };
-    dismiss();
-    snoozeTimerRef.current = setTimeout(() => {
-      showReminderOverlay(snoozedReminder);
-    }, SNOOZE_MS);
+    setReminder(data);
+    setVisible(true);
+    ensureAudioReady();
+
+    // Auto-dismiss after 30 seconds
+    if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+    autoDismissRef.current = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => setReminder(null), 300);
+      // Schedule next repeat if not at max
+      if (count < MAX_SHOWS) {
+        scheduleRepeat(data);
+      }
+    }, AUTO_DISMISS_MS);
+  }, [scheduleRepeat]);
+
+  useEffect(() => {
+    window.addEventListener(REMINDER_EVENT, handleEvent);
+    return () => {
+      window.removeEventListener(REMINDER_EVENT, handleEvent);
+      if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
+      if (repeatTimerRef.current) clearTimeout(repeatTimerRef.current);
+    };
+  }, [handleEvent]);
+
+  const handleDismiss = () => {
+    dismiss(false);
+    // Schedule repeat if not acknowledged and not at max
+    if (reminder) {
+      const key = getReminderKey(reminder);
+      const count = showCountRef.current.get(key) || 0;
+      if (count < MAX_SHOWS) {
+        scheduleRepeat(reminder);
+      }
+    }
   };
 
   const handleAction = () => {
-    ensureAudioReady(); // Re-prime for future alerts
+    ensureAudioReady();
+    dismiss(true); // acknowledged
     if (reminder?.type === "checkin") {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
     } else if (reminder?.type === "medication") {
@@ -92,7 +126,6 @@ const ReminderOverlay = () => {
     } else if (reminder?.type === "exercise") {
       window.location.href = "/my-health";
     }
-    dismiss();
   };
 
   if (!reminder) return null;
@@ -109,6 +142,9 @@ const ReminderOverlay = () => {
     : isExercise
     ? "Log Activity"
     : "View Medications";
+
+  const key = getReminderKey(reminder);
+  const currentShow = showCountRef.current.get(key) || 1;
 
   return (
     <div
@@ -135,6 +171,9 @@ const ReminderOverlay = () => {
               {reminder.reminderCount}
             </p>
           )}
+          <p className="text-sm text-muted-foreground">
+            Reminder {currentShow} of {MAX_SHOWS} · Auto-closes in 30s
+          </p>
         </div>
 
         {/* Action Button */}
@@ -146,20 +185,10 @@ const ReminderOverlay = () => {
           {actionLabel}
         </button>
 
-        {/* Snooze + Dismiss row */}
-        <div className="flex items-center justify-center gap-6">
-          {snoozesLeft > 0 && (
-            <button
-              onClick={handleSnooze}
-              className="flex items-center gap-2 text-lg font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              <AlarmClock className="w-5 h-5" />
-              Snooze 5 min ({snoozesLeft} left)
-            </button>
-          )}
-          <span className="text-muted-foreground">·</span>
+        {/* Dismiss */}
+        <div className="flex items-center justify-center">
           <button
-            onClick={dismiss}
+            onClick={handleDismiss}
             className="flex items-center gap-2 text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-5 h-5" />
