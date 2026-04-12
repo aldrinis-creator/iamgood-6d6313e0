@@ -120,8 +120,7 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
           <Brain className="w-4 h-4" /> {loadingAi ? "Analyzing…" : "Get AI Insights"}
         </Button>
 
-        {aiInsights && (
-          {(() => {
+        {aiInsights && (() => {
             const visual = tryParseVisualReport(aiInsights);
             if (visual) return <VisualHealthReport report={visual} />;
             return (
@@ -130,7 +129,6 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
               </div>
             );
           })()}
-        )}
       </CardContent>
     </Card>
   );
