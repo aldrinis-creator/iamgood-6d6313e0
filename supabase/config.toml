@@ -29,3 +29,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.confirm-payment]
     verify_jwt = false
+  [functions.validate-coupon]
+    verify_jwt = false

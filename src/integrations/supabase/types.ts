@@ -233,6 +233,45 @@ export type Database = {
         }
         Relationships: []
       }
+      coupons: {
+        Row: {
+          applicable_plans: string[]
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          used_count: number
+        }
+        Insert: {
+          applicable_plans?: string[]
+          code: string
+          created_at?: string
+          discount_type?: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Update: {
+          applicable_plans?: string[]
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -1480,6 +1519,7 @@ export type Database = {
         Row: {
           amount_paise: number
           billing_cycle: string
+          coupon_code: string | null
           created_at: string
           expires_at: string
           id: string
@@ -1494,6 +1534,7 @@ export type Database = {
         Insert: {
           amount_paise?: number
           billing_cycle: string
+          coupon_code?: string | null
           created_at?: string
           expires_at: string
           id?: string
@@ -1508,6 +1549,7 @@ export type Database = {
         Update: {
           amount_paise?: number
           billing_cycle?: string
+          coupon_code?: string | null
           created_at?: string
           expires_at?: string
           id?: string
