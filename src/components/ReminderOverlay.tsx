@@ -189,6 +189,14 @@ const ReminderOverlay = () => {
           {actionLabel}
         </button>
 
+        {/* Dismiss — closes overlay but cycle continues */}
+        <button
+          onClick={handleDismiss}
+          className="w-full py-3 rounded-xl border border-border text-muted-foreground text-lg font-medium hover:bg-muted transition-colors active:scale-[0.98]"
+        >
+          Dismiss
+        </button>
+
       </div>
     </div>
   );
