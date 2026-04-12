@@ -180,6 +180,18 @@ Deno.serve(async (req) => {
     let pushesSent = 0;
 
     for (const checkIn of uniqueCheckIns) {
+      // ── Mark as missed FIRST to prevent duplicate processing by next cron run ──
+      const { error: updateError } = await supabase
+        .from("check_ins")
+        .update({ status: "missed" })
+        .eq("id", checkIn.id)
+        .eq("status", "pending"); // optimistic lock: only if still pending
+
+      if (updateError) {
+        console.error("Error marking check-in as missed:", updateError);
+        continue; // skip — another run likely already processed it
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
@@ -206,25 +218,26 @@ Deno.serve(async (req) => {
 
         const message = `${userName} missed their ${timeStr} check-in. Please reach out to make sure they're okay.`;
 
+        // ── Use deduped RPC for in-app notifications ──
+        const notifications = guardians.map((g) => ({
+          user_id: checkIn.user_id,
+          guardian_id: g.id,
+          title: "Missed Check-In Alert",
+          message,
+          type: "missed_checkin",
+        }));
+
+        const { error: dedupError } = await supabase.rpc("insert_notifications_deduped", {
+          p_notifications: notifications,
+        });
+        if (dedupError) {
+          console.error("Deduped notification error:", dedupError);
+        } else {
+          notificationsCreated += guardians.length;
+        }
+
         for (const guardian of guardians) {
-          // Create in-app notification
-          const { error: notifError } = await supabase
-            .from("notifications")
-            .insert({
-              user_id: checkIn.user_id,
-              guardian_id: guardian.id,
-              type: "missed_checkin",
-              title: "Missed Check-In Alert",
-              message,
-            });
-
-          if (notifError) {
-            console.error("Error creating notification:", notifError);
-          } else {
-            notificationsCreated++;
-          }
-
-          // Send email via transactional email queue
+          // Send email via transactional email queue (idempotency key prevents duplicates)
           if (guardian.guardian_email) {
             try {
               await supabase.functions.invoke("send-transactional-email", {
@@ -268,7 +281,7 @@ Deno.serve(async (req) => {
                       {
                         title: "⚠️ Missed Check-In Alert",
                         body: message,
-                        tag: "missed-checkin",
+                        tag: `missed-checkin-${checkIn.id}`,
                         url: "/guardian",
                       },
                       vapidPublicKey,
@@ -294,10 +307,10 @@ Deno.serve(async (req) => {
           }
         }
 
-        // MSG91 WhatsApp notification (inside guardians scope)
+        // MSG91 WhatsApp notification — dedup: only send if this is the first notification batch
         const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
         const msg91CheckinTemplate = Deno.env.get("MSG91_CHECKIN_TEMPLATE_ID");
-        if (msg91AuthKey && msg91CheckinTemplate) {
+        if (msg91AuthKey && msg91CheckinTemplate && !dedupError) {
           const recipients = guardians
             .filter((g: any) => g.guardian_phone)
             .map((g: any) => {
@@ -319,12 +332,6 @@ Deno.serve(async (req) => {
           }
         }
       }
-
-      // Mark check-in as missed
-      await supabase
-        .from("check_ins")
-        .update({ status: "missed" })
-        .eq("id", checkIn.id);
     }
 
     console.log(`Created ${notificationsCreated} notifications, sent ${emailsSent} emails, ${pushesSent} pushes`);

@@ -6,6 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 
+// Guardian notifications are handled exclusively by the server-side
+// check-missed-checkins cron. The client only handles user-facing alerts.
+
 const CHECK_IN_HOURS = [7, 12, 19];
 const POST_GRACE_INTERVAL_MIN = 10;
 const POST_GRACE_MAX_REMINDERS = 3;
@@ -17,32 +20,6 @@ const formatHour = (h: number) => {
   return `${h - 12}:00 PM`;
 };
 
-const notifyGuardiansMissedCheckin = async (userId: string) => {
-  try {
-    // In-app notification to guardians
-    const { data: guardians } = await supabase
-      .from("guardians")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "accepted");
-
-    if (guardians && guardians.length > 0) {
-      const notifications = guardians.map((g) => ({
-        user_id: userId,
-        guardian_id: g.id,
-        title: "Missed Check-In",
-        message: "Your ward has missed a check-in after multiple reminders.",
-        type: "missed_checkin",
-        read: false,
-      }));
-      await supabase.rpc("insert_notifications_deduped", {
-        p_notifications: notifications,
-      });
-    }
-  } catch {
-    // best-effort
-  }
-};
 
 const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
@@ -162,10 +139,7 @@ const useCheckInAudio = () => {
             reminderCount: `Final — ${formatHour(h)}`,
           });
 
-          // Send ONE guardian notification
-          if (session?.user?.id) {
-            notifyGuardiansMissedCheckin(session.user.id);
-          }
+          // Guardian notifications are handled by the server-side cron job
         }
       }
     }
