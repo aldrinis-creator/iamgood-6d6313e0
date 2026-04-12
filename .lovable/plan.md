@@ -1,51 +1,34 @@
 
 
-## Fix Email Disconnects: Bug Fix, Domain Setup, and Queue Migration
+## Fix: Duplicate SMS for Missed Check-Ins
 
-### Three issues found
+### Root Cause Analysis
 
-1. **`check-missed-checkins` crash** — The MSG91 WhatsApp block (line 331) references `guardians` and `message` variables that are scoped inside an `if` block ending at line 329. This causes a `ReferenceError` on every run.
+The database confirms 25 duplicate "Missed Check-In Alert" notifications created within 2 minutes, for only 1 guardian and 2 check-in records. The 6 identical SMS messages in your screenshot come from multiple overlapping sources:
 
-2. **No email domain configured** — The previous domain (`notify.www.futurewave.in`) is no longer set up. Without it, the Lovable email queue has no sending domain.
+**Problem 1 — `check-missed-checkins` marks check-ins as missed TOO LATE**
+The cron runs every 10 minutes. The function sends SMS/notifications FIRST (line 209-320), then marks the check-in as "missed" LAST (line 324). If the function takes time or errors partway through, the next cron run picks up the same still-pending check-in and sends SMS again. With a check-in pending for 60+ minutes, that is up to 6 cron runs each sending SMS.
 
-3. **4 edge functions bypass the email queue** — `check-missed-checkins`, `send-sos-alert`, `send-guardian-invite`, and `notify-vital-anomaly` all call the Resend API directly with an invalid API key. These should route through the Lovable email queue instead.
+**Problem 2 — Direct `.insert()` bypasses deduplication**
+The function uses `supabase.from("notifications").insert(...)` (line 211) instead of `insert_notifications_deduped` RPC, so every run creates a new notification regardless of whether one already exists.
 
-### Plan
+**Problem 3 — Client-side `useCheckInAudio` also sends guardian notifications**
+The client hook calls `notifyGuardiansMissedCheckin()` on final escalation (line 167). When the component remounts (page navigation), `postGraceRef` and `missedSentRef` reset, replaying the entire escalation sequence and firing more notifications.
 
-**Step 1: Set up email domain**
-- Open the email domain setup dialog so you can configure `notify.www.futurewave.in` (or your preferred domain)
+### Fix Plan
 
-**Step 2: Fix the crash in `check-missed-checkins`**
-- Move the MSG91 WhatsApp block (lines 331-354) inside the `if (guardians && guardians.length > 0)` block so `guardians` and `message` are in scope
+**`check-missed-checkins/index.ts`** — 3 changes:
+1. **Mark as missed FIRST, before sending any notifications.** Move the `update({ status: "missed" })` call to BEFORE the notification/SMS block. This prevents subsequent cron runs from re-processing the same check-in.
+2. **Use `insert_notifications_deduped` RPC** instead of direct `.insert()` for notifications.
+3. **Add MSG91 idempotency** — include the check-in ID in a dedup check. Before calling MSG91, check if a notification with `type: missed_checkin` already exists for this user+guardian+scheduled hour. If so, skip SMS.
 
-**Step 3: Create 4 new email templates and route through the queue**
-
-Create React Email templates in `_shared/transactional-email-templates/` for:
-- `missed-checkin-alert` — guardian notification for missed check-ins
-- `sos-alert` — emergency SOS notification to guardians/doctor
-- `guardian-invite` — guardian nomination invitation (replace the inline HTML in `send-guardian-invite`)
-- `vital-anomaly-alert` — guardian notification for abnormal vitals
-
-Then update each edge function to replace the direct `fetch("https://api.resend.com/emails", ...)` calls with `supabase.functions.invoke("send-transactional-email", ...)` using the appropriate template name.
-
-**Step 4: Register all templates in `registry.ts`**
-
-Add the 4 new templates to the TEMPLATES map.
-
-**Step 5: Deploy all changed edge functions**
+**`useCheckInAudio.ts`** — 1 change:
+- **Remove `notifyGuardiansMissedCheckin()` call** (line 167). The server-side cron is the single source of truth for guardian notifications and SMS. The client should only handle user-facing audio/visual reminders.
 
 ### Files to modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/transactional-email-templates/missed-checkin-alert.tsx` | **New** template |
-| `supabase/functions/_shared/transactional-email-templates/sos-alert.tsx` | **New** template |
-| `supabase/functions/_shared/transactional-email-templates/vital-anomaly-alert.tsx` | **New** template |
-| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register 3 new templates |
-| `supabase/functions/check-missed-checkins/index.ts` | Fix scoping bug + replace Resend with queue |
-| `supabase/functions/send-sos-alert/index.ts` | Replace Resend with queue |
-| `supabase/functions/notify-vital-anomaly/index.ts` | Replace Resend with queue |
-| `supabase/functions/send-guardian-invite/index.ts` | Already has a transactional template; replace Resend call with queue invocation |
-
-Note: The `send-guardian-invite` function already has a `guardian-invitation` template registered. Its Resend call will be replaced with a queue invocation using that existing template.
+| `supabase/functions/check-missed-checkins/index.ts` | Mark missed first, use deduped insert, add MSG91 dedup guard |
+| `src/hooks/useCheckInAudio.ts` | Remove `notifyGuardiansMissedCheckin` call on final escalation |
 
