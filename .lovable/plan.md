@@ -1,61 +1,58 @@
-## Fix: Triple SMS for Missed Medication and Correct Escalation Flow
 
-### Root Cause — 3 Separate Notification Paths
 
-When a medication is missed, THREE independent paths all fire guardian notifications:
+## Add PDF and Word File Support to Health Tools
 
-1. `**useMedicationAlarms.ts` line 119** — 60-min missed-dose detection writes a "missed" log and calls `notifyGuardiansMissed`
-2. `**useMedicationAlarms.ts` line 170** — Listens for `app:medication-snooze-exhausted` event (from ReminderOverlay after 3 snoozes) and calls `notifyGuardiansMissed` again
-3. `**TodaySchedule.tsx` line 245** — `autoMarkMissed()` calls `notifyGuardians` with status "missed" when TodaySchedule's own snooze limit is hit
+### What changes
 
-All three can fire for the same dose slot → 3 SMS messages.
+Both **Document Analyzer** and **Prescription Scanner** currently accept only images or plain text. This plan adds PDF (.pdf) and Word (.docx) file acceptance. Since the AI models already handle text input well and Gemini supports image-based PDFs, the approach is:
 
-### Desired Flow (per the user's specification)
+1. **Client-side PDF/DOCX text extraction** using `pdfjs-dist` (PDF) and `mammoth` (DOCX) — extract text on the browser, send as text payload to the existing edge function. No server changes needed.
+2. For image-heavy PDFs (scanned documents), convert the first few pages to images client-side via `pdfjs-dist` canvas rendering, then send as image payload for vision analysis.
 
-```text
-Medication time → Initial reminder fires
-    ↓
-1-hour grace period (user can take medication anytime)
-    ↓
-After 60 minutes if not taken:
-    Reminder 1 fires → wait 10 min
-    Reminder 2 fires → wait 10 min
-    Reminder 3 fires → wait 10 min
-    ↓
-If still not taken after 3 post-grace reminders:
-    → Send ONE missed medication SMS to guardian
-    → Play escalated audio alert to user
-    → Write "missed" log
+### Files to modify
+
+| File | Change |
+|------|--------|
+| `package.json` | Add `pdfjs-dist` and `mammoth` dependencies |
+| `src/lib/documentExtractor.ts` | **New** — shared utility with `extractTextFromPDF(file)`, `extractTextFromDOCX(file)`, `renderPDFPageToImage(file, pageNum)` |
+| `src/components/health-tools/DocumentAnalyzer.tsx` | Accept `.pdf, .docx` in photo mode file input. When a PDF/DOCX is selected, extract text (or render to image for scanned PDFs). Update accept strings, validation, and UI labels. |
+| `src/components/medications/PrescriptionScanner.tsx` | Same — accept PDF/DOCX in photo mode. Extract text or render first page as image. Update accept strings and labels. |
+
+### Technical approach
+
+**`src/lib/documentExtractor.ts`**:
+```typescript
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+
+// Extract text from PDF (first 10 pages)
+export async function extractTextFromPDF(file: File): Promise<{ text: string; hasText: boolean }> { ... }
+
+// Render PDF page to base64 image (for scanned/image PDFs)
+export async function renderPDFPageToImage(file: File, page = 1): Promise<string> { ... }
+
+// Extract text from DOCX
+export async function extractTextFromDOCX(file: File): Promise<string> { ... }
 ```
 
-### Changes
+**DocumentAnalyzer changes**:
+- Photo mode `accept` → `"image/*,.pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"`
+- When file selected: if PDF/DOCX, extract text. If text is minimal (scanned PDF), fall back to rendering page 1 as image.
+- Show file name + icon instead of image preview for document files.
+- Label changes: "Photo / Upload" → "Upload File", hint text → "JPG, PNG, PDF, DOCX — max 10MB"
 
+**PrescriptionScanner changes**:
+- Same accept string update
+- Same extraction logic
+- For prescriptions, image mode is preferred (render PDF page to image for vision model)
 
-| File                                           | Change                                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/hooks/useMedicationAlarms.ts`             | At 60-min mark: instead of immediately writing "missed" log + SMS, start a 3-reminder sequence at 10-min intervals. Only after all 3 are exhausted, write the missed log and send ONE guardian notification. Remove the separate `app:medication-snooze-exhausted` listener (no longer needed as a separate path). |
-| `src/components/ReminderOverlay.tsx`           | Change snooze interval from 5 min to 10 min. Remove the `app:medication-snooze-exhausted` event dispatch — the escalation is now handled entirely by `useMedicationAlarms`.                                                                                                                                        |
-| `src/components/medications/TodaySchedule.tsx` | Remove the `notifyGuardians(..., "missed", ...)` call from `autoMarkMissed()`. TodaySchedule should only write the database log, not send SMS. The alarm hook handles SMS.                                                                                                                                         |
+### UI updates
 
+- File type icons: show a PDF/Word icon in the preview area instead of an image thumbnail
+- Increase `MAX_IMAGE_SIZE` to 10MB for documents (PDFs can be larger than photos)
+- Add a small "Extracting text…" spinner while parsing PDF/DOCX client-side
 
-### Technical Detail
+### No edge function changes needed
 
-**useMedicationAlarms** new logic at the 60-min detection point:
+The existing `health-tools` function already handles both `{ image: base64 }` and text string payloads. Client-side extraction feeds into these existing paths.
 
-- Track a `postGraceReminders` ref: `Map<string, number>` (slot key → reminder count)
-- At 60 min past: if count < 3, show a `ReminderOverlay`, increment count, and DON'T write missed log yet
-- At 90 min (count 1), 100 min (count 2), 110 min (count 3): each `check()` cycle re-fires
-- After count reaches 3 and another 10 min passes with no "taken" log: write missed log, call `notifyGuardiansMissed` ONCE, play escalated audio
-
-**ReminderOverlay** changes:
-
-- `SNOOZE_MS` from `5 * 60_000` to `10 * 60_000`
-- Remove the `window.dispatchEvent(new CustomEvent("app:medication-snooze-exhausted"))` line — the overlay still shows the 3-snooze UI but doesn't trigger SMS independently
-
-**TodaySchedule** changes:
-
-- In `autoMarkMissed()`, remove the `notifyGuardians(...)` call on line 245. Keep the database insert/update for the missed log.
-
-This ensures exactly ONE SMS is sent, only after the full escalation sequence (1 hour grace + 3 reminders at 10-min intervals = ~90 minutes after scheduled time).  
-  
-Do this for all MIssed Medications, Check-iNs
