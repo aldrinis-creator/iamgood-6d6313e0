@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -259,9 +260,15 @@ const DashboardTab = () => {
               content={aiInsights}
               category="Vitals"
             />
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>{aiInsights}</ReactMarkdown>
-            </div>
+            {(() => {
+              const visual = tryParseVisualReport(aiInsights);
+              if (visual) return <VisualHealthReport report={visual} />;
+              return (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown>{aiInsights}</ReactMarkdown>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}

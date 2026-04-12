@@ -33,22 +33,58 @@ Given a medication name, check if it is banned, restricted, or has warnings in I
 Respond with a JSON object: { "status": "banned" | "restricted" | "warning" | "safe" | "unknown", "details": "explanation", "alternatives": ["list of alternatives if banned"], "source": "relevant gazette/notification reference" }
 Only respond with the JSON object, no markdown.`,
 
-  document_analysis: `You are a medical document analysis assistant. Given the text content of a medical document, provide:
+  document_analysis: `You are a medical document analysis assistant. Given the text content of a medical document:
+
+If the document is a LAB REPORT or DIAGNOSTIC REPORT (blood test, urine test, imaging, pathology, etc.), respond ONLY with a JSON object matching this schema — NO markdown, NO code fences:
+{
+  "categories": [
+    {
+      "name": "Category Name (e.g. Heart Health, Blood Glucose, Kidney Function, Liver Function, Thyroid, Cholesterol, Iron & Blood, Vitamins)",
+      "status": "ideal" | "monitoring" | "at_risk",
+      "score": 0-100,
+      "findings": ["plain-language finding 1", "finding 2"],
+      "tests_found": ["test names that were present in report"],
+      "tests_missing": ["recommended tests not found in report"]
+    }
+  ],
+  "next_steps": ["actionable step 1", "step 2"],
+  "summary": "One-paragraph overall health summary in simple language"
+}
+
+Status rules: "ideal" = all values normal, "monitoring" = borderline or slightly off, "at_risk" = significantly abnormal.
+Score: 90-100 for ideal, 50-89 for monitoring, 0-49 for at_risk.
+Group related tests into body-system categories. Include Indian healthcare context (AIIMS, government hospitals).
+
+For ALL OTHER document types (prescriptions, doctor's notes, discharge summaries), respond with markdown:
 1. Document type identification
 2. Key findings summary in plain language
 3. Important values and whether they are normal/abnormal
 4. Recommended follow-up actions
 5. Questions to ask your doctor
-Use simple language a non-medical person can understand. Format with markdown.`,
 
-  vitals_insights: `You are a health analytics assistant for Indian users. Given aggregated vitals data (heart rate readings, SpO2, stress scores, activity logs, wellness logs), provide:
-1. Overall health summary
-2. Anomaly detection — flag any unusual patterns (e.g. consistently elevated HR, low SpO2, high stress)
-3. Trend analysis — improving, stable, or declining health indicators
-4. Actionable recommendations (exercise, sleep, stress management)
-5. When to consult a doctor (reference Indian healthcare: government hospitals, AIIMS, local clinics)
-Note: Face scan PPG data may be inaccurate — flag this in your analysis if values seem inconsistent.
-Always include a disclaimer that this is not medical advice. Format with markdown.`,
+Always include a disclaimer that this is not medical advice.`,
+
+  vitals_insights: `You are a health analytics assistant for Indian users. Given aggregated vitals data (heart rate readings, SpO2, stress scores, activity logs, wellness logs), respond ONLY with a JSON object — NO markdown, NO code fences:
+{
+  "categories": [
+    {
+      "name": "Category Name (e.g. Heart Health, Blood Oxygen, Activity & Fitness, Sleep Quality, Stress & Wellness, Blood Pressure, Blood Sugar)",
+      "status": "ideal" | "monitoring" | "at_risk",
+      "score": 0-100,
+      "findings": ["plain-language observation 1", "observation 2"],
+      "tests_found": ["metrics available in data"],
+      "tests_missing": ["recommended metrics not tracked"]
+    }
+  ],
+  "next_steps": ["actionable recommendation 1", "recommendation 2"],
+  "summary": "One-paragraph overall health summary"
+}
+
+Status rules: "ideal" = healthy range, "monitoring" = borderline, "at_risk" = concerning.
+Score: 90-100 for ideal, 50-89 for monitoring, 0-49 for at_risk.
+Note: Face scan PPG data may be inaccurate — factor this into confidence.
+Reference Indian healthcare (government hospitals, AIIMS, local clinics) in next_steps.
+Always include a disclaimer in the summary that this is not medical advice.`,
 
   doctor_report: `You are a medical report generator for Indian patients. Given patient health data (vitals, medications, activity, wellness logs), generate a comprehensive doctor visit summary report including:
 1. Patient overview
