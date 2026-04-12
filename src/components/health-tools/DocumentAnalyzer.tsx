@@ -10,9 +10,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, extractTextFromDOCX, getFileTypeLabel } from "@/lib/documentExtractor";
 
 const MAX_TEXT_LENGTH = 10000;
-const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for documents
 
 const categories = [
   { label: "Medical Images", icon: FileImage, bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-600", activeBg: "bg-blue-500/20" },
@@ -38,6 +39,8 @@ const analysisSteps = [
   { label: "Finalizing analysis…", duration: 12000 },
 ];
 
+const ACCEPT_STRING = "image/*,.pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 const DocumentAnalyzer = () => {
   const { user } = useAuth();
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
@@ -45,6 +48,9 @@ const DocumentAnalyzer = () => {
   const [file, setFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [docFileName, setDocFileName] = useState<string | null>(null);
+  const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,28 +80,74 @@ const DocumentAnalyzer = () => {
     if (result && loading) setProgress(100);
   }, [result, loading]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
+
+    if (selected.size > MAX_FILE_SIZE) {
+      toast.error("File must be under 10MB");
+      e.target.value = "";
+      return;
+    }
+
+    // Handle PDF/DOCX documents
+    if (isDocument(selected)) {
+      setExtracting(true);
+      setDocFileName(selected.name);
+      setImagePreview(null);
+      setImageBase64(null);
+      try {
+        if (isPDF(selected)) {
+          const { text, hasText } = await extractTextFromPDF(selected);
+          if (hasText) {
+            setExtractedDocText(text);
+          } else {
+            // Scanned PDF — render first page as image
+            const img = await renderPDFPageToImage(selected);
+            setImageBase64(img);
+            setExtractedDocText(null);
+          }
+        } else if (isDOCX(selected)) {
+          const text = await extractTextFromDOCX(selected);
+          if (text.trim().length > 10) {
+            setExtractedDocText(text);
+          } else {
+            toast.error("Could not extract text from this document");
+            clearFile();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Document extraction error:", err);
+        toast.error("Failed to read document. Try a different file.");
+        clearFile();
+        return;
+      } finally {
+        setExtracting(false);
+      }
+      return;
+    }
+
+    // Handle images
     if (!selected.type.startsWith("image/")) {
-      toast.error("Please select an image file (JPG, PNG, etc.)");
+      toast.error("Please select an image, PDF, or Word file");
       e.target.value = "";
       return;
     }
-    if (selected.size > MAX_IMAGE_SIZE) {
-      toast.error("Image must be under 4MB");
-      e.target.value = "";
-      return;
-    }
+
+    setDocFileName(null);
+    setExtractedDocText(null);
     setImagePreview(URL.createObjectURL(selected));
     const reader = new FileReader();
     reader.onload = () => setImageBase64(reader.result as string);
     reader.readAsDataURL(selected);
   };
 
-  const clearImage = () => {
+  const clearFile = () => {
     setImagePreview(null);
     setImageBase64(null);
+    setDocFileName(null);
+    setExtractedDocText(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -111,8 +163,8 @@ const DocumentAnalyzer = () => {
   };
 
   const analyze = async () => {
-    if (mode === "photo" && !imageBase64) {
-      toast.error("Please upload a photo of your document");
+    if (mode === "photo" && !imageBase64 && !extractedDocText) {
+      toast.error("Please upload a document or photo");
       return;
     }
     if (mode === "text" && !textInput && !file) {
@@ -122,8 +174,14 @@ const DocumentAnalyzer = () => {
     setLoading(true);
     try {
       let payload: any;
-      if (mode === "photo" && imageBase64) {
-        payload = { image: imageBase64, category: selectedCat || "General" };
+      if (mode === "photo") {
+        if (extractedDocText) {
+          // Send extracted text from PDF/DOCX
+          const content = extractedDocText.substring(0, MAX_TEXT_LENGTH);
+          payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
+        } else if (imageBase64) {
+          payload = { image: imageBase64, category: selectedCat || "General" };
+        }
       } else {
         let content = textInput;
         if (file && !textInput) {
@@ -214,7 +272,7 @@ const DocumentAnalyzer = () => {
     const activeCat = categories.find(c => c.label === selectedCat);
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearImage(); setSaved(false); }}>← Back</Button>
+        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearFile(); setSaved(false); }}>← Back</Button>
         <Card className="overflow-hidden">
           <div className={`h-1 ${activeCat ? `bg-gradient-to-r ${activeCat.label === "Medical Images" ? "from-blue-500 to-blue-300" : activeCat.label === "Lab Reports" ? "from-emerald-500 to-emerald-300" : activeCat.label === "Doctor's Diagnosis" ? "from-amber-500 to-amber-300" : "from-teal-500 to-teal-300"}`  : "bg-primary"}`} />
           <CardContent className="p-4 space-y-4">
@@ -267,7 +325,6 @@ const DocumentAnalyzer = () => {
   // Input view
   return (
     <div className="space-y-4">
-      {/* Header card with gradient */}
       <Card className="overflow-hidden">
         <div className="h-1.5 bg-gradient-to-r from-blue-500 via-emerald-500 to-amber-500" />
         <CardContent className="p-5 text-center space-y-3">
@@ -275,11 +332,10 @@ const DocumentAnalyzer = () => {
             <Search className="w-7 h-7 text-primary" />
           </div>
           <h3 className="font-bold text-lg">Document Analyzer</h3>
-          <p className="text-sm text-muted-foreground">Upload a photo or paste text from a medical document for AI-powered plain-language analysis.</p>
+          <p className="text-sm text-muted-foreground">Upload a photo, PDF, Word document, or paste text from a medical document for AI-powered plain-language analysis.</p>
         </CardContent>
       </Card>
 
-      {/* Color-coded categories */}
       <div className="grid grid-cols-2 gap-2">
         {categories.map((cat) => {
           const isActive = selectedCat === cat.label;
@@ -302,14 +358,13 @@ const DocumentAnalyzer = () => {
         })}
       </div>
 
-      {/* Mode Toggle */}
       <div className="flex gap-2">
         <Button
           variant={mode === "photo" ? "default" : "outline"}
           className="flex-1"
           onClick={() => setMode("photo")}
         >
-          <Camera className="w-4 h-4 mr-2" /> Photo / Upload
+          <Upload className="w-4 h-4 mr-2" /> Upload File
         </Button>
         <Button
           variant={mode === "text" ? "default" : "outline"}
@@ -320,30 +375,47 @@ const DocumentAnalyzer = () => {
         </Button>
       </div>
 
-      {/* Input */}
       <Card>
         <CardContent className="p-4 space-y-3">
           {mode === "photo" ? (
             <>
-              {imagePreview ? (
+              {extracting ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <span className="text-sm font-medium">Extracting text from document…</span>
+                </div>
+              ) : imagePreview ? (
                 <div className="relative">
                   <img src={imagePreview} alt="Document preview" className="w-full rounded-lg border border-border max-h-64 object-contain bg-muted" />
-                  <Button size="icon" variant="destructive" className="absolute top-2 right-2 h-7 w-7" onClick={clearImage}>
+                  <Button size="icon" variant="destructive" className="absolute top-2 right-2 h-7 w-7" onClick={clearFile}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : docFileName ? (
+                <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
+                  <FileText className="w-10 h-10 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{docFileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {extractedDocText ? "Text extracted successfully ✓" : "Rendered as image for analysis ✓"}
+                    </p>
+                  </div>
+                  <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={clearFile}>
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
               ) : (
                 <label className="flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-gradient-to-b from-muted/30 to-transparent border-border/60">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-primary" />
+                    <Upload className="w-6 h-6 text-primary" />
                   </div>
-                  <span className="text-sm font-medium">Tap to take photo or upload image</span>
-                  <span className="text-xs text-muted-foreground">JPG, PNG — max 4MB</span>
+                  <span className="text-sm font-medium">Tap to upload file or take photo</span>
+                  <span className="text-xs text-muted-foreground">JPG, PNG, PDF, DOCX — max 10MB</span>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
+                    accept={ACCEPT_STRING}
+                    onChange={handleFileSelect}
                     className="hidden"
                   />
                 </label>
@@ -373,7 +445,7 @@ const DocumentAnalyzer = () => {
               </div>
             </>
           )}
-          <Button onClick={analyze} disabled={loading} className="w-full">
+          <Button onClick={analyze} disabled={loading || extracting} className="w-full">
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : <><Upload className="w-4 h-4 mr-2" /> Analyze Document</>}
           </Button>
         </CardContent>

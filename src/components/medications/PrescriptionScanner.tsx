@@ -9,9 +9,10 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import type { AlternativeContext } from "./MedicationManager";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, extractTextFromDOCX } from "@/lib/documentExtractor";
 
 const MAX_INPUT_LENGTH = 5000;
-const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface Alternative {
   name: string;
@@ -52,16 +53,20 @@ interface PrescriptionScannerProps {
   onCancelAltMode?: () => void;
 }
 
+const ACCEPT_STRING = "image/*,.pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAltMode }: PrescriptionScannerProps) => {
   const [inputMode, setInputMode] = useState<InputMode>("photo");
   const [prescriptionText, setPrescriptionText] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [docFileName, setDocFileName] = useState<string | null>(null);
+  const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // When entering alternative mode, pre-fill the medication name and switch to text mode
   useEffect(() => {
     if (alternativeMode) {
       setInputMode("text");
@@ -70,24 +75,70 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     }
   }, [alternativeMode]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file (JPG, PNG, etc.)");
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("Image too large. Please use an image under 4MB.");
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File must be under 10MB");
+      e.target.value = "";
       return;
     }
 
+    // Handle PDF/DOCX
+    if (isDocument(file)) {
+      setExtracting(true);
+      setDocFileName(file.name);
+      setImagePreview(null);
+      setImageBase64(null);
+      setExtractedDocText(null);
+      try {
+        if (isPDF(file)) {
+          // For prescriptions, prefer image rendering for vision model
+          const { text, hasText } = await extractTextFromPDF(file);
+          if (hasText && text.length > 100) {
+            setExtractedDocText(text);
+          } else {
+            const img = await renderPDFPageToImage(file);
+            setImageBase64(img);
+          }
+        } else if (isDOCX(file)) {
+          const text = await extractTextFromDOCX(file);
+          if (text.trim().length > 10) {
+            setExtractedDocText(text);
+          } else {
+            toast.error("Could not extract text from this document");
+            clearFile();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Document extraction error:", err);
+        toast.error("Failed to read document. Try a different file.");
+        clearFile();
+        return;
+      } finally {
+        setExtracting(false);
+      }
+      return;
+    }
+
+    // Handle images
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image, PDF, or Word file");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File too large. Please use a file under 10MB.");
+      return;
+    }
+
+    setDocFileName(null);
+    setExtractedDocText(null);
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
       setImagePreview(dataUrl);
-      // Extract base64 portion after the data URL prefix
       setImageBase64(dataUrl);
     };
     reader.readAsDataURL(file);
@@ -101,8 +152,8 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         return;
       }
     } else {
-      if (!imageBase64) {
-        toast.error("Please upload or take a photo of the diagnosis");
+      if (!imageBase64 && !extractedDocText) {
+        toast.error("Please upload a photo, PDF, or Word document of the diagnosis");
         return;
       }
     }
@@ -110,9 +161,14 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     setLoading(true);
     setResult(null);
     try {
-      const body = inputMode === "photo"
-        ? { type: "prescription_scan", payload: { image: imageBase64 } }
-        : { type: "prescription_scan", payload: prescriptionText.substring(0, MAX_INPUT_LENGTH) };
+      let body: any;
+      if (inputMode === "text") {
+        body = { type: "prescription_scan", payload: prescriptionText.substring(0, MAX_INPUT_LENGTH) };
+      } else if (extractedDocText) {
+        body = { type: "prescription_scan", payload: extractedDocText.substring(0, MAX_INPUT_LENGTH) };
+      } else {
+        body = { type: "prescription_scan", payload: { image: imageBase64 } };
+      }
 
       const { data, error } = await supabase.functions.invoke("health-tools", { body });
       if (error) throw error;
@@ -136,15 +192,16 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     }
   };
 
-  const clearImage = () => {
+  const clearFile = () => {
     setImagePreview(null);
     setImageBase64(null);
+    setDocFileName(null);
+    setExtractedDocText(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
     <div className="space-y-4">
-      {/* Alternative mode banner */}
       {alternativeMode && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-3 flex items-center gap-2">
@@ -165,13 +222,12 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         <CardContent className="p-3 flex items-start gap-2">
           <FileText className="w-5 h-5 text-success shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Upload a photo of your doctor's diagnosis or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
+            Upload a photo, PDF, or Word document of your doctor's diagnosis, or type medication names to check salt composition, find cheaper govt-certified alternatives (Jan Aushadhi/PMBJP), and filter out banned medications.
           </p>
         </CardContent>
       </Card>
       )}
 
-      {/* Mode toggle */}
       <div className="flex gap-2">
         <Button
           variant={inputMode === "photo" ? "default" : "outline"}
@@ -179,7 +235,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
           className="flex-1"
           onClick={() => setInputMode("photo")}
         >
-          <Camera className="w-4 h-4 mr-1" /> Photo / Upload
+          <Upload className="w-4 h-4 mr-1" /> Upload File
         </Button>
         <Button
           variant={inputMode === "text" ? "default" : "outline"}
@@ -198,19 +254,39 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept={ACCEPT_STRING}
                 capture="environment"
-                onChange={handleImageSelect}
+                onChange={handleFileSelect}
                 className="hidden"
               />
-              {imagePreview ? (
+              {extracting ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <span className="text-sm font-medium">Extracting text from document…</span>
+                </div>
+              ) : imagePreview ? (
                 <div className="space-y-2">
                   <img
                     src={imagePreview}
                     alt="Prescription preview"
                     className="w-full max-h-64 object-contain rounded-lg border border-border"
                   />
-                  <Button variant="ghost" size="sm" onClick={clearImage} className="w-full text-muted-foreground">
+                  <Button variant="ghost" size="sm" onClick={clearFile} className="w-full text-muted-foreground">
+                    Remove & choose another
+                  </Button>
+                </div>
+              ) : docFileName ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-lg border-primary/30 bg-primary/5">
+                    <FileText className="w-10 h-10 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{docFileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {extractedDocText ? "Text extracted successfully ✓" : imageBase64 ? "Rendered as image for analysis ✓" : "Ready for analysis"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearFile} className="w-full text-muted-foreground">
                     Remove & choose another
                   </Button>
                 </div>
@@ -220,8 +296,8 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
                   className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 >
                   <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm font-medium">Tap to upload diagnosis photo</p>
-                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG · Max 4MB</p>
+                  <p className="text-sm font-medium">Tap to upload diagnosis file or photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG, PDF, DOCX · Max 10MB</p>
                 </div>
               )}
             </>
@@ -237,7 +313,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
               <p className="text-[10px] text-muted-foreground text-right">{prescriptionText.length.toLocaleString()} / {MAX_INPUT_LENGTH.toLocaleString()}</p>
             </>
           )}
-          <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={analyzePrescription} disabled={loading}>
+          <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={analyzePrescription} disabled={loading || extracting}>
           {loading ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analyzing...</> : <><Pill className="w-4 h-4 mr-1" /> Analyze Diagnosis</>}
           </Button>
         </CardContent>
