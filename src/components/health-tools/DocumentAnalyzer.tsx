@@ -207,8 +207,11 @@ const DocumentAnalyzer = () => {
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
       setResult(data.response);
-    } catch {
-      toast.error("Analysis failed");
+    } catch (err: any) {
+      const msg = err?.message === "timeout"
+        ? "Analysis timed out. Try a smaller file or paste the text manually."
+        : "Analysis failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
