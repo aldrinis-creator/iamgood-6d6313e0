@@ -139,10 +139,7 @@ const useCheckInAudio = () => {
             reminderCount: `Final — ${formatHour(h)}`,
           });
 
-          // Send ONE guardian notification
-          if (session?.user?.id) {
-            notifyGuardiansMissedCheckin(session.user.id);
-          }
+          // Guardian notifications are handled by the server-side cron job
         }
       }
     }
