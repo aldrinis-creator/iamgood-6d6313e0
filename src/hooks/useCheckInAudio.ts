@@ -20,32 +20,6 @@ const formatHour = (h: number) => {
   return `${h - 12}:00 PM`;
 };
 
-const notifyGuardiansMissedCheckin = async (userId: string) => {
-  try {
-    // In-app notification to guardians
-    const { data: guardians } = await supabase
-      .from("guardians")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "accepted");
-
-    if (guardians && guardians.length > 0) {
-      const notifications = guardians.map((g) => ({
-        user_id: userId,
-        guardian_id: g.id,
-        title: "Missed Check-In",
-        message: "Your ward has missed a check-in after multiple reminders.",
-        type: "missed_checkin",
-        read: false,
-      }));
-      await supabase.rpc("insert_notifications_deduped", {
-        p_notifications: notifications,
-      });
-    }
-  } catch {
-    // best-effort
-  }
-};
 
 const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
