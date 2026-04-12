@@ -195,14 +195,23 @@ const DocumentAnalyzer = () => {
         content = content.substring(0, MAX_TEXT_LENGTH);
         payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
       }
-      const { data, error } = await supabase.functions.invoke("health-tools", {
-        body: { type: "document_analysis", payload },
-      });
+      const result = await Promise.race([
+        supabase.functions.invoke("health-tools", {
+          body: { type: "document_analysis", payload },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 60000)
+        ),
+      ]);
+      const { data, error } = result;
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
       setResult(data.response);
-    } catch {
-      toast.error("Analysis failed");
+    } catch (err: any) {
+      const msg = err?.message === "timeout"
+        ? "Analysis timed out. Try a smaller file or paste the text manually."
+        : "Analysis failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
