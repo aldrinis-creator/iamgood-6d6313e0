@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -120,9 +121,15 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
         </Button>
 
         {aiInsights && (
-          <div className="prose prose-sm max-w-none dark:prose-invert border rounded-lg p-3">
-            <ReactMarkdown>{aiInsights}</ReactMarkdown>
-          </div>
+          {(() => {
+            const visual = tryParseVisualReport(aiInsights);
+            if (visual) return <VisualHealthReport report={visual} />;
+            return (
+              <div className="prose prose-sm max-w-none dark:prose-invert border rounded-lg p-3">
+                <ReactMarkdown>{aiInsights}</ReactMarkdown>
+              </div>
+            );
+          })()}
         )}
       </CardContent>
     </Card>

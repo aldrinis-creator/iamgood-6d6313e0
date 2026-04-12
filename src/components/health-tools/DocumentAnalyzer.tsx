@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, extractTextFromDOCX, getFileTypeLabel } from "@/lib/documentExtractor";
 
 const MAX_TEXT_LENGTH = 10000;
@@ -287,9 +288,15 @@ const DocumentAnalyzer = () => {
               )}
             </div>
 
-            <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/30 rounded-lg p-4 border border-border/50">
-              <ReactMarkdown>{result}</ReactMarkdown>
-            </div>
+            {(() => {
+              const visual = tryParseVisualReport(result);
+              if (visual) return <VisualHealthReport report={visual} />;
+              return (
+                <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/30 rounded-lg p-4 border border-border/50">
+                  <ReactMarkdown>{result}</ReactMarkdown>
+                </div>
+              );
+            })()}
 
             <ReportShareButtons
               title={`${selectedCat || "Document"} Analysis`}

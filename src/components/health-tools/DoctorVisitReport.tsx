@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import ReportShareButtons from "@/components/ReportShareButtons";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import UpgradeDialog from "@/components/UpgradeDialog";
@@ -120,9 +121,15 @@ const DoctorVisitReport = () => {
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? "Saving..." : saved ? "Saved to Vault" : "Save to Vault"}
             </Button>
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>{report}</ReactMarkdown>
-            </div>
+            {(() => {
+              const visual = tryParseVisualReport(report);
+              if (visual) return <VisualHealthReport report={visual} />;
+              return (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown>{report}</ReactMarkdown>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
