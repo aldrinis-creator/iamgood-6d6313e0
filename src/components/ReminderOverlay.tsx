@@ -19,7 +19,7 @@ export const showReminderOverlay = (data: ReminderData) => {
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
 
-const SNOOZE_MS = 5 * 60_000; // 5 minutes
+const SNOOZE_MS = 10 * 60_000; // 10 minutes
 const MAX_SNOOZES = 3;
 
 const getReminderKey = (data: ReminderData) => `${data.type}:${data.title}:${data.message}`;
@@ -66,9 +66,7 @@ const ReminderOverlay = () => {
         playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
         playChime();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-        toast.warning("Medication not taken — your guardian has been notified.", { duration: 6000 });
-        // Dispatch event for useMedicationAlarms to notify guardians immediately
-        window.dispatchEvent(new CustomEvent("app:medication-snooze-exhausted", { detail: reminder }));
+        toast.warning("Medication not taken — your guardian will be notified.", { duration: 6000 });
       } else {
         toast.info("Maximum snoozes reached. Please take action.");
       }
