@@ -1,92 +1,49 @@
 
 
-## Add Visual Health Analysis Display to Health Tools
+## Two Changes: Reminder Overlay Timing + Health Pattern Alert on Guardian Dashboard
 
-### What changes
+### Part 1: Reminder Overlay — Auto-dismiss after 30s, max 3 shows at 5-min intervals
 
-Currently, all health tool results (Document Analyzer, Vitals Insights, Doctor Visit Report, Symptom Checker) render AI responses as raw markdown text. The user wants structured, visual analysis cards inspired by Apollo 24|7 Smart Reports — with body system categories, status badges (Ideal Health / Needs Monitoring), colored progress bars, and numbered next steps.
+**Current behavior**: Overlay stays visible indefinitely until user clicks Snooze/Dismiss/Action. Snooze interval is 10 minutes with manual snooze required.
 
-### Approach
+**New behavior**:
+- Overlay auto-dismisses after 30 seconds if user does not interact
+- If not acknowledged (action button clicked), it automatically re-appears after 5 minutes
+- Maximum 3 appearances total per reminder slot — then escalation fires (guardian notification for meds, toast for others)
+- No manual "Snooze" button needed — the auto-cycle replaces it
+- "Dismiss" button still available to manually close early (counts as non-acknowledgment, timer continues)
+- Only the **Action button** (e.g. "View Medications") counts as acknowledgment and stops the cycle
 
-**Two-part change: structured AI output + visual renderer component.**
-
-#### 1. New shared component: `src/components/health-tools/VisualHealthReport.tsx`
-
-A reusable component that accepts structured health analysis data and renders it visually:
-
-- **System/Category Cards** — Each health category (Heart Health, Blood Glucose, Kidney Health, etc.) gets a card with:
-  - Icon (mapped from category name)
-  - Status badge: "IDEAL HEALTH" (green), "NEEDS MONITORING" (orange), "AT RISK" (red)
-  - Color-coded progress bar showing health level
-  - Date stamp
-  - Key findings as bullet points
-- **Next Steps Section** — Numbered action items with descriptions
-- **Tests Overview** — Shows which parameters were found vs missing with checkmark/X indicators
-- **Disclaimer footer** — Standard medical disclaimer
-
-The component accepts this TypeScript interface:
-```typescript
-interface HealthCategory {
-  name: string;
-  status: "ideal" | "monitoring" | "at_risk";
-  score: number; // 0-100
-  findings: string[];
-  tests_found: string[];
-  tests_missing: string[];
-}
-interface VisualReport {
-  categories: HealthCategory[];
-  next_steps: string[];
-  summary: string;
-}
-```
-
-If the AI response can be parsed as this JSON structure, render visually. Otherwise, fall back to the existing `ReactMarkdown` display. This ensures backward compatibility.
-
-#### 2. Update edge function system prompts
-
-Modify `document_analysis` and `vitals_insights` prompts in `supabase/functions/health-tools/index.ts` to request a structured JSON response with the `VisualReport` schema above. Add a new prompt variant or append to existing prompts asking the AI to return JSON when analyzing lab reports or health data.
-
-For `document_analysis` specifically (most relevant for lab reports like in the screenshots):
-- When the document is a lab report, return structured JSON with body system categories
-- For other document types (prescriptions, doctor's notes), continue returning markdown
-
-The prompt will instruct: "If the document is a lab/diagnostic report, respond with JSON matching this schema: {...}. For all other document types, respond with markdown."
-
-#### 3. Update result rendering in these components
-
-| Component | Change |
-|-----------|--------|
-| `DocumentAnalyzer.tsx` | Try parsing result as JSON → render `VisualHealthReport` if valid, else `ReactMarkdown` |
-| `VitalsMonitor.tsx` (AI Insights) | Same JSON-first rendering with fallback |
-| `DoctorVisitReport.tsx` | Same pattern |
-| `SymptomChecker.tsx` | Keep as markdown (chat-based, not report-style) |
-| `WardVitalsSummary.tsx` | Same JSON-first rendering |
-
-#### 4. Category icon mapping
-
-Map category names to appropriate lucide icons:
-- Heart Health → Heart
-- Blood Glucose → Droplet
-- Kidney Health → Bean-shaped icon (Activity)
-- Liver / GI → Pill
-- Bone & Muscle → Bone
-- Vitamins → Pill
-- Hormones → Zap
-- Skin & Hair → Sparkles
-- Blood Health → Droplets
-- General → Stethoscope
-
-### Files to create/modify
-
+**Files to modify**:
 | File | Change |
 |------|--------|
-| `src/components/health-tools/VisualHealthReport.tsx` | **New** — visual report renderer |
-| `supabase/functions/health-tools/index.ts` | Update `document_analysis` and `vitals_insights` prompts for structured JSON |
-| `src/components/health-tools/DocumentAnalyzer.tsx` | Parse JSON, render `VisualHealthReport` or fallback |
-| `src/components/health-tools/DoctorVisitReport.tsx` | Same pattern |
-| `src/components/VitalsMonitor.tsx` | Same pattern for AI insights section |
-| `src/components/WardVitalsSummary.tsx` | Same pattern |
+| `src/components/ReminderOverlay.tsx` | Add 30s auto-dismiss timer, remove snooze button, auto-reschedule at 5-min intervals up to 3 times, track acknowledgment vs dismissal |
 
-### No database changes needed
+### Part 2: Health Pattern Alert — Explanation and Guardian Dashboard Display
+
+**How it works today**: The `useAbnormalPatternCheck` hook runs every hour on the user's device. It calls the `detect-anomalous-patterns` edge function which:
+1. Fetches 14 days of activity logs, check-ins, and wellness data
+2. Runs heuristic checks: no activity today, 2+ missed check-ins in 24h, declining mood trend, elevated heart rate (>100 avg), low SpO2 (<94 avg)
+3. If anomalies found, calls Gemini to generate a caring 2-3 sentence summary
+4. Creates an in-app notification (deduped) for the user, and if severity is "high" (vitals-related), also notifies guardians
+5. Shows a toast on the user's screen
+
+**What the user sees**: The "Health pattern alert detected" toast at the bottom of the screenshot. It's informational — the user should review their health data and consider consulting a doctor if needed.
+
+**What's missing**: The guardian dashboard doesn't display these anomaly alerts prominently. They arrive as generic notifications but aren't called out visually.
+
+**New behavior**:
+- Add a dedicated "Health Pattern Alert" card on the Guardian Dashboard that shows anomaly notifications for the selected ward
+- Only display alerts from the last 24 hours (filter by `created_at`)
+- Card shows the AI-generated summary with an alert icon and amber/orange styling
+- Auto-hides after 24 hours from the event timestamp
+
+**Files to modify**:
+| File | Change |
+|------|--------|
+| `src/pages/GuardianDashboard.tsx` | Filter notifications for `type === "anomaly"` created within 24h, render a dedicated alert card above the regular notifications section |
+
+### No database or edge function changes needed
+
+Both changes are purely client-side UI/timing modifications.
 
