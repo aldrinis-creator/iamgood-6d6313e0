@@ -53,7 +53,7 @@ export async function renderPDFPageToImage(file: File, pageNum = 1): Promise<str
   canvas.height = viewport.height;
   const ctx = canvas.getContext("2d")!;
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
