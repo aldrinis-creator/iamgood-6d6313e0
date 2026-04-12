@@ -1,34 +1,92 @@
 
 
-## Fix: Duplicate SMS for Missed Check-Ins
+## Add Visual Health Analysis Display to Health Tools
 
-### Root Cause Analysis
+### What changes
 
-The database confirms 25 duplicate "Missed Check-In Alert" notifications created within 2 minutes, for only 1 guardian and 2 check-in records. The 6 identical SMS messages in your screenshot come from multiple overlapping sources:
+Currently, all health tool results (Document Analyzer, Vitals Insights, Doctor Visit Report, Symptom Checker) render AI responses as raw markdown text. The user wants structured, visual analysis cards inspired by Apollo 24|7 Smart Reports — with body system categories, status badges (Ideal Health / Needs Monitoring), colored progress bars, and numbered next steps.
 
-**Problem 1 — `check-missed-checkins` marks check-ins as missed TOO LATE**
-The cron runs every 10 minutes. The function sends SMS/notifications FIRST (line 209-320), then marks the check-in as "missed" LAST (line 324). If the function takes time or errors partway through, the next cron run picks up the same still-pending check-in and sends SMS again. With a check-in pending for 60+ minutes, that is up to 6 cron runs each sending SMS.
+### Approach
 
-**Problem 2 — Direct `.insert()` bypasses deduplication**
-The function uses `supabase.from("notifications").insert(...)` (line 211) instead of `insert_notifications_deduped` RPC, so every run creates a new notification regardless of whether one already exists.
+**Two-part change: structured AI output + visual renderer component.**
 
-**Problem 3 — Client-side `useCheckInAudio` also sends guardian notifications**
-The client hook calls `notifyGuardiansMissedCheckin()` on final escalation (line 167). When the component remounts (page navigation), `postGraceRef` and `missedSentRef` reset, replaying the entire escalation sequence and firing more notifications.
+#### 1. New shared component: `src/components/health-tools/VisualHealthReport.tsx`
 
-### Fix Plan
+A reusable component that accepts structured health analysis data and renders it visually:
 
-**`check-missed-checkins/index.ts`** — 3 changes:
-1. **Mark as missed FIRST, before sending any notifications.** Move the `update({ status: "missed" })` call to BEFORE the notification/SMS block. This prevents subsequent cron runs from re-processing the same check-in.
-2. **Use `insert_notifications_deduped` RPC** instead of direct `.insert()` for notifications.
-3. **Add MSG91 idempotency** — include the check-in ID in a dedup check. Before calling MSG91, check if a notification with `type: missed_checkin` already exists for this user+guardian+scheduled hour. If so, skip SMS.
+- **System/Category Cards** — Each health category (Heart Health, Blood Glucose, Kidney Health, etc.) gets a card with:
+  - Icon (mapped from category name)
+  - Status badge: "IDEAL HEALTH" (green), "NEEDS MONITORING" (orange), "AT RISK" (red)
+  - Color-coded progress bar showing health level
+  - Date stamp
+  - Key findings as bullet points
+- **Next Steps Section** — Numbered action items with descriptions
+- **Tests Overview** — Shows which parameters were found vs missing with checkmark/X indicators
+- **Disclaimer footer** — Standard medical disclaimer
 
-**`useCheckInAudio.ts`** — 1 change:
-- **Remove `notifyGuardiansMissedCheckin()` call** (line 167). The server-side cron is the single source of truth for guardian notifications and SMS. The client should only handle user-facing audio/visual reminders.
+The component accepts this TypeScript interface:
+```typescript
+interface HealthCategory {
+  name: string;
+  status: "ideal" | "monitoring" | "at_risk";
+  score: number; // 0-100
+  findings: string[];
+  tests_found: string[];
+  tests_missing: string[];
+}
+interface VisualReport {
+  categories: HealthCategory[];
+  next_steps: string[];
+  summary: string;
+}
+```
 
-### Files to modify
+If the AI response can be parsed as this JSON structure, render visually. Otherwise, fall back to the existing `ReactMarkdown` display. This ensures backward compatibility.
+
+#### 2. Update edge function system prompts
+
+Modify `document_analysis` and `vitals_insights` prompts in `supabase/functions/health-tools/index.ts` to request a structured JSON response with the `VisualReport` schema above. Add a new prompt variant or append to existing prompts asking the AI to return JSON when analyzing lab reports or health data.
+
+For `document_analysis` specifically (most relevant for lab reports like in the screenshots):
+- When the document is a lab report, return structured JSON with body system categories
+- For other document types (prescriptions, doctor's notes), continue returning markdown
+
+The prompt will instruct: "If the document is a lab/diagnostic report, respond with JSON matching this schema: {...}. For all other document types, respond with markdown."
+
+#### 3. Update result rendering in these components
+
+| Component | Change |
+|-----------|--------|
+| `DocumentAnalyzer.tsx` | Try parsing result as JSON → render `VisualHealthReport` if valid, else `ReactMarkdown` |
+| `VitalsMonitor.tsx` (AI Insights) | Same JSON-first rendering with fallback |
+| `DoctorVisitReport.tsx` | Same pattern |
+| `SymptomChecker.tsx` | Keep as markdown (chat-based, not report-style) |
+| `WardVitalsSummary.tsx` | Same JSON-first rendering |
+
+#### 4. Category icon mapping
+
+Map category names to appropriate lucide icons:
+- Heart Health → Heart
+- Blood Glucose → Droplet
+- Kidney Health → Bean-shaped icon (Activity)
+- Liver / GI → Pill
+- Bone & Muscle → Bone
+- Vitamins → Pill
+- Hormones → Zap
+- Skin & Hair → Sparkles
+- Blood Health → Droplets
+- General → Stethoscope
+
+### Files to create/modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/check-missed-checkins/index.ts` | Mark missed first, use deduped insert, add MSG91 dedup guard |
-| `src/hooks/useCheckInAudio.ts` | Remove `notifyGuardiansMissedCheckin` call on final escalation |
+| `src/components/health-tools/VisualHealthReport.tsx` | **New** — visual report renderer |
+| `supabase/functions/health-tools/index.ts` | Update `document_analysis` and `vitals_insights` prompts for structured JSON |
+| `src/components/health-tools/DocumentAnalyzer.tsx` | Parse JSON, render `VisualHealthReport` or fallback |
+| `src/components/health-tools/DoctorVisitReport.tsx` | Same pattern |
+| `src/components/VitalsMonitor.tsx` | Same pattern for AI insights section |
+| `src/components/WardVitalsSummary.tsx` | Same pattern |
+
+### No database changes needed
 
