@@ -1,41 +1,32 @@
 
 
-## Fix: Guardian Dashboard Showing Wrong Ward's Notifications
+## Retain Dismiss Button + Fix Medication Navigation
 
-### Root Cause
+### Changes to `src/components/ReminderOverlay.tsx`
 
-The `fetchNotifications` function in `GuardianDashboard.tsx` (line 229) queries the `notifications` table with no ward filter — it fetches all notifications visible to the logged-in user via RLS. Since Don Carlos is both a user (who missed check-ins) and a guardian (of Aldrin), the dashboard shows Don Carlos's own missed check-in alerts when viewing Aldrin's dashboard.
+1. **Re-add Dismiss button** — A secondary "Dismiss" button below the action button. Clicking it closes the overlay early (non-acknowledgment), so the auto-repeat cycle continues at 5-min intervals. It calls `dismiss(false)` and also schedules the next repeat if under max shows.
 
-The notifications table has both `user_id` (the ward whose event triggered it) and `guardian_id` columns. The fix is to filter by the selected ward's `user_id`.
+2. **Fix "View Medications" navigation** — Currently navigates to `/my-health` which shows the health tools grid, not the medications page directly. Change to `/my-health?tool=Tablets` so the `MyHealth` component auto-opens the `MedicationManager` via its existing `useSearchParams` logic (lines 78-82 of `MyHealth.tsx` already handle `?tool=` param).
 
-### Changes
+### Implementation details
 
-**File: `src/pages/GuardianDashboard.tsx`**
+**Dismiss button behavior:**
+- Clears the auto-dismiss timer
+- Hides overlay with animation
+- Schedules next repeat at 5-min interval (same as auto-dismiss behavior) if show count < MAX_SHOWS
+- Does NOT mark as acknowledged — cycle continues
 
-Update `fetchNotifications` to filter by the selected ward's user_id:
-
+**Navigation fix:**
 ```typescript
-// Current (broken) — no ward filter
-const { data } = await supabase
-  .from("notifications")
-  .select("*")
-  .order("created_at", { ascending: false })
-  .limit(10);
+// Before
+window.location.href = "/my-health";
 
-// Fixed — filter to only show notifications for the selected ward
-const { data } = await supabase
-  .from("notifications")
-  .select("*")
-  .eq("user_id", selectedWard.userId)   // only this ward's notifications
-  .order("created_at", { ascending: false })
-  .limit(10);
+// After  
+window.location.href = "/my-health?tool=Tablets";
 ```
 
-Also add `selectedWard` to the `useCallback` dependency array and add an early return if no ward is selected.
-
-### Impact
-
-- Guardian Dashboard will only show notifications relevant to the currently selected ward
-- Switching wards via the WardPicker will correctly refresh notifications
-- No database or edge function changes needed
+### Single file modified
+| File | Change |
+|------|--------|
+| `src/components/ReminderOverlay.tsx` | Add Dismiss button with `handleDismiss`, update medication navigation to `/my-health?tool=Tablets` |
 
