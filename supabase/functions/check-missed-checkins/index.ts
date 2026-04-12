@@ -112,37 +112,6 @@ async function sendPushNotification(
   return response;
 }
 
-// ── Email helper ──
-
-async function sendEmail(to: string, subject: string, html: string) {
-  const resendKey = Deno.env.get("RESEND_API_KEY");
-  if (!resendKey) {
-    console.log("No RESEND_API_KEY configured, skipping email");
-    return false;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${resendKey}`,
-    },
-    body: JSON.stringify({
-      from: "Check-iN Alerts <onboarding@resend.dev>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error(`Failed to send email to ${to}:`, err);
-    return false;
-  }
-  return true;
-}
-
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -184,7 +153,6 @@ Deno.serve(async (req) => {
     }
 
     // Deduplicate: keep only ONE pending check-in per user+scheduled_hour
-    // This prevents sending multiple alerts for the same missed slot
     const seen = new Set<string>();
     const uniqueCheckIns: typeof pendingCheckIns = [];
     const duplicateIds: string[] = [];
@@ -256,29 +224,30 @@ Deno.serve(async (req) => {
             notificationsCreated++;
           }
 
-          // Send email if guardian has an email
+          // Send email via transactional email queue
           if (guardian.guardian_email) {
-            const html = `
-              <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-                <h2 style="color: #dc2626; margin-bottom: 8px;">⚠️ Missed Check-In Alert</h2>
-                <p style="font-size: 16px; color: #333;">${message}</p>
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-                <p style="font-size: 13px; color: #888;">
-                  This alert was sent by <strong>Check-iN</strong> — Personal Emergency Response System.
-                </p>
-              </div>
-            `;
-            const sent = await sendEmail(
-              guardian.guardian_email,
-              `⚠️ ${userName} missed their check-in`,
-              html
-            );
-            if (sent) emailsSent++;
+            try {
+              await supabase.functions.invoke("send-transactional-email", {
+                body: {
+                  templateName: "missed-checkin-alert",
+                  recipientEmail: guardian.guardian_email,
+                  idempotencyKey: `missed-checkin-${checkIn.id}-${guardian.id}`,
+                  templateData: {
+                    userName,
+                    guardianName: guardian.guardian_name,
+                    timeStr,
+                    message,
+                  },
+                },
+              });
+              emailsSent++;
+            } catch (emailErr) {
+              console.error("Email queue error:", emailErr);
+            }
           }
 
           // Send push notification to guardian's registered devices
           if (vapidPrivateKey) {
-            // Find the guardian's user account via their phone number
             const { data: guardianProfile } = await supabase
               .from("profiles")
               .select("id")
@@ -310,13 +279,11 @@ Deno.serve(async (req) => {
                     if (res.status === 201 || res.status === 200) {
                       pushesSent++;
                     } else if (res.status === 410 || res.status === 404) {
-                      // Subscription expired, clean up
                       await supabase
                         .from("push_subscriptions")
                         .delete()
                         .eq("endpoint", sub.endpoint);
                     }
-                    // Consume response body
                     await res.text();
                   } catch (pushErr) {
                     console.error("Push send error:", pushErr);
@@ -326,29 +293,29 @@ Deno.serve(async (req) => {
             }
           }
         }
-      }
 
-      // MSG91 WhatsApp notification
-      const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-      const msg91CheckinTemplate = Deno.env.get("MSG91_CHECKIN_TEMPLATE_ID");
-      if (msg91AuthKey && msg91CheckinTemplate) {
-        const recipients = guardians
-          .filter((g: any) => g.guardian_phone)
-          .map((g: any) => {
-            const clean = g.guardian_phone.replace(/[^0-9]/g, "");
-            const mobile = clean.startsWith("91") ? clean : `91${clean}`;
-            return { mobiles: mobile, user_name: userName, message };
-          });
-
-        if (recipients.length > 0) {
-          try {
-            await fetch("https://control.msg91.com/api/v5/flow", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
-              body: JSON.stringify({ template_id: msg91CheckinTemplate, short_url: "0", recipients }),
+        // MSG91 WhatsApp notification (inside guardians scope)
+        const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
+        const msg91CheckinTemplate = Deno.env.get("MSG91_CHECKIN_TEMPLATE_ID");
+        if (msg91AuthKey && msg91CheckinTemplate) {
+          const recipients = guardians
+            .filter((g: any) => g.guardian_phone)
+            .map((g: any) => {
+              const clean = g.guardian_phone.replace(/[^0-9]/g, "");
+              const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+              return { mobiles: mobile, user_name: userName, message };
             });
-          } catch (e) {
-            console.error("MSG91 checkin alert error:", e);
+
+          if (recipients.length > 0) {
+            try {
+              await fetch("https://control.msg91.com/api/v5/flow", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
+                body: JSON.stringify({ template_id: msg91CheckinTemplate, short_url: "0", recipients }),
+              });
+            } catch (e) {
+              console.error("MSG91 checkin alert error:", e);
+            }
           }
         }
       }

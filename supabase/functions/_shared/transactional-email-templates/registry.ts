@@ -13,10 +13,16 @@ import { template as contactConfirmation } from './contact-confirmation.tsx'
 import { template as welcome } from './welcome.tsx'
 import { template as appointmentConfirmation } from './appointment-confirmation.tsx'
 import { template as guardianInvitation } from './guardian-invitation.tsx'
+import { template as missedCheckinAlert } from './missed-checkin-alert.tsx'
+import { template as sosAlert } from './sos-alert.tsx'
+import { template as vitalAnomalyAlert } from './vital-anomaly-alert.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'contact-confirmation': contactConfirmation,
   'welcome': welcome,
   'appointment-confirmation': appointmentConfirmation,
   'guardian-invitation': guardianInvitation,
+  'missed-checkin-alert': missedCheckinAlert,
+  'sos-alert': sosAlert,
+  'vital-anomaly-alert': vitalAnomalyAlert,
 }

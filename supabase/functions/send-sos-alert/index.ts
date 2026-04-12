@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// --- Web Push utilities (from send-medication-push) ---
+// --- Web Push utilities ---
 
 const VAPID_PUBLIC_KEY = "BJq2e6gs1zTIdmNLo6v4DWL4trzwEedK_ghxuB9wb63nlh_y1ShYf2RS_IKdDdPu59tQJ3pLk5XHed6pGZ141lw";
 
@@ -130,60 +130,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    const resendKey = Deno.env.get("RESEND_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Build HTML email
-    const htmlMessage = message
-      .replace(/\n/g, "<br>")
-      .replace(/(https:\/\/[^\s<]+)/g, '<a href="$1" style="color:#2563eb">$1</a>');
+    // Send emails via transactional email queue
+    const allEmails = [...(guardian_emails || [])];
+    if (doctor_email) allEmails.push(doctor_email);
 
-    const emailHtml = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;border-radius:12px;border:2px solid #dc2626">
-        <div style="text-align:center;padding:16px;background:#dc2626;border-radius:8px;margin-bottom:16px">
-          <h1 style="color:#fff;margin:0;font-size:24px">🚨 EMERGENCY SOS ALERT</h1>
-        </div>
-        <div style="padding:16px;font-size:15px;line-height:1.6;color:#1a1a1a">
-          ${htmlMessage}
-        </div>
-        <div style="margin-top:16px;padding:12px;background:#fef2f2;border-radius:8px;text-align:center">
-          <p style="margin:0;color:#dc2626;font-weight:bold">⚠️ This is an emergency alert. Please respond immediately.</p>
-        </div>
-      </div>
-    `;
-
-    const emailResults: any[] = [];
-
-    // Send emails (only if Resend is configured)
-    if (resendKey) {
-      const allEmails = [...(guardian_emails || [])];
-      if (doctor_email) allEmails.push(doctor_email);
-
-      for (const email of allEmails) {
-        try {
-          const res = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${resendKey}`,
+    let emailsQueued = 0;
+    for (const email of allEmails) {
+      try {
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "sos-alert",
+            recipientEmail: email,
+            idempotencyKey: `sos-${user_id}-${Date.now()}-${email}`,
+            templateData: {
+              userName: user_name || "Check-iN User",
+              message,
             },
-            body: JSON.stringify({
-              from: "Check-iN SOS <onboarding@resend.dev>",
-              to: [email],
-              subject: `🚨 EMERGENCY SOS from ${user_name || "Check-iN User"}`,
-              html: emailHtml,
-            }),
-          });
-          const result = await res.json();
-          emailResults.push({ email, success: res.ok, result });
-        } catch (e) {
-          emailResults.push({ email, success: false, error: String(e) });
-        }
+          },
+        });
+        emailsQueued++;
+      } catch (e) {
+        console.error(`Email queue error for ${email}:`, e);
       }
-    } else {
-      console.error("RESEND_API_KEY not configured, skipping emails");
     }
 
     // Create DB notifications for guardians
@@ -211,7 +183,6 @@ Deno.serve(async (req) => {
       const guardianPhones = guardianRows.map((g: any) => g.guardian_phone).filter(Boolean);
 
       if (guardianPhones.length) {
-        // Look up profile IDs by phone
         const { data: guardianProfiles } = await supabase
           .from("profiles")
           .select("id")
@@ -220,7 +191,6 @@ Deno.serve(async (req) => {
         if (guardianProfiles?.length) {
           const profileIds = guardianProfiles.map((p: any) => p.id);
 
-          // Get push subscriptions for those profiles
           const { data: subs } = await supabase
             .from("push_subscriptions")
             .select("endpoint, p256dh, auth")
@@ -237,19 +207,13 @@ Deno.serve(async (req) => {
             for (const sub of subs) {
               try {
                 const res = await sendPushNotification(
-                  sub,
-                  pushPayload,
-                  VAPID_PUBLIC_KEY,
-                  vapidPrivateKey,
+                  sub, pushPayload, VAPID_PUBLIC_KEY, vapidPrivateKey,
                   "mailto:checkin_support@futurewave.in"
                 );
                 if (res.status === 200 || res.status === 201) {
                   pushSent++;
                 } else if (res.status === 410 || res.status === 404) {
-                  await supabase
-                    .from("push_subscriptions")
-                    .delete()
-                    .eq("endpoint", sub.endpoint);
+                  await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
                 } else {
                   console.error(`Push failed: ${res.status} ${await res.text()}`);
                 }
@@ -292,7 +256,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: emailResults.length, results: emailResults, pushSent, msg91Sent }),
+      JSON.stringify({ sent: emailsQueued, pushSent, msg91Sent }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

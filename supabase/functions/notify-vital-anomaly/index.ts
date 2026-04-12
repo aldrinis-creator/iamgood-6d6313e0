@@ -128,42 +128,28 @@ Deno.serve(async (req) => {
     }));
     await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
 
-    // Send email via Resend if configured
-    const resendKey = Deno.env.get("RESEND_API_KEY");
-    let emailsSent = 0;
-    if (resendKey) {
-      for (const g of guardians) {
-        const email = g.guardian_email;
-        if (!email) continue;
-        try {
-          const emailHtml = `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;border-radius:12px;border:2px solid #f59e0b">
-              <div style="text-align:center;padding:16px;background:#f59e0b;border-radius:8px;margin-bottom:16px">
-                <h1 style="color:#fff;margin:0;font-size:22px">⚠️ VITAL ANOMALY ALERT</h1>
-              </div>
-              <div style="padding:16px;font-size:15px;line-height:1.6;color:#1a1a1a">
-                <p><strong>${userName}</strong>'s vitals require attention:</p>
-                <ul>${anomalies.map((a) => `<li style="color:#dc2626;font-weight:600">${a}</li>`).join("")}</ul>
-                <p style="color:#666;font-size:13px">Source: ${source || "vitals check"}</p>
-                <p>Please check on them or open the Check-iN app for more details.</p>
-              </div>
-              <div style="text-align:center;padding:12px;font-size:11px;color:#999">
-                Check-iN — Personal Emergency Response System
-              </div>
-            </div>`;
-
-          await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: "Check-iN Alerts <alerts@checkin.lovable.app>",
-              to: [email],
-              subject: title,
-              html: emailHtml,
-            }),
-          });
-          emailsSent++;
-        } catch { /* continue */ }
+    // Send email via transactional email queue
+    let emailsQueued = 0;
+    for (const g of guardians) {
+      const email = g.guardian_email;
+      if (!email) continue;
+      try {
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "vital-anomaly-alert",
+            recipientEmail: email,
+            idempotencyKey: `vital-anomaly-${user_id}-${g.id}-${Date.now()}`,
+            templateData: {
+              userName,
+              guardianName: g.guardian_name,
+              anomalies,
+              source: source || "vitals check",
+            },
+          },
+        });
+        emailsQueued++;
+      } catch (emailErr) {
+        console.error("Email queue error:", emailErr);
       }
     }
 
@@ -174,7 +160,6 @@ Deno.serve(async (req) => {
 
     if (vapidPublicKey && vapidPrivateKey) {
       for (const g of guardians) {
-        // Look up guardian's user account by phone
         const { data: gProfile } = await supabase
           .from("profiles")
           .select("id")
@@ -205,7 +190,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ anomalies: anomalies.length, notified: guardians.length, emailsSent, pushSent }),
+      JSON.stringify({ anomalies: anomalies.length, notified: guardians.length, emailsQueued, pushSent }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
