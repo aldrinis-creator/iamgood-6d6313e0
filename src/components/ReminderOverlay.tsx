@@ -102,17 +102,7 @@ const ReminderOverlay = () => {
     };
   }, [handleEvent]);
 
-  const handleDismiss = () => {
-    dismiss(false);
-    // Schedule repeat if not acknowledged and not at max
-    if (reminder) {
-      const key = getReminderKey(reminder);
-      const count = showCountRef.current.get(key) || 0;
-      if (count < MAX_SHOWS) {
-        scheduleRepeat(reminder);
-      }
-    }
-  };
+  // No manual dismiss — only action button or auto-dismiss stops the overlay
 
   const handleAction = () => {
     ensureAudioReady();
@@ -185,16 +175,6 @@ const ReminderOverlay = () => {
           {actionLabel}
         </button>
 
-        {/* Dismiss */}
-        <div className="flex items-center justify-center">
-          <button
-            onClick={handleDismiss}
-            className="flex items-center gap-2 text-lg font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-5 h-5" />
-            Dismiss
-          </button>
-        </div>
       </div>
     </div>
   );
