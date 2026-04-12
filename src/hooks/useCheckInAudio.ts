@@ -7,6 +7,8 @@ import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const CHECK_IN_HOURS = [7, 12, 19];
+const POST_GRACE_INTERVAL_MIN = 10;
+const POST_GRACE_MAX_REMINDERS = 3;
 
 const formatHour = (h: number) => {
   if (h === 0) return "12:00 AM";
@@ -15,11 +17,42 @@ const formatHour = (h: number) => {
   return `${h - 12}:00 PM`;
 };
 
+const notifyGuardiansMissedCheckin = async (userId: string) => {
+  try {
+    // In-app notification to guardians
+    const { data: guardians } = await supabase
+      .from("guardians")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "accepted");
+
+    if (guardians && guardians.length > 0) {
+      const notifications = guardians.map((g) => ({
+        user_id: userId,
+        guardian_id: g.id,
+        title: "Missed Check-In",
+        message: "Your ward has missed a check-in after multiple reminders.",
+        type: "missed_checkin",
+        read: false,
+      }));
+      await supabase.rpc("insert_notifications_deduped", {
+        p_notifications: notifications,
+      });
+    }
+  } catch {
+    // best-effort
+  }
+};
+
 const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
   const { pauseMode } = useApp();
+  // Track post-grace reminder counts: slotKey → { count, lastFiredAt }
+  const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
+  // Track slots where we already sent the final missed notification
+  const missedSentRef = useRef<Set<string>>(new Set());
 
   const fireAlert = useCallback((message: string) => {
     if (settings.voiceReminders) {
@@ -64,12 +97,11 @@ const useCheckInAudio = () => {
     const minute = now.getMinutes();
     const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-    // --- DUE alerts: fire during the check-in window (from h until next slot) ---
+    // --- DUE alerts: fire once at the check-in hour (initial reminder) ---
     for (let i = 0; i < CHECK_IN_HOURS.length; i++) {
       const h = CHECK_IN_HOURS[i];
-      const nextH = i + 1 < CHECK_IN_HOURS.length ? CHECK_IN_HOURS[i + 1] : 24;
       const dueKey = `due-${dateKey}-${h}`;
-      if (hour >= h && hour < nextH && !firedRef.current.has(dueKey)) {
+      if (hour === h && minute < 5 && !firedRef.current.has(dueKey)) {
         const responded = await isCheckInResponded(h, now);
         if (!responded) {
           firedRef.current.add(dueKey);
@@ -84,20 +116,56 @@ const useCheckInAudio = () => {
       }
     }
 
-    // --- MISSED alerts: any past check-in hour with no response ---
+    // --- Post-grace escalation: 60+ minutes past check-in hour ---
     for (const h of CHECK_IN_HOURS) {
+      const scheduledAt = new Date(now);
+      scheduledAt.setHours(h, 0, 0, 0);
+      const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
       const missedKey = `missed-${dateKey}-${h}`;
-      if (hour > h && !firedRef.current.has(missedKey)) {
+
+      if (diffMin >= 60 && diffMin < 1440 && !missedSentRef.current.has(missedKey)) {
         const responded = await isCheckInResponded(h, now);
-        if (!responded) {
-          firedRef.current.add(missedKey);
-          fireAlert(`You missed your ${formatHour(h)} Check-iN. Please check in now.`);
+        if (responded) {
+          missedSentRef.current.add(missedKey);
+          continue;
+        }
+
+        const state = postGraceRef.current.get(missedKey) || { count: 0, lastFiredAt: 0 };
+        const minSinceLast = (now.getTime() - state.lastFiredAt) / 60_000;
+
+        if (state.count < POST_GRACE_MAX_REMINDERS && (state.count === 0 || minSinceLast >= POST_GRACE_INTERVAL_MIN)) {
+          // Fire a post-grace reminder
+          state.count += 1;
+          state.lastFiredAt = now.getTime();
+          postGraceRef.current.set(missedKey, state);
+
+          fireAlert(`Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS}: You missed your ${formatHour(h)} Check-iN. Please check in now.`);
           showReminderOverlay({
             type: "checkin",
             title: "Missed Check-In",
-            message: `You missed your ${formatHour(h)} Check-iN. Please check in now. Your guardians will be notified.`,
-            reminderCount: `Missed — ${formatHour(h)}`,
+            message: `You missed your ${formatHour(h)} Check-iN. Please check in now.`,
+            reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${formatHour(h)}`,
           });
+        } else if (state.count >= POST_GRACE_MAX_REMINDERS && minSinceLast >= POST_GRACE_INTERVAL_MIN) {
+          // All 3 reminders exhausted — final escalation: ONE guardian notification
+          missedSentRef.current.add(missedKey);
+
+          // Escalated alert to user
+          playVoiceReminder(`You have not checked in after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians are being notified.`);
+          playChime();
+          if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+
+          showReminderOverlay({
+            type: "checkin",
+            title: "Check-In Missed",
+            message: `You missed your ${formatHour(h)} Check-iN after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians have been notified.`,
+            reminderCount: `Final — ${formatHour(h)}`,
+          });
+
+          // Send ONE guardian notification
+          if (session?.user?.id) {
+            notifyGuardiansMissedCheckin(session.user.id);
+          }
         }
       }
     }
@@ -106,7 +174,13 @@ const useCheckInAudio = () => {
     firedRef.current.forEach((k) => {
       if (!k.includes(dateKey)) firedRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded]);
+    missedSentRef.current.forEach((k) => {
+      if (!k.includes(dateKey)) missedSentRef.current.delete(k);
+    });
+    postGraceRef.current.forEach((_, k) => {
+      if (!k.includes(dateKey)) postGraceRef.current.delete(k);
+    });
+  }, [pauseMode, fireAlert, isCheckInResponded, session?.user?.id]);
 
   useEffect(() => {
     check();

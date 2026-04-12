@@ -242,7 +242,7 @@ const TodaySchedule = () => {
           scheduled_at: slot.scheduledAt.toISOString(), status: "missed",
         });
       }
-      notifyGuardians(session.user.id, slot.medication.name, "missed", slot.scheduledAt.toISOString());
+      // Guardian SMS is handled centrally by useMedicationAlarms — no duplicate here
       toast.error(`${slot.medication.name} recorded as Not Taken`);
       setSnoozeState((prev) => { const n = new Map(prev); n.delete(key); return n; });
       loadSchedule();
