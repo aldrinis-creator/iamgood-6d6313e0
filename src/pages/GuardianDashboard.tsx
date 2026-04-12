@@ -225,10 +225,11 @@ const GuardianDashboard = () => {
   const alertedNotifIds = useRef<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !selectedWard) return;
     const { data } = await supabase
       .from("notifications")
       .select("*")
+      .eq("user_id", selectedWard.userId)
       .order("created_at", { ascending: false })
       .limit(10);
     if (data) {
@@ -247,7 +248,7 @@ const GuardianDashboard = () => {
       });
       setNotifications(processed);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, selectedWard]);
 
   const fetchWardCheckIns = useCallback(async () => {
     if (!session?.user?.id) return;
