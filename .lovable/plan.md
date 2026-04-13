@@ -1,25 +1,35 @@
 
 
-## Fix: PDF Files Not Being Read in Document Analyzer
+## Payment Success Confirmation Screen
 
-### Root Cause
+### What changes
 
-The PDF.js worker is loaded from a CDN URL (`cdnjs.cloudflare.com/ajax/libs/pdf.js/5.6.205/pdf.worker.min.mjs`), but **version 5.6.205 does not exist on that CDN** (returns 404). This causes `getDocument()` to hang indefinitely — the "loop" users experience.
+**`src/pages/Subscription.tsx`** — Instead of only showing a toast on `?status=success`, display a full-screen confirmation card that overlays the plan cards. The card will include:
 
-### Fix
+- A checkmark animation/icon
+- "Payment Successful!" heading
+- Plan name and billing cycle (read from URL params or subscription query)
+- Expiry date (from refreshed subscription data)
+- Amount paid
+- "Next Steps" list: set up guardians, configure medications, explore health tools
+- "Go to Dashboard" and "Explore Features" buttons
+- A dismiss/close option that clears the status param and shows the normal page
 
-Change the worker source from a CDN URL to a direct import of the local worker file bundled with the `pdfjs-dist` package. Vite will handle serving it correctly.
+### Implementation details
 
-### File to modify
+1. Add new state `showSuccess` (boolean), set to `true` when `status=success` is detected
+2. Add URL params `plan` and `billing` to the redirect URL in `handleChoosePlan` so they're available on return
+3. When `showSuccess` is true, render a confirmation `Card` above/instead of the plan cards with:
+   - Green checkmark icon (CheckCircle2 from lucide)
+   - Plan details from URL params or the refreshed `subscription` object
+   - Next steps as a simple list with navigation links
+   - "Go to Dashboard" button linking to `/dashboard`
+4. Keep the toast as a secondary notification
+5. Dismissing the card sets `showSuccess = false` and clears search params
 
-**`src/lib/documentExtractor.ts`** — Replace the CDN worker URL (line 4) with a local import:
+### Files modified
 
-```typescript
-import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/pdf.worker.min.mjs?url";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-```
-
-This uses Vite's `?url` import suffix to get a proper URL to the local worker file, eliminating the CDN dependency entirely. No other files need changes.
+| File | Change |
+|------|--------|
+| `src/pages/Subscription.tsx` | Add success confirmation card UI, update redirect URL to include plan/billing params |
 
