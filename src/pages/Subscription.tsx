@@ -88,6 +88,11 @@ const Subscription = () => {
   const { user } = useAuth();
   const { subscription, isActive, loading } = useSubscription();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successPlan, setSuccessPlan] = useState<string | null>(null);
+  const [successBilling, setSuccessBilling] = useState<string | null>(null);
 
   const [couponOpen, setCouponOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
