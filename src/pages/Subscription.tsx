@@ -194,7 +194,7 @@ const Subscription = () => {
 
   const handleChoosePlan = (planKey: string) => {
     if (!user || planKey === "free") return;
-    const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success`);
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success&plan=${planKey}&billing=${billing}`);
     const cancelUrl = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
     let url = `https://futurewave.in/pay?plan=${planKey}&billing=${billing}&user_id=${user.id}&app_callback=${callbackUrl}&cancel_url=${cancelUrl}`;
     if (appliedCoupon && appliedCoupon.discounts[planKey] !== undefined) {
