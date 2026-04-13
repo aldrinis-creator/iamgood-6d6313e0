@@ -99,13 +99,16 @@ Deno.serve(async (req) => {
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
     const msg91MedTemplate = Deno.env.get("MSG91_MED_TEMPLATE_ID");
     if (msg91AuthKey && msg91MedTemplate) {
-      const recipients = eligibleGuardians
+      const recipientsRaw = eligibleGuardians
         .filter((g: any) => g.guardian_phone)
         .map((g: any) => {
           const clean = g.guardian_phone.replace(/[^0-9]/g, "");
           const mobile = clean.startsWith("91") ? clean : `91${clean}`;
           return { mobiles: mobile, user_name: userName, medication_name, status: statusLabel, message };
         });
+
+      // Deduplicate by phone number to prevent multiple SMS to the same number
+      const recipients = [...new Map(recipientsRaw.map((r: any) => [r.mobiles, r])).values()];
 
       if (recipients.length > 0) {
         try {
