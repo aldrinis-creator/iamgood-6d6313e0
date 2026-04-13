@@ -75,6 +75,7 @@ const GuardianReports = () => {
       return {
         day: format(subDays(new Date(), 6 - i), "EEE"),
         taken: dayLogs.filter(l => l.status === "taken").length,
+        taken_late: dayLogs.filter(l => l.status === "taken_late").length,
         missed: dayLogs.filter(l => l.status === "missed" || l.status === "skipped").length,
       };
     });
@@ -133,7 +134,7 @@ const GuardianReports = () => {
   }
 
   const chartConfigs: Record<string, any> = {
-    medications: { taken: { label: "Taken", color: "hsl(var(--success))" }, missed: { label: "Missed", color: "hsl(var(--destructive))" } },
+    medications: { taken: { label: "On Time", color: "hsl(var(--success))" }, taken_late: { label: "Late", color: "hsl(45 93% 47%)" }, missed: { label: "Missed", color: "hsl(var(--destructive))" } },
     checkins: { done: { label: "Done", color: "hsl(var(--success))" }, missed: { label: "Missed", color: "hsl(var(--destructive))" } },
     activity: { steps: { label: "Steps", color: "hsl(var(--primary))" }, calories: { label: "Calories", color: "hsl(var(--success))" } },
     vitals: { hr: { label: "Heart Rate", color: "hsl(var(--sos))" }, spo2: { label: "SpO2", color: "hsl(var(--primary))" } },
@@ -216,6 +217,7 @@ const GuardianReports = () => {
                     <YAxis hide />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="taken" stackId="a" fill="var(--color-taken)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="taken_late" stackId="a" fill="var(--color-taken_late)" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="missed" stackId="a" fill="var(--color-missed)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ChartContainer>

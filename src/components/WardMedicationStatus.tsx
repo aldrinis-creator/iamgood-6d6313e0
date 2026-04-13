@@ -23,7 +23,7 @@ interface DoseSlot {
   time: string;
   hour: number;
   minute: number;
-  status: "taken" | "missed" | "pending";
+  status: "taken" | "taken_late" | "missed" | "pending";
 }
 
 type TimePeriod = "Morning" | "Afternoon" | "Evening";
@@ -78,6 +78,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
 
         let status: DoseSlot["status"] = "pending";
         if (log?.status === "taken") status = "taken";
+        else if (log?.status === "taken_late") status = "taken_late";
         else if (log?.status === "missed" || log?.status === "skipped") status = "missed";
         else if (h < now.getHours() || (h === now.getHours() && m < now.getMinutes() - 60)) {
           status = "missed";
@@ -128,7 +129,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
     return groups;
   }, [doses]);
 
-  const takenCount = doses.filter((d) => d.status === "taken").length;
+  const takenCount = doses.filter((d) => d.status === "taken" || d.status === "taken_late").length;
   const totalCount = doses.length;
   const progress = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
@@ -195,15 +196,18 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
                       variant={
                         slot.status === "taken"
                           ? "default"
+                          : slot.status === "taken_late"
+                          ? "default"
                           : slot.status === "missed"
                           ? "destructive"
                           : "secondary"
                       }
                       className={`text-[10px] ${
-                        slot.status === "taken" ? "bg-success text-success-foreground" : ""
+                        slot.status === "taken" ? "bg-success text-success-foreground" : 
+                        slot.status === "taken_late" ? "bg-amber-500 text-white" : ""
                       }`}
                     >
-                      {slot.status === "taken" ? "Taken" : slot.status === "missed" ? "Missed" : "Pending"}
+                      {slot.status === "taken" ? "Taken" : slot.status === "taken_late" ? "Late" : slot.status === "missed" ? "Missed" : "Pending"}
                     </Badge>
                   </div>
                 ))}

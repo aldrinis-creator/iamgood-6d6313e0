@@ -21,6 +21,8 @@ const notifyGuardiansMissed = async (userId: string, medName: string, scheduledT
 
 const POST_GRACE_INTERVAL_MIN = 10;
 const POST_GRACE_MAX_REMINDERS = 3;
+const POST_GRACE_START_MIN = 30;
+const HARD_CUTOFF_MIN = 60;
 
 const useMedicationAlarms = () => {
   const { session } = useAuth();
@@ -88,8 +90,8 @@ const useMedicationAlarms = () => {
           });
         }
 
-        // --- Post-grace escalation (60+ minutes past) ---
-        if (diffMin >= 60 && diffMin < 1440 && !missedSentRef.current.has(missedKey)) {
+        // --- Post-grace escalation (30-60 minutes past, hard stop at 60) ---
+        if (diffMin >= POST_GRACE_START_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           // Check if medication was already taken
           const todayStart = new Date(now);
           todayStart.setHours(0, 0, 0, 0);
@@ -141,34 +143,57 @@ const useMedicationAlarms = () => {
               message: "You have not taken your medication. Please take your tablets now.",
               reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${timeStr}`,
             });
-          } else if (state.count >= POST_GRACE_MAX_REMINDERS && minSinceLast >= POST_GRACE_INTERVAL_MIN) {
-            // All 3 reminders exhausted — final escalation: write missed log + ONE SMS
-            missedSentRef.current.add(missedKey);
-
-            // Check if a log already exists
-            const hasLog = (existingLogs || []).some((l) => {
-              const logDate = new Date(l.scheduled_at ?? "");
-              return logDate.getHours() === h && logDate.getMinutes() === (m || 0);
-            });
-
-            if (!hasLog) {
-              await supabase.from("medication_logs").insert({
-                medication_id: med.id,
-                user_id: session.user.id,
-                scheduled_at: scheduledAt.toISOString(),
-                status: "missed",
-              });
-            }
-
-            // Escalated alert to user
-            playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
-            playChime();
-            if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-
-            // Send ONE guardian SMS
-            notifyGuardiansMissed(session.user.id, med.name, scheduledAt.toISOString());
           }
         }
+
+        // --- Final escalation at 60-min mark (fires once) ---
+        if (diffMin >= HARD_CUTOFF_MIN && diffMin < 1440 && !missedSentRef.current.has(missedKey)) {
+          const todayStart2 = new Date(now);
+          todayStart2.setHours(0, 0, 0, 0);
+          const todayEnd2 = new Date(now);
+          todayEnd2.setHours(23, 59, 59, 999);
+
+          const { data: finalLogs } = await supabase
+            .from("medication_logs")
+            .select("id, status, scheduled_at")
+            .eq("medication_id", med.id)
+            .eq("user_id", session.user.id)
+            .gte("scheduled_at", todayStart2.toISOString())
+            .lte("scheduled_at", todayEnd2.toISOString());
+
+          const alreadyTaken = (finalLogs || []).some((l) => {
+            const logDate = new Date(l.scheduled_at ?? "");
+            return logDate.getHours() === h && logDate.getMinutes() === (m || 0) && (l.status === "taken" || l.status === "taken_late");
+          });
+
+          if (alreadyTaken) {
+            missedSentRef.current.add(missedKey);
+            continue;
+          }
+
+          missedSentRef.current.add(missedKey);
+
+          const hasLog = (finalLogs || []).some((l) => {
+            const logDate = new Date(l.scheduled_at ?? "");
+            return logDate.getHours() === h && logDate.getMinutes() === (m || 0);
+          });
+
+          if (!hasLog) {
+            await supabase.from("medication_logs").insert({
+              medication_id: med.id,
+              user_id: session.user.id,
+              scheduled_at: scheduledAt.toISOString(),
+              status: "missed",
+            });
+          }
+
+          playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
+          playChime();
+          if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+
+          notifyGuardiansMissed(session.user.id, med.name, scheduledAt.toISOString());
+        }
+        // Beyond 60 min: NO more alerts fire
       }
     }
 

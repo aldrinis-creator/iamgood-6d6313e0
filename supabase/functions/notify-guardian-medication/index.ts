@@ -44,11 +44,11 @@ Deno.serve(async (req) => {
       ? new Date(scheduled_time).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
       : "";
 
-    const statusLabel = status === "taken" ? "✅ taken" : status === "skipped" ? "⏭️ skipped" : "❌ not taken";
-    const title = `Medication ${status === "taken" ? "Taken" : "Missed"}`;
+    const statusLabel = status === "taken" ? "✅ taken" : status === "taken_late" ? "⏰ taken late" : status === "skipped" ? "⏭️ skipped" : "❌ not taken";
+    const title = `Medication ${status === "taken" ? "Taken" : status === "taken_late" ? "Taken Late" : "Missed"}`;
     const message = `${userName} has ${statusLabel} their ${medication_name}${timeLabel ? ` (${timeLabel})` : ""}.`;
-    const notificationType = status === "taken" ? "medication_taken" : "medication_missed";
-    const isMissed = status !== "taken";
+    const notificationType = status === "taken" ? "medication_taken" : status === "taken_late" ? "medication_taken_late" : "medication_missed";
+    const isMissed = status !== "taken" && status !== "taken_late";
 
     // For missed notifications, check each guardian's preference
     const eligibleGuardians = [];
