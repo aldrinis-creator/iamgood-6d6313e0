@@ -1,54 +1,46 @@
 
 
-## Medication Alerts: 1-Hour Hard Cutoff + "Taken Late" Status
+## Fix: Stop Excess Medication SMS Notifications
 
 ### Problem
-1. Reminders/alerts keep firing beyond 1 hour after the scheduled medication time.
-2. If a user takes a tablet more than 1 hour late, it's recorded as "taken" — indistinguishable from an on-time dose.
+8 SMS sent for a single missed medication due to two bugs:
+1. The "already sent" flag (`missedSentRef`) is in-memory and resets on every page load — so every app open after 60 min re-fires the guardian SMS for the entire day
+2. User has 3 duplicate guardian records (same person, same phone), tripling every SMS
 
 ### Solution
 
-#### 1. Stop all reminders after 1 hour of scheduled time
+#### 1. Tighten the final escalation window (`src/hooks/useMedicationAlarms.ts`)
+- Change `diffMin < 1440` to `diffMin < HARD_CUTOFF_MIN + 15` (i.e., only fire within 60–75 min window)
+- Before calling `notifyGuardiansMissed`, check the database for an existing "missed" log for that slot — if it already exists, skip the SMS call (the DB is the durable guard, not the volatile ref)
+- This ensures that even with page refreshes, the SMS only fires once
 
-**`src/hooks/useMedicationAlarms.ts`**:
-- Change the post-grace escalation window from `diffMin >= 60 && diffMin < 1440` to fire reminders only **within** the first 60 minutes (e.g., reminders at ~60, ~70, ~80 min — 3 reminders at 10-min intervals starting from the 30-min mark, all completing before 60 min). After 60 minutes from scheduled time, no more alerts fire at all.
-- Specifically: start post-grace reminders at 30 minutes past scheduled time (not 60), fire 3 at 10-min intervals (30, 40, 50 min), then send the final guardian SMS at ~60 min. After that, silence.
-- The `diffMin >= 60` final escalation (guardian SMS + missed log) remains as the terminal action at the 1-hour mark, but no further reminders or sounds after that.
+#### 2. Deduplicate guardians by phone in the edge function (`supabase/functions/notify-guardian-medication/index.ts`)
+- Before sending MSG91 SMS, deduplicate `eligibleGuardians` by phone number so the same phone only receives one SMS regardless of how many guardian records exist
 
-#### 2. Introduce "taken_late" status
+#### 3. Clean up duplicate guardian records (database)
+- Remove the 2 duplicate "Don Carlos" records for user `8d12aed0-ce40-4103-acc4-5d69f9df8da7`, keeping only one
 
-**`src/components/medications/TodaySchedule.tsx`**:
-- In `markTaken()`: check if `differenceInMinutes(now, slot.scheduledAt) > 60`. If yes, save status as `"taken_late"` instead of `"taken"`. Still decrement quantity and notify guardians (with status `"taken_late"`).
-- Update the `DoseSlot` interface: add `"taken_late"` to the status union type.
-- For "missed" slots (>1 hour past), show a "Taken" button so the user can still close the loop, but it records `"taken_late"`.
-- In the completed doses section, show a distinct badge: "TAKEN LATE" (amber/warning color) vs "TAKEN" (green/success).
+### Technical Details
 
-**`src/components/WardMedicationStatus.tsx`**:
-- Treat `"taken_late"` as a taken dose for progress counting but display an amber "Late" badge.
-
-**`src/pages/GuardianReports.tsx`**:
-- Count `"taken_late"` separately in adherence charts so guardians can see on-time vs late compliance.
-
-### Revised Escalation Timeline (per medication slot)
-
+**`src/hooks/useMedicationAlarms.ts`** — line 150:
 ```text
-T+0 min   → Initial alarm (sound + overlay + notification)
-T+30 min  → Post-grace reminder 1/3
-T+40 min  → Post-grace reminder 2/3
-T+50 min  → Post-grace reminder 3/3 (final voice escalation)
-T+60 min  → Guardian SMS + missed log written
-T+60+ min → NO MORE ALERTS. "Taken" button stays visible → records "taken_late"
+BEFORE: if (diffMin >= HARD_CUTOFF_MIN && diffMin < 1440 && ...)
+AFTER:  if (diffMin >= HARD_CUTOFF_MIN && diffMin < HARD_CUTOFF_MIN + 15 && ...)
 ```
+Plus add a DB check: query `medication_logs` for existing "missed" status before calling `notifyGuardiansMissed`.
+
+**`supabase/functions/notify-guardian-medication/index.ts`** — before MSG91 block:
+- Deduplicate recipients by phone: `const uniqueRecipients = [...new Map(recipients.map(r => [r.mobiles, r])).values()]`
+
+**Database cleanup** — migration to:
+- Delete duplicate guardian rows (keep earliest `id` per `user_id + guardian_phone` combo)
+- Add a unique constraint on `(user_id, guardian_phone)` to prevent future duplicates
 
 ### Files Modified
 
 | File | Change |
 |------|--------|
-| `src/hooks/useMedicationAlarms.ts` | Shift post-grace window to 30-60 min; hard stop at 60 min |
-| `src/components/medications/TodaySchedule.tsx` | Add `taken_late` status; show Taken button on missed slots; amber badge for late |
-| `src/components/WardMedicationStatus.tsx` | Handle `taken_late` display (amber badge) |
-| `src/pages/GuardianReports.tsx` | Distinguish taken vs taken_late in adherence stats |
-| `supabase/functions/notify-guardian-medication/index.ts` | Handle `taken_late` status in notification message |
-
-No database migration needed — `medication_logs.status` is a text column that already accepts any string value.
+| `src/hooks/useMedicationAlarms.ts` | Tighten window to 60–75 min; add DB-level "already missed" check before SMS |
+| `supabase/functions/notify-guardian-medication/index.ts` | Deduplicate recipients by phone before sending SMS |
+| Database migration | Remove duplicate guardians; add unique constraint |
 
