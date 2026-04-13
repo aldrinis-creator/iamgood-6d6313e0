@@ -1,8 +1,10 @@
 import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/pdf.worker.min.mjs?url";
 
-// Use local bundled worker instead of unreliable CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Use local worker via new URL() so Vite/Rollup can resolve it at build time
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 const MAX_PAGES = 10;
 
