@@ -476,6 +476,8 @@ const Subscription = () => {
         <p className="text-xs text-center text-muted-foreground px-4">
           You'll be redirected to our secure payment page at futurewave.in to complete your purchase.
         </p>
+        </>
+        )}
       </div>
     </AppLayout>
   );
