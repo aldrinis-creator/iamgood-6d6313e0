@@ -102,9 +102,11 @@ const Subscription = () => {
   useEffect(() => {
     const status = searchParams.get("status");
     if (status === "success") {
+      setSuccessPlan(searchParams.get("plan"));
+      setSuccessBilling(searchParams.get("billing"));
+      setShowSuccess(true);
       toast.success("Payment successful! Your subscription is now active.");
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      setSearchParams({}, { replace: true });
     } else if (status === "cancelled") {
       toast.info("Payment was cancelled.");
       setSearchParams({}, { replace: true });
