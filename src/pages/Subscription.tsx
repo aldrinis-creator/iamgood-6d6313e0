@@ -203,9 +203,100 @@ const Subscription = () => {
     window.location.href = url;
   };
 
+  const handleDismissSuccess = () => {
+    setShowSuccess(false);
+    setSearchParams({}, { replace: true });
+  };
+
+  const planLabel = successPlan === "pro" ? "Pro" : successPlan === "basic" ? "Basic" : successPlan;
+  const billingLabel = successBilling === "yearly" ? "Yearly" : "Monthly";
+  const planData = plans.find((p) => p.key === successPlan);
+  const paidAmount = planData
+    ? successBilling === "yearly" ? planData.yearly : planData.monthly
+    : null;
+
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        {showSuccess ? (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="border-2 border-success overflow-hidden">
+              <div className="bg-success/10 p-6 text-center space-y-3">
+                <CheckCircle2 className="w-16 h-16 text-success mx-auto" />
+                <h1 className="text-2xl font-bold">Payment Successful!</h1>
+                <p className="text-muted-foreground">
+                  Welcome to Check-iN <span className="font-semibold text-foreground">{planLabel}</span>
+                </p>
+              </div>
+              <CardContent className="pt-5 space-y-5">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Plan</p>
+                    <p className="font-semibold">{planLabel}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Billing</p>
+                    <p className="font-semibold">{billingLabel}</p>
+                  </div>
+                  {paidAmount !== null && (
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-muted-foreground text-xs">Amount</p>
+                      <p className="font-semibold">₹{paidAmount}</p>
+                    </div>
+                  )}
+                  {subscription?.expires_at && (
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-muted-foreground text-xs">Valid Until</p>
+                      <p className="font-semibold">
+                        {new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-sm">Next Steps</h3>
+                  <div className="space-y-2">
+                    <button onClick={() => navigate("/settings")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Shield className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Set Up Guardians</p>
+                        <p className="text-xs text-muted-foreground">Add family members for safety alerts</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                    <button onClick={() => navigate("/my-health")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Pill className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Configure Medications</p>
+                        <p className="text-xs text-muted-foreground">Set up reminders & schedules</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                    <button onClick={() => navigate("/my-health")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Heart className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Explore Health Tools</p>
+                        <p className="text-xs text-muted-foreground">AI symptom checker, vitals & more</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button size="lg" className="w-full" onClick={() => navigate("/dashboard")}>
+                    Go to Dashboard
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={handleDismissSuccess}>
+                    View Plans
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+        <>
         <div className="text-center space-y-2">
           <h1 className="text-xl font-bold">Choose Your Plan</h1>
           <p className="text-sm text-muted-foreground">
