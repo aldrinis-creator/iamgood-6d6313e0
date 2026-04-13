@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -88,6 +88,11 @@ const Subscription = () => {
   const { user } = useAuth();
   const { subscription, isActive, loading } = useSubscription();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successPlan, setSuccessPlan] = useState<string | null>(null);
+  const [successBilling, setSuccessBilling] = useState<string | null>(null);
 
   const [couponOpen, setCouponOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
@@ -97,9 +102,11 @@ const Subscription = () => {
   useEffect(() => {
     const status = searchParams.get("status");
     if (status === "success") {
+      setSuccessPlan(searchParams.get("plan"));
+      setSuccessBilling(searchParams.get("billing"));
+      setShowSuccess(true);
       toast.success("Payment successful! Your subscription is now active.");
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      setSearchParams({}, { replace: true });
     } else if (status === "cancelled") {
       toast.info("Payment was cancelled.");
       setSearchParams({}, { replace: true });
@@ -187,7 +194,7 @@ const Subscription = () => {
 
   const handleChoosePlan = (planKey: string) => {
     if (!user || planKey === "free") return;
-    const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success`);
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/subscription?status=success&plan=${planKey}&billing=${billing}`);
     const cancelUrl = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
     let url = `https://futurewave.in/pay?plan=${planKey}&billing=${billing}&user_id=${user.id}&app_callback=${callbackUrl}&cancel_url=${cancelUrl}`;
     if (appliedCoupon && appliedCoupon.discounts[planKey] !== undefined) {
@@ -196,9 +203,100 @@ const Subscription = () => {
     window.location.href = url;
   };
 
+  const handleDismissSuccess = () => {
+    setShowSuccess(false);
+    setSearchParams({}, { replace: true });
+  };
+
+  const planLabel = successPlan === "pro" ? "Pro" : successPlan === "basic" ? "Basic" : successPlan;
+  const billingLabel = successBilling === "yearly" ? "Yearly" : "Monthly";
+  const planData = plans.find((p) => p.key === successPlan);
+  const paidAmount = planData
+    ? successBilling === "yearly" ? planData.yearly : planData.monthly
+    : null;
+
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        {showSuccess ? (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="border-2 border-success overflow-hidden">
+              <div className="bg-success/10 p-6 text-center space-y-3">
+                <CheckCircle2 className="w-16 h-16 text-success mx-auto" />
+                <h1 className="text-2xl font-bold">Payment Successful!</h1>
+                <p className="text-muted-foreground">
+                  Welcome to Check-iN <span className="font-semibold text-foreground">{planLabel}</span>
+                </p>
+              </div>
+              <CardContent className="pt-5 space-y-5">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Plan</p>
+                    <p className="font-semibold">{planLabel}</p>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Billing</p>
+                    <p className="font-semibold">{billingLabel}</p>
+                  </div>
+                  {paidAmount !== null && (
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-muted-foreground text-xs">Amount</p>
+                      <p className="font-semibold">₹{paidAmount}</p>
+                    </div>
+                  )}
+                  {subscription?.expires_at && (
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-muted-foreground text-xs">Valid Until</p>
+                      <p className="font-semibold">
+                        {new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-sm">Next Steps</h3>
+                  <div className="space-y-2">
+                    <button onClick={() => navigate("/settings")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Shield className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Set Up Guardians</p>
+                        <p className="text-xs text-muted-foreground">Add family members for safety alerts</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                    <button onClick={() => navigate("/my-health")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Pill className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Configure Medications</p>
+                        <p className="text-xs text-muted-foreground">Set up reminders & schedules</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                    <button onClick={() => navigate("/my-health")} className="flex items-center gap-3 w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors">
+                      <Heart className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Explore Health Tools</p>
+                        <p className="text-xs text-muted-foreground">AI symptom checker, vitals & more</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <Button size="lg" className="w-full" onClick={() => navigate("/dashboard")}>
+                    Go to Dashboard
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={handleDismissSuccess}>
+                    View Plans
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+        <>
         <div className="text-center space-y-2">
           <h1 className="text-xl font-bold">Choose Your Plan</h1>
           <p className="text-sm text-muted-foreground">
@@ -378,6 +476,8 @@ const Subscription = () => {
         <p className="text-xs text-center text-muted-foreground px-4">
           You'll be redirected to our secure payment page at futurewave.in to complete your purchase.
         </p>
+        </>
+        )}
       </div>
     </AppLayout>
   );
