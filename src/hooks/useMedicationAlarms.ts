@@ -146,8 +146,8 @@ const useMedicationAlarms = () => {
           }
         }
 
-        // --- Final escalation at 60-min mark (fires once) ---
-        if (diffMin >= HARD_CUTOFF_MIN && diffMin < 1440 && !missedSentRef.current.has(missedKey)) {
+        // --- Final escalation at 60-min mark (fires once, window 60–75 min) ---
+        if (diffMin >= HARD_CUTOFF_MIN && diffMin < HARD_CUTOFF_MIN + 15 && !missedSentRef.current.has(missedKey)) {
           const todayStart2 = new Date(now);
           todayStart2.setHours(0, 0, 0, 0);
           const todayEnd2 = new Date(now);
@@ -171,29 +171,31 @@ const useMedicationAlarms = () => {
             continue;
           }
 
-          missedSentRef.current.add(missedKey);
-
-          const hasLog = (finalLogs || []).some((l) => {
+          // Durable guard: if a "missed" log already exists, skip SMS (handles page refreshes)
+          const alreadyMissedLog = (finalLogs || []).some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
-            return logDate.getHours() === h && logDate.getMinutes() === (m || 0);
+            return logDate.getHours() === h && logDate.getMinutes() === (m || 0) && l.status === "missed";
           });
 
-          if (!hasLog) {
+          missedSentRef.current.add(missedKey);
+
+          if (!alreadyMissedLog) {
             await supabase.from("medication_logs").insert({
               medication_id: med.id,
               user_id: session.user.id,
               scheduled_at: scheduledAt.toISOString(),
               status: "missed",
             });
+
+            // Only play final escalation audio + notify guardians when this is the first time
+            playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
+            playChime();
+            if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+
+            notifyGuardiansMissed(session.user.id, med.name, scheduledAt.toISOString());
           }
-
-          playVoiceReminder("You have not taken your medication after 3 reminders. Please take your tablets now.");
-          playChime();
-          if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-
-          notifyGuardiansMissed(session.user.id, med.name, scheduledAt.toISOString());
         }
-        // Beyond 60 min: NO more alerts fire
+        // Beyond 75 min: NO more alerts fire
       }
     }
 
