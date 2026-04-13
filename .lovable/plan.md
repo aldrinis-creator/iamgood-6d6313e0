@@ -1,35 +1,54 @@
 
 
-## Payment Success Confirmation Screen
+## Medication Alerts: 1-Hour Hard Cutoff + "Taken Late" Status
 
-### What changes
+### Problem
+1. Reminders/alerts keep firing beyond 1 hour after the scheduled medication time.
+2. If a user takes a tablet more than 1 hour late, it's recorded as "taken" — indistinguishable from an on-time dose.
 
-**`src/pages/Subscription.tsx`** — Instead of only showing a toast on `?status=success`, display a full-screen confirmation card that overlays the plan cards. The card will include:
+### Solution
 
-- A checkmark animation/icon
-- "Payment Successful!" heading
-- Plan name and billing cycle (read from URL params or subscription query)
-- Expiry date (from refreshed subscription data)
-- Amount paid
-- "Next Steps" list: set up guardians, configure medications, explore health tools
-- "Go to Dashboard" and "Explore Features" buttons
-- A dismiss/close option that clears the status param and shows the normal page
+#### 1. Stop all reminders after 1 hour of scheduled time
 
-### Implementation details
+**`src/hooks/useMedicationAlarms.ts`**:
+- Change the post-grace escalation window from `diffMin >= 60 && diffMin < 1440` to fire reminders only **within** the first 60 minutes (e.g., reminders at ~60, ~70, ~80 min — 3 reminders at 10-min intervals starting from the 30-min mark, all completing before 60 min). After 60 minutes from scheduled time, no more alerts fire at all.
+- Specifically: start post-grace reminders at 30 minutes past scheduled time (not 60), fire 3 at 10-min intervals (30, 40, 50 min), then send the final guardian SMS at ~60 min. After that, silence.
+- The `diffMin >= 60` final escalation (guardian SMS + missed log) remains as the terminal action at the 1-hour mark, but no further reminders or sounds after that.
 
-1. Add new state `showSuccess` (boolean), set to `true` when `status=success` is detected
-2. Add URL params `plan` and `billing` to the redirect URL in `handleChoosePlan` so they're available on return
-3. When `showSuccess` is true, render a confirmation `Card` above/instead of the plan cards with:
-   - Green checkmark icon (CheckCircle2 from lucide)
-   - Plan details from URL params or the refreshed `subscription` object
-   - Next steps as a simple list with navigation links
-   - "Go to Dashboard" button linking to `/dashboard`
-4. Keep the toast as a secondary notification
-5. Dismissing the card sets `showSuccess = false` and clears search params
+#### 2. Introduce "taken_late" status
 
-### Files modified
+**`src/components/medications/TodaySchedule.tsx`**:
+- In `markTaken()`: check if `differenceInMinutes(now, slot.scheduledAt) > 60`. If yes, save status as `"taken_late"` instead of `"taken"`. Still decrement quantity and notify guardians (with status `"taken_late"`).
+- Update the `DoseSlot` interface: add `"taken_late"` to the status union type.
+- For "missed" slots (>1 hour past), show a "Taken" button so the user can still close the loop, but it records `"taken_late"`.
+- In the completed doses section, show a distinct badge: "TAKEN LATE" (amber/warning color) vs "TAKEN" (green/success).
+
+**`src/components/WardMedicationStatus.tsx`**:
+- Treat `"taken_late"` as a taken dose for progress counting but display an amber "Late" badge.
+
+**`src/pages/GuardianReports.tsx`**:
+- Count `"taken_late"` separately in adherence charts so guardians can see on-time vs late compliance.
+
+### Revised Escalation Timeline (per medication slot)
+
+```text
+T+0 min   → Initial alarm (sound + overlay + notification)
+T+30 min  → Post-grace reminder 1/3
+T+40 min  → Post-grace reminder 2/3
+T+50 min  → Post-grace reminder 3/3 (final voice escalation)
+T+60 min  → Guardian SMS + missed log written
+T+60+ min → NO MORE ALERTS. "Taken" button stays visible → records "taken_late"
+```
+
+### Files Modified
 
 | File | Change |
 |------|--------|
-| `src/pages/Subscription.tsx` | Add success confirmation card UI, update redirect URL to include plan/billing params |
+| `src/hooks/useMedicationAlarms.ts` | Shift post-grace window to 30-60 min; hard stop at 60 min |
+| `src/components/medications/TodaySchedule.tsx` | Add `taken_late` status; show Taken button on missed slots; amber badge for late |
+| `src/components/WardMedicationStatus.tsx` | Handle `taken_late` display (amber badge) |
+| `src/pages/GuardianReports.tsx` | Distinguish taken vs taken_late in adherence stats |
+| `supabase/functions/notify-guardian-medication/index.ts` | Handle `taken_late` status in notification message |
+
+No database migration needed — `medication_logs.status` is a text column that already accepts any string value.
 
