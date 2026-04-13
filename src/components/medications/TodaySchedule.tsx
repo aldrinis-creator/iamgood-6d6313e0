@@ -24,7 +24,7 @@ interface DoseSlot {
   scheduledAt: Date;
   timeLabel: string;
   logId: string | null;
-  status: "pending" | "taken" | "missed" | "skipped";
+  status: "pending" | "taken" | "taken_late" | "missed" | "skipped";
   takenAt: string | null;
 }
 
@@ -163,17 +163,21 @@ const TodaySchedule = () => {
     const key = slotKey(slot);
 
     try {
+      const diffMin = differenceInMinutes(now, slot.scheduledAt);
+      const effectiveStatus = diffMin > 60 ? "taken_late" : "taken";
+
       if (slot.logId) {
-        await supabase.from("medication_logs").update({ status: "taken", taken_at: now.toISOString() }).eq("id", slot.logId);
+        await supabase.from("medication_logs").update({ status: effectiveStatus, taken_at: now.toISOString() }).eq("id", slot.logId);
       } else {
         await supabase.from("medication_logs").insert({
           medication_id: slot.medication.id, user_id: session.user.id,
-          scheduled_at: slot.scheduledAt.toISOString(), taken_at: now.toISOString(), status: "taken",
+          scheduled_at: slot.scheduledAt.toISOString(), taken_at: now.toISOString(), status: effectiveStatus,
         });
       }
       await supabase.from("medications").update({ remaining_quantity: Math.max(0, slot.medication.remaining_quantity - 1) }).eq("id", slot.medication.id);
-      toast.success(`${slot.medication.name} marked as taken ✓`);
-      notifyGuardians(session.user.id, slot.medication.name, "taken", slot.scheduledAt.toISOString());
+      const label = effectiveStatus === "taken_late" ? "taken (late)" : "taken";
+      toast.success(`${slot.medication.name} marked as ${label} ✓`);
+      notifyGuardians(session.user.id, slot.medication.name, effectiveStatus, slot.scheduledAt.toISOString());
 
       // Fade out then hide
       setFadingOut((prev) => new Set(prev).add(key));
@@ -250,7 +254,7 @@ const TodaySchedule = () => {
   };
 
   // Summary stats (include all, even hidden)
-  const takenCount = doses.filter(d => d.status === "taken").length;
+  const takenCount = doses.filter(d => d.status === "taken" || d.status === "taken_late").length;
   const totalCount = doses.length;
   const progressPct = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
@@ -264,7 +268,7 @@ const TodaySchedule = () => {
       const key = slotKey(d);
 
       // Hidden after taking
-      if (hiddenTaken.has(key) || d.status === "taken") {
+      if (hiddenTaken.has(key) || d.status === "taken" || d.status === "taken_late") {
         completed.push(d);
         return;
       }
@@ -425,6 +429,21 @@ const TodaySchedule = () => {
                           )}
                         </div>
                       )}
+
+                      {/* Taken Late button for missed doses */}
+                      {slot.status === "missed" && (
+                        <div className="flex items-center gap-2 pl-[72px]">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1 border-amber-500 text-amber-600 hover:bg-amber-50"
+                            onClick={() => markTaken(slot)}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Taken (Late)
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -444,21 +463,26 @@ const TodaySchedule = () => {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-1.5 pt-1">
-            {completedDoses.map((slot, i) => (
-              <Card key={`done-${slot.medication.id}-${slot.timeLabel}-${i}`} className="border-success/30 bg-success/5">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className="text-center min-w-[60px]">
-                    <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
-                    <Badge className="text-[10px] mt-1 bg-success text-success-foreground">TAKEN</Badge>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate line-through opacity-70">{slot.medication.name}</p>
-                    <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
-                  </div>
-                  <Check className="w-5 h-5 text-success shrink-0" />
-                </CardContent>
-              </Card>
-            ))}
+            {completedDoses.map((slot, i) => {
+              const isLate = slot.status === "taken_late";
+              return (
+                <Card key={`done-${slot.medication.id}-${slot.timeLabel}-${i}`} className={isLate ? "border-amber-400/30 bg-amber-50/50" : "border-success/30 bg-success/5"}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="text-center min-w-[60px]">
+                      <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
+                      <Badge className={`text-[10px] mt-1 ${isLate ? "bg-amber-500 text-white" : "bg-success text-success-foreground"}`}>
+                        {isLate ? "TAKEN LATE" : "TAKEN"}
+                      </Badge>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate line-through opacity-70">{slot.medication.name}</p>
+                      <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
+                    </div>
+                    <Check className={`w-5 h-5 shrink-0 ${isLate ? "text-amber-500" : "text-success"}`} />
+                  </CardContent>
+                </Card>
+              );
+            })}
           </CollapsibleContent>
         </Collapsible>
       )}
