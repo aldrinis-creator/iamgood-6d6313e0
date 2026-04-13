@@ -1,7 +1,8 @@
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/pdf.worker.min.mjs?url";
 
-// Use CDN worker for pdfjs
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Use local bundled worker instead of unreliable CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const MAX_PAGES = 10;
 
