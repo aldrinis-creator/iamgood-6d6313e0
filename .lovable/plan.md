@@ -1,46 +1,24 @@
 
 
-## Fix: Stop Excess Medication SMS Notifications
+## Auth Email Templates — Already Set Up
 
-### Problem
-8 SMS sent for a single missed medication due to two bugs:
-1. The "already sent" flag (`missedSentRef`) is in-memory and resets on every page load — so every app open after 60 min re-fires the guardian SMS for the entire day
-2. User has 3 duplicate guardian records (same person, same phone), tripling every SMS
+Your auth email templates are already configured and branded with the Check-iN identity:
 
-### Solution
+- **6 templates exist**: Signup confirmation, Magic link, Password recovery, Invite, Email change, and Reauthentication
+- **Branding applied**: Navy blue (#1a365d) primary color, circular "C-iN" logo badge, 12px rounded buttons, and the standard "Check-iN — Personal Emergency Response System / Future Wave Technologies Pvt. Ltd." footer
+- **Queue-based sending**: The auth email hook already uses the durable email queue with retry safety
 
-#### 1. Tighten the final escalation window (`src/hooks/useMedicationAlarms.ts`)
-- Change `diffMin < 1440` to `diffMin < HARD_CUTOFF_MIN + 15` (i.e., only fire within 60–75 min window)
-- Before calling `notifyGuardiansMissed`, check the database for an existing "missed" log for that slot — if it already exists, skip the SMS call (the DB is the durable guard, not the volatile ref)
-- This ensures that even with page refreshes, the SMS only fires once
+### What needs to happen
 
-#### 2. Deduplicate guardians by phone in the edge function (`supabase/functions/notify-guardian-medication/index.ts`)
-- Before sending MSG91 SMS, deduplicate `eligibleGuardians` by phone number so the same phone only receives one SMS regardless of how many guardian records exist
+The only remaining step is **DNS verification**. Your domain `notify.www.futurewave.in` is currently verifying (nameservers: `ns5.lovable.cloud`, `ns6.lovable.cloud`). Once DNS propagates (up to 72 hours), auth emails will automatically start sending from your branded domain.
 
-#### 3. Clean up duplicate guardian records (database)
-- Remove the 2 duplicate "Don Carlos" records for user `8d12aed0-ce40-4103-acc4-5d69f9df8da7`, keeping only one
+### Action required at your DNS provider
 
-### Technical Details
+Make sure these NS records exist for `notify.www.futurewave.in` at your domain registrar:
+- `notify.www.futurewave.in` → NS → `ns5.lovable.cloud`
+- `notify.www.futurewave.in` → NS → `ns6.lovable.cloud`
 
-**`src/hooks/useMedicationAlarms.ts`** — line 150:
-```text
-BEFORE: if (diffMin >= HARD_CUTOFF_MIN && diffMin < 1440 && ...)
-AFTER:  if (diffMin >= HARD_CUTOFF_MIN && diffMin < HARD_CUTOFF_MIN + 15 && ...)
-```
-Plus add a DB check: query `medication_logs` for existing "missed" status before calling `notifyGuardiansMissed`.
+### No code changes needed
 
-**`supabase/functions/notify-guardian-medication/index.ts`** — before MSG91 block:
-- Deduplicate recipients by phone: `const uniqueRecipients = [...new Map(recipients.map(r => [r.mobiles, r])).values()]`
-
-**Database cleanup** — migration to:
-- Delete duplicate guardian rows (keep earliest `id` per `user_id + guardian_phone` combo)
-- Add a unique constraint on `(user_id, guardian_phone)` to prevent future duplicates
-
-### Files Modified
-
-| File | Change |
-|------|--------|
-| `src/hooks/useMedicationAlarms.ts` | Tighten window to 60–75 min; add DB-level "already missed" check before SMS |
-| `supabase/functions/notify-guardian-medication/index.ts` | Deduplicate recipients by phone before sending SMS |
-| Database migration | Remove duplicate guardians; add unique constraint |
+Everything is already in place. If you want to modify the styling or wording of any specific template (e.g., change button text, update copy), I can do that — just let me know which template to update.
 
