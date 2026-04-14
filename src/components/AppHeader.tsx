@@ -3,9 +3,7 @@ import NotificationCenter from "@/components/NotificationCenter";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useTodayAppointments } from "@/hooks/useTodayAppointments";
-import useRefillDue from "@/hooks/useRefillDue";
+import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getISTHour } from "@/lib/istTime";
 
@@ -13,9 +11,6 @@ const AppHeader = () => {
   const { userName, role } = useApp();
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const todayApptCount = useTodayAppointments();
-  const refillDue = useRefillDue();
 
   const getGreeting = () => {
     const hour = getISTHour();
@@ -65,55 +60,6 @@ const AppHeader = () => {
         </div>
       </div>
 
-      {role === "user" && (
-        <nav className="flex gap-1 bg-primary-foreground/10 rounded-lg p-1">
-          {[
-            { label: "Home", path: "/dashboard" },
-            { label: "Appointments", path: "/appointments", glow: todayApptCount > 0 },
-            { label: "My Health", path: "/my-health", glow: refillDue },
-            { label: "Help", path: "/help" },
-          ].map((tab) => (
-            <button
-              key={tab.path}
-              onClick={() => navigate(tab.path)}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors relative ${
-                location.pathname === tab.path
-                  ? "bg-primary-foreground text-primary"
-                  : "text-primary-foreground/70 hover:text-primary-foreground"
-              } ${"glow" in tab && tab.glow ? "ring-2 ring-destructive shadow-[0_0_12px_hsl(var(--destructive))]" : ""}`}
-            >
-              {tab.label}
-              {"glow" in tab && tab.glow && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
-              )}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {role === "guardian" && (
-        <nav className="flex gap-1 bg-primary-foreground/10 rounded-lg p-1">
-          {[
-            { label: "My User", path: "/guardian" },
-            { label: "Alerts", path: "/guardian/alerts" },
-            { label: "Reports", path: "/guardian/reports" },
-            { label: "Services", path: "/guardian/services" },
-            { label: "Settings", path: "/guardian-settings" },
-          ].map((tab) => (
-            <button
-              key={tab.path}
-              onClick={() => navigate(tab.path)}
-              className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                location.pathname === tab.path
-                  ? "bg-primary-foreground text-primary"
-                  : "text-primary-foreground/70 hover:text-primary-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      )}
     </header>
   );
 };
