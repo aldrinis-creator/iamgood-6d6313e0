@@ -5,6 +5,7 @@ import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/aud
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { formatISTDateTime } from "@/lib/istTime";
 
 const notifyGuardiansMissed = async (userId: string, medNames: string[], scheduledTimes: string[]) => {
   try {
@@ -148,21 +149,22 @@ const useMedicationAlarms = () => {
     // Phase 2: Fire ONE batched alert per time slot
 
     // --- Initial alarms ---
+    const ts = formatISTDateTime(now);
     for (const [timeStr, names] of initialSlots) {
       const combined = names.join(", ");
       if (settings.voiceReminders) {
-        playVoiceReminder(`Your medications are due: ${combined}. Remember to take your tablets.`);
+        playVoiceReminder(`[${ts}] Your medications are due: ${combined}. Remember to take your tablets.`);
       } else if (settings.audioAlerts) {
         playChime();
       }
       if (settings.vibration && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
-      showBrowserNotification("Medication Reminder", `Time to take: ${combined}`);
+      showBrowserNotification("Medication Reminder", `[${ts}] Time to take: ${combined}`);
       showReminderOverlay({
         type: "medication",
         title: "Medication Reminder",
-        message: `Time to take: ${combined}`,
+        message: `[${ts}] Time to take: ${combined}`,
         reminderCount: `Scheduled — ${timeStr}`,
       });
     }
@@ -180,18 +182,18 @@ const useMedicationAlarms = () => {
 
         const combined = names.join(", ");
         if (settings.voiceReminders) {
-          playVoiceReminder(`You have not taken your medication: ${combined}. Please take your tablets now.`);
+          playVoiceReminder(`[${ts}] You have not taken your medication: ${combined}. Please take your tablets now.`);
         } else if (settings.audioAlerts) {
           playChime();
         }
         if (settings.vibration && navigator.vibrate) {
           navigator.vibrate([200, 100, 200]);
         }
-        showBrowserNotification("Medication Overdue", `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${combined}`);
+        showBrowserNotification("Medication Overdue", `[${ts}] Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${combined}`);
         showReminderOverlay({
           type: "medication",
           title: "Medication Overdue",
-          message: `You have not taken: ${combined}. Please take your tablets now.`,
+          message: `[${ts}] You have not taken: ${combined}. Please take your tablets now.`,
           reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${timeStr}`,
         });
       }
@@ -211,7 +213,7 @@ const useMedicationAlarms = () => {
 
       if (medsToLog.length > 0) {
         const combined = names.join(", ");
-        playVoiceReminder(`You have not taken your medication after 3 reminders: ${combined}. Please take your tablets now.`);
+        playVoiceReminder(`[${ts}] You have not taken your medication after 3 reminders: ${combined}. Please take your tablets now.`);
         playChime();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
@@ -232,7 +234,7 @@ const useMedicationAlarms = () => {
         .eq("user_id", session.user.id);
 
       if (guardians && guardians.length > 0) {
-        const message = `Medication reminder fired for: ${firedMedNames.join(", ")}`;
+        const message = `[${ts}] Medication reminder fired for: ${firedMedNames.join(", ")}`;
         const notifications = guardians.map((g) => ({
           user_id: session.user.id,
           guardian_id: g.id,

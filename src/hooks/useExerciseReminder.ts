@@ -3,6 +3,7 @@ import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/aud
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { formatISTDateTime } from "@/lib/istTime";
 
 const EXERCISE_HOURS = [8, 18];
 const EXERCISE_MESSAGE = "Hey, don't forget to undertake your Exercises Activity";
@@ -32,8 +33,11 @@ const useExerciseReminder = () => {
       if (hour === h && minute < 5 && !firedRef.current.has(key)) {
         firedRef.current.add(key);
 
+        const ts = formatISTDateTime(now);
+        const msgWithTs = `[${ts}] ${EXERCISE_MESSAGE}`;
+
         if (settings.voiceReminders) {
-          playVoiceReminder(EXERCISE_MESSAGE);
+          playVoiceReminder(msgWithTs);
         } else if (settings.audioAlerts) {
           playChime();
         }
@@ -42,12 +46,12 @@ const useExerciseReminder = () => {
           navigator.vibrate([200, 100, 200]);
         }
 
-        showBrowserNotification("Exercise Reminder", EXERCISE_MESSAGE);
+        showBrowserNotification("Exercise Reminder", msgWithTs);
 
         showReminderOverlay({
           type: "exercise",
           title: "Exercise Time",
-          message: EXERCISE_MESSAGE,
+          message: msgWithTs,
           reminderCount: `Scheduled — ${formatHour(h)}`,
         });
       }

@@ -131,10 +131,20 @@ Deno.serve(async (req) => {
     const now = new Date();
     const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
+    // Compute today's IST boundaries (UTC+5:30) to prevent previous-day spillover
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffsetMs);
+    const istMidnight = new Date(istNow);
+    istMidnight.setUTCHours(0, 0, 0, 0);
+    const todayStartUTC = new Date(istMidnight.getTime() - istOffsetMs); // IST 00:00 in UTC
+    const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000 - 1); // IST 23:59:59.999 in UTC
+
     const { data: pendingCheckIns, error: fetchError } = await supabase
       .from("check_ins")
       .select("id, user_id, scheduled_at")
       .eq("status", "pending")
+      .gte("scheduled_at", todayStartUTC.toISOString())
+      .lte("scheduled_at", todayEndUTC.toISOString())
       .lt("scheduled_at", tenMinutesAgo.toISOString());
 
     if (fetchError) {
@@ -243,7 +253,20 @@ Deno.serve(async (req) => {
         const displayHour = istHours % 12 || 12;
         const timeStr = `${displayHour}:${String(istMinutes).padStart(2, "0")} ${period}`;
 
-        const message = `${userName} missed their ${timeStr} check-in. Please reach out to make sure they're okay.`;
+        // Current IST timestamp for the alert
+        const alertIstMs = now.getTime() + (5.5 * 60 * 60 * 1000);
+        const alertIst = new Date(alertIstMs);
+        const alertDay = alertIst.getUTCDate();
+        const alertMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const alertMonth = alertMonths[alertIst.getUTCMonth()];
+        const alertYear = alertIst.getUTCFullYear();
+        const alertH = alertIst.getUTCHours();
+        const alertM = alertIst.getUTCMinutes();
+        const alertPeriod = alertH >= 12 ? "PM" : "AM";
+        const alertDisplayH = alertH % 12 || 12;
+        const alertTimestamp = `${alertDay} ${alertMonth} ${alertYear}, ${alertDisplayH}:${String(alertM).padStart(2,"0")} ${alertPeriod}`;
+
+        const message = `[${alertTimestamp}] ${userName} missed their ${timeStr} check-in. Please reach out to make sure they're okay.`;
 
         // ── Use deduped RPC for in-app notifications ──
         const notifications = guardians.map((g) => ({
