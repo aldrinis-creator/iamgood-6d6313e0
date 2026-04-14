@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2 } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 
@@ -119,16 +120,27 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
+  const [showEmailSection, setShowEmailSection] = useState(false);
+
   const phoneDigitCount = getDigitCount(phone);
   const isPhoneValid = phoneDigitCount >= 10;
 
+  const generatePlaceholderEmail = (phoneNum: string) => {
+    const cleaned = phoneNum.replace(/[\s\-\+]/g, "");
+    return `${cleaned}@phone.checkin.app`;
+  };
+
   const handleDetailsNext = () => {
-    if (!fullName || !email || !password) {
-      toast.error("Please fill in all required fields");
+    if (!fullName) {
+      toast.error("Please enter your name");
       return;
     }
     if (!isPhoneValid) {
       toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+      return;
+    }
+    if (email && !password) {
+      toast.error("Password is required when email is provided");
       return;
     }
     setStep(3);
@@ -174,12 +186,12 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
-    if (!fullName || !email || !password) {
+    if (!fullName) {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
-      toast.error("Primary guardian name, phone and email are required", { description: "Guardian email is essential for emergency notifications." });
+    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone)) {
+      toast.error("Primary guardian name and phone are required");
       return;
     }
     if (selectedRole === "user") {
@@ -214,8 +226,12 @@ const Register = () => {
           }))
       : [];
 
+    // Use provided email or generate placeholder for phone-only registration
+    const emailToUse = email.trim() || generatePlaceholderEmail(phone);
+    const passwordToUse = password || crypto.randomUUID();
+
     setLoading(true);
-    const { data, error } = await signUp(email, password, { 
+    const { data, error } = await signUp(emailToUse, passwordToUse, { 
       full_name: fullName,
       app_role: selectedRole || "user",
       phone: phone.replace(/\s/g, ""),
