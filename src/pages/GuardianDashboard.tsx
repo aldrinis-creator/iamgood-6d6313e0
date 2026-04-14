@@ -637,34 +637,6 @@ const GuardianDashboard = () => {
           );
         })()}
 
-        {/* Notification Alerts */}
-        {unreadCount > 0 && (
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Bell className="w-5 h-5 text-destructive" />
-                <h3 className="font-semibold text-sm">
-                  Alerts <Badge variant="destructive" className="ml-1">{unreadCount}</Badge>
-                </h3>
-              </div>
-              {notifications.filter(n => !n.read).slice(0, 3).map(n => (
-                <div key={n.id} className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{n.title}</p>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatISTTime(n.created_at)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{n.message}</p>
-                  <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>
-                    Dismiss
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
         {/* User Status */}
         <Card>
           <CardContent className="p-4">
@@ -741,41 +713,18 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Live Location (consent-gated) — collapsible dropdown */}
-        <CollapsibleSection
-          title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
-          icon={<MapPin className="w-5 h-5 text-primary" />}
-          defaultOpen={!!activeSOS}
-        >
-          <Card>
-            <CardContent className="pt-3">
-              {!locationConsent && !activeSOS ? (
-                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground text-center px-4">
-                    {wardName} has not permitted their location to be displayed
-                  </p>
-                </div>
-              ) : wardLocation ? (
-                <div className="space-y-2">
-                  <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
-                  {!activeSOS && (
-                    <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
-                      <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-                  <MapPin className="w-8 h-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No location data available</p>
-                  <Button variant="outline" size="sm" onClick={handleRefreshLocation}>
-                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </CollapsibleSection>
+        {/* Missed Check-in Alert (elevated) */}
+        {(() => {
+          const missedCount = todayCheckIns.filter(ci => ci.status === "missed").length;
+          return missedCount > 0 ? (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+              <p className="text-sm font-medium text-destructive">
+                {wardName} missed {missedCount} check-in{missedCount > 1 ? "s" : ""} today
+              </p>
+            </div>
+          ) : null;
+        })()}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-4 gap-2">
@@ -820,19 +769,35 @@ const GuardianDashboard = () => {
 
         {showAmbulance && <AmbulanceBooking />}
 
+        {/* Notification Alerts */}
+        {unreadCount > 0 && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Bell className="w-5 h-5 text-destructive" />
+                <h3 className="font-semibold text-sm">
+                  Alerts <Badge variant="destructive" className="ml-1">{unreadCount}</Badge>
+                </h3>
+              </div>
+              {notifications.filter(n => !n.read).slice(0, 3).map(n => (
+                <div key={n.id} className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{n.title}</p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatISTTime(n.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{n.message}</p>
+                  <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>
+                    Dismiss
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Today's Check-Ins */}
-        {(() => {
-          const missedCount = todayCheckIns.filter(ci => ci.status === "missed").length;
-          return missedCount > 0 ? (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
-              <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
-              <p className="text-sm font-medium text-destructive">
-                {wardName} missed {missedCount} check-in{missedCount > 1 ? "s" : ""} today
-              </p>
-            </div>
-          ) : null;
-        })()}
+        {/* Today's Check-iNs */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -863,21 +828,49 @@ const GuardianDashboard = () => {
         {/* Active Journey Tracker */}
         {wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
 
+        {/* Live Location (consent-gated) — collapsible dropdown */}
+        <CollapsibleSection
+          title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
+          icon={<MapPin className="w-5 h-5 text-primary" />}
+          defaultOpen={!!activeSOS}
+        >
+          <Card>
+            <CardContent className="pt-3">
+              {!locationConsent && !activeSOS ? (
+                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center px-4">
+                    {wardName} has not permitted their location to be displayed
+                  </p>
+                </div>
+              ) : wardLocation ? (
+                <div className="space-y-2">
+                  <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
+                  {!activeSOS && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
+                      <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
+                  <MapPin className="w-8 h-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No location data available</p>
+                  <Button variant="outline" size="sm" onClick={handleRefreshLocation}>
+                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </CollapsibleSection>
+
         {/* Collapsible ward modules */}
         {wardUserId && (
           <div className="space-y-2">
-            <CollapsibleSection title={`${wardName}'s Medications`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">💊</Badge>}>
+            <CollapsibleSection title={`${wardName}'s Medications`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">💊</Badge>} defaultOpen={true}>
               <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
               <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
               <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title={`${wardName}'s Health`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏥</Badge>}>
-              <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Emergency Health Card" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🆔</Badge>}>
-              <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
             </CollapsibleSection>
 
             <CollapsibleSection title={`${wardName}'s Vitals`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">❤️</Badge>}>
@@ -886,6 +879,14 @@ const GuardianDashboard = () => {
 
             <CollapsibleSection title={`${wardName}'s Activity`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏃</Badge>}>
               <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={`${wardName}'s Health`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏥</Badge>}>
+              <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Emergency Health Card" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🆔</Badge>}>
+              <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
             </CollapsibleSection>
 
             <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
