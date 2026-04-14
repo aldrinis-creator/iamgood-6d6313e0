@@ -46,6 +46,19 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if nomination has expired
+    if (guardian.nomination_expires_at && new Date(guardian.nomination_expires_at) < new Date()) {
+      // Mark as expired if still pending
+      await supabase
+        .from("guardians")
+        .update({ status: "expired" })
+        .eq("id", guardian.id);
+      return new Response(
+        JSON.stringify({ error: "Nomination has expired. Ask your ward to re-send the invite.", status: "expired" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const newStatus = action === "accept" ? "accepted" : "rejected";
 
     const { error: updateError } = await supabase

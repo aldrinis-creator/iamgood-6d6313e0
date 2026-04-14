@@ -306,6 +306,17 @@ const Register = () => {
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
+      // Explicitly accept nomination via token if available
+      const nominationToken = searchParams.get("token");
+      if (nominationToken) {
+        try {
+          await supabase.functions.invoke("guardian-nomination-response", {
+            body: { token: nominationToken, action: "accept" },
+          });
+        } catch (e) {
+          console.error("Failed to accept nomination:", e);
+        }
+      }
     }
 
     setLoading(false);
