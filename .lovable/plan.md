@@ -1,50 +1,56 @@
 
 
-## Fix False "Missed Check-In" SMS Alerts
+## Enforce Day Boundaries and Add Timestamps to All Alerts
 
-### Root Cause (confirmed with database evidence)
+### Problem
+1. **Spillover**: The `check-missed-checkins` cron has no upper date bound — it picks up stale "pending" records from previous days and sends false alerts.
+2. **Client-side spillover**: `useCheckInAudio` allows post-grace reminders up to `diffMin < 1440` (24 hours), meaning yesterday's missed check-ins can trigger today's alerts. Same pattern in `useMedicationAlarms`.
+3. **Missing timestamps**: Notification messages, browser notifications, SMS, and emails do not consistently include the current date and time, making it hard to identify when an alert was generated.
 
-The database shows duplicate check-in records for the same user + time slot (e.g., user `8d12aed0` has 3 records at the same slot, and user `8d12aed0` on Apr 9 has one "responded" and one "missed" for the same hour). Here is how the false alert happens:
+### Fixes
 
-1. `CheckInCard.loadCurrentCheckIn()` runs every 30 seconds. A race condition between two intervals (or page reload + interval) causes TWO "pending" records to be inserted for the same 7:00 AM slot.
-2. User checks in at 7:15 AM → `handleCheckIn()` updates only ONE record by ID to "responded".
-3. The orphaned duplicate stays "pending".
-4. The `check-missed-checkins` cron runs → finds the orphaned "pending" record → marks it "missed" → sends SMS/email/push to guardians. **False alert.**
-
-Additionally, `check-missed-checkins` queries guardians WITHOUT filtering `status = 'accepted'`, meaning even pending/expired guardians receive alerts.
-
-### Fixes (3 layers of defense)
-
-#### 1. Database: Add unique constraint (prevents duplicates at source)
-Create a migration adding a unique constraint on `(user_id, scheduled_at)` in `check_ins`. This makes it impossible to create duplicate records for the same slot. Clean up existing duplicates first.
-
-```sql
--- Remove duplicates keeping the best record (responded > pending > missed)
-DELETE FROM check_ins a USING check_ins b
-WHERE a.user_id = b.user_id 
-  AND a.scheduled_at = b.scheduled_at 
-  AND a.id < b.id
-  AND (b.status = 'responded' OR a.status != 'responded');
-
-ALTER TABLE check_ins ADD CONSTRAINT check_ins_user_slot_unique 
-  UNIQUE (user_id, scheduled_at);
-```
-
-#### 2. Server: Cron must verify no "responded" record exists before alerting
+#### 1. Server: `check-missed-checkins` — add today-only date bound
 **File: `supabase/functions/check-missed-checkins/index.ts`**
 
-Before processing each pending check-in, query for ANY "responded" record in the same user+hour window. If one exists, silently mark the orphaned pending record as "responded" (not "missed") and skip all alerts.
+- Add an upper bound to the pending check-ins query: only fetch records where `scheduled_at` is within **today** (IST midnight to 23:59:59). Currently line 134-138 queries all pending records older than 10 minutes with no date ceiling.
+- Compute today's IST boundaries (UTC+5:30) and add `.gte("scheduled_at", todayStartISO)` to the query.
 
-Also add `status = 'accepted'` filter to the guardians query (line 203-206).
+#### 2. Client: `useCheckInAudio` — cap reminders at 23:59 today
+**File: `src/hooks/useCheckInAudio.ts`**
 
-#### 3. Client: Use upsert and update ALL records for the window
-**File: `src/components/CheckInCard.tsx`**
+- Line 103: Change `diffMin < 1440` to `diffMin < (24*60 - h*60)` or simpler: add a guard that `scheduledAt` is today (same `dateKey`). This prevents yesterday's missed check-in hours from firing reminders today.
+- Simplest fix: before the post-grace loop, skip if `scheduledAt < todayStart`.
 
-- `loadCurrentCheckIn()`: Use `.upsert()` with `onConflict: 'user_id,scheduled_at'` instead of insert, or wrap in a try-catch that ignores unique constraint violations.
-- `handleCheckIn()`: After updating the primary record, also update ALL pending records for the same window to "responded" (not just the one by ID).
+#### 3. Client: `useMedicationAlarms` — already day-scoped (confirmed OK)
+The medication alarm hook uses `todayStart`/`todayEnd` for log queries, and `dateKey` for fired/missed refs. The `diffMin` checks are bounded by `HARD_CUTOFF_MIN + 15` (75 min max). No spillover risk here. No changes needed.
 
-### Files to modify
-- **Migration**: unique constraint + duplicate cleanup
-- `supabase/functions/check-missed-checkins/index.ts` — add responded-check before alerting + filter guardians by accepted status
-- `src/components/CheckInCard.tsx` — use conflict-safe insert + update all window records on check-in
+#### 4. Add IST date+time stamps to all alert messages
+
+**File: `supabase/functions/check-missed-checkins/index.ts`**
+- Include current IST date+time in the notification message, e.g. `"[14 Apr 2026, 10:30 AM] Ravi missed their 7:00 AM check-in..."`
+
+**File: `supabase/functions/notify-guardian-medication/index.ts`**
+- Include current IST timestamp in the notification `message` field and SMS body.
+
+**File: `src/hooks/useMedicationAlarms.ts`**
+- Add IST timestamp to `showBrowserNotification` and `showReminderOverlay` messages using `formatISTDateTime` from `src/lib/istTime.ts`.
+
+**File: `src/hooks/useCheckInAudio.ts`**
+- Add IST timestamp to `fireAlert` messages and `showReminderOverlay` messages.
+
+**File: `src/hooks/useAppointmentAlarms.ts`**
+- Add IST timestamp to appointment reminder messages.
+
+**File: `src/hooks/useExerciseReminder.ts`**
+- Add IST timestamp to exercise reminder messages.
+
+### Summary
+
+| # | Fix | Files |
+|---|-----|-------|
+| 1 | Cron: today-only query bound (IST) | `check-missed-checkins/index.ts` |
+| 2 | Client: cap check-in reminders to today | `useCheckInAudio.ts` |
+| 3 | Timestamps in all check-in alerts | `check-missed-checkins/index.ts`, `useCheckInAudio.ts` |
+| 4 | Timestamps in all medication alerts | `notify-guardian-medication/index.ts`, `useMedicationAlarms.ts` |
+| 5 | Timestamps in appointment/exercise alerts | `useAppointmentAlarms.ts`, `useExerciseReminder.ts` |
 
