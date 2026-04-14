@@ -1,27 +1,23 @@
 
 
-## Reorder Guardian Dashboard Layout
+## Move Health Passport Score Ring to Top of Guardian Dashboard
 
-Rearrange the render section of `src/pages/GuardianDashboard.tsx` (lines 574-895) to follow the "Alert → Act → Monitor → Review" hierarchy.
+### What Changes
 
-### New Order (top to bottom)
+1. **Create `WardHealthScoreRing` component** (`src/components/WardHealthScoreRing.tsx`)
+   - A compact inline widget showing the ward's overall Health Passport score as a small ring (48x48px) with green/yellow/red coloring, placed next to the ward name/status area.
+   - Fetches the latest score from `health_passport_scores` table for today (single query, lightweight).
+   - Displays: ring + score number + short label ("Great" / "Steady" / "Needs Attention").
+   - Refreshes every 60 seconds.
 
-1. **Ward Picker** (unchanged)
-2. **SOS Banner** (unchanged, stays at top)
-3. **Health Pattern Alerts** (unchanged position)
-4. **User Status Card** (Last Active / Battery / Mode)
-5. **Missed Check-in Alert banner** (move UP from line 825 to before Quick Actions)
-6. **Quick Actions** (Call / Route / Ambulance / Ping)
-7. **Ambulance Booking** (conditional)
-8. **Notification Alerts** (unread count card — move DOWN from line 640)
-9. **Today's Check-iNs card** (without the missed banner, already moved up)
-10. **Active Journey Tracker**
-11. **Location** (collapsible, already collapsed by default)
-12. **Medications** — change `defaultOpen` to `true`
-13. **Vitals**
-14. **Activity**
-15. **Reference group** (bottom): Health Passport, Emergency Health Card, Care Journal
+2. **Insert the ring in the User Status card** (`src/pages/GuardianDashboard.tsx`, ~line 640-680)
+   - Place `<WardHealthScoreRing wardUserId={wardUserId} />` inside the existing User Status card, next to the ward name/mode indicator — keeping it compact as a single row element rather than a separate card.
 
-### File to modify
-- `src/pages/GuardianDashboard.tsx` — reorder JSX blocks in the return statement; set Medications `CollapsibleSection` `defaultOpen={true}`; group Health Passport, Emergency Card, and Care Journal at the bottom.
+3. **Remove `WardHealthPassport` from the bottom reference group** (`src/pages/GuardianDashboard.tsx`, ~line 884-886)
+   - Delete the Health collapsible section that currently wraps `WardHealthPassport`.
+   - The full category breakdown is still available on the Guardian Reports page.
+
+### Files
+- **New**: `src/components/WardHealthScoreRing.tsx`
+- **Modify**: `src/pages/GuardianDashboard.tsx` — add ring to status card, remove Health collapsible section
 
