@@ -121,22 +121,41 @@ const CheckInCard = () => {
       setCurrentCheckInId(checkIn.id);
       setCheckedIn(checkIn.status === "responded");
     } else {
-      // Create a pending check-in for this window
+      // Create a pending check-in for this window using upsert to avoid duplicates
       const { data: created, error: insertError } = await supabase
         .from("check_ins")
-        .insert({
-          user_id: session.user.id,
-          scheduled_at: windowStart.toISOString(),
-          status: "pending",
-        })
+        .upsert(
+          {
+            user_id: session.user.id,
+            scheduled_at: windowStart.toISOString(),
+            status: "pending",
+          },
+          { onConflict: "user_id,scheduled_at", ignoreDuplicates: true }
+        )
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (insertError) {
         console.error("Failed to create check-in:", insertError);
         return;
       }
-      setCurrentCheckInId(created?.id ?? null);
+
+      if (created) {
+        setCurrentCheckInId(created.id);
+      } else {
+        // upsert was a no-op (record already exists), re-fetch
+        const { data: refetched } = await supabase
+          .from("check_ins")
+          .select("id, status")
+          .eq("user_id", session.user.id)
+          .eq("scheduled_at", windowStart.toISOString())
+          .single();
+        if (refetched) {
+          setCurrentCheckInId(refetched.id);
+          setCheckedIn(refetched.status === "responded");
+          return;
+        }
+      }
       setCheckedIn(false);
     }
   }, [session?.user?.id]);
@@ -210,36 +229,40 @@ const CheckInCard = () => {
     if (!session?.user?.id || loading) return;
     setLoading(true);
 
-    let checkInId = currentCheckInId;
+    const now = new Date();
+    const windowHour = getCurrentWindow();
+    const scheduledAt = windowHour !== null
+      ? getCheckInWindowStart(windowHour)
+      : now;
 
-    // If no check-in record exists yet, create one on-the-fly
-    if (!checkInId) {
-      const now = new Date();
-      const windowHour = getCurrentWindow();
-      const scheduledAt = windowHour !== null
-        ? getCheckInWindowStart(windowHour)
-        : now;
-
+    // Upsert to handle race conditions — creates if missing, no-ops if exists
+    if (!currentCheckInId) {
       const { data: created, error: insertError } = await supabase
         .from("check_ins")
-        .insert({
-          user_id: session.user.id,
-          scheduled_at: scheduledAt.toISOString(),
-          status: "pending",
-        })
+        .upsert(
+          {
+            user_id: session.user.id,
+            scheduled_at: scheduledAt.toISOString(),
+            status: "pending",
+          },
+          { onConflict: "user_id,scheduled_at", ignoreDuplicates: true }
+        )
         .select("id")
-        .single();
+        .maybeSingle();
 
-      if (insertError || !created) {
+      if (insertError) {
         console.error("Failed to create check-in:", insertError);
         toast.error("Check-in failed. Please try again.");
         setLoading(false);
         return;
       }
-      checkInId = created.id;
-      setCurrentCheckInId(checkInId);
+
+      if (created) {
+        setCurrentCheckInId(created.id);
+      }
     }
 
+    // Update ALL pending check-ins for this user + scheduled_at to responded
     const { error } = await supabase
       .from("check_ins")
       .update({
@@ -247,7 +270,9 @@ const CheckInCard = () => {
         response: "ok",
         responded_at: new Date().toISOString(),
       })
-      .eq("id", checkInId);
+      .eq("user_id", session.user.id)
+      .eq("scheduled_at", scheduledAt.toISOString())
+      .eq("status", "pending");
 
     if (error) {
       console.error("Failed to check in:", error);
