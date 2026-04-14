@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +17,8 @@ const GuardianServices = () => {
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [showApptDialog, setShowApptDialog] = useState(false);
   const [wardAppointments, setWardAppointments] = useState<any[]>([]);
+  const [wardPhone, setWardPhone] = useState<string>("");
+  const [wardLocation, setWardLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const fetchWardAppointments = useCallback(async () => {
     if (!wardUserId) return;
@@ -26,7 +26,28 @@ const GuardianServices = () => {
     if (appts) setWardAppointments(appts);
   }, [wardUserId]);
 
-  useEffect(() => { fetchWardAppointments(); }, [fetchWardAppointments]);
+  const fetchWardDetails = useCallback(async () => {
+    if (!wardUserId) return;
+    // Fetch phone from profile
+    const { data: profile } = await supabase.from("profiles").select("phone").eq("id", wardUserId).maybeSingle();
+    if (profile?.phone) setWardPhone(profile.phone);
+    else setWardPhone("");
+
+    // Fetch last known location from user_settings
+    const { data: settings } = await supabase.from("user_settings" as any).select("settings").eq("user_id", wardUserId).maybeSingle();
+    if (settings) {
+      const s = (settings as any).settings;
+      if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+        setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
+      } else {
+        setWardLocation(null);
+      }
+    } else {
+      setWardLocation(null);
+    }
+  }, [wardUserId]);
+
+  useEffect(() => { fetchWardAppointments(); fetchWardDetails(); }, [fetchWardAppointments, fetchWardDetails]);
 
   const availableServices = [
     {
@@ -80,7 +101,14 @@ const GuardianServices = () => {
           ))}
         </div>
 
-        {showAmbulance && <AmbulanceBooking />}
+        {showAmbulance && (
+          <AmbulanceBooking
+            wardUserId={wardUserId || undefined}
+            wardName={wardName}
+            wardLocation={wardLocation}
+            wardPhone={wardPhone}
+          />
+        )}
 
         {/* Restricted services */}
         <div className="space-y-2">
