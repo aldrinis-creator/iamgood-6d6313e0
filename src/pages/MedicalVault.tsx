@@ -324,10 +324,6 @@ ${r.file_name ? `<div class="section"><div class="section-title">📎 Attachment
     } else if (win.document.getElementById("attachment-area")) {
       win.document.getElementById("attachment-area")!.innerHTML = `<p>${r.file_name || "No file"}</p>`;
     }
-    const win = window.open("", "_blank");
-    if (!win) { toast.error("Pop-up blocked. Please allow pop-ups."); return; }
-    win.document.write(html);
-    win.document.close();
   };
 
   const filteredRecords = records.filter((r) => {
