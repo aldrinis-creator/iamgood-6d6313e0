@@ -194,9 +194,9 @@ Deno.serve(async (req) => {
 
     // Deduplicate: keep only ONE pending check-in per user+scheduled_hour
     const seen = new Set<string>();
-    const uniqueCheckIns: typeof pendingCheckIns = [];
+    const uniqueCheckIns: typeof userCheckIns = [];
     const duplicateIds: string[] = [];
-    for (const ci of pendingCheckIns) {
+    for (const ci of userCheckIns) {
       const scheduledDate = new Date(ci.scheduled_at);
       const key = `${ci.user_id}-${scheduledDate.getUTCFullYear()}-${scheduledDate.getUTCMonth()}-${scheduledDate.getUTCDate()}-${scheduledDate.getUTCHours()}`;
       if (seen.has(key)) {
