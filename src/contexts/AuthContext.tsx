@@ -60,13 +60,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try { await supabase.rpc("link_guardian_user_id" as any); } catch {};
             // Send welcome email once (idempotent)
             if (session.user.email) {
-              const profileData = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+              const profileData = await supabase.from("profiles").select("full_name, phone").eq("id", session.user.id).single();
+              const { data: guardianData } = await supabase
+                .from("guardians")
+                .select("guardian_name, guardian_phone")
+                .eq("user_id", session.user.id)
+                .eq("is_primary", true)
+                .maybeSingle();
+              const primaryGuardian = guardianData
+                ? `${guardianData.guardian_name} (${guardianData.guardian_phone})`
+                : "None nominated yet";
+              const isPhoneOnly = session.user.email?.endsWith("@phone.checkin.app");
               supabase.functions.invoke("send-transactional-email", {
                 body: {
                   templateName: "welcome",
                   recipientEmail: session.user.email,
                   idempotencyKey: `welcome-${session.user.id}`,
-                  templateData: { name: profileData.data?.full_name || "" },
+                  templateData: {
+                    name: profileData.data?.full_name || "",
+                    phone: profileData.data?.phone || "",
+                    primaryGuardian,
+                    ...(isPhoneOnly ? { setPasswordUrl: `${window.location.origin}/reset-password` } : {}),
+                  },
                 },
               }).catch(() => {});
             }
