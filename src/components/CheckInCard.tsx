@@ -368,12 +368,12 @@ const CheckInCard = () => {
         ) : (
           <div className="text-center space-y-3">
             <div
-              className="relative w-24 h-24 mx-auto flex items-center justify-center"
+              className="relative w-32 h-32 mx-auto flex items-center justify-center"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-12 h-12 text-success fill-current" />
+              <Heart className="w-20 h-20 text-success fill-current" />
             </div>
             <p className="text-accessible font-semibold text-success">✓ Checked In!</p>
             <p className="text-sm text-muted-foreground">
