@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { flushPendingSettings } from "@/hooks/useUserSettings";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -111,7 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Flush pending settings on abrupt tab close
+    const handleUnload = () => flushPendingSettings();
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleUnload);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -134,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    flushPendingSettings();
     await supabase.auth.signOut();
     setProfile(null);
   };

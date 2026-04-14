@@ -367,16 +367,7 @@ const GuardianDashboard = () => {
     return () => clearInterval(pollId);
   }, [wardUserId, fetchWardSettings]);
 
-  // Battery low alert for guardian
-  useEffect(() => {
-    if (wardBattery !== null && wardBattery <= 30 && !batteryAlertShown && settings.guardianVoiceAlerts) {
-      setBatteryAlertShown(true);
-      playVoiceReminder(`Please ask ${wardName} to charge their phone now! Battery is at ${wardBattery} percent.`);
-    }
-    if (wardBattery !== null && wardBattery > 30) {
-      setBatteryAlertShown(false);
-    }
-  }, [wardBattery, wardName, batteryAlertShown, settings.guardianVoiceAlerts]);
+  // Battery low visual indicator only – no audio alert
 
   // Realtime subscriptions
   useEffect(() => {
@@ -398,24 +389,13 @@ const GuardianDashboard = () => {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on ${wardName}, as we have detected ${eventType} alert`);
         } else if (newNotif?.type === "missed_checkin") {
-          missedCheckInCount.current += 1;
-          if (missedCheckInCount.current >= 3 && settings.guardianVoiceAlerts) {
-            playVoiceReminder(`${wardName} has missed multiple check-ins. Please check on them.`);
-            missedCheckInCount.current = 0;
-          } else {
-            playChime();
-          }
-        } else if (newNotif?.type === "medication_missed") {
-          missedMedCount.current += 1;
-          if (missedMedCount.current >= 3 && settings.guardianVoiceAlerts) {
-            const hour = new Date().getHours();
-            const period = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
-            playVoiceReminder(`${wardName} has not taken their ${period} medication.`);
-            missedMedCount.current = 0;
-          } else {
+          // Play chime once, only if the check-in was missed within the last 60 minutes
+          const createdAt = newNotif?.created_at ? new Date(newNotif.created_at).getTime() : 0;
+          if (Date.now() - createdAt <= 3600000) {
             playChime();
           }
         }
+        // No audio for medication_missed, medication_taken, route_deviation, battery, etc.
       })
       .subscribe();
     channels.push(notifChannel);
@@ -761,41 +741,41 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Live Location (consent-gated) */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              {activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!locationConsent && !activeSOS ? (
-              <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
-                <p className="text-sm text-muted-foreground text-center px-4">
-                  {wardName} has not permitted their location to be displayed
-                </p>
-              </div>
-            ) : wardLocation ? (
-              <div className="space-y-2">
-                <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
-                {!activeSOS && (
-                  <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
-                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
+        {/* Live Location (consent-gated) — collapsible dropdown */}
+        <CollapsibleSection
+          title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
+          icon={<MapPin className="w-5 h-5 text-primary" />}
+          defaultOpen={!!activeSOS}
+        >
+          <Card>
+            <CardContent className="pt-3">
+              {!locationConsent && !activeSOS ? (
+                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center px-4">
+                    {wardName} has not permitted their location to be displayed
+                  </p>
+                </div>
+              ) : wardLocation ? (
+                <div className="space-y-2">
+                  <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
+                  {!activeSOS && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
+                      <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
+                  <MapPin className="w-8 h-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No location data available</p>
+                  <Button variant="outline" size="sm" onClick={handleRefreshLocation}>
+                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh
                   </Button>
-                )}
-              </div>
-            ) : (
-              <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-                <MapPin className="w-8 h-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No location data available</p>
-                <Button variant="outline" size="sm" onClick={handleRefreshLocation}>
-                  <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </CollapsibleSection>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-4 gap-2">
