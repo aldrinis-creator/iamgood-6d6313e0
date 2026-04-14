@@ -12,7 +12,7 @@ import CareJournal from "@/components/CareJournal";
 import WardEmergencyCard from "@/components/WardEmergencyCard";
 import AmbulanceBooking from "@/components/AmbulanceBooking";
 import WardActivitySummary from "@/components/WardActivitySummary";
-import WardHealthPassport from "@/components/WardHealthPassport";
+import WardHealthScoreRing from "@/components/WardHealthScoreRing";
 import WardVitalsSummary from "@/components/WardVitalsSummary";
 import WardMedicationStatus from "@/components/WardMedicationStatus";
 import WardMedicationAdherence from "@/components/WardMedicationAdherence";
@@ -671,9 +671,12 @@ const GuardianDashboard = () => {
                   )}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={refreshAll} disabled={refreshing}>
-                <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-              </Button>
+              <div className="flex items-center gap-3">
+                <WardHealthScoreRing wardUserId={wardUserId} />
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={refreshAll} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -881,9 +884,6 @@ const GuardianDashboard = () => {
               <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />
             </CollapsibleSection>
 
-            <CollapsibleSection title={`${wardName}'s Health`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏥</Badge>}>
-              <WardHealthPassport wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
 
             <CollapsibleSection title="Emergency Health Card" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🆔</Badge>}>
               <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
