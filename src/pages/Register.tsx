@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2 } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 
@@ -119,16 +120,27 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
+  const [showEmailSection, setShowEmailSection] = useState(false);
+
   const phoneDigitCount = getDigitCount(phone);
   const isPhoneValid = phoneDigitCount >= 10;
 
+  const generatePlaceholderEmail = (phoneNum: string) => {
+    const cleaned = phoneNum.replace(/[\s\-\+]/g, "");
+    return `${cleaned}@phone.checkin.app`;
+  };
+
   const handleDetailsNext = () => {
-    if (!fullName || !email || !password) {
-      toast.error("Please fill in all required fields");
+    if (!fullName) {
+      toast.error("Please enter your name");
       return;
     }
     if (!isPhoneValid) {
       toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+      return;
+    }
+    if (email && !password) {
+      toast.error("Password is required when email is provided");
       return;
     }
     setStep(3);
@@ -174,12 +186,12 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
-    if (!fullName || !email || !password) {
+    if (!fullName) {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone || !guardians[0].email)) {
-      toast.error("Primary guardian name, phone and email are required", { description: "Guardian email is essential for emergency notifications." });
+    if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone)) {
+      toast.error("Primary guardian name and phone are required");
       return;
     }
     if (selectedRole === "user") {
@@ -214,8 +226,12 @@ const Register = () => {
           }))
       : [];
 
+    // Use provided email or generate placeholder for phone-only registration
+    const emailToUse = email.trim() || generatePlaceholderEmail(phone);
+    const passwordToUse = password || crypto.randomUUID();
+
     setLoading(true);
-    const { data, error } = await signUp(email, password, { 
+    const { data, error } = await signUp(emailToUse, passwordToUse, { 
       full_name: fullName,
       app_role: selectedRole || "user",
       phone: phone.replace(/\s/g, ""),
@@ -264,15 +280,27 @@ const Register = () => {
           <Separator />
 
           <div className="space-y-4 text-left">
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-foreground text-sm">Verify your email</p>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
-                </p>
+            {email ? (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Verify your email</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
+                <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Phone verified — you're all set!</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Sign in with your phone number and OTP. You can add an email later from Settings.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {selectedRole === "user" && sentGuardianCount > 0 && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
@@ -324,9 +352,15 @@ const Register = () => {
             Go to Sign In
           </Button>
 
-          <p className="text-xs text-muted-foreground">
-            Didn't receive the email? Check your spam folder or sign in to resend the verification.
-          </p>
+          {email ? (
+            <p className="text-xs text-muted-foreground">
+              Didn't receive the email? Check your spam folder or sign in to resend the verification.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              You can sign in immediately using Phone OTP.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -435,13 +469,32 @@ const Register = () => {
               )}
             </div>
             <div>
-              <Label>Email *</Label>
-              <Input placeholder="Email address" className="text-base min-h-[48px]" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label>Date of Birth</Label>
+              <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />
             </div>
-            <div>
-              <Label>Password *</Label>
-              <Input placeholder="Create password" className="text-base min-h-[48px]" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
+
+            <Collapsible open={showEmailSection} onOpenChange={setShowEmailSection}>
+              <CollapsibleTrigger asChild>
+                <button type="button" className="flex items-center gap-2 text-sm text-primary font-medium w-full py-2">
+                  <Mail className="w-4 h-4" />
+                  Add email for notifications (optional)
+                  <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${showEmailSection ? "rotate-180" : ""}`} />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-2">
+                <div>
+                  <Label>Email</Label>
+                  <Input placeholder="Email address" className="text-base min-h-[48px]" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                {email && (
+                  <div>
+                    <Label>Password</Label>
+                    <Input placeholder="Create password" className="text-base min-h-[48px]" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <p className="text-xs text-muted-foreground mt-1">Required when email is provided</p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
             <div>
               <Label>Date of Birth</Label>
               <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />

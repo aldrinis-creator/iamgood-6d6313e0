@@ -1,4 +1,5 @@
 import { Moon, Sun, DoorOpen, Navigation } from "lucide-react";
+import EmailPromptBanner from "@/components/EmailPromptBanner";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
@@ -192,6 +193,7 @@ const UserDashboard = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <EmailPromptBanner userEmail={session?.user?.email} />
         {/* Mode Selector */}
         <Card className="bg-primary/5">
           <CardContent className="p-3 space-y-3">

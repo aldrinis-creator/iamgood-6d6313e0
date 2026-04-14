@@ -310,12 +310,9 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">Your Personal Emergency Response System</p>
         </div>
 
-        <GoogleSignInButton />
-        <OrDivider />
-
         <Button
           type="button"
-          variant="outline"
+          variant="default"
           className="w-full text-base py-6 gap-3"
           size="lg"
           onClick={() => setOtpMode(true)}
@@ -324,6 +321,8 @@ const Login = () => {
           Sign in with Phone OTP
         </Button>
 
+        <OrDivider />
+        <GoogleSignInButton label="Sign in with Google" />
         <OrDivider />
 
         <form onSubmit={handleLogin} className="space-y-4">
