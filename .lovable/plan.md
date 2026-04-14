@@ -1,57 +1,50 @@
-## Batch Medication Alerts for Same Time Slot
 
-### Problem
 
-When multiple medications are scheduled at the same time (e.g., 08:00), the system fires separate audio alerts, vibrations, browser notifications, and reminder overlays for each one. This creates a noisy, repetitive experience.
+## Fix False "Missed Check-In" SMS Alerts
 
-### Solution
+### Root Cause (confirmed with database evidence)
 
-Restructure the alarm check loop to **group medications by time slot first**, then fire one consolidated alert per slot containing all medication names.
+The database shows duplicate check-in records for the same user + time slot (e.g., user `8d12aed0` has 3 records at the same slot, and user `8d12aed0` on Apr 9 has one "responded" and one "missed" for the same hour). Here is how the false alert happens:
 
-### Changes
+1. `CheckInCard.loadCurrentCheckIn()` runs every 30 seconds. A race condition between two intervals (or page reload + interval) causes TWO "pending" records to be inserted for the same 7:00 AM slot.
+2. User checks in at 7:15 AM → `handleCheckIn()` updates only ONE record by ID to "responded".
+3. The orphaned duplicate stays "pending".
+4. The `check-missed-checkins` cron runs → finds the orphaned "pending" record → marks it "missed" → sends SMS/email/push to guardians. **False alert.**
 
-**File: `src/hooks/useMedicationAlarms.ts**`
+Additionally, `check-missed-checkins` queries guardians WITHOUT filtering `status = 'accepted'`, meaning even pending/expired guardians receive alerts.
 
-Restructure the check function:
+### Fixes (3 layers of defense)
 
-1. **Initial alarm (T+0)**: Instead of firing inside the per-med loop, collect all meds due at the same time slot into a `Map<timeStr, medName[]>`. After the loop, fire ONE alert per unique time slot:
-  - One `playVoiceReminder` with all med names (e.g., "Your medications are due: Aspirin, Metformin")
-  - One `showBrowserNotification` listing all meds
-  - One `showReminderOverlay` with a combined message listing all meds
-  - One vibration burst
-  - The `slotKey` stays `med-slot-${dateKey}-${timeStr}` (already time-based, not per-med)
-2. **Post-grace reminders (T+30 to T+60)**: Similarly batch — collect all untaken meds for a time slot, fire one combined reminder with all overdue med names.
-3. **Final escalation (T+60-75)**: Keep per-med `medication_logs` inserts (each med needs its own missed log), but batch the audio/notification into one alert listing all missed meds for that slot. Even the Guardian notifications to follow the same logic.
-4. **Guardian in-app notifications**: Already batched (fires once with `firedMedNames.join(", ")`), no change needed.
+#### 1. Database: Add unique constraint (prevents duplicates at source)
+Create a migration adding a unique constraint on `(user_id, scheduled_at)` in `check_ins`. This makes it impossible to create duplicate records for the same slot. Clean up existing duplicates first.
 
-**File: `src/components/ReminderOverlay.tsx**`
+```sql
+-- Remove duplicates keeping the best record (responded > pending > missed)
+DELETE FROM check_ins a USING check_ins b
+WHERE a.user_id = b.user_id 
+  AND a.scheduled_at = b.scheduled_at 
+  AND a.id < b.id
+  AND (b.status = 'responded' OR a.status != 'responded');
 
-- The "View Medications" action already navigates to `/my-health?tool=Tablets` — no change needed. Confirm the label says "View Medications" (it does).
-
-### Technical approach
-
-```typescript
-// Phase 1: Collect slots
-const initialSlots = new Map<string, string[]>(); // timeStr → medNames[]
-const postGraceSlots = new Map<string, string[]>();
-const finalSlots = new Map<string, { names: string[], meds: Array<{id, scheduledAt}> }>();
-
-// Phase 2: Loop meds, populate maps (no alerts inside loop)
-
-// Phase 3: Fire ONE alert per time slot from each map
-for (const [timeStr, names] of initialSlots) {
-  const combined = names.join(", ");
-  playVoiceReminder(`Your medications are due: ${combined}`);
-  showBrowserNotification("Medication Reminder", `Time to take: ${combined}`);
-  showReminderOverlay({
-    type: "medication",
-    title: "Medication Reminder",
-    message: `Time to take: ${combined}`,
-    reminderCount: `Scheduled — ${timeStr}`,
-  });
-}
+ALTER TABLE check_ins ADD CONSTRAINT check_ins_user_slot_unique 
+  UNIQUE (user_id, scheduled_at);
 ```
 
-### Files to modify
+#### 2. Server: Cron must verify no "responded" record exists before alerting
+**File: `supabase/functions/check-missed-checkins/index.ts`**
 
-- `src/hooks/useMedicationAlarms.ts` — restructure to batch alerts by time slot
+Before processing each pending check-in, query for ANY "responded" record in the same user+hour window. If one exists, silently mark the orphaned pending record as "responded" (not "missed") and skip all alerts.
+
+Also add `status = 'accepted'` filter to the guardians query (line 203-206).
+
+#### 3. Client: Use upsert and update ALL records for the window
+**File: `src/components/CheckInCard.tsx`**
+
+- `loadCurrentCheckIn()`: Use `.upsert()` with `onConflict: 'user_id,scheduled_at'` instead of insert, or wrap in a try-catch that ignores unique constraint violations.
+- `handleCheckIn()`: After updating the primary record, also update ALL pending records for the same window to "responded" (not just the one by ID).
+
+### Files to modify
+- **Migration**: unique constraint + duplicate cleanup
+- `supabase/functions/check-missed-checkins/index.ts` — add responded-check before alerting + filter guardians by accepted status
+- `src/components/CheckInCard.tsx` — use conflict-safe insert + update all window records on check-in
+
