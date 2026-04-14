@@ -647,7 +647,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                     {r.hospital_name && <p className="text-[10px] text-muted-foreground">{r.hospital_name}</p>}
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openRecordViewWindow(r)} title="View">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleViewRecord(r)} title="View">
                       <Eye className="w-3 h-3" />
                     </Button>
                     {r.file_url && (
