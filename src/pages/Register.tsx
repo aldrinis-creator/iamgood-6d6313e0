@@ -418,7 +418,9 @@ const Register = () => {
                 <div>
                   <p className="font-medium text-foreground text-sm">Guardian account ready</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins.
+                    {email
+                      ? "Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins."
+                      : "Your guardian account is linked. Sign in with your phone number to start monitoring your ward."}
                   </p>
                 </div>
               </div>
