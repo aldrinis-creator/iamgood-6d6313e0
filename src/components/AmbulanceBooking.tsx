@@ -7,23 +7,50 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Ambulance, AlertTriangle, CreditCard, Navigation, Phone,
-  MessageCircle, MapPin, User, Info
+  MessageCircle, MapPin, User, Info, Pencil, Check
 } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
+import { supabase } from "@/integrations/supabase/client";
 
 type TabMode = "emergency" | "book";
 
-const AmbulanceBooking = () => {
+interface AmbulanceBookingProps {
+  wardUserId?: string;
+  wardName?: string;
+  wardLocation?: { lat: number; lng: number } | null;
+  wardPhone?: string;
+}
+
+const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: AmbulanceBookingProps) => {
+  const isGuardianMode = !!wardUserId;
   const [mode, setMode] = useState<TabMode>("emergency");
   const [showForm, setShowForm] = useState(false);
   const [progress, setProgress] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [locationDetected, setLocationDetected] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+  const [sending, setSending] = useState(false);
 
   const [patientName, setPatientName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [emergencyType, setEmergencyType] = useState("");
+
+  // Pre-fill guardian mode data
+  useEffect(() => {
+    if (isGuardianMode) {
+      if (wardName) setPatientName(wardName);
+      if (wardPhone) setContactNumber(wardPhone);
+      if (wardLocation) {
+        setLocation(wardLocation);
+        setLocationDetected(true);
+        setManualLat(wardLocation.lat.toString());
+        setManualLng(wardLocation.lng.toString());
+      }
+    }
+  }, [isGuardianMode, wardName, wardPhone, wardLocation]);
 
   useEffect(() => {
     if (showForm) return;
@@ -56,12 +83,75 @@ const AmbulanceBooking = () => {
     );
   };
 
-  const sendWhatsApp = () => {
-    const locStr = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : "Location not available";
-    const msg = encodeURIComponent(
-      `🚑 AMBULANCE REQUEST\n\nPatient: ${patientName || "N/A"}\nContact: ${contactNumber || "N/A"}\nEmergency: ${emergencyType || "Not specified"}\nLocation: ${locStr}`
-    );
-    window.open(`https://wa.me/917045868482?text=${msg}`, "_blank");
+  const applyManualLocation = () => {
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setLocation({ lat, lng });
+      setLocationDetected(true);
+      setEditingLocation(false);
+    }
+  };
+
+  const fetchWardHealthCard = async (): Promise<string> => {
+    if (!wardUserId) return "";
+    try {
+      const [profileRes, healthRes, medsRes, guardiansRes, tokenRes] = await Promise.all([
+        supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", wardUserId).maybeSingle(),
+        supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone, emergency_notes").eq("user_id", wardUserId).maybeSingle(),
+        supabase.from("medications").select("name, dosage").eq("user_id", wardUserId),
+        supabase.from("guardians").select("guardian_name, guardian_phone, relation, is_primary").eq("user_id", wardUserId).eq("status", "accepted"),
+        supabase.from("emergency_share_tokens").select("token").eq("user_id", wardUserId).eq("is_active", true).maybeSingle(),
+      ]);
+
+      const health = healthRes.data;
+      const meds = medsRes.data;
+      const guardians = guardiansRes.data;
+      const token = tokenRes.data?.token;
+
+      const lines: string[] = ["\n═══ EMERGENCY HEALTH CARD ═══"];
+
+      if (health?.blood_group) lines.push(`Blood Group: ${health.blood_group}`);
+      if (health?.allergies?.length) lines.push(`Allergies: ${health.allergies.join(", ")}`);
+      if (health?.chronic_conditions?.length) lines.push(`Conditions: ${health.chronic_conditions.join(", ")}`);
+      if (meds?.length) lines.push(`Medications: ${meds.map(m => `${m.name} ${m.dosage}`).join(", ")}`);
+      else if (health?.current_medications?.length) lines.push(`Medications: ${health.current_medications.join(", ")}`);
+      if (health?.family_doctor_name) {
+        lines.push(`Family Doctor: ${health.family_doctor_name}${health.family_doctor_phone ? ` (${health.family_doctor_phone})` : ""}`);
+      }
+      if (health?.emergency_notes) lines.push(`Notes: ${health.emergency_notes}`);
+      if (guardians?.length) {
+        lines.push("Emergency Contacts:");
+        guardians.forEach(g => {
+          lines.push(`  - ${g.guardian_name}${g.relation ? ` (${g.relation})` : ""} ${g.guardian_phone}${g.is_primary ? " [Primary]" : ""}`);
+        });
+      }
+      if (token) {
+        lines.push(`Emergency Profile: https://iamgood.lovable.app/e/${token}`);
+      }
+
+      return lines.length > 1 ? lines.join("\n") : "";
+    } catch (err) {
+      console.error("Failed to fetch ward health card:", err);
+      return "";
+    }
+  };
+
+  const sendWhatsApp = async () => {
+    setSending(true);
+    try {
+      const locStr = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : "Location not available";
+      let healthCard = "";
+      if (isGuardianMode) {
+        healthCard = await fetchWardHealthCard();
+      }
+      const msg = encodeURIComponent(
+        `🚑 AMBULANCE REQUEST\n\nPatient: ${patientName || "N/A"}\nContact: ${contactNumber || "N/A"}\nEmergency: ${emergencyType || "Not specified"}\nLocation: ${locStr}${healthCard}`
+      );
+      window.open(`https://wa.me/917045868482?text=${msg}`, "_blank");
+    } finally {
+      setSending(false);
+    }
   };
 
   const callHelpline = () => {
@@ -103,7 +193,9 @@ const AmbulanceBooking = () => {
           <Phone className="w-6 h-6 text-sos-foreground" />
         </div>
         <h2 className="text-xl font-bold">Book Ambulance</h2>
-        <p className="text-sm text-muted-foreground">Emergency or scheduled ambulance service</p>
+        <p className="text-sm text-muted-foreground">
+          {isGuardianMode ? `Emergency ambulance for ${wardName}` : "Emergency or scheduled ambulance service"}
+        </p>
       </div>
 
       <div className="flex rounded-lg border border-border overflow-hidden">
@@ -140,20 +232,57 @@ const AmbulanceBooking = () => {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Location section */}
             <div className="space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" /> Your Location
+                <MapPin className="w-4 h-4" /> {isGuardianMode ? `${wardName}'s Location` : "Your Location"}
               </h3>
-              <Button
-                onClick={detectLocation}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <Navigation className="w-4 h-4 mr-2" /> Detect My Location
-              </Button>
-              {locationDetected && location && (
-                <p className="text-xs text-success flex items-center gap-1">
-                  ✅ Location detected: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </p>
+
+              {isGuardianMode ? (
+                <div className="space-y-2">
+                  {!editingLocation ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 p-2.5 rounded-md border border-border bg-muted/50 text-sm">
+                        {location
+                          ? `📍 ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
+                          : "Location not available"}
+                      </div>
+                      <Button variant="outline" size="icon" onClick={() => setEditingLocation(true)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Latitude</Label>
+                          <Input value={manualLat} onChange={e => setManualLat(e.target.value)} placeholder="19.0760" className="text-base" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Longitude</Label>
+                          <Input value={manualLng} onChange={e => setManualLng(e.target.value)} placeholder="72.8777" className="text-base" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingLocation(false)}>Cancel</Button>
+                        <Button size="sm" className="flex-1" onClick={applyManualLocation}>
+                          <Check className="w-4 h-4 mr-1" /> Apply
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Button onClick={detectLocation} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                    <Navigation className="w-4 h-4 mr-2" /> Detect My Location
+                  </Button>
+                  {locationDetected && location && (
+                    <p className="text-xs text-success flex items-center gap-1">
+                      ✅ Location detected: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -170,10 +299,7 @@ const AmbulanceBooking = () => {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Contact Number</Label>
-                <PhoneInput
-                  value={contactNumber}
-                  onChange={setContactNumber}
-                />
+                <PhoneInput value={contactNumber} onChange={setContactNumber} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Emergency Type (Optional)</Label>
@@ -188,11 +314,19 @@ const AmbulanceBooking = () => {
 
             <Button
               onClick={sendWhatsApp}
+              disabled={sending}
               className="w-full bg-success hover:bg-success/90 text-success-foreground font-semibold py-5"
               size="lg"
             >
-              <MessageCircle className="w-5 h-5 mr-2" /> Send Request via WhatsApp
+              <MessageCircle className="w-5 h-5 mr-2" />
+              {sending ? "Preparing..." : "Send Request via WhatsApp"}
             </Button>
+
+            {isGuardianMode && (
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+                <Info className="w-3 h-3" /> Emergency Health Card will be attached automatically
+              </p>
+            )}
 
             <div className="text-center space-y-2">
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -211,10 +345,21 @@ const AmbulanceBooking = () => {
             <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
               <p className="text-xs font-semibold">How it works:</p>
               <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>Detect your current location</li>
-                <li>Fill in patient details</li>
-                <li>Send request via WhatsApp to ambulance service</li>
-                <li>If no response, call the 24/7 helpline</li>
+                {isGuardianMode ? (
+                  <>
+                    <li>Verify {wardName}'s location (edit if needed)</li>
+                    <li>Confirm patient details</li>
+                    <li>Send request via WhatsApp with health card attached</li>
+                    <li>If no response, call the 24/7 helpline</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Detect your current location</li>
+                    <li>Fill in patient details</li>
+                    <li>Send request via WhatsApp to ambulance service</li>
+                    <li>If no response, call the 24/7 helpline</li>
+                  </>
+                )}
               </ol>
             </div>
           </CardContent>
@@ -253,9 +398,11 @@ const AmbulanceBooking = () => {
                 <Label className="text-xs font-medium">Pickup Location</Label>
                 <div className="flex gap-2">
                   <Input placeholder="Enter pickup address" className="flex-1 text-base" />
-                  <Button variant="outline" size="icon" onClick={detectLocation}>
-                    <Navigation className="w-4 h-4" />
-                  </Button>
+                  {!isGuardianMode && (
+                    <Button variant="outline" size="icon" onClick={detectLocation}>
+                      <Navigation className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -264,7 +411,7 @@ const AmbulanceBooking = () => {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Contact Number</Label>
-                <PhoneInput value="" onChange={() => {}} />
+                <PhoneInput value={isGuardianMode ? contactNumber : ""} onChange={isGuardianMode ? setContactNumber : () => {}} />
               </div>
             </div>
 
