@@ -1,33 +1,35 @@
 
 
-## Add Response Timestamp to Today's Check-iNs
+## Reorganize User Dashboard
 
-### What changes
+### New Layout Order (top to bottom)
+1. Email Prompt Banner (unchanged)
+2. Mode Selector (unchanged)
+3. Check-In Card (unchanged)
+4. Map My Journey (unchanged)
+5. **NEW: Today's Appointments reminder card** — compact card showing count of today's appointments with a tap-to-navigate action to `/appointments`
+6. **NEW: Medication Due alert** — compact card showing low-stock/refill-due medications using existing `useRefillDue` hook, linking to `/my-health?tool=Medications`
+7. Health Passport accordion (unchanged, collapsed by default)
+8. ~~How It Works~~ — **removed** (moved to Help)
+9. ~~AI Health Companion~~ — **removed** (moved to Help)
 
-In `src/pages/GuardianDashboard.tsx`, the Today's Check-iNs list (lines 812-824) currently shows:
-- Left: slot time label (e.g. "7:00 AM")
-- Right: status badge ("Checked In" / "Missed" / "Pending")
+### Files to Modify
 
-**Change**: For check-ins with status `responded`/`ok`, append the actual `responded_at` timestamp formatted in IST next to the "Checked In" label — e.g. `"Checked In · 7:03 AM"`.
+**`src/pages/UserDashboard.tsx`**
+- Import `useTodayAppointments` and `useRefillDue`
+- Add a compact appointments card (icon + "You have N appointments today" + chevron) between Map My Journey and Health Passport — only renders when count > 0
+- Add a compact medication alert card (icon + "Medication refill due" + chevron) below appointments — only renders when `refillDue` is true
+- Delete the "How It Works" accordion (lines 267-292) and "AI Health Companion" card (lines 294-303)
 
-### Implementation
+**`src/pages/Help.tsx`**
+- Add a new "About" or "How It Works" section within the FAQ tab (or as a separate card above FAQs) containing:
+  - The 4-step "How Check-iN Works" content
+  - The "AI Health Companion" description
+- These render as static cards at the top of the FAQ tab content area
 
-Modify the check-in row rendering (~line 814-822) to include the `responded_at` value:
-
-```tsx
-<div key={ci.id} className="flex items-center justify-between ...">
-  <span className="text-sm">{formatCheckInTime(ci.scheduled_at)}</span>
-  <span className={`text-xs px-2 py-1 rounded-full ${...}`}>
-    {getStatusLabel(ci.status)}
-    {(ci.status === "ok" || ci.status === "responded") && ci.responded_at && (
-      <span className="ml-1 opacity-75">· {formatISTTime(ci.responded_at)}</span>
-    )}
-  </span>
-</div>
-```
-
-The `todayCheckIns` data already includes all columns from the `check_ins` table (fetched with `select("*")`), so `responded_at` is available — no query changes needed.
-
-### File to modify
-- `src/pages/GuardianDashboard.tsx` — add `responded_at` display in the check-in row
+### Technical Details
+- `useTodayAppointments()` already returns today's appointment count with 60s refresh
+- `useRefillDue()` already returns a boolean for low-stock medications with realtime subscription
+- Both new cards are conditional (hidden when nothing to show), keeping the dashboard clean
+- Cards use `onClick={() => navigate(...)}` for navigation, matching the Map My Journey pattern
 
