@@ -893,7 +893,97 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
         </TabsContent>
       </Tabs>
 
-      {/* Add Document Dialog */}
+      {/* View Record Dialog */}
+      <Dialog open={!!viewRecord} onOpenChange={(open) => { if (!open) { setViewRecord(null); setViewSignedUrl(""); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {viewRecord?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {viewRecord?.record_type}
+              {viewRecord?.record_date && ` · ${new Date(viewRecord.record_date).toLocaleDateString("en-IN")}`}
+            </DialogDescription>
+          </DialogHeader>
+          {viewRecord && (
+            <div className="space-y-4">
+              {/* Details */}
+              <div className="space-y-1">
+                {viewRecord.doctor_name && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Doctor</span>
+                    <span className="font-medium">{viewRecord.doctor_name}</span>
+                  </div>
+                )}
+                {viewRecord.hospital_name && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Hospital / Clinic</span>
+                    <span className="font-medium">{viewRecord.hospital_name}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
+              {viewRecord.description && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">📝 Notes</p>
+                  <p className="text-sm whitespace-pre-wrap break-words bg-muted/50 rounded-lg p-3">
+                    {viewRecord.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Attachment */}
+              {viewRecord.file_name && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">📎 Attachment</p>
+                  <p className="text-sm font-medium mb-2">{viewRecord.file_name}</p>
+                  {viewLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading file…
+                    </div>
+                  ) : viewSignedUrl ? (
+                    <div className="space-y-2">
+                      {/\.(jpe?g|png|webp|gif)$/i.test(viewRecord.file_name || "") && (
+                        <img src={viewSignedUrl} alt={viewRecord.file_name || "attachment"} className="w-full rounded-lg border" />
+                      )}
+                      {/\.pdf$/i.test(viewRecord.file_name || "") && (
+                        <iframe src={viewSignedUrl} className="w-full h-[400px] border-none rounded-lg" title="PDF preview" />
+                      )}
+                      <a
+                        href={viewSignedUrl}
+                        download={viewRecord.file_name || "document"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        <Download className="w-4 h-4" /> Download File
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">File not available</p>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => { if (viewRecord) handleShare(viewRecord); }}>
+                  <Share2 className="w-3.5 h-3.5 mr-1" /> Share
+                </Button>
+                {viewRecord.file_url && (
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => { if (viewRecord) handleDownload(viewRecord); }}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> Save As
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={addDocDialog} onOpenChange={setAddDocDialog}>
         <DialogContent>
           <DialogHeader>
