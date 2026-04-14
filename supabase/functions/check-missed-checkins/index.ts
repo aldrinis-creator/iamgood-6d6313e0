@@ -165,11 +165,38 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Filter out guardian-role users — they should not have check-ins tracked ──
+    const userIds = [...new Set(pendingCheckIns.map((ci) => ci.user_id))];
+    const { data: guardianRoles } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .in("user_id", userIds)
+      .eq("role", "guardian");
+
+    const guardianUserIds = new Set((guardianRoles || []).map((r) => r.user_id));
+
+    // Silently mark guardian check-ins as missed (no alerts)
+    const guardianCheckInIds = pendingCheckIns
+      .filter((ci) => guardianUserIds.has(ci.user_id))
+      .map((ci) => ci.id);
+    if (guardianCheckInIds.length > 0) {
+      await supabase.from("check_ins").update({ status: "missed" }).in("id", guardianCheckInIds);
+      console.log(`Silently dismissed ${guardianCheckInIds.length} guardian-role check-ins`);
+    }
+
+    const userCheckIns = pendingCheckIns.filter((ci) => !guardianUserIds.has(ci.user_id));
+    if (userCheckIns.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No user check-ins to process", processed: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Deduplicate: keep only ONE pending check-in per user+scheduled_hour
     const seen = new Set<string>();
-    const uniqueCheckIns: typeof pendingCheckIns = [];
+    const uniqueCheckIns: typeof userCheckIns = [];
     const duplicateIds: string[] = [];
-    for (const ci of pendingCheckIns) {
+    for (const ci of userCheckIns) {
       const scheduledDate = new Date(ci.scheduled_at);
       const key = `${ci.user_id}-${scheduledDate.getUTCFullYear()}-${scheduledDate.getUTCMonth()}-${scheduledDate.getUTCDate()}-${scheduledDate.getUTCHours()}`;
       if (seen.has(key)) {
@@ -186,7 +213,7 @@ Deno.serve(async (req) => {
       console.log(`Silently marked ${duplicateIds.length} duplicate check-ins as missed`);
     }
 
-    console.log(`Found ${pendingCheckIns.length} missed check-ins`);
+    console.log(`Found ${userCheckIns.length} user check-ins (${guardianCheckInIds.length} guardian-role skipped)`);
 
     let notificationsCreated = 0;
     let emailsSent = 0;
