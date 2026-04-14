@@ -280,15 +280,27 @@ const Register = () => {
           <Separator />
 
           <div className="space-y-4 text-left">
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-foreground text-sm">Verify your email</p>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
-                </p>
+            {email ? (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Verify your email</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
+                <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Phone verified — you're all set!</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Sign in with your phone number and OTP. You can add an email later from Settings.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {selectedRole === "user" && sentGuardianCount > 0 && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
