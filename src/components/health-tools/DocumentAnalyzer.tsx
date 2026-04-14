@@ -50,6 +50,7 @@ const DocumentAnalyzer = () => {
   const [mode, setMode] = useState<InputMode>("photo");
   const [customTitle, setCustomTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [docFileName, setDocFileName] = useState<string | null>(null);
