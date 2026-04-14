@@ -261,17 +261,55 @@ const DocumentAnalyzer = () => {
     if (!user) { toast.error("Please log in to save"); return; }
     setSaving(true);
     try {
-      const recordType = selectedCat === "Doctor's Diagnosis" ? "Doctor's Diagnosis" : "AI Analysis";
+      let fileUrl: string | null = null;
+      let fileName: string | null = docFileName || null;
+
+      // Upload original image/scan to storage
+      if (imageBase64 || imagePreview) {
+        const base64Data = imageBase64 || imagePreview;
+        const base64Str = base64Data!.split(",")[1];
+        const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+        const ext = base64Data!.includes("image/png") ? "png" : "jpg";
+        fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
+        const storagePath = `${user.id}/${Date.now()}-${fileName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("medical-documents")
+          .upload(storagePath, byteArray, { contentType: `image/${ext}` });
+        if (!uploadErr) fileUrl = storagePath;
+      }
+
+      // Build description: original content + separator + AI analysis
+      const originalSection = extractedDocText
+        ? extractedDocText.substring(0, 20000)
+        : (mode === "text" && textInput)
+          ? textInput.substring(0, 20000)
+          : null;
+
+      const fullDescription = [
+        ...(originalSection ? [
+          "═══ ORIGINAL DOCUMENT ═══",
+          originalSection,
+          "",
+          "═══ AI ANALYSIS ═══",
+        ] : []),
+        result,
+      ].join("\n").substring(0, 50000);
+
+      const displayTitle = customTitle.trim() || `${selectedCat || "Document"} Analysis — ${new Date().toLocaleDateString("en-IN")}`;
+
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
-        title: `${selectedCat || "Document"} Analysis — ${new Date().toLocaleDateString("en-IN")}`,
-        record_type: recordType,
-        description: result.substring(0, 50000),
+        title: displayTitle,
+        record_type: "Doctor's Diagnosis",
+        description: fullDescription,
+        file_name: fileName,
+        file_url: fileUrl,
         record_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
       setSaved(true);
-      toast.success("Your Report is saved in the Vault in Reports in the Document Analyzer tab");
+      toast.success("Saved to Medical Vault under Doctor's Diagnosis");
     } catch (err: any) {
       console.error("Vault save error:", err);
       toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
