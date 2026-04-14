@@ -1,5 +1,7 @@
-import { Moon, Sun, DoorOpen, Navigation } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
+import { useTodayAppointments } from "@/hooks/useTodayAppointments";
+import useRefillDue from "@/hooks/useRefillDue";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
@@ -59,6 +61,8 @@ const msUntilSleepEnd = (to: string): number => {
 
 const UserDashboard = () => {
   const { pauseMode, setPauseMode, userName } = useApp();
+  const todayAppointments = useTodayAppointments();
+  const refillDue = useRefillDue();
   const navigate = useNavigate();
   const { settings, updateSetting } = useUserSettings();
 
@@ -252,6 +256,38 @@ const UserDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Today's Appointments */}
+        {todayAppointments > 0 && (
+          <Card className="cursor-pointer hover:shadow-md transition-shadow border-primary/20" onClick={() => navigate("/appointments")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <CalendarDays className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm">Today's Appointments</h3>
+                <p className="text-xs text-muted-foreground">You have {todayAppointments} appointment{todayAppointments > 1 ? "s" : ""} today</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Medication Refill Due */}
+        {refillDue && (
+          <Card className="cursor-pointer hover:shadow-md transition-shadow border-warning/30 bg-warning/5" onClick={() => navigate("/my-health?tool=Medications")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                <Pill className="w-5 h-5 text-warning" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm">Medication Refill Due</h3>
+                <p className="text-xs text-muted-foreground">One or more medications are running low</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Health Passport — collapsible */}
         <Accordion type="single" collapsible>
           <AccordionItem value="health-passport">
@@ -263,44 +299,6 @@ const UserDashboard = () => {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-
-        {/* How It Works */}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="how-it-works">
-            <AccordionTrigger className="text-accessible font-semibold">
-              How Check-iN Works
-            </AccordionTrigger>
-            <AccordionContent className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex gap-3 items-start">
-                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                <p><strong>Set Your Schedule:</strong> Choose your daily Check-iN times (default: 7AM, 12PM, 7PM).</p>
-              </div>
-              <div className="flex gap-3 items-start">
-                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">2</span>
-                <p><strong>Tap the Heart:</strong> When prompted, tap the pulsing heart to confirm you're okay.</p>
-              </div>
-              <div className="flex gap-3 items-start">
-                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                <p><strong>Automatic Alerts:</strong> If you miss a Check-iN, your guardians are notified automatically.</p>
-              </div>
-              <div className="flex gap-3 items-start">
-                <span className="w-7 h-7 rounded-full bg-sos text-sos-foreground flex items-center justify-center text-xs font-bold shrink-0">!</span>
-                <p><strong>SOS Anytime:</strong> Press the SOS button for immediate emergency alert with live location sharing.</p>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
-        {/* AI Health Companion */}
-        <Card className="bg-gradient-to-r from-primary/10 to-success/10 border-0">
-          <CardContent className="p-4">
-            <h3 className="text-accessible font-semibold mb-2">🤖 AI Health Companion</h3>
-            <p className="text-sm text-muted-foreground">
-              Check-iN uses AI to learn your daily patterns and detect unusual inactivity.
-              Combined with phone-based fall detection, it provides a proactive safety net — even without wearable hardware.
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Dialogs */}
