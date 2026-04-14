@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       console.log(`Silently marked ${duplicateIds.length} duplicate check-ins as missed`);
     }
 
-    console.log(`Found ${pendingCheckIns.length} missed check-ins`);
+    console.log(`Found ${userCheckIns.length} user check-ins (${guardianCheckInIds.length} guardian-role skipped)`);
 
     let notificationsCreated = 0;
     let emailsSent = 0;
