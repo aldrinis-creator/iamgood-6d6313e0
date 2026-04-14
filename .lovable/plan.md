@@ -1,60 +1,41 @@
 
 
-## Guardian Ambulance Booking: Auto-use Ward Location + Attach Health Card
+## Suppress Notifications/Alerts During Login
 
-### What Changes
+### Problem
+During login, various notifications, alerts, and overlays fire prematurely — notification permission prompts, welcome email triggers, reminder overlays, battery warnings, etc. — before the user has fully landed on their dashboard.
 
-1. **Accept props in `AmbulanceBooking`** — new optional props: `wardUserId`, `wardName`, `wardLocation` (from `user_settings.lastLocation`), `wardPhone`.
+### Solution
+Add a `loginInProgress` flag to `AuthContext` that is `true` from the moment sign-in starts until the profile is fully loaded and the auth state change handler completes. All alert-producing systems check this flag and stay silent while it's active.
 
-2. **Auto-populate ward location** — When used from Guardian context (props provided), skip the "Detect My Location" button entirely. Instead show the ward's last known location as a read-only display with an "Edit" pencil button that reveals a manual address/coordinates input for the guardian to override.
+### Changes
 
-3. **Auto-fill patient details** — Pre-fill patient name (from `wardName`) and contact number (from ward's profile phone). Guardian can still edit.
+**1. `src/contexts/AuthContext.tsx`** — Add and expose `loginInProgress` state
+- Set `loginInProgress = true` at the start of `signIn()` and during `onAuthStateChange` when a new session appears
+- Set `loginInProgress = false` after profile fetch completes (inside the `setTimeout` callback, after `fetchProfile`)
+- Move the `Notification.requestPermission()` call inside the setTimeout, after profile is loaded
+- Export `loginInProgress` in the context value
 
-4. **Attach Emergency Health Card to WhatsApp/API** — When sending the ambulance request:
-   - Fetch the ward's profile, health_profile, medications, guardians, and medical_history from Supabase (same data as the Emergency Health Card).
-   - Build a comprehensive text block appended to the WhatsApp message: blood group, allergies, conditions, current medications, emergency contacts, family doctor.
-   - Include the ward's public emergency profile link (`/e/:token`) if available.
+**2. `src/contexts/AppContext.tsx`** — Pass through `loginInProgress` from AuthContext
+- Expose it in `AppState` so hooks/components can access it via `useApp()`
 
-5. **Pass ward data from `GuardianServices`** — Fetch ward's location from `user_settings` and phone from `profiles`, pass as props to `AmbulanceBooking`.
+**3. `src/components/AppLayout.tsx`** — Guard overlays with `loginInProgress`
+- Don't render `BatteryWarning`, `FallDetectionOverlay`, `GuardianPingOverlay`, `ReminderOverlay`, `CookieConsent`, `EmergencyModeOverlay`, or `UserOnlyHooks` while `loginInProgress` is `true`
 
-### Files to Modify
+**4. Alert hooks** — Early-return when login is in progress
+- `useCheckInAudio.ts` — check `loginInProgress` before firing
+- `useMedicationAlarms.ts` — check `loginInProgress` before firing  
+- `useExerciseReminder.ts` — check `loginInProgress` before firing
+- `useAppointmentAlarms.ts` — check `loginInProgress` before firing
+- `useAutoSleepMode.ts` — check `loginInProgress` before firing
 
-**`src/components/AmbulanceBooking.tsx`**
-- Add props interface: `wardUserId?: string`, `wardName?: string`, `wardLocation?: {lat, lng}`, `wardPhone?: string`
-- When `wardUserId` is provided (guardian mode):
-  - Pre-fill `patientName` with `wardName`, `contactNumber` with `wardPhone`
-  - Show ward location as read-only text with Edit button (toggles editable input)
-  - Remove "Detect My Location" button in guardian mode
-  - In `sendWhatsApp()`: fetch ward's health data (profile, health_profile, medications, guardians, medical_history, emergency_share_tokens) and append an "Emergency Health Card" section to the WhatsApp message text
-- When no props (user mode): keep existing behavior unchanged
-
-**`src/pages/GuardianServices.tsx`**
-- Fetch ward's `user_settings` (for `lastLocation`) and `profiles` (for `phone`) 
-- Pass `wardUserId`, `wardName`, `wardLocation`, `wardPhone` to `<AmbulanceBooking />`
-
-### WhatsApp Message Format (Guardian Mode)
-
-```text
-🚑 AMBULANCE REQUEST
-
-Patient: Ramesh Kumar
-Contact: +91 98765 43210
-Emergency: Chest pain
-Location: https://maps.google.com/?q=19.0760,72.8777
-
-═══ EMERGENCY HEALTH CARD ═══
-Blood Group: B+
-Allergies: Penicillin, Sulfa
-Conditions: Hypertension, Diabetes Type 2
-Medications: Metformin 500mg, Amlodipine 5mg
-Family Doctor: Dr. Sharma (+91 98765 00000)
-Emergency Contacts:
-  - Priya Kumar (Daughter) +91 98765 11111 [Primary]
-Emergency Profile: https://iamgood.lovable.app/e/abc123
-```
-
-### Technical Notes
-- Location edit uses a simple text input for address override; the Edit button toggles between read-only display and editable mode
-- Health data fetch is done at send time (not on mount) to keep it fresh
-- If no emergency share token exists, the profile link line is omitted
+### Files to modify
+- `src/contexts/AuthContext.tsx`
+- `src/contexts/AppContext.tsx`
+- `src/components/AppLayout.tsx`
+- `src/hooks/useCheckInAudio.ts`
+- `src/hooks/useMedicationAlarms.ts`
+- `src/hooks/useExerciseReminder.ts`
+- `src/hooks/useAppointmentAlarms.ts`
+- `src/hooks/useAutoSleepMode.ts`
 
