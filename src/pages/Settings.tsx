@@ -347,7 +347,7 @@ const Settings = () => {
         return;
       }
     }
-    const { error } = await supabase.from("guardians").insert({
+    const { data: insertData, error } = await supabase.from("guardians").insert({
       user_id: session.user.id,
       guardian_name: newName,
       guardian_phone: newPhone,
