@@ -50,6 +50,7 @@ const DocumentAnalyzer = () => {
   const [mode, setMode] = useState<InputMode>("photo");
   const [customTitle, setCustomTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [docFileName, setDocFileName] = useState<string | null>(null);
@@ -98,6 +99,7 @@ const DocumentAnalyzer = () => {
     if (isDocument(selected)) {
       setExtracting(true);
       setDocFileName(selected.name);
+      setOriginalFile(selected);
       setImagePreview(null);
       setImageBase64(null);
       try {
@@ -141,6 +143,7 @@ const DocumentAnalyzer = () => {
 
     setDocFileName(null);
     setExtractedDocText(null);
+    setOriginalFile(selected);
     setImagePreview(URL.createObjectURL(selected));
     const reader = new FileReader();
     reader.onload = () => setImageBase64(reader.result as string);
@@ -152,6 +155,7 @@ const DocumentAnalyzer = () => {
     setImageBase64(null);
     setDocFileName(null);
     setExtractedDocText(null);
+    setOriginalFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -264,18 +268,28 @@ const DocumentAnalyzer = () => {
       let fileUrl: string | null = null;
       let fileName: string | null = docFileName || null;
 
-      // Upload original image/scan to storage
-      if (imageBase64 || imagePreview) {
-        const base64Data = imageBase64 || imagePreview;
-        const base64Str = base64Data!.split(",")[1];
-        const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
-        const ext = base64Data!.includes("image/png") ? "png" : "jpg";
-        fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
+      // Upload original file to storage
+      if (originalFile) {
+        fileName = fileName || originalFile.name;
         const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-
         const { error: uploadErr } = await supabase.storage
           .from("medical-documents")
-          .upload(storagePath, byteArray, { contentType: `image/${ext}` });
+          .upload(storagePath, originalFile, { contentType: originalFile.type });
+        if (!uploadErr) fileUrl = storagePath;
+      } else if (imageBase64 || imagePreview) {
+        // Camera capture fallback — convert base64 to Blob
+        const base64Data = (imageBase64 || imagePreview)!;
+        const mimeMatch = base64Data.match(/^data:(.*?);/);
+        const mime = mimeMatch?.[1] || "image/jpeg";
+        const base64Str = base64Data.split(",")[1];
+        const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+        const blob = new Blob([byteArray], { type: mime });
+        const ext = mime.includes("png") ? "png" : "jpg";
+        fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
+        const storagePath = `${user.id}/${Date.now()}-${fileName}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("medical-documents")
+          .upload(storagePath, blob, { contentType: mime });
         if (!uploadErr) fileUrl = storagePath;
       }
 
