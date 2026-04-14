@@ -1,82 +1,71 @@
-## Fix: Save Original Document + AI Analysis to Medical Vault
 
-### Problem
 
-When saving from Document Analyzer, only the AI analysis text is stored in `description`. The original scanned document (image/PDF/text) is not saved alongside it. The record type should always be "Doctor's Diagnosis".
+## Fix: Original Documents from Document Analyzer Cannot Be Opened in Medical Vault
 
-### Solution
+### Root Cause
 
-**File: `src/components/health-tools/DocumentAnalyzer.tsx**` — Update `saveToVault()`:
+The `saveToVault()` function in `DocumentAnalyzer.tsx` has two bugs:
 
-1. **Upload original document to storage**: If the user uploaded an image or scanned PDF (we have `imageBase64`), upload it to the `medical-documents` bucket and store the path in `file_url` and `file_name`.
-2. **Combine original + analysis in `description**`: Prepend the original document content (extracted text from PDF/DOCX, or typed text) before the AI analysis, with a clear separator, so both are preserved in the saved record.
-3. **Always use record_type "Doctor's Diagnosis"**: Currently it conditionally uses "AI Analysis" for non-diagnosis categories — change to always save as "Doctor's Diagnosis" per the requirement.
-4. **Set `file_name**`: Use the original filename (from `docFileName`) or a generated name for camera captures. 
-5. Allow User to give a file name of upto 30 characters. 
+1. **PDFs/DOCXs with extractable text are never uploaded**: When a PDF has text content, `imageBase64` and `imagePreview` are both `null` (only `extractedDocText` is set). The upload block checks `if (imageBase64 || imagePreview)` and skips entirely, so `file_url` is saved as `null`. The attachment appears in the vault (because `file_name` is set) but clicking Download does nothing — there is no file in storage.
 
-### Detailed changes in `saveToVault()`:
+2. **Image uploads use raw `Uint8Array` without `Blob` wrapping**: The content type is guessed from the base64 string (`image/png` vs `image/jpg`) rather than from the actual file. This can cause mismatched content types, making downloaded files unreadable.
+
+### Fix — File: `src/components/health-tools/DocumentAnalyzer.tsx`
+
+Rewrite the upload section of `saveToVault()` to:
+
+1. **Keep a reference to the original `File` object** — add a new state `originalFile` that stores the raw `File` from the file input, preserved through extraction.
+
+2. **Upload the original file when available** — use the actual `File` object (PDF, DOCX, or image) directly with `supabase.storage.upload()`, which correctly handles content type. This ensures the real document (not a rendered image) is stored.
+
+3. **Fall back to base64 upload for camera captures** — when the user captures via camera (no `File` object), convert base64 to a proper `Blob` with the correct MIME type before uploading.
+
+### Detailed changes
 
 ```typescript
-const saveToVault = async () => {
-  if (!user) { toast.error("Please log in to save"); return; }
-  setSaving(true);
-  try {
-    let fileUrl: string | null = null;
-    let fileName: string | null = docFileName || null;
+// Add state to preserve original file
+const [originalFile, setOriginalFile] = useState<File | null>(null);
 
-    // Upload original image/scan to storage
-    if (imageBase64 || imagePreview) {
-      const base64Data = imageBase64 || imagePreview;
-      const base64Str = base64Data!.split(",")[1];
-      const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
-      const ext = base64Data!.includes("image/png") ? "png" : "jpg";
-      fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
-      const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-      
-      const { error: uploadErr } = await supabase.storage
-        .from("medical-documents")
-        .upload(storagePath, byteArray, { contentType: `image/${ext}` });
-      if (!uploadErr) fileUrl = storagePath;
-    }
+// In handleFileSelect — store the original file for all types
+// For documents (PDF/DOCX):
+setOriginalFile(selected);  // add this line
 
-    // Build description: original content + separator + AI analysis
-    const originalSection = extractedDocText 
-      ? extractedDocText.substring(0, 20000)
-      : (mode === "text" && textInput) 
-        ? textInput.substring(0, 20000) 
-        : null;
+// For images:
+setOriginalFile(selected);  // add this line
 
-    const fullDescription = [
-      ...(originalSection ? [
-        "═══ ORIGINAL DOCUMENT ═══",
-        originalSection,
-        "",
-        "═══ AI ANALYSIS ═══",
-      ] : []),
-      result,
-    ].join("\n").substring(0, 50000);
+// In clearFile:
+setOriginalFile(null);
 
-    const { error } = await supabase.from("medical_records").insert({
-      user_id: user.id,
-      title: `${selectedCat || "Document"} Analysis — ${new Date().toLocaleDateString("en-IN")}`,
-      record_type: "Doctor's Diagnosis",
-      description: fullDescription,
-      file_name: fileName,
-      file_url: fileUrl,
-      record_date: new Date().toISOString().split("T")[0],
-    });
-    if (error) throw error;
-    setSaved(true);
-    toast.success("Saved to Medical Vault under Doctor's Diagnosis");
-  } catch (err: any) {
-    console.error("Vault save error:", err);
-    toast.error(`Failed to save: ${err?.message || "Unknown error"}`);
-  } finally {
-    setSaving(false);
-  }
-};
+// In saveToVault — rewrite upload block:
+if (originalFile) {
+  // Upload the actual original file (PDF, DOCX, or image)
+  const ext = originalFile.name.split(".").pop() || "bin";
+  fileName = fileName || originalFile.name;
+  const storagePath = `${user.id}/${Date.now()}-${fileName}`;
+  const { error: uploadErr } = await supabase.storage
+    .from("medical-documents")
+    .upload(storagePath, originalFile, { contentType: originalFile.type });
+  if (!uploadErr) fileUrl = storagePath;
+} else if (imageBase64 || imagePreview) {
+  // Camera capture fallback — convert base64 to Blob
+  const base64Data = (imageBase64 || imagePreview)!;
+  const mimeMatch = base64Data.match(/^data:(.*?);/);
+  const mime = mimeMatch?.[1] || "image/jpeg";
+  const base64Str = base64Data.split(",")[1];
+  const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+  const blob = new Blob([byteArray], { type: mime });
+  const ext = mime.includes("png") ? "png" : "jpg";
+  fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
+  const storagePath = `${user.id}/${Date.now()}-${fileName}`;
+  const { error: uploadErr } = await supabase.storage
+    .from("medical-documents")
+    .upload(storagePath, blob, { contentType: mime });
+  if (!uploadErr) fileUrl = storagePath;
+}
 ```
 
-### Files to modify
+Also reset `originalFile` in the Back button's `onClick` handler alongside the other state resets.
 
-- `**src/components/health-tools/DocumentAnalyzer.tsx**` — rewrite `saveToVault` to upload original file to storage and combine original + analysis in description, always using "Doctor's Diagnosis" record type.
+### Files to modify
+- `src/components/health-tools/DocumentAnalyzer.tsx` — add `originalFile` state, store it on file select, use it in `saveToVault()`
+
