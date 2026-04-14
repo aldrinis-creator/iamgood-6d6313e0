@@ -333,7 +333,13 @@ const Settings = () => {
       toast.error(`Your plan allows ${limit} guardian(s). Upgrade for more.`);
       return;
     }
-    // Check if this guardian already monitors 3 users
+    // Check if this guardian already monitors 3 users (by phone and email)
+    const cleanGPhone = newPhone.replace(/[\s\-\+]/g, "");
+    const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
+    if (typeof phoneCount === "number" && phoneCount >= 3) {
+      toast.error(`${newName} already monitors 3 users (maximum). They cannot be added as your guardian.`);
+      return;
+    }
     if (newEmail) {
       const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: newEmail });
       if (typeof countResult === "number" && countResult >= 3) {

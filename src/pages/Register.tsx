@@ -242,13 +242,23 @@ const Register = () => {
       }
     }
 
-    // Check 3-ward limit for each nominated guardian with an email
+    // Check 3-ward limit for each nominated guardian (by email AND phone)
     if (selectedRole === "user") {
-      for (const g of guardians.filter(g => g.email)) {
-        const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
-        if (typeof countResult === "number" && countResult >= 3) {
-          toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
+      for (const g of guardians.filter(g => g.phone)) {
+        const cleanGPhone = g.phone.replace(/[\s\-\+]/g, "");
+        // Check by phone
+        const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
+        if (typeof phoneCount === "number" && phoneCount >= 3) {
+          toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users (maximum). Please choose a different guardian.` });
           return;
+        }
+        // Also check by email if provided
+        if (g.email) {
+          const { data: emailCount } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
+          if (typeof emailCount === "number" && emailCount >= 3) {
+            toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
+            return;
+          }
         }
       }
     }
