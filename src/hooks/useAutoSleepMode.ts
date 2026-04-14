@@ -30,12 +30,13 @@ const isInSleepWindow = (from: string, to: string): boolean => {
  * the next transition (leaving then re-entering the sleep window).
  */
 const useAutoSleepMode = () => {
-  const { pauseMode, setPauseMode } = useApp();
+  const { pauseMode, setPauseMode, loginInProgress } = useApp();
   const { settings } = useUserSettings();
   const manualOverrideRef = useRef(false);
   const prevInWindowRef = useRef<boolean | null>(null);
 
   const tick = useCallback(() => {
+    if (loginInProgress) return;
     if (!settings.sleepMode) return; // user disabled auto-sleep entirely
     if (pauseMode === "checked-out") return; // don't interfere with check-out
 

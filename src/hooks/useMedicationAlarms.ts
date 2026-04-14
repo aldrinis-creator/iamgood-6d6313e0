@@ -36,13 +36,14 @@ interface MedInfo {
 const useMedicationAlarms = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
-  const { pauseMode } = useApp();
+  const { pauseMode, loginInProgress } = useApp();
   const firedRef = useRef<Set<string>>(new Set());
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
 
   const check = useCallback(async () => {
     if (pauseMode !== "active") return;
+    if (loginInProgress) return;
     if (!session?.user?.id) return;
 
     const now = new Date();
