@@ -38,7 +38,7 @@ const NotificationCenter = () => {
       .channel("notification-center")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${session?.user?.id}` },
         () => fetchNotifications()
       )
       .subscribe();

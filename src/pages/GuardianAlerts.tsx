@@ -68,7 +68,7 @@ const GuardianAlerts = () => {
   useEffect(() => {
     const channel = supabase
       .channel("guardian-alerts-page")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${session?.user?.id}` }, (payload: any) => {
         fetchAll();
         const newNotif = payload?.new;
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {

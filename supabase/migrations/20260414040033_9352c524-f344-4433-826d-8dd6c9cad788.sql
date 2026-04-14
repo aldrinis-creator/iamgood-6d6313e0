@@ -1,0 +1,1 @@
+DROP POLICY "Users can read active coupons" ON public.coupons;

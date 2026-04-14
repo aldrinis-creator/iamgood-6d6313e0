@@ -384,7 +384,7 @@ const GuardianDashboard = () => {
 
     const notifChannel = supabase
       .channel("guardian-notifications")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: wardUserId ? `user_id=eq.${wardUserId}` : undefined }, (payload: any) => {
         fetchNotifications();
         const newNotif = payload?.new;
         if (!newNotif?.id) return;
