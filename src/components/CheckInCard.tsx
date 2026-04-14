@@ -296,6 +296,15 @@ const CheckInCard = () => {
     <>
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
+        <p className="text-center text-sm font-medium text-muted-foreground mb-2">
+          {new Date().toLocaleDateString("en-IN", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            timeZone: "Asia/Kolkata",
+          })}
+        </p>
         {isPaused ? (
           <div className="text-center space-y-3">
             <div
