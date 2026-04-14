@@ -1,71 +1,60 @@
 
 
-## Fix: Original Documents from Document Analyzer Cannot Be Opened in Medical Vault
+## Guardian Ambulance Booking: Auto-use Ward Location + Attach Health Card
 
-### Root Cause
+### What Changes
 
-The `saveToVault()` function in `DocumentAnalyzer.tsx` has two bugs:
+1. **Accept props in `AmbulanceBooking`** — new optional props: `wardUserId`, `wardName`, `wardLocation` (from `user_settings.lastLocation`), `wardPhone`.
 
-1. **PDFs/DOCXs with extractable text are never uploaded**: When a PDF has text content, `imageBase64` and `imagePreview` are both `null` (only `extractedDocText` is set). The upload block checks `if (imageBase64 || imagePreview)` and skips entirely, so `file_url` is saved as `null`. The attachment appears in the vault (because `file_name` is set) but clicking Download does nothing — there is no file in storage.
+2. **Auto-populate ward location** — When used from Guardian context (props provided), skip the "Detect My Location" button entirely. Instead show the ward's last known location as a read-only display with an "Edit" pencil button that reveals a manual address/coordinates input for the guardian to override.
 
-2. **Image uploads use raw `Uint8Array` without `Blob` wrapping**: The content type is guessed from the base64 string (`image/png` vs `image/jpg`) rather than from the actual file. This can cause mismatched content types, making downloaded files unreadable.
+3. **Auto-fill patient details** — Pre-fill patient name (from `wardName`) and contact number (from ward's profile phone). Guardian can still edit.
 
-### Fix — File: `src/components/health-tools/DocumentAnalyzer.tsx`
+4. **Attach Emergency Health Card to WhatsApp/API** — When sending the ambulance request:
+   - Fetch the ward's profile, health_profile, medications, guardians, and medical_history from Supabase (same data as the Emergency Health Card).
+   - Build a comprehensive text block appended to the WhatsApp message: blood group, allergies, conditions, current medications, emergency contacts, family doctor.
+   - Include the ward's public emergency profile link (`/e/:token`) if available.
 
-Rewrite the upload section of `saveToVault()` to:
+5. **Pass ward data from `GuardianServices`** — Fetch ward's location from `user_settings` and phone from `profiles`, pass as props to `AmbulanceBooking`.
 
-1. **Keep a reference to the original `File` object** — add a new state `originalFile` that stores the raw `File` from the file input, preserved through extraction.
+### Files to Modify
 
-2. **Upload the original file when available** — use the actual `File` object (PDF, DOCX, or image) directly with `supabase.storage.upload()`, which correctly handles content type. This ensures the real document (not a rendered image) is stored.
+**`src/components/AmbulanceBooking.tsx`**
+- Add props interface: `wardUserId?: string`, `wardName?: string`, `wardLocation?: {lat, lng}`, `wardPhone?: string`
+- When `wardUserId` is provided (guardian mode):
+  - Pre-fill `patientName` with `wardName`, `contactNumber` with `wardPhone`
+  - Show ward location as read-only text with Edit button (toggles editable input)
+  - Remove "Detect My Location" button in guardian mode
+  - In `sendWhatsApp()`: fetch ward's health data (profile, health_profile, medications, guardians, medical_history, emergency_share_tokens) and append an "Emergency Health Card" section to the WhatsApp message text
+- When no props (user mode): keep existing behavior unchanged
 
-3. **Fall back to base64 upload for camera captures** — when the user captures via camera (no `File` object), convert base64 to a proper `Blob` with the correct MIME type before uploading.
+**`src/pages/GuardianServices.tsx`**
+- Fetch ward's `user_settings` (for `lastLocation`) and `profiles` (for `phone`) 
+- Pass `wardUserId`, `wardName`, `wardLocation`, `wardPhone` to `<AmbulanceBooking />`
 
-### Detailed changes
+### WhatsApp Message Format (Guardian Mode)
 
-```typescript
-// Add state to preserve original file
-const [originalFile, setOriginalFile] = useState<File | null>(null);
+```text
+🚑 AMBULANCE REQUEST
 
-// In handleFileSelect — store the original file for all types
-// For documents (PDF/DOCX):
-setOriginalFile(selected);  // add this line
+Patient: Ramesh Kumar
+Contact: +91 98765 43210
+Emergency: Chest pain
+Location: https://maps.google.com/?q=19.0760,72.8777
 
-// For images:
-setOriginalFile(selected);  // add this line
-
-// In clearFile:
-setOriginalFile(null);
-
-// In saveToVault — rewrite upload block:
-if (originalFile) {
-  // Upload the actual original file (PDF, DOCX, or image)
-  const ext = originalFile.name.split(".").pop() || "bin";
-  fileName = fileName || originalFile.name;
-  const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-  const { error: uploadErr } = await supabase.storage
-    .from("medical-documents")
-    .upload(storagePath, originalFile, { contentType: originalFile.type });
-  if (!uploadErr) fileUrl = storagePath;
-} else if (imageBase64 || imagePreview) {
-  // Camera capture fallback — convert base64 to Blob
-  const base64Data = (imageBase64 || imagePreview)!;
-  const mimeMatch = base64Data.match(/^data:(.*?);/);
-  const mime = mimeMatch?.[1] || "image/jpeg";
-  const base64Str = base64Data.split(",")[1];
-  const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
-  const blob = new Blob([byteArray], { type: mime });
-  const ext = mime.includes("png") ? "png" : "jpg";
-  fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
-  const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-  const { error: uploadErr } = await supabase.storage
-    .from("medical-documents")
-    .upload(storagePath, blob, { contentType: mime });
-  if (!uploadErr) fileUrl = storagePath;
-}
+═══ EMERGENCY HEALTH CARD ═══
+Blood Group: B+
+Allergies: Penicillin, Sulfa
+Conditions: Hypertension, Diabetes Type 2
+Medications: Metformin 500mg, Amlodipine 5mg
+Family Doctor: Dr. Sharma (+91 98765 00000)
+Emergency Contacts:
+  - Priya Kumar (Daughter) +91 98765 11111 [Primary]
+Emergency Profile: https://iamgood.lovable.app/e/abc123
 ```
 
-Also reset `originalFile` in the Back button's `onClick` handler alongside the other state resets.
-
-### Files to modify
-- `src/components/health-tools/DocumentAnalyzer.tsx` — add `originalFile` state, store it on file select, use it in `saveToVault()`
+### Technical Notes
+- Location edit uses a simple text input for address override; the Edit button toggles between read-only display and editable mode
+- Health data fetch is done at send time (not on mount) to keep it fresh
+- If no emergency share token exists, the profile link line is omitted
 
