@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type, Save, Check } from "lucide-react";
+import { Search, FileImage, FlaskConical, FileText, Stethoscope, Loader2, Upload, Camera, X, Type, Save, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -283,6 +285,42 @@ const DocumentAnalyzer = () => {
     return (
       <div className="space-y-4">
         <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearFile(); setSaved(false); }}>← Back</Button>
+
+        {/* Original Document Reference */}
+        {(imagePreview || imageBase64 || extractedDocText || (mode === "text" && textInput)) && (
+          <Collapsible defaultOpen className="border border-border rounded-xl overflow-hidden">
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
+              <span className="flex items-center gap-2 font-semibold text-sm">
+                <FileText className="w-4 h-4 text-primary" />
+                Original Document
+                {docFileName && <span className="text-xs font-normal text-muted-foreground">— {docFileName}</span>}
+              </span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ScrollArea className="max-h-[300px]">
+                <div className="p-4">
+                  {(imagePreview || (imageBase64 && !extractedDocText)) ? (
+                    <img
+                      src={imagePreview || imageBase64 || ""}
+                      alt="Original document"
+                      className="w-full rounded-lg border border-border object-contain bg-muted"
+                    />
+                  ) : extractedDocText ? (
+                    <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
+                      {extractedDocText}
+                    </pre>
+                  ) : textInput ? (
+                    <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
+                      {textInput}
+                    </pre>
+                  ) : null}
+                </div>
+              </ScrollArea>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
         <Card className="overflow-hidden">
           <div className={`h-1 ${activeCat ? `bg-gradient-to-r ${activeCat.label === "Medical Images" ? "from-blue-500 to-blue-300" : activeCat.label === "Lab Reports" ? "from-emerald-500 to-emerald-300" : activeCat.label === "Doctor's Diagnosis" ? "from-amber-500 to-amber-300" : "from-teal-500 to-teal-300"}`  : "bg-primary"}`} />
           <CardContent className="p-4 space-y-4">
