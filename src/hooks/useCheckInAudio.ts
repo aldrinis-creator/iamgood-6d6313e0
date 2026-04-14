@@ -5,6 +5,7 @@ import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatISTDateTime } from "@/lib/istTime";
 
 // Guardian notifications are handled exclusively by the server-side
 // check-missed-checkins cron. The client only handles user-facing alerts.
@@ -82,11 +83,12 @@ const useCheckInAudio = () => {
         const responded = await isCheckInResponded(h, now);
         if (!responded) {
           firedRef.current.add(dueKey);
-          fireAlert("We hope you are well, Please Check-iN");
+          const ts = formatISTDateTime(now);
+          fireAlert(`[${ts}] We hope you are well, Please Check-iN`);
           showReminderOverlay({
             type: "checkin",
             title: "Check-In Reminder",
-            message: "You haven't checked in yet. Please tap below to let us know you're okay.",
+            message: `[${ts}] You haven't checked in yet. Please tap below to let us know you're okay.`,
             reminderCount: `Reminder — ${formatHour(h)}`,
           });
         }
@@ -100,7 +102,12 @@ const useCheckInAudio = () => {
       const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
       const missedKey = `missed-${dateKey}-${h}`;
 
-      if (diffMin >= 60 && diffMin < 1440 && !missedSentRef.current.has(missedKey)) {
+      // Cap at end of today (23:59) — no spillover from previous days
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
+      const maxDiffMin = (todayEnd.getTime() - scheduledAt.getTime()) / 60_000;
+
+      if (diffMin >= 60 && diffMin < Math.min(maxDiffMin, 1440) && !missedSentRef.current.has(missedKey)) {
         const responded = await isCheckInResponded(h, now);
         if (responded) {
           missedSentRef.current.add(missedKey);
@@ -116,11 +123,12 @@ const useCheckInAudio = () => {
           state.lastFiredAt = now.getTime();
           postGraceRef.current.set(missedKey, state);
 
-          fireAlert(`Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS}: You missed your ${formatHour(h)} Check-iN. Please check in now.`);
+          const ts = formatISTDateTime(now);
+          fireAlert(`[${ts}] Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS}: You missed your ${formatHour(h)} Check-iN. Please check in now.`);
           showReminderOverlay({
             type: "checkin",
             title: "Missed Check-In",
-            message: `You missed your ${formatHour(h)} Check-iN. Please check in now.`,
+            message: `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`,
             reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${formatHour(h)}`,
           });
         } else if (state.count >= POST_GRACE_MAX_REMINDERS && minSinceLast >= POST_GRACE_INTERVAL_MIN) {
@@ -128,14 +136,15 @@ const useCheckInAudio = () => {
           missedSentRef.current.add(missedKey);
 
           // Escalated alert to user
-          playVoiceReminder(`You have not checked in after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians are being notified.`);
+          const tsf = formatISTDateTime(now);
+          playVoiceReminder(`[${tsf}] You have not checked in after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians are being notified.`);
           playChime();
           if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
           showReminderOverlay({
             type: "checkin",
             title: "Check-In Missed",
-            message: `You missed your ${formatHour(h)} Check-iN after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians have been notified.`,
+            message: `[${tsf}] You missed your ${formatHour(h)} Check-iN after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians have been notified.`,
             reminderCount: `Final — ${formatHour(h)}`,
           });
 

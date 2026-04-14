@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const now = new Date();
     const { user_id, medication_name, status, scheduled_time } = await req.json();
 
     if (!user_id || !medication_name || !status) {
@@ -44,9 +45,22 @@ Deno.serve(async (req) => {
       ? new Date(scheduled_time).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
       : "";
 
+    // Current IST timestamp
+    const istMs = now.getTime() + (5.5 * 60 * 60 * 1000);
+    const istNow = new Date(istMs);
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const istDay = istNow.getUTCDate();
+    const istMonth = months[istNow.getUTCMonth()];
+    const istYear = istNow.getUTCFullYear();
+    const istH = istNow.getUTCHours();
+    const istM = istNow.getUTCMinutes();
+    const istPeriod = istH >= 12 ? "PM" : "AM";
+    const istDisplayH = istH % 12 || 12;
+    const istTimestamp = `${istDay} ${istMonth} ${istYear}, ${istDisplayH}:${String(istM).padStart(2,"0")} ${istPeriod}`;
+
     const statusLabel = status === "taken" ? "✅ taken" : status === "taken_late" ? "⏰ taken late" : status === "skipped" ? "⏭️ skipped" : "❌ not taken";
     const title = `Medication ${status === "taken" ? "Taken" : status === "taken_late" ? "Taken Late" : "Missed"}`;
-    const message = `${userName} has ${statusLabel} their ${medication_name}${timeLabel ? ` (${timeLabel})` : ""}.`;
+    const message = `[${istTimestamp}] ${userName} has ${statusLabel} their ${medication_name}${timeLabel ? ` (${timeLabel})` : ""}.`;
     const notificationType = status === "taken" ? "medication_taken" : status === "taken_late" ? "medication_taken_late" : "medication_missed";
     const isMissed = status !== "taken" && status !== "taken_late";
 

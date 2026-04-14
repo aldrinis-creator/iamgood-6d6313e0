@@ -5,6 +5,7 @@ import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/aud
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { formatISTDateTime } from "@/lib/istTime";
 
 const ALERT_LEAD: Record<string, number> = {
   "5min": 5,
@@ -58,7 +59,8 @@ const useAppointmentAlarms = () => {
         if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(firedKey)) {
           firedRef.current.add(firedKey);
 
-          const message = `${appt.title} starts in ${leadMin} minutes`;
+          const ts = formatISTDateTime(now);
+          const message = `[${ts}] ${appt.title} starts in ${leadMin} minutes`;
 
           if (settings.voiceReminders) {
             playVoiceReminder(message);
