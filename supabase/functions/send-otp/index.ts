@@ -134,8 +134,8 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
       }
 
-      // Mark as verified
-      await admin.from("otp_events").update({ verified: true, status: "verified" }).eq("id", otpRow.id);
+      // Mark as verified and nullify the OTP code
+      await admin.from("otp_events").update({ verified: true, status: "verified", otp_code: null }).eq("id", otpRow.id);
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
 
       // Registration: just confirm

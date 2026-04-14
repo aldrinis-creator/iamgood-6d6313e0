@@ -19,6 +19,14 @@ Deno.serve(async (req) => {
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
+    // First, nullify any remaining plaintext OTP codes on unverified rows
+    await admin
+      .from("otp_events")
+      .update({ otp_code: null })
+      .not("otp_code", "is", null)
+      .lt("created_at", cutoff);
+
+    // Then delete old records
     const { data, error } = await admin
       .from("otp_events")
       .delete()

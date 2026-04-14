@@ -33,7 +33,7 @@ const NavTabs = () => {
       .channel("guardian-nav-notifications")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${session!.user!.id}` },
         () => fetchUnread()
       )
       .subscribe();
@@ -59,7 +59,7 @@ const NavTabs = () => {
 
     const pingChannel = supabase
       .channel("user-nav-pings")
-      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings" }, () => fetchUnreadPings())
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings", filter: `user_id=eq.${session!.user!.id}` }, () => fetchUnreadPings())
       .subscribe();
 
     return () => { supabase.removeChannel(pingChannel); };
@@ -92,7 +92,7 @@ const NavTabs = () => {
 
     const replyChannel = supabase
       .channel("guardian-nav-replies")
-      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings" }, () => fetchUnreadReplies())
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings", filter: `guardian_user_id=eq.${session!.user!.id}` }, () => fetchUnreadReplies())
       .subscribe();
 
     return () => { supabase.removeChannel(replyChannel); };

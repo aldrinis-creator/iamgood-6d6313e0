@@ -23,7 +23,7 @@ const useRefillDue = (): boolean => {
 
     const channel = supabase
       .channel("refill-due-watch")
-      .on("postgres_changes", { event: "*", schema: "public", table: "medications" }, () => check())
+      .on("postgres_changes", { event: "*", schema: "public", table: "medications", filter: `user_id=eq.${session.user.id}` }, () => check())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

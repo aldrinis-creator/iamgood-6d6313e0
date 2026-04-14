@@ -302,7 +302,7 @@ const Settings = () => {
     const fetchGuardians = async () => {
       const { data } = await supabase
         .from("guardians")
-        .select("*")
+        .select("id, guardian_name, guardian_phone, guardian_email, relation, is_primary, status, nominated_at, is_vault_nominee, nomination_expires_at")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: true });
       if (data) setGuardians(data as unknown as Guardian[]);

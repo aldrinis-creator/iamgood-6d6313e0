@@ -214,7 +214,7 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
     const channel = supabase
       .channel(`guardian-journey-live-${wardUserId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "journeys", filter: `user_id=eq.${wardUserId}` }, () => fetchJourney())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journey_updates" }, (payload) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "journey_updates", filter: `user_id=eq.${wardUserId}` }, (payload) => {
         const u = payload.new as Update;
         setUpdates((prev) => [...prev, u]);
       })
