@@ -312,6 +312,40 @@ const Register = () => {
     setRegistrationComplete(true);
   };
 
+  // --- Nomination blocked screen (guardian without nomination) ---
+  if (nominationBlocked) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 mx-auto flex items-center justify-center">
+            <AlertCircle className="w-10 h-10 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">No Nomination Found</h1>
+            <p className="text-muted-foreground">
+              You haven't been nominated as a guardian yet.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border text-left space-y-2">
+            <p className="text-sm text-foreground font-medium">How to become a guardian:</p>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Ask the person you want to protect to open Check-iN</li>
+              <li>They go to <strong>Settings → Guardians</strong></li>
+              <li>They add your phone number as a guardian</li>
+              <li>You'll receive an invite link — use it to register</li>
+            </ol>
+          </div>
+          <Button className="w-full text-lg min-h-[52px]" size="lg" onClick={() => navigate("/login")}>
+            Go to Sign In
+          </Button>
+          <button type="button" className="text-sm text-primary underline" onClick={() => { setNominationBlocked(false); setStep(1); setSelectedRole(null); }}>
+            Register as a User instead
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- Registration success screen ---
   if (registrationComplete) {
     return (
