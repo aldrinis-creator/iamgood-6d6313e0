@@ -361,7 +361,7 @@ const Settings = () => {
     if (error) {
       toast.error("Failed to add guardian");
     } else {
-      const token = (data as any)?.nomination_token;
+      const token = (insertData as any)?.nomination_token;
       toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
