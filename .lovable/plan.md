@@ -1,24 +1,42 @@
 
 
-## Auth Email Templates — Already Set Up
+## Make Registration Phone-First (Email Optional)
 
-Your auth email templates are already configured and branded with the Check-iN identity:
+### Rationale
+Check-iN targets elderly Indian users where phone is the primary digital identity. Following the pattern of Aarogya Setu, CoWIN, and major Indian apps — phone number becomes the primary identifier, email becomes optional.
 
-- **6 templates exist**: Signup confirmation, Magic link, Password recovery, Invite, Email change, and Reauthentication
-- **Branding applied**: Navy blue (#1a365d) primary color, circular "C-iN" logo badge, 12px rounded buttons, and the standard "Check-iN — Personal Emergency Response System / Future Wave Technologies Pvt. Ltd." footer
-- **Queue-based sending**: The auth email hook already uses the durable email queue with retry safety
+### Changes
 
-### What needs to happen
+**1. Registration flow (`src/pages/Register.tsx`)**
+- Remove `email` and `password` as required fields
+- Add them as optional ("Add email for notifications" expandable section)
+- Phone + OTP becomes the primary account creation method
+- If email is provided, store it; if not, generate a placeholder email internally for Supabase auth (e.g., `+919876543210@phone.checkin.app`) since Supabase requires an email for the user record
+- Password is only required if email is provided
 
-The only remaining step is **DNS verification**. Your domain `notify.www.futurewave.in` is currently verifying (nameservers: `ns5.lovable.cloud`, `ns6.lovable.cloud`). Once DNS propagates (up to 72 hours), auth emails will automatically start sending from your branded domain.
+**2. Login flow (`src/pages/Login.tsx`)**  
+- Make "Sign in with Phone OTP" the primary/top option (swap order with Google)
+- Move email/password login below as secondary option
+- Keep Google sign-in as-is
 
-### Action required at your DNS provider
+**3. Auth context (`src/contexts/AuthContext.tsx`)**
+- Add a `signInWithPhone` method that uses the existing OTP flow
+- No changes to session management
 
-Make sure these NS records exist for `notify.www.futurewave.in` at your domain registrar:
-- `notify.www.futurewave.in` → NS → `ns5.lovable.cloud`
-- `notify.www.futurewave.in` → NS → `ns6.lovable.cloud`
+**4. Database migration**
+- Make `email` column nullable in profiles (if not already)
+- Ensure `phone` column has a unique constraint
 
-### No code changes needed
+**5. Profile completion prompt**
+- After phone-only registration, show a gentle prompt on dashboard: "Add your email to receive important alerts" — not blocking, just encouraging
 
-Everything is already in place. If you want to modify the styling or wording of any specific template (e.g., change button text, update copy), I can do that — just let me know which template to update.
+### Login priority order (top to bottom)
+1. Phone OTP (primary)
+2. Google sign-in
+3. Email + password (secondary)
+
+### No changes to
+- Guardian invitation flow (already uses phone)
+- OTP edge function (already works)
+- SOS/emergency flows (already phone-based)
 
