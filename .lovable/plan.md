@@ -1,49 +1,57 @@
+## Batch Medication Alerts for Same Time Slot
 
+### Problem
 
-## Show Original Document Above Analysis Results
+When multiple medications are scheduled at the same time (e.g., 08:00), the system fires separate audio alerts, vibrations, browser notifications, and reminder overlays for each one. This creates a noisy, repetitive experience.
 
-### What changes
-When the Document Analyzer displays results, it will first show the original document (image, PDF page render, or extracted text) in a collapsible "Original Document" card, followed by the analysis below it. This gives users a side-by-side reference without losing context.
+### Solution
 
-### Implementation
+Restructure the alarm check loop to **group medications by time slot first**, then fire one consolidated alert per slot containing all medication names.
 
-**File: `src/components/health-tools/DocumentAnalyzer.tsx`**
+### Changes
 
-In the results view (lines 280-338), insert an "Original Document" section before the "Analysis Results" card:
+**File: `src/hooks/useMedicationAlarms.ts**`
 
-1. **Preserve original data across the analysis flow** — the state variables `imagePreview`, `imageBase64`, `docFileName`, `extractedDocText`, and `textInput` are already retained when `result` is set. No state changes needed.
+Restructure the check function:
 
-2. **Add an "Original Document" card** using a `Collapsible` component (already available via shadcn):
-   - If `imagePreview` or `imageBase64` exists: render the image at full width in a scrollable container
-   - If `docFileName` + `extractedDocText` exists: render the extracted text in a pre-formatted, scrollable block with the filename as a header
-   - If `mode === "text"` and `textInput` exists: render the pasted text in a similar block
-   - The card starts **expanded** so the original is immediately visible
-   - User can collapse it to focus on the analysis
+1. **Initial alarm (T+0)**: Instead of firing inside the per-med loop, collect all meds due at the same time slot into a `Map<timeStr, medName[]>`. After the loop, fire ONE alert per unique time slot:
+  - One `playVoiceReminder` with all med names (e.g., "Your medications are due: Aspirin, Metformin")
+  - One `showBrowserNotification` listing all meds
+  - One `showReminderOverlay` with a combined message listing all meds
+  - One vibration burst
+  - The `slotKey` stays `med-slot-${dateKey}-${timeStr}` (already time-based, not per-med)
+2. **Post-grace reminders (T+30 to T+60)**: Similarly batch — collect all untaken meds for a time slot, fire one combined reminder with all overdue med names.
+3. **Final escalation (T+60-75)**: Keep per-med `medication_logs` inserts (each med needs its own missed log), but batch the audio/notification into one alert listing all missed meds for that slot. Even the Guardian notifications to follow the same logic.
+4. **Guardian in-app notifications**: Already batched (fires once with `firedMedNames.join(", ")`), no change needed.
 
-3. **Styling**: The original document card gets a neutral border with a `FileText` icon header, a max-height scroll area (~300px), and monospace font for extracted text to preserve formatting.
+**File: `src/components/ReminderOverlay.tsx**`
 
-### Technical detail
+- The "View Medications" action already navigates to `/my-health?tool=Tablets` — no change needed. Confirm the label says "View Medications" (it does).
 
-```text
-Results view layout:
-┌──────────────────────────┐
-│ ← Back                   │
-├──────────────────────────┤
-│ 📄 Original Document  ▼  │  ← Collapsible, starts open
-│ ┌──────────────────────┐ │
-│ │ [image / text / PDF] │ │  ← ScrollArea max-h-[300px]
-│ └──────────────────────┘ │
-├──────────────────────────┤
-│ 🔍 Analysis Results      │  ← Existing analysis card
-│ [VisualHealthReport or   │
-│  ReactMarkdown]          │
-│ [Share buttons]          │
-├──────────────────────────┤
-│ [Save to Vault]          │
-│ ⚠️ Disclaimer            │
-└──────────────────────────┘
+### Technical approach
+
+```typescript
+// Phase 1: Collect slots
+const initialSlots = new Map<string, string[]>(); // timeStr → medNames[]
+const postGraceSlots = new Map<string, string[]>();
+const finalSlots = new Map<string, { names: string[], meds: Array<{id, scheduledAt}> }>();
+
+// Phase 2: Loop meds, populate maps (no alerts inside loop)
+
+// Phase 3: Fire ONE alert per time slot from each map
+for (const [timeStr, names] of initialSlots) {
+  const combined = names.join(", ");
+  playVoiceReminder(`Your medications are due: ${combined}`);
+  showBrowserNotification("Medication Reminder", `Time to take: ${combined}`);
+  showReminderOverlay({
+    type: "medication",
+    title: "Medication Reminder",
+    message: `Time to take: ${combined}`,
+    reminderCount: `Scheduled — ${timeStr}`,
+  });
+}
 ```
 
 ### Files to modify
-- `src/components/health-tools/DocumentAnalyzer.tsx` — add original document section in results view, import `Collapsible` and `ScrollArea`
 
+- `src/hooks/useMedicationAlarms.ts` — restructure to batch alerts by time slot
