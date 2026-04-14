@@ -451,13 +451,32 @@ const Register = () => {
               )}
             </div>
             <div>
-              <Label>Email *</Label>
-              <Input placeholder="Email address" className="text-base min-h-[48px]" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label>Date of Birth</Label>
+              <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />
             </div>
-            <div>
-              <Label>Password *</Label>
-              <Input placeholder="Create password" className="text-base min-h-[48px]" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
+
+            <Collapsible open={showEmailSection} onOpenChange={setShowEmailSection}>
+              <CollapsibleTrigger asChild>
+                <button type="button" className="flex items-center gap-2 text-sm text-primary font-medium w-full py-2">
+                  <Mail className="w-4 h-4" />
+                  Add email for notifications (optional)
+                  <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${showEmailSection ? "rotate-180" : ""}`} />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-2">
+                <div>
+                  <Label>Email</Label>
+                  <Input placeholder="Email address" className="text-base min-h-[48px]" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                {email && (
+                  <div>
+                    <Label>Password</Label>
+                    <Input placeholder="Create password" className="text-base min-h-[48px]" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <p className="text-xs text-muted-foreground mt-1">Required when email is provided</p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
             <div>
               <Label>Date of Birth</Label>
               <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />
