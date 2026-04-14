@@ -323,7 +323,7 @@ const DocumentAnalyzer = () => {
     const activeCat = categories.find(c => c.label === selectedCat);
     return (
       <div className="space-y-4">
-        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearFile(); setSaved(false); }}>← Back</Button>
+        <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearFile(); setSaved(false); setCustomTitle(""); }}>← Back</Button>
 
         {/* Original Document Reference */}
         {(imagePreview || imageBase64 || extractedDocText || (mode === "text" && textInput)) && (
