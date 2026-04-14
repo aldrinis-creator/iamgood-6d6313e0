@@ -393,6 +393,19 @@ const DocumentAnalyzer = () => {
           </CardContent>
         </Card>
 
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">Report Name (optional, max 30 characters)</label>
+          <input
+            type="text"
+            maxLength={30}
+            value={customTitle}
+            onChange={(e) => setCustomTitle(e.target.value)}
+            placeholder={`${selectedCat || "Document"} Analysis`}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <p className="text-[10px] text-muted-foreground text-right">{customTitle.length}/30</p>
+        </div>
+
         <Button
           onClick={saveToVault}
           disabled={saving || saved}
