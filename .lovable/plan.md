@@ -1,60 +1,81 @@
 
 
-## Change Nomination Rule: Require Explicit Acceptance
+## Fix 4 Security Vulnerabilities
 
-### Current behavior
-- Status defaults to `pending`, auto-accepts after 24 hours if not rejected
-- Guardian gets access to health data, location, and SOS without ever confirming
+### 1. Nullify OTP codes after verification (Critical)
 
-### New behavior
-- Status defaults to `pending`
-- Guardian must click "Accept" in the invite link to become `accepted`
-- If no action within **72 hours**, status changes to `expired`
-- Ward is notified of expiry and can re-send
-- Guardian can reject at any time within the window
+**Problem**: Plaintext OTP codes remain in `otp_events` indefinitely, creating a data exposure risk.
 
-### Changes
+**Fix**: In `supabase/functions/send-otp/index.ts`, after successful verification (where we update status to `verified`), also set `otp_code = null`. Additionally, in the `cleanup-expired-otps` edge function, null out codes on all expired-but-not-yet-deleted rows.
 
-**1. Database migration**
-- Add `expired` to any status checks or constraints
-- Create a scheduled function (or pg_cron job) to mark nominations as `expired` where `status = 'pending'` and `nomination_expires_at < now()`
-- Update `nomination_expires_at` default from 24h to 72h in the guardian creation logic
-
-**2. Edge function: `guardian-nomination-response/index.ts`**
-- Already handles accept/reject via token — no major changes needed
-- Add expiry check: if `nomination_expires_at < now()` and still `pending`, return "Nomination has expired"
-
-**3. UI updates (`src/pages/Register.tsx`)**
-- When guardian arrives via invite link with token, call the nomination-response edge function with `action: "accept"` after successful registration
-- Show clear confirmation: "You have accepted the guardian nomination from [ward name]"
-
-**4. UI updates (`src/components/GuardianTab.tsx` / Settings)**
-- Show `expired` status badge (yellow/grey) alongside pending/accepted/rejected
-- Add "Re-send Invite" button for expired nominations (already exists for pending, extend to expired)
-- Update the 24-hour rejection window messaging to "Awaiting acceptance (expires in X hours)"
-
-**5. Notification on expiry**
-- The pg_cron job that expires nominations also inserts a notification for the ward: "Your guardian nomination to [name] has expired. Re-send the invite from Settings."
-
-**6. `check-missed-checkins` or new cron function**
-- Add a lightweight query to expire stale nominations, or create a dedicated `expire-stale-nominations` cron job
-
-### Files to modify
-- New migration — add expiry logic, pg_cron job
-- `supabase/functions/guardian-nomination-response/index.ts` — add expiry check
-- `src/pages/Register.tsx` — call accept on successful guardian registration
-- `src/components/GuardianTab.tsx` — expired status badge + re-send for expired
-- `src/pages/Settings.tsx` — update nomination_expires_at to 72h
-- Ward notification insert in cron job
-
-### Technical detail
 ```sql
--- Cron job to expire stale nominations (runs hourly)
-SELECT cron.schedule('expire-stale-nominations', '0 * * * *', $$
-  UPDATE public.guardians
-  SET status = 'expired'
-  WHERE status = 'pending'
-    AND nomination_expires_at < now();
-$$);
+-- In send-otp verify block, change the update to:
+UPDATE otp_events SET verified = true, status = 'verified', otp_code = NULL WHERE id = otpRow.id;
 ```
+
+**Files**: `supabase/functions/send-otp/index.ts`, `supabase/functions/cleanup-expired-otps/index.ts`
+
+---
+
+### 2. Scope Realtime channels (Critical)
+
+**Problem**: Several Realtime subscriptions lack a `filter` parameter, meaning any authenticated user can subscribe and receive all rows from `notifications`, `guardian_pings`, and `journey_updates`.
+
+**Fix**: Add `filter: \`user_id=eq.\${userId}\`` (or equivalent scoping column) to every `.on("postgres_changes", ...)` call that currently omits it.
+
+Affected files and channels:
+- `src/pages/GuardianAlerts.tsx` — `notifications` table, no filter → add `filter` by guardian_id lookup
+- `src/components/NotificationCenter.tsx` — `notifications`, no filter → add `user_id` filter
+- `src/components/NavTabs.tsx` — `notifications` channel (no filter), `guardian_pings` channels (no filter) → add filters
+- `src/pages/GuardianDashboard.tsx` — `notifications` channel (no filter) → add filter
+- `src/pages/Messages.tsx` — `guardian_pings` INSERT (no filter) → add `user_id` filter
+- `src/components/GuardianJourneyTracker.tsx` — `journey_updates` INSERT (no filter) → add `user_id` filter
+- `src/hooks/useRefillDue.ts` — `medications` (no filter) → add `user_id` filter
+- `src/components/WardMedicationStatus.tsx` — check if filter exists, add if missing
+
+Note: RLS still protects the actual data returned by queries, but unscoped channels leak row metadata (event type, timestamps) and could cause unnecessary function invocations.
+
+**Files**: 8 frontend files listed above
+
+---
+
+### 3. Hide nomination tokens from ward SELECT (Warning)
+
+**Problem**: When a ward queries the `guardians` table, the `nomination_token` column is included, which could allow token harvesting.
+
+**Fix**: Create a database migration that:
+- Drops the existing ward SELECT policies
+- Recreates them using a column list via a view, OR more practically: update the frontend code to never select `nomination_token`, and create a security definer function that returns guardian data without the token column.
+
+Simpler approach: Create an RLS-safe view `guardians_safe` that excludes `nomination_token`, or update the frontend queries in `Settings.tsx` and `GuardianTab.tsx` to explicitly select only needed columns (excluding `nomination_token`). The token is only needed by the edge function (which uses service_role and bypasses RLS).
+
+**Files**: `src/pages/Settings.tsx`, `src/components/GuardianTab.tsx` — change `.select("*")` to explicit column list excluding `nomination_token`
+
+---
+
+### 4. Restrict coupon access (Warning)
+
+**Problem**: The RLS policy `Users can read active coupons` allows any authenticated user to read all active coupon codes, discount values, and usage counts.
+
+**Fix**: Remove the authenticated SELECT policy. Coupon validation already happens via the `validate-coupon` edge function which uses `service_role`. Users should not be able to browse coupons directly.
+
+**Migration**:
+```sql
+DROP POLICY "Users can read active coupons" ON public.coupons;
+```
+
+Then verify the `validate-coupon` edge function uses `SUPABASE_SERVICE_ROLE_KEY` (it already does).
+
+**Files**: New migration only. No frontend changes needed since the Subscription page already calls the edge function.
+
+---
+
+### Summary of changes
+
+| # | Severity | Fix | Files |
+|---|----------|-----|-------|
+| 1 | Critical | Null OTP codes after verify | 2 edge functions |
+| 2 | Critical | Add `filter` to all Realtime channels | 8 frontend files |
+| 3 | Warning | Select explicit columns, exclude token | 2 frontend files |
+| 4 | Warning | Drop public coupon SELECT policy | 1 migration |
 
