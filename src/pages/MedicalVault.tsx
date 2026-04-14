@@ -284,7 +284,14 @@ ${r.doctor_name ? `<div class="row"><span class="label">Doctor</span><span class
 ${r.hospital_name ? `<div class="row"><span class="label">Hospital / Clinic</span><span class="value">${r.hospital_name}</span></div>` : ""}
 </div></div>
 ${r.description ? `<div class="section"><div class="section-title">📝 Notes</div><div class="section-body"><p style="white-space:pre-wrap;word-break:break-word;">${r.description}</p></div></div>` : ""}
-${r.file_name ? `<div class="section"><div class="section-title">📎 Attachment</div><div class="section-body"><p>${r.file_name}</p></div></div>` : ""}`;
+${r.file_name ? `<div class="section"><div class="section-title">📎 Attachment</div><div class="section-body">${(() => {
+  const fn = r.file_name || "";
+  const isImage = /\.(jpe?g|png|webp|gif)$/i.test(fn);
+  const isPdf = /\.pdf$/i.test(fn);
+  return '__SIGNED_URL__'
+    ? `<p><strong>${fn}</strong></p>${isImage ? `<img src="__SIGNED_URL__" style="max-width:100%;border-radius:8px;margin:8px 0" />` : ""}${isPdf ? `<iframe src="__SIGNED_URL__" style="width:100%;height:400px;border:none;border-radius:8px;margin:8px 0"></iframe>` : ""}<a href="__SIGNED_URL__" download="${fn}" target="_blank" style="display:inline-block;margin-top:8px;padding:6px 16px;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">⬇ Download File</a>`
+    : `<p>${fn}</p>`;
+})()}</div></div>` : ""}`;
 
     return buildLetterheadHtml({
       title: r.record_type.toUpperCase(),
@@ -294,8 +301,20 @@ ${r.file_name ? `<div class="section"><div class="section-title">📎 Attachment
     });
   };
 
-  const openRecordViewWindow = (r: MedicalRecord) => {
-    const html = buildRecordViewHtml(r);
+  const openRecordViewWindow = async (r: MedicalRecord) => {
+    let signedUrl = "";
+    if (r.file_url) {
+      try {
+        const { data } = await supabase.storage.from("medical-documents").createSignedUrl(r.file_url, 3600);
+        if (data?.signedUrl) signedUrl = data.signedUrl;
+      } catch (e) {
+        console.error("Failed to get signed URL:", e);
+      }
+    }
+    let html = buildRecordViewHtml(r);
+    if (signedUrl) {
+      html = html.replaceAll("__SIGNED_URL__", signedUrl);
+    }
     const win = window.open("", "_blank");
     if (!win) { toast.error("Pop-up blocked. Please allow pop-ups."); return; }
     win.document.write(html);
