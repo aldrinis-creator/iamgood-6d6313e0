@@ -1,35 +1,33 @@
 
 
-## Reorganize User Dashboard
+## Add Date Display Above Check-In Heart
 
-### New Layout Order (top to bottom)
-1. Email Prompt Banner (unchanged)
-2. Mode Selector (unchanged)
-3. Check-In Card (unchanged)
-4. Map My Journey (unchanged)
-5. **NEW: Today's Appointments reminder card** — compact card showing count of today's appointments with a tap-to-navigate action to `/appointments`
-6. **NEW: Medication Due alert** — compact card showing low-stock/refill-due medications using existing `useRefillDue` hook, linking to `/my-health?tool=Medications`
-7. Health Passport accordion (unchanged, collapsed by default)
-8. ~~How It Works~~ — **removed** (moved to Help)
-9. ~~AI Health Companion~~ — **removed** (moved to Help)
+### What changes
 
-### Files to Modify
+Add a formatted date line (e.g. "Tuesday, April 14 2026") at the top of the `CheckInCard` component, displayed above the green heart in all states (paused, approaching, active, checked-in).
 
-**`src/pages/UserDashboard.tsx`**
-- Import `useTodayAppointments` and `useRefillDue`
-- Add a compact appointments card (icon + "You have N appointments today" + chevron) between Map My Journey and Health Passport — only renders when count > 0
-- Add a compact medication alert card (icon + "Medication refill due" + chevron) below appointments — only renders when `refillDue` is true
-- Delete the "How It Works" accordion (lines 267-292) and "AI Health Companion" card (lines 294-303)
+### Implementation
 
-**`src/pages/Help.tsx`**
-- Add a new "About" or "How It Works" section within the FAQ tab (or as a separate card above FAQs) containing:
-  - The 4-step "How Check-iN Works" content
-  - The "AI Health Companion" description
-- These render as static cards at the top of the FAQ tab content area
+**File: `src/components/CheckInCard.tsx`**
 
-### Technical Details
-- `useTodayAppointments()` already returns today's appointment count with 60s refresh
-- `useRefillDue()` already returns a boolean for low-stock medications with realtime subscription
-- Both new cards are conditional (hidden when nothing to show), keeping the dashboard clean
-- Cards use `onClick={() => navigate(...)}` for navigation, matching the Map My Journey pattern
+1. Import `formatISTDayDate` or create an inline formatter using IST timezone to produce "weekday, month day year" format (e.g. "Tuesday, April 14 2026").
+
+2. Inside the `<CardContent>` block (line 298), add a date string element before the conditional rendering block (before line 299):
+
+```tsx
+<p className="text-center text-sm font-medium text-muted-foreground mb-2">
+  {new Date().toLocaleDateString("en-IN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Kolkata",
+  })}
+</p>
+```
+
+This renders consistently in IST across all check-in states, appearing as the first element inside the card above the heart.
+
+### Files to modify
+- `src/components/CheckInCard.tsx` — add date display at top of card content
 
