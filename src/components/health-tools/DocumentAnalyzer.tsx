@@ -48,6 +48,7 @@ const DocumentAnalyzer = () => {
   const { user } = useAuth();
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [mode, setMode] = useState<InputMode>("photo");
+  const [customTitle, setCustomTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
