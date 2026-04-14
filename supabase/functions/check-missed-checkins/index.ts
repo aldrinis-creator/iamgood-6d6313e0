@@ -129,7 +129,10 @@ Deno.serve(async (req) => {
     const vapidSubject = "mailto:alerts@check-in.app";
 
     const now = new Date();
-    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+    // 60-minute grace: users get a full hour (with 3 client-side reminders)
+    // before the server escalates to guardians.
+    const graceMs = 60 * 60 * 1000;
+    const graceCutoff = new Date(now.getTime() - graceMs);
 
     // Compute today's IST boundaries (UTC+5:30) to prevent previous-day spillover
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
@@ -145,7 +148,7 @@ Deno.serve(async (req) => {
       .eq("status", "pending")
       .gte("scheduled_at", todayStartUTC.toISOString())
       .lte("scheduled_at", todayEndUTC.toISOString())
-      .lt("scheduled_at", tenMinutesAgo.toISOString());
+      .lt("scheduled_at", graceCutoff.toISOString());
 
     if (fetchError) {
       console.error("Error fetching pending check-ins:", fetchError);
