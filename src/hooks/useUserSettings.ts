@@ -131,10 +131,24 @@ const DEFAULTS: UserSettings = {
   guardianVoiceAlerts: true,
 };
 
+// Module-level refs so flushPendingWrites can work outside React lifecycle
+let _pendingTimeout: ReturnType<typeof setTimeout> | undefined;
+let _pendingMutate: (() => void) | undefined;
+
+export function flushPendingSettings() {
+  if (_pendingTimeout) {
+    clearTimeout(_pendingTimeout);
+    _pendingTimeout = undefined;
+  }
+  if (_pendingMutate) {
+    _pendingMutate();
+    _pendingMutate = undefined;
+  }
+}
+
 export function useUserSettings() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const userId = session?.user?.id;
 
   const { data: settings = DEFAULTS, isLoading } = useQuery({
@@ -171,8 +185,13 @@ export function useUserSettings() {
       // Optimistic update
       queryClient.setQueryData(["user_settings", userId], updated);
       // Debounce the DB write
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => mutation.mutate(updated), 500);
+      if (_pendingTimeout) clearTimeout(_pendingTimeout);
+      _pendingMutate = () => mutation.mutate(updated);
+      _pendingTimeout = setTimeout(() => {
+        _pendingMutate?.();
+        _pendingMutate = undefined;
+        _pendingTimeout = undefined;
+      }, 500);
     },
     [userId, queryClient, mutation]
   );

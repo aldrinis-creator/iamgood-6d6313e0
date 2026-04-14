@@ -74,11 +74,14 @@ const GuardianAlerts = () => {
         if ((newNotif?.type === "sos" || newNotif?.type === "fall") && settings.guardianVoiceAlerts) {
           const eventType = newNotif.type === "sos" ? "an SOS" : "a Fall";
           playVoiceReminder(`Dear Guardian, please check on your user, as we have detected ${eventType} alert`);
-        } else if (newNotif?.type === "route_deviation" && settings.guardianVoiceAlerts) {
-          playVoiceReminder("Dear Guardian, your ward has deviated from the expected route. Please check on them.");
         } else if (newNotif?.type === "missed_checkin") {
-          playChime();
+          // Play chime once, only if missed within the last 60 minutes
+          const createdAt = newNotif?.created_at ? new Date(newNotif.created_at).getTime() : 0;
+          if (Date.now() - createdAt <= 3600000) {
+            playChime();
+          }
         }
+        // No audio for route_deviation, medication, battery, etc.
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
