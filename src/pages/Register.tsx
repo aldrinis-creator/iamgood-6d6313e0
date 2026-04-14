@@ -352,9 +352,15 @@ const Register = () => {
             Go to Sign In
           </Button>
 
-          <p className="text-xs text-muted-foreground">
-            Didn't receive the email? Check your spam folder or sign in to resend the verification.
-          </p>
+          {email ? (
+            <p className="text-xs text-muted-foreground">
+              Didn't receive the email? Check your spam folder or sign in to resend the verification.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              You can sign in immediately using Phone OTP.
+            </p>
+          )}
         </div>
       </div>
     );
