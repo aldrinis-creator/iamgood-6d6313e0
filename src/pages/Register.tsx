@@ -476,20 +476,18 @@ const Register = () => {
                 <p className="text-sm text-muted-foreground">Set up check-ins & nominate guardians</p>
               </div>
             </button>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("guardian")}
-              className="flex items-center gap-4 p-5 rounded-xl border-2 border-border bg-card text-left transition-colors hover:border-primary focus:border-primary focus:outline-none min-h-[80px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-primary mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-foreground text-base">I'm a Guardian</p>
-                <p className="text-sm text-muted-foreground">Monitor & respond to someone's safety</p>
+                <p className="font-medium text-foreground text-sm">Are you a Guardian?</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Guardian accounts can only be created via an invite link sent by your ward. Ask the person you want to protect to add you from their Settings page.
+                </p>
               </div>
-            </button>
+            </div>
           </div>
 
           <p className="text-center text-sm text-muted-foreground">
