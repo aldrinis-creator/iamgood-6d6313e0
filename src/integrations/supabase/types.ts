@@ -1816,6 +1816,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      expire_stale_nominations: { Args: never; Returns: number }
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
       guardian_ward_count: {
         Args: { _guardian_email: string }

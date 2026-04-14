@@ -362,7 +362,7 @@ const Settings = () => {
       toast.error("Failed to add guardian");
     } else {
       const token = (insertData as any)?.nomination_token;
-      toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
+      toast.success(`${newName} added as Guardian (pending — awaiting acceptance)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
       // Send branded invite email if email provided
@@ -409,14 +409,17 @@ const Settings = () => {
   };
 
   const getStatusBadge = (g: Guardian) => {
-    const nominated = new Date(g.nominated_at);
-    const hoursSince = (Date.now() - nominated.getTime()) / (1000 * 60 * 60);
-    
     if (g.status === "rejected") {
       return <Badge variant="destructive" className="text-xs gap-1"><XCircle className="w-3 h-3" /> Rejected</Badge>;
     }
-    if (g.status === "accepted" && hoursSince < 24) {
-      return <Badge className="bg-warning text-warning-foreground text-xs gap-1"><Clock className="w-3 h-3" /> Pending ({Math.ceil(24 - hoursSince)}h left)</Badge>;
+    if (g.status === "expired") {
+      return <Badge variant="outline" className="text-xs gap-1 border-warning text-warning"><Clock className="w-3 h-3" /> Expired</Badge>;
+    }
+    if (g.status === "pending") {
+      const nominated = new Date(g.nominated_at);
+      const expiresAt = new Date(nominated.getTime() + 72 * 60 * 60 * 1000);
+      const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
+      return <Badge className="bg-warning text-warning-foreground text-xs gap-1"><Clock className="w-3 h-3" /> Pending ({hoursLeft}h left)</Badge>;
     }
     return <Badge className="bg-success text-success-foreground text-xs gap-1"><CheckCircle className="w-3 h-3" /> Accepted</Badge>;
   };

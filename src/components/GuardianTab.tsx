@@ -21,6 +21,8 @@ interface Guardian {
   guardian_email: string | null;
   relation: string | null;
   is_primary: boolean;
+  status: string;
+  nominated_at: string;
 }
 
 interface GuardianTabProps {
@@ -47,7 +49,7 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("guardians")
-      .select("id, guardian_name, guardian_phone, guardian_email, relation, is_primary")
+      .select("id, guardian_name, guardian_phone, guardian_email, relation, is_primary, status, nominated_at")
       .eq("user_id", userId)
       .order("is_primary", { ascending: false });
 
@@ -169,6 +171,27 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
                         {g.guardian_email}
                       </p>
                     )}
+                    {/* Status badge */}
+                    <div className="mt-1">
+                      {g.status === "rejected" && (
+                        <Badge variant="destructive" className="text-xs">Rejected</Badge>
+                      )}
+                      {g.status === "expired" && (
+                        <Badge variant="outline" className="text-xs border-warning text-warning">Expired</Badge>
+                      )}
+                      {g.status === "pending" && (
+                        <Badge className="bg-warning text-warning-foreground text-xs">
+                          Pending {(() => {
+                            const expiresAt = new Date(new Date(g.nominated_at).getTime() + 72 * 60 * 60 * 1000);
+                            const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
+                            return `(${hoursLeft}h left)`;
+                          })()}
+                        </Badge>
+                      )}
+                      {g.status === "accepted" && (
+                        <Badge className="bg-success text-success-foreground text-xs">Accepted</Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {g.is_primary && (
@@ -184,7 +207,7 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
                     </Button>
                   </div>
                 </div>
-                {g.guardian_email && (
+                {(g.status === "pending" || g.status === "expired") && g.guardian_email && (
                   <Button
                     variant="outline"
                     size="sm"
