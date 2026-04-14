@@ -819,6 +819,9 @@ const GuardianDashboard = () => {
                     "bg-muted text-muted-foreground"
                   }`}>
                     {getStatusLabel(ci.status)}
+                    {(ci.status === "ok" || ci.status === "responded") && ci.responded_at && (
+                      <span className="ml-1 opacity-75">· {formatISTTime(ci.responded_at)}</span>
+                    )}
                   </span>
                 </div>
               ))
