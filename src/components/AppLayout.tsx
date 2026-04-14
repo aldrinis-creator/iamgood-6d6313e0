@@ -8,6 +8,7 @@ import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import FallDetectionOverlay from "@/components/FallDetectionOverlay";
 import GuardianPingOverlay from "@/components/GuardianPingOverlay";
 import { useApp } from "@/contexts/AppContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
 import BatteryWarning from "@/components/BatteryWarning";
@@ -33,6 +34,7 @@ const UserOnlyHooks = () => {
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
+  const { loginInProgress } = useAuth();
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
   useAutoSleepMode();
@@ -51,7 +53,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
-        {role === "user" && <UserOnlyHooks />}
+        {role === "user" && !loginInProgress && <UserOnlyHooks />}
         {offline && (
           <div className="bg-warning text-warning-foreground text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
             <WifiOff className="w-3.5 h-3.5" /> You're offline — SOS will queue and send when reconnected
@@ -100,12 +102,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </main>
         <NavTabs />
         {role === "user" && <SOSButton />}
-        <EmergencyModeOverlay />
-        {role === "user" && <FallDetectionOverlay />}
-        {role === "user" && <BatteryWarning />}
-        <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />
-        <ReminderOverlay />
-        {role === "user" && <GuardianPingOverlay />}
+        {!loginInProgress && <EmergencyModeOverlay />}
+        {role === "user" && !loginInProgress && <FallDetectionOverlay />}
+        {role === "user" && !loginInProgress && <BatteryWarning />}
+        {!loginInProgress && <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />}
+        {!loginInProgress && <ReminderOverlay />}
+        {role === "user" && !loginInProgress && <GuardianPingOverlay />}
       </div>
     </div>
   );

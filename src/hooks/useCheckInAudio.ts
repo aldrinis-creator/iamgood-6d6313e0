@@ -4,6 +4,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
+// loginInProgress guard added below
 import { supabase } from "@/integrations/supabase/client";
 import { formatISTDateTime } from "@/lib/istTime";
 
@@ -26,7 +27,7 @@ const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
-  const { pauseMode } = useApp();
+  const { pauseMode, loginInProgress } = useApp();
   // Track post-grace reminder counts: slotKey → { count, lastFiredAt }
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   // Track slots where we already sent the final missed notification
@@ -70,6 +71,7 @@ const useCheckInAudio = () => {
 
   const check = useCallback(async () => {
     if (pauseMode !== "active") return;
+    if (loginInProgress) return;
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();

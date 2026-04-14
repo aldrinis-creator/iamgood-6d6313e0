@@ -20,11 +20,12 @@ const ALERT_LEAD: Record<string, number> = {
 const useAppointmentAlarms = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
-  const { pauseMode } = useApp();
+  const { pauseMode, loginInProgress } = useApp();
   const firedRef = useRef<Set<string>>(new Set());
 
   const check = useCallback(async () => {
     if (pauseMode !== "active") return;
+    if (loginInProgress) return;
     if (!session?.user?.id) return;
 
     const now = new Date();

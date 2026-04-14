@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
+// loginInProgress guard
 import { showReminderOverlay } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
@@ -17,10 +18,11 @@ const formatHour = (h: number) => {
 const useExerciseReminder = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
-  const { pauseMode } = useApp();
+  const { pauseMode, loginInProgress } = useApp();
 
   const check = useCallback(() => {
     if (pauseMode !== "active") return;
+    if (loginInProgress) return;
     if (!settings.exerciseReminder) return;
 
     const now = new Date();

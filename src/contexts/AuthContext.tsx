@@ -12,6 +12,7 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  loginInProgress: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, metadata?: AuthMetadata) => Promise<{ error: Error | null; data: any }>;
   signOut: () => Promise<void>;
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loginInProgress, setLoginInProgress] = useState(false);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -53,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          setLoginInProgress(true);
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
             await fetchProfile(session.user.id);
@@ -85,13 +88,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 },
               }).catch(() => {});
             }
+            setLoginInProgress(false);
+            // Request notification permission after login completes
+            if ("Notification" in window && Notification.permission === "default") {
+              Notification.requestPermission();
+            }
           }, 0);
-          // Request notification permission on sign-in
-          if ("Notification" in window && Notification.permission === "default") {
-            Notification.requestPermission();
-          }
         } else {
           setProfile(null);
+          setLoginInProgress(false);
         }
         setLoading(false);
       }
@@ -110,7 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    setLoginInProgress(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setLoginInProgress(false);
     return { error: error as Error | null };
   };
 
@@ -139,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut, resetPassword, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, loginInProgress, signIn, signUp, signOut, resetPassword, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

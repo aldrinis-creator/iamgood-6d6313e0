@@ -10,6 +10,7 @@ interface AppState {
   role: UserRole;
   setRole: (role: UserRole) => void;
   isLoggedIn: boolean;
+  loginInProgress: boolean;
   emergencyMode: boolean;
   activeSosId: string | null;
   triggerSOS: () => void;
@@ -42,7 +43,7 @@ const getCurrentPosition = (): Promise<{ latitude: number; longitude: number } |
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { session, profile } = useAuth();
+  const { session, profile, loginInProgress } = useAuth();
   const [emergencyMode, setEmergencyMode] = useState(false);
   const [activeSosId, setActiveSosId] = useState<string | null>(null);
   const [roleOverride, setRoleOverride] = useState<UserRole | null>(null);
@@ -157,7 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeSosId, session, profile]);
 
   return (
-    <AppContext.Provider value={{ role, setRole, isLoggedIn, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName, pauseMode, setPauseMode }}>
+    <AppContext.Provider value={{ role, setRole, isLoggedIn, loginInProgress, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName, pauseMode, setPauseMode }}>
       {children}
     </AppContext.Provider>
   );
