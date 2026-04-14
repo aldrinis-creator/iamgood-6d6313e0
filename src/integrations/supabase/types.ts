@@ -1807,6 +1807,7 @@ export type Database = {
       }
     }
     Functions: {
+      check_guardian_nomination: { Args: { _phone: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1818,6 +1819,10 @@ export type Database = {
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
       guardian_ward_count: {
         Args: { _guardian_email: string }
+        Returns: number
+      }
+      guardian_ward_count_by_phone: {
+        Args: { _phone: string }
         Returns: number
       }
       has_role: {

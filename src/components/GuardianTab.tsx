@@ -92,6 +92,22 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
       setShowUpgrade(true);
       return;
     }
+    // Check 3-ward limit by phone
+    const cleanPhone = phone.trim().replace(/[\s\-\+]/g, "");
+    const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanPhone });
+    if (typeof phoneCount === "number" && phoneCount >= 3) {
+      toast.error("Guardian limit reached", { description: `${name.trim()} already monitors 3 users (maximum).` });
+      setAdding(false);
+      return;
+    }
+    if (email.trim()) {
+      const { data: emailCount } = await supabase.rpc("guardian_ward_count", { _guardian_email: email.trim() });
+      if (typeof emailCount === "number" && emailCount >= 3) {
+        toast.error("Guardian limit reached", { description: `${name.trim()} already monitors 3 users (maximum).` });
+        setAdding(false);
+        return;
+      }
+    }
     setAdding(true);
     const { error } = await supabase.from("guardians").insert({
       user_id: userId,

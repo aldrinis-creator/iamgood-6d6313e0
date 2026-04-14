@@ -333,7 +333,13 @@ const Settings = () => {
       toast.error(`Your plan allows ${limit} guardian(s). Upgrade for more.`);
       return;
     }
-    // Check if this guardian already monitors 3 users
+    // Check if this guardian already monitors 3 users (by phone and email)
+    const cleanGPhone = newPhone.replace(/[\s\-\+]/g, "");
+    const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
+    if (typeof phoneCount === "number" && phoneCount >= 3) {
+      toast.error(`${newName} already monitors 3 users (maximum). They cannot be added as your guardian.`);
+      return;
+    }
     if (newEmail) {
       const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: newEmail });
       if (typeof countResult === "number" && countResult >= 3) {
@@ -341,7 +347,7 @@ const Settings = () => {
         return;
       }
     }
-    const { error } = await supabase.from("guardians").insert({
+    const { data: insertData, error } = await supabase.from("guardians").insert({
       user_id: session.user.id,
       guardian_name: newName,
       guardian_phone: newPhone,
@@ -351,16 +357,18 @@ const Settings = () => {
       status: "pending",
       nominated_at: new Date().toISOString(),
       is_vault_nominee: false,
-    } as any);
+    } as any).select("nomination_token").single();
     if (error) {
       toast.error("Failed to add guardian");
     } else {
+      const token = (insertData as any)?.nomination_token;
       toast.success(`${newName} added as Guardian (pending — 24hr auto-accept window)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
       // Send branded invite email if email provided
+      const baseUrl = "https://iamgood.lovable.app";
+      const acceptLink = token ? `${baseUrl}/register?nomination=accept&token=${token}` : `${baseUrl}/register`;
       if (newEmail) {
-        const baseUrl = "https://iamgood.lovable.app";
         supabase.functions.invoke("send-transactional-email", {
           body: {
             templateName: "guardian-invitation",
@@ -370,18 +378,18 @@ const Settings = () => {
               guardianName: newName,
               userName: session.user.email,
               relation: newRelation,
-              acceptLink: `${baseUrl}/register`,
+              acceptLink,
             },
           },
         }).catch(() => {});
-        // Also trigger MSG91 SMS/WhatsApp
-        supabase.functions.invoke("send-guardian-invite", {
-          body: { guardian_name: newName, user_name: session.user.email, relation: newRelation, guardian_phone: newPhone },
-        }).catch(() => {});
       }
+      // Also trigger MSG91 SMS/WhatsApp with invite link
+      supabase.functions.invoke("send-guardian-invite", {
+        body: { guardian_name: newName, user_name: session.user.email, relation: newRelation, guardian_phone: newPhone, accept_link: acceptLink },
+      }).catch(() => {});
       // Refresh
-      const { data } = await supabase.from("guardians").select("*").eq("user_id", session.user.id).order("created_at");
-      if (data) setGuardians(data as unknown as Guardian[]);
+      const { data: refreshed } = await supabase.from("guardians").select("*").eq("user_id", session.user.id).order("created_at");
+      if (refreshed) setGuardians(refreshed as unknown as Guardian[]);
     }
   };
 

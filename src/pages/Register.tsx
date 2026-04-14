@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -72,6 +72,7 @@ const TOTAL_STEPS_GUARDIAN = 3;
 const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<number>(1);
   const [selectedRole, setSelectedRole] = useState<SelectedRole>(null);
@@ -86,9 +87,34 @@ const Register = () => {
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [sentGuardianCount, setSentGuardianCount] = useState(0);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
+  const [nominationBlocked, setNominationBlocked] = useState(false);
+  const [isInviteLink, setIsInviteLink] = useState(false);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
   const progressPercent = (step / totalSteps) * 100;
+
+  // Handle invite link: /register?nomination=accept&token=...
+  useEffect(() => {
+    const nomination = searchParams.get("nomination");
+    const token = searchParams.get("token");
+    if (nomination === "accept" && token) {
+      setIsInviteLink(true);
+      setSelectedRole("guardian");
+      setStep(2);
+      // Try to pre-fill name from nomination token
+      supabase
+        .from("guardians")
+        .select("guardian_name, guardian_phone")
+        .eq("nomination_token", token)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setFullName(data.guardian_name || "");
+            if (data.guardian_phone) setPhone(data.guardian_phone);
+          }
+        });
+    }
+  }, [searchParams]);
 
   const handleRoleSelect = (role: SelectedRole) => {
     setSelectedRole(role);
@@ -146,11 +172,24 @@ const Register = () => {
     setStep(3);
   };
 
-  const handleOtpVerified = () => {
+  const handleOtpVerified = async () => {
     setPhoneVerified(true);
     if (selectedRole === "user") {
       setStep(4); // Guardian nomination
     } else {
+      // Guardian role: check nomination exists before proceeding
+      const cleanPhone = phone.replace(/[\s\-\+]/g, "");
+      const { data: hasNomination } = await supabase.rpc("check_guardian_nomination" as any, { _phone: cleanPhone });
+      if (!hasNomination) {
+        setNominationBlocked(true);
+        return;
+      }
+      // Check 3-ward limit by phone
+      const { data: wardCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanPhone });
+      if (typeof wardCount === "number" && wardCount >= 3) {
+        toast.error("Ward limit reached", { description: "You already monitor 3 users (maximum)." });
+        return;
+      }
       handleSubmit(); // Guardian role: submit directly
     }
   };
@@ -203,13 +242,23 @@ const Register = () => {
       }
     }
 
-    // Check 3-ward limit for each nominated guardian with an email
+    // Check 3-ward limit for each nominated guardian (by email AND phone)
     if (selectedRole === "user") {
-      for (const g of guardians.filter(g => g.email)) {
-        const { data: countResult } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
-        if (typeof countResult === "number" && countResult >= 3) {
-          toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
+      for (const g of guardians.filter(g => g.phone)) {
+        const cleanGPhone = g.phone.replace(/[\s\-\+]/g, "");
+        // Check by phone
+        const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
+        if (typeof phoneCount === "number" && phoneCount >= 3) {
+          toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users (maximum). Please choose a different guardian.` });
           return;
+        }
+        // Also check by email if provided
+        if (g.email) {
+          const { data: emailCount } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
+          if (typeof emailCount === "number" && emailCount >= 3) {
+            toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
+            return;
+          }
         }
       }
     }
@@ -262,6 +311,40 @@ const Register = () => {
     setLoading(false);
     setRegistrationComplete(true);
   };
+
+  // --- Nomination blocked screen (guardian without nomination) ---
+  if (nominationBlocked) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
+        <div className="w-full max-w-md space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 mx-auto flex items-center justify-center">
+            <AlertCircle className="w-10 h-10 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-foreground">No Nomination Found</h1>
+            <p className="text-muted-foreground">
+              You haven't been nominated as a guardian yet.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border text-left space-y-2">
+            <p className="text-sm text-foreground font-medium">How to become a guardian:</p>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Ask the person you want to protect to open Check-iN</li>
+              <li>They go to <strong>Settings → Guardians</strong></li>
+              <li>They add your phone number as a guardian</li>
+              <li>You'll receive an invite link — use it to register</li>
+            </ol>
+          </div>
+          <Button className="w-full text-lg min-h-[52px]" size="lg" onClick={() => navigate("/login")}>
+            Go to Sign In
+          </Button>
+          <button type="button" className="text-sm text-primary underline" onClick={() => { setNominationBlocked(false); setStep(1); setSelectedRole(null); }}>
+            Register as a User instead
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // --- Registration success screen ---
   if (registrationComplete) {
@@ -335,7 +418,9 @@ const Register = () => {
                 <div>
                   <p className="font-medium text-foreground text-sm">Guardian account ready</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins.
+                    {email
+                      ? "Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins."
+                      : "Your guardian account is linked. Sign in with your phone number to start monitoring your ward."}
                   </p>
                 </div>
               </div>
@@ -393,20 +478,18 @@ const Register = () => {
                 <p className="text-sm text-muted-foreground">Set up check-ins & nominate guardians</p>
               </div>
             </button>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("guardian")}
-              className="flex items-center gap-4 p-5 rounded-xl border-2 border-border bg-card text-left transition-colors hover:border-primary focus:border-primary focus:outline-none min-h-[80px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-primary mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-foreground text-base">I'm a Guardian</p>
-                <p className="text-sm text-muted-foreground">Monitor & respond to someone's safety</p>
+                <p className="font-medium text-foreground text-sm">Are you a Guardian?</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Guardian accounts can only be created via an invite link sent by your ward. Ask the person you want to protect to add you from their Settings page.
+                </p>
               </div>
-            </button>
+            </div>
           </div>
 
           <p className="text-center text-sm text-muted-foreground">
