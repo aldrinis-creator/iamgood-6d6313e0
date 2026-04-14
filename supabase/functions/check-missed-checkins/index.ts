@@ -180,6 +180,32 @@ Deno.serve(async (req) => {
     let pushesSent = 0;
 
     for (const checkIn of uniqueCheckIns) {
+      // ── Safety check: verify no "responded" record exists for this user+slot ──
+      const scheduledDate = new Date(checkIn.scheduled_at);
+      const slotStart = new Date(scheduledDate);
+      slotStart.setMinutes(0, 0, 0);
+      const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000); // +1 hour
+
+      const { data: respondedRecords } = await supabase
+        .from("check_ins")
+        .select("id")
+        .eq("user_id", checkIn.user_id)
+        .eq("status", "responded")
+        .gte("scheduled_at", slotStart.toISOString())
+        .lt("scheduled_at", slotEnd.toISOString())
+        .limit(1);
+
+      if (respondedRecords && respondedRecords.length > 0) {
+        // User already responded — mark this orphan as responded, skip alerts
+        await supabase
+          .from("check_ins")
+          .update({ status: "responded", response: "ok", responded_at: new Date().toISOString() })
+          .eq("id", checkIn.id)
+          .eq("status", "pending");
+        console.log(`Orphan check-in ${checkIn.id} resolved — user already responded`);
+        continue;
+      }
+
       // ── Mark as missed FIRST to prevent duplicate processing by next cron run ──
       const { error: updateError } = await supabase
         .from("check_ins")
@@ -203,7 +229,8 @@ Deno.serve(async (req) => {
       const { data: guardians } = await supabase
         .from("guardians")
         .select("id, guardian_name, guardian_email, guardian_phone")
-        .eq("user_id", checkIn.user_id);
+        .eq("user_id", checkIn.user_id)
+        .eq("status", "accepted");
 
       if (guardians && guardians.length > 0) {
         const scheduledTime = new Date(checkIn.scheduled_at);
