@@ -1,22 +1,114 @@
-import { useState, useEffect } from "react";
-import { Wind, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Wind, Loader2, Thermometer, MapPin, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const API_KEY = "AIzaSyCQuBmmLMKvQwqD4ydUL8DA8sZ7sIQtLX8";
+const MAX_SEARCHES_PER_DAY = 5;
+
+interface Pollutant {
+  code: string;
+  displayName: string;
+  fullName: string;
+  concentration: { value: number; units: string };
+}
 
 interface AQIData {
   aqi: number;
   aqiDisplay: string;
   category: string;
   dominantPollutant: string;
+  pollutants: Pollutant[];
+  elderlyRecommendation?: string;
+  temp?: number;
+  locationName?: string;
 }
 
 const AQIWidget = () => {
   const [aqiData, setAqiData] = useState<AQIData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchesLeft, setSearchesLeft] = useState(MAX_SEARCHES_PER_DAY);
+
+  // Initialize rate limiting
+  useEffect(() => {
+    const trackerStr = localStorage.getItem("aqi_search_tracker");
+    const today = new Date().toISOString().split("T")[0];
+    if (trackerStr) {
+      const tracker = JSON.parse(trackerStr);
+      if (tracker.date === today) {
+        setSearchesLeft(Math.max(0, MAX_SEARCHES_PER_DAY - tracker.count));
+      } else {
+        localStorage.setItem("aqi_search_tracker", JSON.stringify({ date: today, count: 0 }));
+      }
+    } else {
+      localStorage.setItem("aqi_search_tracker", JSON.stringify({ date: today, count: 0 }));
+    }
+  }, []);
+
+  const incrementSearchTracker = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const trackerStr = localStorage.getItem("aqi_search_tracker");
+    let count = 0;
+    if (trackerStr) {
+      const tracker = JSON.parse(trackerStr);
+      count = tracker.date === today ? tracker.count : 0;
+    }
+    const newCount = count + 1;
+    localStorage.setItem("aqi_search_tracker", JSON.stringify({ date: today, count: newCount }));
+    setSearchesLeft(Math.max(0, MAX_SEARCHES_PER_DAY - newCount));
+  };
+
+  const fetchEnvironmentData = async (lat: number, lng: number, locationName?: string) => {
+    try {
+      // 1. Fetch detailed Air Quality
+      const aqiRes = await fetch(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: { latitude: lat, longitude: lng },
+          extraComputations: ["POLLUTANT_CONCENTRATION", "HEALTH_RECOMMENDATIONS"],
+        }),
+      });
+      const data = await aqiRes.json();
+      
+      const uaqi = data.indexes?.find((idx: any) => idx.code === "uaqi");
+      if (!uaqi) throw new Error("No AQI data");
+
+      // 2. Fetch Temperature via free Open-Meteo
+      let temp: number | undefined;
+      try {
+        const tempRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        const tempData = await tempRes.json();
+        temp = tempData?.current_weather?.temperature;
+      } catch (e) {
+        console.warn("Temperature fetch failed", e);
+      }
+
+      setAqiData({
+        aqi: uaqi.aqi,
+        aqiDisplay: uaqi.aqiDisplay,
+        category: uaqi.category,
+        dominantPollutant: uaqi.dominantPollutant,
+        pollutants: data.pollutants || [],
+        elderlyRecommendation: data.healthRecommendations?.elderly,
+        temp,
+        locationName: locationName || "Current Location"
+      });
+      setError(false);
+    } catch {
+      setError(true);
+      if (!aqiData) toast.error("Failed to load air quality data");
+    } finally {
+      setLoading(false);
+      setSearchLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -24,33 +116,8 @@ const AQIWidget = () => {
       setError(true);
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: {
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-              },
-            }),
-          });
-          const data = await res.json();
-          const uaqi = data.indexes?.find((idx: any) => idx.code === "uaqi");
-          if (uaqi) {
-            setAqiData(uaqi);
-          } else {
-            setError(true);
-          }
-        } catch {
-          setError(true);
-        } finally {
-          setLoading(false);
-        }
-      },
+      (pos) => fetchEnvironmentData(pos.coords.latitude, pos.coords.longitude),
       () => {
         setError(true);
         setLoading(false);
@@ -59,7 +126,46 @@ const AQIWidget = () => {
     );
   }, []);
 
-  if (error) return null;
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    if (searchesLeft <= 0) {
+      toast.error("You have reached your daily limit of 5 manual AQI checks.");
+      return;
+    }
+
+    setSearchLoading(true);
+    incrementSearchTracker();
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`);
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        toast.error("Location not found");
+        setSearchLoading(false);
+        return;
+      }
+      
+      const loc = data[0];
+      await fetchEnvironmentData(parseFloat(loc.lat), parseFloat(loc.lon), loc.display_name.split(",")[0]);
+      setSearchQuery("");
+    } catch {
+      toast.error("Failed to search location");
+      setSearchLoading(false);
+    }
+  };
+
+  const renderPollutant = (code: string) => {
+    const p = aqiData?.pollutants?.find((x) => x.code === code);
+    return (
+      <div className="flex justify-between items-center bg-muted/40 p-2 rounded-md">
+        <span className="text-xs font-semibold uppercase">{p?.displayName || code}</span>
+        <span className="text-xs font-mono">{p ? `${p.concentration.value.toFixed(1)}` : "--"}</span>
+      </div>
+    );
+  };
+
+  if (error && !aqiData) return null;
 
   return (
     <Popover>
@@ -75,7 +181,14 @@ const AQIWidget = () => {
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin text-primary-foreground" />
           ) : (
-            <Wind className={cn("w-4 h-4", aqiData?.aqi && aqiData.aqi < 50 ? "text-emerald-400" : aqiData?.aqi && aqiData.aqi < 100 ? "text-yellow-400" : "text-red-400")} />
+            <>
+              <Wind className={cn("w-4 h-4", aqiData?.aqi && aqiData.aqi < 50 ? "text-emerald-400" : aqiData?.aqi && aqiData.aqi < 100 ? "text-yellow-400" : "text-red-400")} />
+              {aqiData?.temp !== undefined && (
+                <span className="text-sm font-semibold tracking-wide text-primary-foreground mr-1">
+                  {Math.round(aqiData.temp)}°
+                </span>
+              )}
+            </>
           )}
           <span className="text-sm font-semibold tracking-wide text-primary-foreground">
             {loading ? "AQI" : aqiData?.aqiDisplay || "--"}
@@ -83,29 +196,85 @@ const AQIWidget = () => {
         </button>
       </PopoverTrigger>
       {!loading && aqiData && (
-        <PopoverContent align="end" className="w-[280px] p-4 space-y-3">
-          <div className="flex items-center gap-3 border-b border-border pb-3">
-            <div className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg text-white",
-              aqiData.aqi < 50 ? "bg-emerald-500" : aqiData.aqi < 100 ? "bg-yellow-500" : "bg-red-500"
-            )}>
-              {aqiData.aqiDisplay}
+        <PopoverContent align="end" className="w-[320px] p-0 overflow-hidden divide-y divide-border">
+          
+          {/* Header & Main Readout */}
+          <div className="p-4 bg-card">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground truncate font-medium">{aqiData.locationName}</p>
             </div>
-            <div>
-              <p className="font-semibold">{aqiData.category}</p>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Air Quality</p>
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-14 h-14 rounded-full flex flex-col items-center justify-center text-white shrink-0 shadow-inner",
+                aqiData.aqi < 50 ? "bg-emerald-500" : aqiData.aqi < 100 ? "bg-yellow-500" : "bg-red-500"
+              )}>
+                <span className="text-xl font-bold leading-none">{aqiData.aqiDisplay}</span>
+                <span className="text-[10px] opacity-90 font-medium">AQI</span>
+              </div>
+              <div>
+                <p className="font-bold text-base leading-tight">{aqiData.category}</p>
+                {aqiData.temp !== undefined && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Thermometer className="w-3.5 h-3.5" />
+                    {aqiData.temp}°C
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            <p><strong>Primary Pollutant:</strong> {aqiData.dominantPollutant.toUpperCase()}</p>
-            <p className="mt-2 text-xs">
-              {aqiData.aqi < 50 
-                ? "Air quality is considered satisfactory, and air pollution poses little or no risk."
-                : aqiData.aqi < 100 
-                ? "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution."
-                : "Members of sensitive groups may experience health effects. The general public is less likely to be affected."}
+
+          {/* Health Recommendation */}
+          {aqiData.elderlyRecommendation && (
+            <div className="px-4 py-3 bg-muted/30">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                <strong className="text-foreground">Seniors Advisory:</strong> {aqiData.elderlyRecommendation}
+              </p>
+            </div>
+          )}
+
+          {/* Detailed Pollutants */}
+          <div className="p-4">
+            <p className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wider flex justify-between">
+              Pollutants <span>(µg/m³ or ppb)</span>
             </p>
+            <div className="grid grid-cols-2 gap-2">
+              {renderPollutant("pm25")}
+              {renderPollutant("pm10")}
+              {renderPollutant("co")}
+              {renderPollutant("so2")}
+              {renderPollutant("no2")}
+              {renderPollutant("o3")}
+            </div>
           </div>
+
+          {/* Search Bar */}
+          <div className="p-3 bg-muted/20">
+            <form onSubmit={handleSearch} className="flex flex-col gap-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs text-muted-foreground font-medium">Search Location</p>
+                <p className="text-[10px] text-muted-foreground">{searchesLeft}/5 left today</p>
+              </div>
+              <div className="flex gap-2">
+                <Input 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="e.g., London, Tokyo..." 
+                  className="h-8 text-xs"
+                  disabled={searchLoading || searchesLeft <= 0}
+                />
+                <Button 
+                  type="submit" 
+                  size="sm" 
+                  className="h-8 px-3" 
+                  disabled={searchLoading || searchesLeft <= 0 || !searchQuery.trim()}
+                >
+                  {searchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+            </form>
+          </div>
+          
         </PopoverContent>
       )}
     </Popover>
