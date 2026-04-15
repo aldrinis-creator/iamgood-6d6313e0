@@ -909,7 +909,7 @@ const Settings = () => {
 
         {/* ============ PRIVACY TAB ============ */}
         {activeTab === "privacy" && (
-          <PrivacyTab session={session} navigate={navigate} />
+          <PrivacyTab session={session} navigate={navigate} guardians={guardians} />
         )}
       </div>
     </AppLayout>
