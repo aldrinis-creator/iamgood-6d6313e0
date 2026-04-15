@@ -33,6 +33,8 @@ import Install from "./pages/Install";
 import GuardianMessages from "./pages/GuardianMessages";
 import MapMyJourney from "./pages/MapMyJourney";
 import Unsubscribe from "./pages/Unsubscribe";
+import AdminCoupons from "./pages/AdminCoupons";
+import AdminRoute from "./components/AdminRoute";
 
 const queryClient = new QueryClient();
 
