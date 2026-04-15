@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
@@ -153,6 +154,14 @@ const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: a
             </div>
             <Switch checked={settings.shareLocation} onCheckedChange={(v) => updateSetting("shareLocation", v)} />
           </div>
+          {settings.shareLocation && acceptedGuardians.length > 0 && (
+            <GuardianChecklist
+              guardians={acceptedGuardians}
+              selectedIds={settings.locationSharingGuardianIds}
+              settingKey="locationSharingGuardianIds"
+              updateSetting={updateSetting}
+            />
+          )}
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium">Live Location for Guardians</p>
@@ -160,6 +169,14 @@ const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: a
             </div>
             <Switch checked={(settings as any).shareLocationWithGuardian !== false} onCheckedChange={(v) => updateSetting("shareLocationWithGuardian" as any, v)} />
           </div>
+          {(settings as any).shareLocationWithGuardian !== false && acceptedGuardians.length > 0 && (
+            <GuardianChecklist
+              guardians={acceptedGuardians}
+              selectedIds={settings.liveLocationGuardianIds}
+              settingKey="liveLocationGuardianIds"
+              updateSetting={updateSetting}
+            />
+          )}
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium">Share Health Data</p>
