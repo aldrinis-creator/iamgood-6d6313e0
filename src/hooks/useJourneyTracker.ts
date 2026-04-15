@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { playChime } from "@/lib/audioAlerts";
 
 interface JourneyData {
   id: string;
@@ -117,6 +118,8 @@ export function useJourneyTracker() {
         if (dist < 500 && !arrivingSoon) {
           setArrivingSoon(true);
           setArrivingSoonDismissed(false);
+          playChime();
+          if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
           notifyGuardians("🏁 Arriving Soon", `User is approaching ${activeJourney.destination_name}`);
         }
 
