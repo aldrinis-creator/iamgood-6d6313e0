@@ -99,6 +99,7 @@ const GuardianChecklist = ({
   );
 };
 
+const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: any; navigate: any; guardians: Guardian[] }) => {
   const queryClient = useQueryClient();
   const { settings, updateSetting } = useUserSettings();
 
