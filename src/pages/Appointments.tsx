@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
+import ShareAppointmentDialog from "@/components/appointments/ShareAppointmentDialog";
 
 const Appointments = () => {
   const { session } = useAuth();
@@ -22,6 +23,7 @@ const Appointments = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today">("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [shareAppointment, setShareAppointment] = useState<typeof appointments[0] | null>(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments", session?.user?.id],
@@ -149,13 +151,17 @@ const Appointments = () => {
                   </p>
                 )}
 
-                <div className="flex items-center justify-center gap-2 border rounded-md py-2 text-sm">
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => setShareAppointment(apt)}
+                >
                   <Share2 className="w-4 h-4" />
-                  Share with Doctor
+                  Share with Member/s
                   <Badge variant={apt.share_status === "shared" ? "default" : "secondary"} className="text-xs">
                     {apt.share_status === "shared" ? "Shared" : "Pending"}
                   </Badge>
-                </div>
+                </Button>
 
                 {apt.alarm_enabled && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -196,6 +202,12 @@ const Appointments = () => {
         onOpenChange={setShowAdd}
         editId={editingId}
         appointments={appointments}
+      />
+
+      <ShareAppointmentDialog
+        open={!!shareAppointment}
+        onOpenChange={(open) => !open && setShareAppointment(null)}
+        appointment={shareAppointment}
       />
     </AppLayout>
   );
