@@ -86,6 +86,9 @@ export interface UserSettings {
   // Journey Tracking
   journeyCheckInFrequency: number | null;
   journeyTrackingGuardians: string[];
+  // Per-guardian location sharing
+  locationSharingGuardianIds: string[];
+  liveLocationGuardianIds: string[];
 }
 
 export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
@@ -134,6 +137,8 @@ const DEFAULTS: UserSettings = {
   guardianVoiceAlerts: true,
   journeyCheckInFrequency: 15,
   journeyTrackingGuardians: [],
+  locationSharingGuardianIds: [],
+  liveLocationGuardianIds: [],
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle
