@@ -23,6 +23,7 @@ const Appointments = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "today">("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [shareAppointment, setShareAppointment] = useState<typeof appointments[0] | null>(null);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments", session?.user?.id],
