@@ -51,7 +51,8 @@ const NavTabs = () => {
         .from("guardian_pings")
         .select("*", { count: "exact", head: true })
         .eq("user_id", session.user.id)
-        .eq("read", false);
+        .eq("read", false)
+        .eq("initiated_by", "guardian" as any);
       setUnreadPings(count || 0);
     };
 
@@ -79,13 +80,21 @@ const NavTabs = () => {
     if (role !== "guardian" || !session?.user?.id) return;
 
     const fetchUnreadReplies = async () => {
-      const { count } = await supabase
+      // Count: user-initiated pings not yet read by guardian + guardian-initiated pings with unread replies
+      const { count: userPings } = await supabase
         .from("guardian_pings")
         .select("*", { count: "exact", head: true })
         .eq("guardian_user_id", session.user.id)
+        .eq("initiated_by", "user" as any)
+        .eq("guardian_read", false);
+      const { count: replies } = await supabase
+        .from("guardian_pings")
+        .select("*", { count: "exact", head: true })
+        .eq("guardian_user_id", session.user.id)
+        .eq("initiated_by", "guardian" as any)
         .not("reply_message", "is", null)
         .eq("guardian_read", false);
-      setUnreadReplies(count || 0);
+      setUnreadReplies((userPings || 0) + (replies || 0));
     };
 
     fetchUnreadReplies();

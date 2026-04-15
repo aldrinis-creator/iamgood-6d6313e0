@@ -19,7 +19,7 @@ interface Ping {
   guardian_name?: string;
   reply_message?: string | null;
   replied_at?: string | null;
-  direction: "received" | "sent";
+  initiated_by?: string;
 }
 
 const Messages = () => {
@@ -33,7 +33,6 @@ const Messages = () => {
   const fetchPings = async () => {
     if (!session?.user?.id) return;
 
-    // Fetch all pings where user_id = me (received from guardians + sent by me)
     const { data: received } = await supabase
       .from("guardian_pings")
       .select("*")
@@ -41,7 +40,6 @@ const Messages = () => {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    // Get user's guardians
     const { data: guardianRows } = await supabase
       .from("guardians")
       .select("guardian_user_id, guardian_name")
@@ -54,15 +52,12 @@ const Messages = () => {
       if (g.guardian_user_id) guardianMap[g.guardian_user_id] = g.guardian_name;
     });
 
-    const allPings: Ping[] = (received || []).map((p) => ({
+    const allPings: Ping[] = (received || []).map((p: any) => ({
       ...p,
       guardian_name: guardianMap[p.guardian_user_id] || "Guardian",
-      // If guardian_user_id !== me, it was sent by a guardian (received)
-      // If guardian_user_id === me... that shouldn't happen for user_id=me pings
-      direction: "received" as const,
     }));
 
-    // Fetch guardian names for unknowns
+    // Fetch names for unknown guardian IDs
     const unknownIds = [...new Set(allPings.filter(p => !guardianMap[p.guardian_user_id]).map(p => p.guardian_user_id))];
     if (unknownIds.length > 0) {
       const { data: profiles } = await supabase
@@ -75,6 +70,18 @@ const Messages = () => {
         if (!guardianMap[p.guardian_user_id]) {
           p.guardian_name = nameMap[p.guardian_user_id] || "Guardian";
         }
+      });
+    }
+
+    // Mark received pings as read
+    const unreadReceivedIds = allPings
+      .filter(p => !p.read && (p.initiated_by || "guardian") === "guardian")
+      .map(p => p.id);
+    if (unreadReceivedIds.length > 0) {
+      await supabase.from("guardian_pings").update({ read: true } as any).in("id", unreadReceivedIds);
+      unreadReceivedIds.forEach(id => {
+        const ping = allPings.find(p => p.id === id);
+        if (ping) ping.read = true;
       });
     }
 
@@ -99,14 +106,6 @@ const Messages = () => {
     return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id]);
 
-  const markAllRead = async () => {
-    if (!session?.user?.id) return;
-    const unreadIds = pings.filter(p => !p.read).map(p => p.id);
-    if (unreadIds.length === 0) return;
-    await supabase.from("guardian_pings").update({ read: true } as any).in("id", unreadIds);
-    setPings(prev => prev.map(p => ({ ...p, read: true })));
-  };
-
   const sendReply = async (pingId: string) => {
     if (!replyText.trim() || !session?.user?.id) return;
     setSending(true);
@@ -121,7 +120,8 @@ const Messages = () => {
     fetchPings();
   };
 
-  const unreadCount = pings.filter(p => !p.read).length;
+  // Determine bubble direction: initiated_by tells us who sent the original message
+  const isSentByUser = (p: Ping) => (p.initiated_by || "guardian") === "user";
 
   return (
     <AppLayout>
@@ -131,14 +131,7 @@ const Messages = () => {
             <MessageCircle className="w-5 h-5 text-primary" />
             Messages
           </h1>
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Button variant="outline" size="sm" onClick={markAllRead} className="text-xs">
-                <CheckCheck className="w-3 h-3 mr-1" /> Mark all read
-              </Button>
-            )}
-            <UserPingDialog onSent={fetchPings} />
-          </div>
+          <UserPingDialog onSent={fetchPings} />
         </div>
 
         {loading ? (
@@ -152,63 +145,86 @@ const Messages = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {pings.map(p => (
-              <Card key={p.id} className={`transition-colors ${!p.read ? "border-primary/30 bg-primary/5" : ""}`}>
-                <CardContent className="p-3 space-y-2">
-                  {/* Guardian's message (received) */}
-                  <div className="flex justify-start">
-                    <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-medium text-primary">{p.guardian_name}</span>
-                        {!p.read && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
-                      </div>
-                      <p className="text-sm">{p.message}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        {formatISTDateTime(p.created_at)}
-                      </p>
-                    </div>
-                  </div>
+            {pings.map(p => {
+              const sentByUser = isSentByUser(p);
+              // The "message" field is the original message from whoever initiated
+              // The "reply_message" is the response from the other party
+              // User can reply to guardian-initiated pings that have no reply yet
+              const canReply = !sentByUser && !p.reply_message;
 
-                  {/* User's reply */}
-                  {p.reply_message ? (
-                    <div className="flex justify-end">
-                      <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
-                        <p className="text-sm">{p.reply_message}</p>
-                        <div className="flex items-center gap-1 mt-1 justify-end">
-                          <p className="text-[10px] opacity-70">
-                            {p.replied_at ? formatISTDateTime(p.replied_at) : ""}
+              return (
+                <Card key={p.id}>
+                  <CardContent className="p-3 space-y-2">
+                    {/* Original message */}
+                    {sentByUser ? (
+                      // User sent this — show on right
+                      <div className="flex justify-end">
+                        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
+                          <p className="text-sm">{p.message}</p>
+                          <p className="text-[10px] opacity-70 text-right mt-1">
+                            {formatISTDateTime(p.created_at)}
                           </p>
-                          <Check className="w-3 h-3 opacity-70" />
                         </div>
                       </div>
-                    </div>
-                  ) : replyingTo === p.id ? (
-                    <div className="flex gap-2 pt-1">
-                      <Input
-                        placeholder="Type a reply..."
-                        value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
-                        className="flex-1"
-                        autoFocus
-                      />
-                      <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-primary"
-                      onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
-                    >
-                      <Send className="w-3 h-3 mr-1" /> Reply
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    ) : (
+                      // Guardian sent this — show on left
+                      <div className="flex justify-start">
+                        <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
+                          <span className="text-xs font-medium text-primary">{p.guardian_name}</span>
+                          <p className="text-sm">{p.message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {formatISTDateTime(p.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reply */}
+                    {p.reply_message ? (
+                      <div className={`flex ${sentByUser ? "justify-start" : "justify-end"}`}>
+                        <div className={`${sentByUser ? "bg-muted rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm"} rounded-2xl px-3 py-2 max-w-[80%]`}>
+                          {sentByUser && <span className="text-xs font-medium text-primary">{p.guardian_name}</span>}
+                          <p className="text-sm">{p.reply_message}</p>
+                          <div className="flex items-center gap-1 mt-1 justify-end">
+                            <p className={`text-[10px] ${sentByUser ? "text-muted-foreground" : "opacity-70"}`}>
+                              {p.replied_at ? formatISTDateTime(p.replied_at) : ""}
+                            </p>
+                            <Check className={`w-3 h-3 ${sentByUser ? "text-primary" : "opacity-70"}`} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : canReply ? (
+                      replyingTo === p.id ? (
+                        <div className="flex gap-2 pt-1">
+                          <Input
+                            placeholder="Type a reply..."
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
+                            className="flex-1"
+                            autoFocus
+                          />
+                          <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-primary"
+                          onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
+                        >
+                          <Send className="w-3 h-3 mr-1" /> Reply
+                        </Button>
+                      )
+                    ) : sentByUser && !p.reply_message ? (
+                      <p className="text-[10px] text-muted-foreground italic">Awaiting reply…</p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 
