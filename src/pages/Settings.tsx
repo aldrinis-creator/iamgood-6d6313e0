@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -55,10 +55,11 @@ const TYPE_LABELS: Record<string, string> = {
   objection: "Processing Objection",
 };
 
-const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
+const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: any; navigate: any; guardians: Guardian[] }) => {
   const queryClient = useQueryClient();
   const { settings, updateSetting } = useUserSettings();
 
+  const acceptedGuardians = useMemo(() => allGuardians.filter(g => g.status === "accepted"), [allGuardians]);
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["privacy_requests", session?.user?.id],
     queryFn: async () => {
