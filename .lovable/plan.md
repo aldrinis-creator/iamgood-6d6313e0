@@ -1,41 +1,48 @@
 
 
-## Replace "Now" Tile with Real-Time "Last Active"
+## Admin Coupon Management Panel
 
-### Problem
-The 3rd tile in the guardian status band shows the current clock time labeled "Now" — useless information. It should show when the ward last interacted with their phone.
+### Overview
+Create a protected admin page at `/admin/coupons` that provides full CRUD for the `coupons` table. Since the coupons table RLS only allows `service_role`, all mutations will go through a new edge function that verifies admin role before executing.
 
 ### Changes
 
-**1. Database Migration**
-Add `last_active_at` column to `profiles`:
-```sql
-ALTER TABLE public.profiles ADD COLUMN last_active_at timestamptz;
-```
-No new RLS needed — guardians already have SELECT on ward profiles via existing guardian policies.
+**1. New Edge Function: `supabase/functions/admin-coupons/index.ts`**
+- Accepts POST with action: `list`, `create`, `update`, `delete`
+- Validates the caller has `admin` role via `has_role(uid, 'admin')`
+- Uses `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS on the `coupons` table
+- Returns coupon data or success/error responses
 
-**2. New Hook: `src/hooks/useActivityHeartbeat.ts`**
-- Listens to `pointerdown`, `scroll`, `keydown`, `visibilitychange` events
-- Debounces writes to **2 minutes** to minimize DB load
-- Updates `profiles.last_active_at = now()` for the current user
-- Only active for `user` role accounts
+**2. New Page: `src/pages/AdminCoupons.tsx`**
+- Table view of all coupons with columns: Code, Type, Value, Plans, Expiry, Max Uses, Used, Active, Actions
+- "Create Coupon" button opens a dialog with form fields:
+  - Code (text, auto-uppercased)
+  - Discount Type (select: percentage / flat)
+  - Discount Value (number)
+  - Applicable Plans (checkboxes: basic, pro)
+  - Expiry Date (date picker)
+  - Max Uses (number, optional)
+  - Active toggle
+- Edit button on each row opens the same dialog pre-filled
+- Activate/Deactivate toggle switch per row
+- Delete button with AlertDialog confirmation
+- Color-coded badges for active/expired/exhausted status
 
-**3. Wire into `src/components/AppLayout.tsx`**
-Add `useActivityHeartbeat()` inside the existing `UserOnlyHooks` component.
+**3. Route: `src/App.tsx`**
+- Add `/admin/coupons` route protected by a new `AdminRoute` component that checks `has_role` for admin
 
-**4. Update `src/pages/GuardianDashboard.tsx`**
-- Fetch `last_active_at` from the ward's profile row alongside existing data
-- Replace the "Now" tile (lines 761-765):
-  - Icon: `Smartphone` instead of `Clock`
-  - Value: relative time from `last_active_at` (e.g. "2 min ago", "1h ago")
-  - Label: "Last Active"
-- Subscribe to realtime changes on `profiles` filtered to ward user ID for live updates
+**4. New Component: `src/components/AdminRoute.tsx`**
+- Checks if user has admin role via `user_roles` table
+- Redirects non-admins to `/dashboard`
 
 ### Files
 | File | Action |
 |------|--------|
-| Migration SQL | Add `last_active_at` column |
-| `src/hooks/useActivityHeartbeat.ts` | New — debounced activity tracker |
-| `src/components/AppLayout.tsx` | Add heartbeat to `UserOnlyHooks` |
-| `src/pages/GuardianDashboard.tsx` | Replace "Now" tile, fetch + subscribe to `last_active_at` |
+| `supabase/functions/admin-coupons/index.ts` | New — CRUD edge function |
+| `src/pages/AdminCoupons.tsx` | New — admin UI |
+| `src/components/AdminRoute.tsx` | New — admin route guard |
+| `src/App.tsx` | Add route |
+
+### Prerequisites
+- You need an `admin` role assigned to your user in the `user_roles` table. I will insert that after building the page, or you can tell me your user ID.
 
