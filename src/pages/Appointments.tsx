@@ -203,6 +203,12 @@ const Appointments = () => {
         editId={editingId}
         appointments={appointments}
       />
+
+      <ShareAppointmentDialog
+        open={!!shareAppointment}
+        onOpenChange={(open) => !open && setShareAppointment(null)}
+        appointment={shareAppointment}
+      />
     </AppLayout>
   );
 };
