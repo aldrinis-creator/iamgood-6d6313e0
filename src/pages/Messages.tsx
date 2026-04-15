@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Check, CheckCheck, ArrowUpRight, ArrowDownLeft, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MessageCircle, Check, CheckCheck, Send, Clock } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +17,8 @@ interface Ping {
   read: boolean;
   created_at: string;
   guardian_name?: string;
-  reply_message?: string;
-  replied_at?: string;
+  reply_message?: string | null;
+  replied_at?: string | null;
   direction: "received" | "sent";
 }
 
@@ -25,11 +26,14 @@ const Messages = () => {
   const { session } = useAuth();
   const [pings, setPings] = useState<Ping[]>([]);
   const [loading, setLoading] = useState(true);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
 
   const fetchPings = async () => {
     if (!session?.user?.id) return;
 
-    // Fetch received pings (from guardians to user)
+    // Fetch all pings where user_id = me (received from guardians + sent by me)
     const { data: received } = await supabase
       .from("guardian_pings")
       .select("*")
@@ -37,7 +41,7 @@ const Messages = () => {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    // Get user's guardians to fetch sent pings
+    // Get user's guardians
     const { data: guardianRows } = await supabase
       .from("guardians")
       .select("guardian_user_id, guardian_name")
@@ -49,29 +53,16 @@ const Messages = () => {
     (guardianRows || []).forEach((g) => {
       if (g.guardian_user_id) guardianMap[g.guardian_user_id] = g.guardian_name;
     });
-    const guardianIds = Object.keys(guardianMap);
-
-    // Fetch sent pings (user initiated — where user_id = me but guardian sent query won't catch them,
-    // so we look for pings where user_id = me that were NOT from the guardian's perspective)
-    // Actually, all pings where user_id = me are already in `received`. 
-    // Sent pings by user are also user_id = me, guardian_user_id = guardian.
-    // We need to distinguish: if the guardian inserted it (guardian ping to user) vs user inserted it (user ping to guardian).
-    // Since both have user_id = session.user.id, we can't distinguish by columns alone.
-    // However, received pings from guardians will have replies from the user,
-    // and sent pings from the user won't typically have replies.
-    // For now, all pings with user_id = me are shown. The direction is implicit.
-    // Let's mark ones where the guardian_user_id matches a known guardian and there's no reply as potentially sent by user.
-    
-    // Actually the simplest approach: fetch ALL guardian_pings where user_id = me. They're all in one list.
-    // We already have them from 'received'. Let's just enrich with guardian names.
 
     const allPings: Ping[] = (received || []).map((p) => ({
       ...p,
       guardian_name: guardianMap[p.guardian_user_id] || "Guardian",
-      direction: "received" as const, // We show all as a conversation
+      // If guardian_user_id !== me, it was sent by a guardian (received)
+      // If guardian_user_id === me... that shouldn't happen for user_id=me pings
+      direction: "received" as const,
     }));
 
-    // Also fetch guardian names for any not in guardianMap
+    // Fetch guardian names for unknowns
     const unknownIds = [...new Set(allPings.filter(p => !guardianMap[p.guardian_user_id]).map(p => p.guardian_user_id))];
     if (unknownIds.length > 0) {
       const { data: profiles } = await supabase
@@ -98,7 +89,7 @@ const Messages = () => {
     const channel = supabase
       .channel("user-messages-page")
       .on("postgres_changes", {
-        event: "INSERT",
+        event: "*",
         schema: "public",
         table: "guardian_pings",
         filter: `user_id=eq.${session.user.id}`,
@@ -114,6 +105,20 @@ const Messages = () => {
     if (unreadIds.length === 0) return;
     await supabase.from("guardian_pings").update({ read: true } as any).in("id", unreadIds);
     setPings(prev => prev.map(p => ({ ...p, read: true })));
+  };
+
+  const sendReply = async (pingId: string) => {
+    if (!replyText.trim() || !session?.user?.id) return;
+    setSending(true);
+    await supabase.from("guardian_pings").update({
+      reply_message: replyText.trim(),
+      replied_at: new Date().toISOString(),
+      read: true,
+    } as any).eq("id", pingId);
+    setSending(false);
+    setReplyingTo(null);
+    setReplyText("");
+    fetchPings();
   };
 
   const unreadCount = pings.filter(p => !p.read).length;
@@ -149,28 +154,58 @@ const Messages = () => {
           <div className="space-y-2">
             {pings.map(p => (
               <Card key={p.id} className={`transition-colors ${!p.read ? "border-primary/30 bg-primary/5" : ""}`}>
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                <CardContent className="p-3 space-y-2">
+                  {/* Guardian's message (received) */}
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
+                      <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-xs font-medium text-primary">{p.guardian_name}</span>
-                        {!p.read && (
-                          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                        )}
+                        {!p.read && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
                       </div>
                       <p className="text-sm">{p.message}</p>
-                      {p.reply_message && (
-                        <div className="mt-1.5 pl-3 border-l-2 border-primary/30">
-                          <p className="text-xs text-primary font-medium">Your reply:</p>
-                          <p className="text-sm text-foreground/80">{p.reply_message}</p>
-                        </div>
-                      )}
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {formatISTDateTime(p.created_at)}
                       </p>
                     </div>
-                    {p.read && <Check className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-1" />}
                   </div>
+
+                  {/* User's reply */}
+                  {p.reply_message ? (
+                    <div className="flex justify-end">
+                      <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
+                        <p className="text-sm">{p.reply_message}</p>
+                        <div className="flex items-center gap-1 mt-1 justify-end">
+                          <p className="text-[10px] opacity-70">
+                            {p.replied_at ? formatISTDateTime(p.replied_at) : ""}
+                          </p>
+                          <Check className="w-3 h-3 opacity-70" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : replyingTo === p.id ? (
+                    <div className="flex gap-2 pt-1">
+                      <Input
+                        placeholder="Type a reply..."
+                        value={replyText}
+                        onChange={e => setReplyText(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-primary"
+                      onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
+                    >
+                      <Send className="w-3 h-3 mr-1" /> Reply
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
