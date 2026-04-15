@@ -461,6 +461,7 @@ export type Database = {
           guardian_read: boolean
           guardian_user_id: string
           id: string
+          initiated_by: string
           message: string
           read: boolean
           replied_at: string | null
@@ -472,6 +473,7 @@ export type Database = {
           guardian_read?: boolean
           guardian_user_id: string
           id?: string
+          initiated_by?: string
           message: string
           read?: boolean
           replied_at?: string | null
@@ -483,6 +485,7 @@ export type Database = {
           guardian_read?: boolean
           guardian_user_id?: string
           id?: string
+          initiated_by?: string
           message?: string
           read?: boolean
           replied_at?: string | null
