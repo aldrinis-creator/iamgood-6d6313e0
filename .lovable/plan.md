@@ -1,57 +1,73 @@
 
 
-## Fix Messages Not Popping + Remove Blocking Journey Acknowledge Overlay
+## Guardian Dashboard Reordering & Restructuring
 
-### Issue 1: Messages System Fixes
+### Changes Overview
 
-**Root causes identified:**
-1. No popup overlay exists for guardians when users send messages
-2. User's own `GuardianPingOverlay` fires on their own outgoing messages (self-triggered)
-3. RLS missing: guardians cannot update `guardian_read` column
+**File: `src/pages/GuardianDashboard.tsx`**
 
-**Fixes:**
+### 1. Move Today's Check-iNs Above Alerts
+- Move the Check-iNs card (lines 803-832) to render immediately after Quick Actions / Ambulance section
+- Move the Notification Alerts card (lines 775-801) below Check-iNs
 
-**A. `src/components/GuardianPingOverlay.tsx`** — Filter out self-sent pings
-- In the realtime INSERT handler, check if `p.guardian_user_id !== session.user.id` before showing the overlay. This prevents the user from seeing their own outgoing messages as incoming pings.
+### 2. Auto-Collapsing Alerts Section
+- Wrap the existing Alerts card in a `Collapsible` that is controlled by state
+- Add state: `alertsOpen` (boolean), driven by `unreadCount > 0` or active journey
+- Add a `useEffect` that sets a 5-minute timer to auto-close when alerts appear or journey ends
+- When new unread alerts arrive or an active journey is detected, re-open
+- When `unreadCount` drops to 0 and no journey, start the 5-min close timer
 
-**B. `src/components/AppLayout.tsx`** — Add guardian-side ping overlay
-- Render a new `UserPingOverlay` component when `role === "guardian"` that listens for new pings where `guardian_user_id = session.user.id` and shows a popup notification.
+### 3. Medications — Summary + View Details
+- Replace the current always-expanded `CollapsibleSection` with a new inline card
+- Show a compact summary: `"X of Y doses taken"` with an inline `<Progress>` bar and percentage
+- Add a "View Details" button that toggles showing the full `WardMedicationStatus`, `WardMedicationAdherence`, and `WardRefillOrder`
+- Add a 5-minute inactivity timer: after details are opened, auto-collapse after 5 minutes of no interaction
+- Fetch dose counts directly in the dashboard (query `medications` + `medication_logs` for today) or extract from `WardMedicationStatus` props
 
-**C. New component: `src/components/UserPingOverlay.tsx`**
-- Similar to `GuardianPingOverlay` but for the guardian role
-- Subscribes to realtime INSERT on `guardian_pings` filtered by `guardian_user_id=eq.${session.user.id}`
-- Shows popup with the user's message, reply input, and dismiss button
-- On dismiss, marks `guardian_read = true`
+### 4. Data Analysis Tiles Grid
+- Remove the individual `CollapsibleSection` wrappers for Vitals, Activity, Emergency Health Card
+- Add a new section with heading: `"{wardName}'s Data Analysis"`
+- Render a 3-column grid of tiles (navigable cards) for:
+  - **Vitals** — links to `/guardian/reports` (vitals section) or opens inline
+  - **Activity** — same pattern
+  - **Emergency Card** — same pattern
+  - **Nutrition** — new tile
+  - **Face Scan** — new tile
+  - **Wellness** — new tile
+- Each tile: icon + label, tapping opens a Dialog/Sheet with the relevant component content
+- Keep `CareJournal` collapsible section as-is (not part of data analysis)
 
-**D. Database migration** — Add UPDATE RLS policy for guardians
-```sql
-CREATE POLICY "Guardians can update own pings"
-ON public.guardian_pings
-FOR UPDATE
-TO authenticated
-USING (guardian_user_id = auth.uid());
+### New State Variables
+```
+alertsOpen: boolean
+alertsTimer: NodeJS.Timeout | null
+medDetailsOpen: boolean
+medDetailsTimer: NodeJS.Timeout | null
+medDoseSummary: { taken: number; total: number } | null
+dataAnalysisSheet: "vitals" | "activity" | "emergency" | "nutrition" | "facescan" | "wellness" | null
 ```
 
-### Issue 2: Remove Blocking "Acknowledged" Overlay on Arriving
+### New Components/Imports Needed
+- Import existing: `WardVitalsSummary`, `WardActivitySummary`, `EmergencyCardGated`
+- For Nutrition/FaceScan/Wellness tiles: render placeholder cards or fetch summary data (these were removed from Health Passport but the ward components may still exist)
+- Use `Sheet` or `Dialog` for tile detail views
 
-**Root cause:** The `JourneyAlertOverlay` for "arriving" type is a full-screen modal at z-[100] that blocks the "End Journey" button. It serves no actionable purpose.
-
-**Fix:**
-
-**E. `src/pages/MapMyJourney.tsx`** — Replace arriving overlay with inline banner
-- Remove the `JourneyAlertOverlay` for the "arriving" type (keep it for "deviation" which is critical)
-- Instead, show the "Arriving Soon" status as a non-blocking inline banner within the status card (already partially done with the badge at line 267, just enhance it)
-- Add an "End Journey" button directly accessible without any overlay blocking it
-
-**F. `src/components/JourneyAlertOverlay.tsx`** — No changes needed (keep for deviation only)
-
-**G. `src/hooks/useJourneyTracker.ts`** — When `arrivingSoon` triggers, also play the chime/vibrate directly in the hook instead of relying on the overlay for audio feedback
+### Final Layout Order
+1. WardPicker
+2. Active SOS card (if any)
+3. Health Pattern Alerts (if any)
+4. User Status card (with health ring, battery, etc.)
+5. Missed Check-in Alert
+6. Quick Actions (Call, Route, Ambulance, Ping)
+7. Ambulance booking (if toggled)
+8. **Today's Check-iNs** ← moved up
+9. **Alerts** (auto-collapsing) ← moved down, collapsible
+10. Journey Tracker
+11. Location (collapsible)
+12. **Medications Summary** (compact + View Details)
+13. **"{wardName}'s Data Analysis"** tile grid
+14. Care Journal (collapsible)
 
 ### Files to modify
-- `src/components/GuardianPingOverlay.tsx` (filter self-sent)
-- `src/components/UserPingOverlay.tsx` (new — guardian-side overlay)
-- `src/components/AppLayout.tsx` (add UserPingOverlay for guardians)
-- `src/pages/MapMyJourney.tsx` (remove arriving overlay, keep deviation)
-- `src/hooks/useJourneyTracker.ts` (play audio on arrivingSoon)
-- Database migration (guardian UPDATE policy)
+- `src/pages/GuardianDashboard.tsx` — all changes in this single file
 
