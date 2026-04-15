@@ -113,7 +113,7 @@ const MapMyJourney = () => {
       .select("*")
       .eq("user_id", session.user.id)
       .then(({ data }) => {
-        if (data) setAvailableGuardians(data.filter((g) => !g.is_primary && g.status === "accepted"));
+        if (data) setAvailableGuardians(data.filter((g) => !g.is_primary));
       });
   }, [session?.user?.id]);
 
@@ -146,6 +146,29 @@ const MapMyJourney = () => {
       .limit(20)
       .then(({ data }) => setJourneyReports(data || []));
   }, [activeJourney, session?.user?.id]);
+
+  const handleDeleteReport = async (id: string) => {
+    try {
+      const { error } = await supabase.from("journey_reports").delete().eq("id", id);
+      if (error) throw error;
+      setJourneyReports((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Report deleted successfully");
+    } catch (err: any) {
+      toast.error("Failed to delete report");
+    }
+  };
+
+  const handleDeleteAllReports = async () => {
+    if (!session?.user?.id) return;
+    try {
+      const { error } = await supabase.from("journey_reports").delete().eq("user_id", session.user.id);
+      if (error) throw error;
+      setJourneyReports([]);
+      toast.success("All reports erased");
+    } catch (err: any) {
+      toast.error("Failed to delete reports");
+    }
+  };
 
   // Fetch route from OSRM
   const fetchRoute = useCallback(async (origin: { lat: number; lng: number }, dest: { lat: number; lng: number }, mode: string) => {
@@ -639,12 +662,17 @@ const MapMyJourney = () => {
 
                 {journeyReports.length > 0 && (
                   <div className="mt-8 pt-6 border-t border-border">
-                    <h2 className="text-sm font-semibold flex items-center gap-2 mb-4 text-muted-foreground uppercase tracking-wider">
-                      <History className="w-4 h-4" /> Past Journeys
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                        <History className="w-4 h-4" /> Past Journeys
+                      </h2>
+                      <Button variant="ghost" size="sm" onClick={handleDeleteAllReports} className="text-xs text-muted-foreground hover:text-destructive h-auto py-1">
+                        Clear All
+                      </Button>
+                    </div>
                     <div className="space-y-3">
                       {journeyReports.slice(0,3).map((r) => (
-                        <JourneyReportCard key={r.id} report={r} />
+                        <JourneyReportCard key={r.id} report={r} onDelete={handleDeleteReport} />
                       ))}
                     </div>
                   </div>
