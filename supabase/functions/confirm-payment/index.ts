@@ -132,24 +132,8 @@ Deno.serve(async (req) => {
       const { error: couponErr } = await supabase.rpc("increment_coupon_usage", {
         _code: coupon_code,
       });
-      // If the RPC doesn't exist yet, fall back to a direct update
       if (couponErr) {
-        await supabase
-          .from("coupons")
-          .update({ used_count: supabase.rpc ? undefined : 0 })
-          .eq("code", coupon_code);
-        // Simple increment via raw update
-        const { data: couponData } = await supabase
-          .from("coupons")
-          .select("used_count")
-          .eq("code", coupon_code)
-          .maybeSingle();
-        if (couponData) {
-          await supabase
-            .from("coupons")
-            .update({ used_count: couponData.used_count + 1 })
-            .eq("code", coupon_code);
-        }
+        console.error("Failed to increment coupon usage:", couponErr);
       }
     }
 
