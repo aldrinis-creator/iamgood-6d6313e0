@@ -1,5 +1,6 @@
 import { User, LogOut, Settings, UserCircle, ShieldCheck } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
+import AQIWidget from "@/components/AQIWidget";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +34,7 @@ const AppHeader = () => {
         </div>
         <div className="flex items-center gap-3">
           <NotificationCenter />
-          <AccessibilityMenu />
+          <AQIWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
@@ -49,6 +50,9 @@ const AppHeader = () => {
                   <ShieldCheck className="w-4 h-4 mr-2" /> Medical Vault
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem asChild>
+                <AccessibilityMenu renderAsMenuItem={true} />
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate(role === "guardian" ? "/guardian-settings" : "/settings")}>
                 <Settings className="w-4 h-4 mr-2" /> Settings
               </DropdownMenuItem>

@@ -112,7 +112,7 @@ const ToggleButton = ({
   </button>
 );
 
-const AccessibilityMenu = () => {
+const AccessibilityMenu = ({ renderAsMenuItem }: { renderAsMenuItem?: boolean }) => {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<A11yState>(() => {
     try {
@@ -236,9 +236,15 @@ const AccessibilityMenu = () => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="p-2 rounded-full hover:bg-primary-foreground/10" aria-label="Accessibility Menu">
-          <Accessibility className="w-5 h-5" />
-        </button>
+        {renderAsMenuItem ? (
+          <button className="flex w-full items-center select-none rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
+            <Accessibility className="w-4 h-4 mr-2" /> Accessibility
+          </button>
+        ) : (
+          <button className="p-2 rounded-full hover:bg-primary-foreground/10" aria-label="Accessibility Menu">
+            <Accessibility className="w-5 h-5" />
+          </button>
+        )}
       </SheetTrigger>
       <SheetContent side="right" className="w-[340px] sm:w-[380px] overflow-y-auto p-0">
         <SheetHeader className="bg-primary text-primary-foreground p-4 sticky top-0 z-10">
