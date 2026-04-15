@@ -28,6 +28,8 @@ export function useSubscription() {
         expires_at: string;
         starts_at: string;
         amount_paise: number;
+        coupon_code: string | null;
+        razorpay_payment_id: string | null;
       } | null;
     },
     staleTime: 5 * 60 * 1000,

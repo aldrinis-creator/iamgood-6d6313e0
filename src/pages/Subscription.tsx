@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart } from "lucide-react";
+import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart, Printer } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
+import { printReceipt } from "@/lib/receiptPdf";
 
 const plans = [
   {
@@ -288,6 +289,28 @@ const Subscription = () => {
                   <Button size="lg" className="w-full" onClick={() => navigate("/dashboard")}>
                     Go to Dashboard
                   </Button>
+                  {subscription && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="w-full gap-2"
+                      onClick={() =>
+                        printReceipt({
+                          id: subscription.id,
+                          plan_type: subscription.plan_type,
+                          billing_cycle: subscription.billing_cycle,
+                          amount_paise: subscription.amount_paise,
+                          starts_at: subscription.starts_at,
+                          expires_at: subscription.expires_at,
+                          coupon_code: subscription.coupon_code,
+                          razorpay_payment_id: subscription.razorpay_payment_id,
+                          userName: user?.user_metadata?.full_name || undefined,
+                        })
+                      }
+                    >
+                      <Printer className="w-4 h-4" /> Download Receipt
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="w-full" onClick={handleDismissSuccess}>
                     View Plans
                   </Button>
