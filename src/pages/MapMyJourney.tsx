@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2 } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2, Users } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
 import JourneyReportCard from "@/components/JourneyReportCard";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatISTTime } from "@/lib/istTime";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,8 +100,22 @@ const MapMyJourney = () => {
   const [inputFocused, setInputFocused] = useState(false);
   const [pendingHomeWork, setPendingHomeWork] = useState<"home" | "work" | null>(null);
   const [journeyReports, setJourneyReports] = useState<any[]>([]);
+  const [availableGuardians, setAvailableGuardians] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { destinations: savedDests, saveDestination, toggleFavorite, removeDestination, home: homeDest, work: workDest, setHomeWork } = useSavedDestinations();
+  const { settings, updateSetting } = useUserSettings();
+
+  // Fetch guardians once
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase
+      .from("guardians")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .then(({ data }) => {
+        if (data) setAvailableGuardians(data.filter((g) => !g.is_primary && g.status === "accepted"));
+      });
+  }, [session?.user?.id]);
 
   // Google-first place autocomplete hook
   const {
@@ -243,18 +259,72 @@ const MapMyJourney = () => {
 
   return (
     <AppLayout>
-      <div className="p-4 space-y-4">
-        <h1 className="text-xl font-bold flex items-center gap-2">
+      <div className="relative w-full h-[calc(100vh-64px)] flex flex-col bg-background overflow-hidden">
+        <h1 className="absolute top-4 left-4 z-10 bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-sm text-lg font-bold flex items-center gap-2 border border-border">
           <Navigation className="w-5 h-5 text-primary" />
           Map My Journey
         </h1>
 
-        {/* Active Journey View */}
-        {activeJourney ? (
-          <>
-            {/* Status Card */}
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4 space-y-3">
+        {/* Full-screen absolute Map */}
+        <div className="absolute inset-0 z-0">
+          <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }} zoomControl={false}>
+            <TileLayer
+              attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+            <FitBounds bounds={mapBounds} />
+            {currentPos && <Marker position={[currentPos.lat, currentPos.lng]} icon={userIcon} />}
+            {selectedDest && !activeJourney && <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />}
+            {activeJourney?.destination_lat && activeJourney?.destination_lng && (
+               <Marker position={[activeJourney.destination_lat, activeJourney.destination_lng]} icon={destIcon} />
+            )}
+            {activeJourney?.origin_lat && activeJourney?.origin_lng && (
+              <Marker position={[activeJourney.origin_lat, activeJourney.origin_lng]} icon={userIcon} />
+            )}
+            {(activeRouteCoords.length > 1) ? (
+              <Polyline positions={activeRouteCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 4 }} />
+            ) : (routeCoords.length > 1) ? (
+              <Polyline positions={routeCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3, dashArray: "8 4" }} />
+            ) : null}
+          </MapContainer>
+
+          {/* Street View toggle */}
+          <Button
+            size="sm"
+            variant={showStreetView ? "default" : "secondary"}
+            className="absolute bottom-[40vh] right-4 z-[1000] h-9 shadow-lg gap-1.5 rounded-full px-4"
+            onClick={() => setShowStreetView((s) => !s)}
+          >
+            <Eye className="w-4 h-4" />
+            Street View
+          </Button>
+        </div>
+
+        {/* Street View Panel */}
+        {showStreetView && currentPos && (
+          <div className="absolute top-20 right-4 left-4 z-20 rounded-xl overflow-hidden shadow-2xl border border-border">
+            <StreetViewPanel
+              lat={currentPos.lat}
+              lng={currentPos.lng}
+              heading={activeRouteCoords.length >= 2
+                ? (() => {
+                    const last = activeRouteCoords[activeRouteCoords.length - 1];
+                    const prev = activeRouteCoords[activeRouteCoords.length - 2];
+                    const dLat = last[0] - prev[0];
+                    const dLng = last[1] - prev[1];
+                    return (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
+                  })()
+                : 0}
+              height={250}
+            />
+          </div>
+        )}
+
+        {/* Floating Controls (Bottom Sheet) */}
+        <div className="relative z-10 flex flex-col h-full pointer-events-none p-0 justify-end">
+          {activeJourney ? (
+            <Card className="pointer-events-auto shadow-2xl rounded-t-3xl w-full max-w-xl mx-auto bg-card/95 backdrop-blur-md border-t-4 border-t-primary border-x-0 border-b-0 animate-in slide-in-from-bottom pt-2">
+              <CardContent className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-primary">🗺️ Journey Active</span>
                   <div className="flex items-center gap-1.5">
@@ -270,14 +340,14 @@ const MapMyJourney = () => {
                     )}
                   </div>
                 </div>
-                <p className="text-sm font-medium">{activeJourney.destination_name}</p>
-                <div className="flex gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {elapsed} min elapsed
+                <p className="text-base font-medium">{activeJourney.destination_name}</p>
+                <div className="flex gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" /> {elapsed} min elapsed
                   </span>
                   {distanceRemaining !== null && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4" />
                       {distanceRemaining > 1000
                         ? `${(distanceRemaining / 1000).toFixed(1)} km`
                         : `${Math.round(distanceRemaining)} m`} left
@@ -285,402 +355,307 @@ const MapMyJourney = () => {
                   )}
                 </div>
 
-                {/* Check-in responses */}
                 {updates.filter((u) => u.check_in_response).length > 0 && (
-                  <div className="space-y-1 pt-2 border-t border-border">
-                    <p className="text-xs font-semibold text-muted-foreground">Check-in Responses</p>
+                  <div className="space-y-1.5 pt-3 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Check-in Responses</p>
                     {updates
                       .filter((u) => u.check_in_response)
                       .slice(-3)
                       .map((u) => (
-                        <p key={u.id} className="text-xs text-muted-foreground">
+                        <p key={u.id} className="text-sm text-muted-foreground">
                           {formatISTTime(u.created_at)}
-                          : {u.check_in_response}
+                          : <span className="text-foreground">{u.check_in_response}</span>
                         </p>
                       ))}
                   </div>
                 )}
 
-                <Button variant="destructive" onClick={handleEndJourney} className="w-full">
+                <Button variant="destructive" onClick={handleEndJourney} className="w-full h-12 text-md font-semibold mt-2">
                   End Journey
                 </Button>
               </CardContent>
             </Card>
+          ) : (
+            <div className="pointer-events-auto w-full max-w-xl mx-auto bg-card rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] border-t border-border overflow-y-auto max-h-[75vh]">
+              <div className="p-5 pb-8 space-y-5">
+                <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mb-2" />
 
-            {/* Map */}
-            <div className="relative rounded-lg overflow-hidden border border-border" style={{ height: 350 }}>
-              <MapContainer center={mapCenter} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                <TileLayer
-                  attribution="&copy; Google"
-                  url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                />
-                <FitBounds bounds={mapBounds} />
-                {currentPos && <Marker position={[currentPos.lat, currentPos.lng]} icon={userIcon} />}
-                <Marker position={[activeJourney.destination_lat, activeJourney.destination_lng]} icon={destIcon} />
-                {activeJourney.origin_lat && activeJourney.origin_lng && (
-                  <Marker position={[activeJourney.origin_lat, activeJourney.origin_lng]} icon={userIcon} />
-                )}
-                {activeRouteCoords.length > 1 && (
-                  <Polyline positions={activeRouteCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3 }} />
-                )}
-              </MapContainer>
-
-              {/* Street View toggle */}
-              <Button
-                size="sm"
-                variant={showStreetView ? "default" : "secondary"}
-                className="absolute bottom-2 right-2 z-[1000] h-7 shadow-md text-[10px] gap-1"
-                onClick={() => setShowStreetView((s) => !s)}
-              >
-                <Eye className="w-3 h-3" />
-                Street View
-              </Button>
-            </div>
-
-            {/* Street View Panel */}
-            {showStreetView && currentPos && (
-              <StreetViewPanel
-                lat={currentPos.lat}
-                lng={currentPos.lng}
-                heading={activeRouteCoords.length >= 2
-                  ? (() => {
-                      const last = activeRouteCoords[activeRouteCoords.length - 1];
-                      const prev = activeRouteCoords[activeRouteCoords.length - 2];
-                      const dLat = last[0] - prev[0];
-                      const dLng = last[1] - prev[1];
-                      return (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
-                    })()
-                  : 0}
-                height={250}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            {/* Setup Form */}
-            <Card>
-              <CardContent className="p-4 space-y-4">
                 {/* Home / Work Quick-Set */}
                 <div className="flex gap-2">
-                  <Button
-                    variant={homeDest ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1 gap-1.5"
-                    onClick={() => {
-                      if (homeDest) {
-                        const name = homeDest.name.replace("🏠 Home: ", "");
-                        setSelectedDest({ name: homeDest.name, lat: homeDest.lat, lng: homeDest.lng });
-                        setDestination(name.split(",")[0]);
-                        setPendingHomeWork(null);
-                      } else {
-                        setPendingHomeWork("home");
-                        setDestination("");
-                        setSelectedDest(null);
-                        clearSearch();
-                        setInputFocused(true);
-                        setTimeout(() => inputRef.current?.focus(), 50);
-                        toast.info("Search and select a place to set as Home");
-                      }
-                    }}
-                  >
-                    <Home className="w-4 h-4" />
-                    {homeDest ? "Home" : "Set Home"}
+                  <Button variant={homeDest ? "default" : "secondary"} size="sm" className="flex-1 gap-1.5 h-10" onClick={() => {
+                    if (homeDest) {
+                      const name = homeDest.name.replace("🏠 Home: ", "");
+                      setSelectedDest({ name: homeDest.name, lat: homeDest.lat, lng: homeDest.lng });
+                      setDestination(name.split(",")[0]);
+                      setPendingHomeWork(null);
+                    } else {
+                      setPendingHomeWork("home");
+                      setDestination("");
+                      setSelectedDest(null);
+                      clearSearch();
+                      setInputFocused(true);
+                      setTimeout(() => inputRef.current?.focus(), 50);
+                      toast.info("Search and select a place to set as Home");
+                    }
+                  }}>
+                    <Home className="w-4 h-4" /> {homeDest ? "Home" : "Set Home"}
                   </Button>
-                  <Button
-                    variant={workDest ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1 gap-1.5"
-                    onClick={() => {
-                      if (workDest) {
-                        const name = workDest.name.replace("🏢 Work: ", "");
-                        setSelectedDest({ name: workDest.name, lat: workDest.lat, lng: workDest.lng });
-                        setDestination(name.split(",")[0]);
-                        setPendingHomeWork(null);
-                      } else {
-                        setPendingHomeWork("work");
-                        setDestination("");
-                        setSelectedDest(null);
-                        clearSearch();
-                        setInputFocused(true);
-                        setTimeout(() => inputRef.current?.focus(), 50);
-                        toast.info("Search and select a place to set as Work");
-                      }
-                    }}
-                  >
-                    <Briefcase className="w-4 h-4" />
-                    {workDest ? "Work" : "Set Work"}
+                  <Button variant={workDest ? "default" : "secondary"} size="sm" className="flex-1 gap-1.5 h-10" onClick={() => {
+                    if (workDest) {
+                      const name = workDest.name.replace("🏢 Work: ", "");
+                      setSelectedDest({ name: workDest.name, lat: workDest.lat, lng: workDest.lng });
+                      setDestination(name.split(",")[0]);
+                      setPendingHomeWork(null);
+                    } else {
+                      setPendingHomeWork("work");
+                      setDestination("");
+                      setSelectedDest(null);
+                      clearSearch();
+                      setInputFocused(true);
+                      setTimeout(() => inputRef.current?.focus(), 50);
+                      toast.info("Search and select a place to set as Work");
+                    }
+                  }}>
+                    <Briefcase className="w-4 h-4" /> {workDest ? "Work" : "Set Work"}
                   </Button>
                 </div>
+
                 {pendingHomeWork && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-muted-foreground"
-                    onClick={() => setPendingHomeWork(null)}
-                  >
+                  <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => setPendingHomeWork(null)}>
                     <X className="w-3.5 h-3.5 mr-1" />
                     Cancel setting {pendingHomeWork === "home" ? "Home" : "Work"}
                   </Button>
                 )}
 
                 {/* Destination Input */}
-                <div className="space-y-2">
-                  <Label>Destination</Label>
+                <div className="space-y-2 relative z-50">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Where to?</Label>
                   <div className="relative">
-                     <div className="relative">
-                      <Input
-                        ref={inputRef}
-                        placeholder={pendingHomeWork ? `Search to set as ${pendingHomeWork === "home" ? "Home 🏠" : "Work 🏢"}...` : "Search destination..."}
-                        value={destination}
-                        onFocus={() => setInputFocused(true)}
-                        onBlur={() => setTimeout(() => setInputFocused(false), 300)}
-                        onChange={(e) => {
-                          setDestination(e.target.value);
-                          searchDestination(e.target.value);
-                          if (!e.target.value) setSelectedDest(null);
+                    <Input
+                      ref={inputRef}
+                      placeholder={pendingHomeWork ? `Search to set ${pendingHomeWork}...` : "Search destination..."}
+                      value={destination}
+                      onFocus={() => setInputFocused(true)}
+                      onBlur={() => setTimeout(() => setInputFocused(false), 300)}
+                      onChange={(e) => {
+                        setDestination(e.target.value);
+                        searchDestination(e.target.value);
+                        if (!e.target.value) setSelectedDest(null);
+                      }}
+                      className={`h-12 text-base shadow-sm ${pendingHomeWork ? "ring-2 ring-primary" : ""}`}
+                    />
+                    {destination && !searching && (
+                      <button
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted rounded-full"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setDestination("");
+                          setSelectedDest(null);
+                          clearSearch();
+                          setRouteCoords([]);
+                          setEta(null);
+                          setPendingHomeWork(null);
                         }}
-                        className={pendingHomeWork ? "ring-2 ring-primary" : ""}
-                      />
-                      {destination && !searching && (
+                      >
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                    {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />}
+                  </div>
+
+                  {/* Autocomplete Dropdown */}
+                  {inputFocused && (destination.length > 0 && searchResults.length === 0 && !searching && !selectedDest) && (
+                    <div className="absolute z-[100] w-full mt-1 bg-card border border-border rounded-xl shadow-xl px-4 py-3">
+                      <p className="text-sm text-muted-foreground">No results found. Try a different search.</p>
+                      {apiStatus && <p className="text-xs text-destructive mt-1">{apiStatus}</p>}
+                    </div>
+                  )}
+
+                  {searchResults.length > 0 && (
+                    <div className="absolute z-[100] w-full mt-1 bg-card border border-border rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                      {searchResults.some(r => r.isFuzzy) && (
+                        <div className="px-4 py-2 bg-muted/30 border-b border-border">
+                          <p className="text-xs text-muted-foreground italic">No exact match found. Showing similar places.</p>
+                        </div>
+                      )}
+                      {searchResults.map((r, i) => (
                         <button
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          key={r.place_id || i}
+                          className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-0"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             setDestination("");
-                            setSelectedDest(null);
-                            clearSearch();
-                            setRouteCoords([]);
-                            setEta(null);
-                            setPendingHomeWork(null);
+                            handleSelectDest(r);
                           }}
                         >
-                          <X className="w-4 h-4" />
+                          <div className="flex items-start gap-3">
+                            <MapPin className="w-4 h-4 mt-1 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-base font-medium text-foreground truncate">{r.main_text}</p>
+                              {r.secondary_text && <p className="text-xs text-muted-foreground truncate">{r.secondary_text}</p>}
+                            </div>
+                          </div>
                         </button>
-                      )}
-                      {searching && (
-                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                      )}
+                      ))}
                     </div>
-                    {/* Search results dropdown */}
-                    {inputFocused && destination.length > 0 && !searching && searchResults.length === 0 && !selectedDest && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg px-3 py-2.5">
-                        <p className="text-xs text-muted-foreground">No results found. Try a different search.</p>
-                        {apiStatus && (
-                          <p className="text-xs text-destructive mt-1">{apiStatus}</p>
-                        )}
-                      </div>
-                    )}
-                    {searchResults.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                        {searchResults.some(r => r.isFuzzy) && (
-                          <div className="px-3 py-1.5 bg-muted/50 border-b border-border">
-                            <p className="text-xs text-muted-foreground italic">No exact match found. Showing similar places nearby.</p>
-                          </div>
-                        )}
-                        {searchResults.map((r, i) => (
-                          <button
-                            key={r.place_id || i}
-                            className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-0"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              handleSelectDest(r);
-                            }}
-                          >
-                            <div className="flex items-start gap-2">
-                              <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{r.main_text}</p>
-                                {r.secondary_text && (
-                                  <p className="text-xs text-muted-foreground truncate">{r.secondary_text}</p>
-                                )}
-                              </div>
-                            </div>
-                          </button>
+                  )}
+
+                  {inputFocused && searchResults.length === 0 && destination.length === 0 && (
+                     <div className="absolute z-[100] w-full mt-1 bg-card border border-border rounded-xl shadow-xl max-h-[300px] overflow-y-auto">
+                       <div className="px-4 py-3 border-b border-border">
+                         <p className="text-sm font-semibold text-muted-foreground mb-3">Quick Search</p>
+                         <div className="flex flex-wrap gap-2">
+                           {[ { label: "Restaurant", icon: UtensilsCrossed }, { label: "Hospital", icon: Hospital }, { label: "Mall", icon: ShoppingBag }, { label: "Station", icon: TrainFront } ].map((chip) => (
+                             <button key={chip.label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-sm font-medium hover:bg-accent transition-colors" onMouseDown={(e) => { e.preventDefault(); setDestination(chip.label); searchDestination(chip.label); }}>
+                               <chip.icon className="w-3.5 h-3.5" /> {chip.label}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+                       {savedDests.length > 0 && (
+                         <>
+                           <div className="px-4 py-2 bg-muted/20 border-b border-border">
+                             <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+                               <History className="w-3 h-3" /> Recent Searches
+                             </p>
+                           </div>
+                           {savedDests.map((d) => (
+                             <div key={d.id} className="flex items-center gap-1 hover:bg-accent transition-colors border-b border-border last:border-0">
+                               <button className="flex-1 text-left px-4 py-3" onMouseDown={(e) => {
+                                 e.preventDefault();
+                                 setSelectedDest({ name: d.name, lat: d.lat, lng: d.lng });
+                                 setDestination(d.name.split(",")[0]);
+                                 setInputFocused(false);
+                                 if (pendingHomeWork) {
+                                   setHomeWork(pendingHomeWork, { name: d.name, lat: d.lat, lng: d.lng });
+                                   toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} saved!`);
+                                   setPendingHomeWork(null);
+                                 }
+                               }}>
+                                 <div className="flex items-center gap-3">
+                                   {d.name.startsWith("🏠") ? <Home className="w-4 h-4 text-primary shrink-0" /> : d.name.startsWith("🏢") ? <Briefcase className="w-4 h-4 text-primary shrink-0" /> : d.is_favorite ? <Star className="w-4 h-4 text-accent-foreground shrink-0" /> : <History className="w-4 h-4 text-muted-foreground shrink-0" />}
+                                   <div className="min-w-0">
+                                     <p className="text-sm font-medium text-foreground truncate">{d.name.split(",")[0]}</p>
+                                   </div>
+                                 </div>
+                               </button>
+                               <button className="p-3 hover:text-accent-foreground text-muted-foreground" onMouseDown={(e) => { e.preventDefault(); toggleFavorite(d.id, d.is_favorite); }}>
+                                 <Star className={`w-4 h-4 ${d.is_favorite ? "text-accent-foreground fill-current" : ""}`} />
+                               </button>
+                             </div>
+                           ))}
+                         </>
+                       )}
+                     </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Transport Mode */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Transport</Label>
+                    <Select value={transportMode} onValueChange={setTransportMode}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRANSPORT_MODES.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            <span className="flex items-center gap-2">
+                              <m.icon className="w-4 h-4" /> {m.label}
+                            </span>
+                          </SelectItem>
                         ))}
-                      </div>
-                    )}
-                    {/* Recent/Saved destinations + category chips when input is focused but empty */}
-                    {inputFocused && searchResults.length === 0 && destination.length < 1 && (
-                      <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-72 overflow-y-auto">
-                        {/* Quick category chips */}
-                        <div className="px-3 py-2 border-b border-border">
-                          <p className="text-xs font-semibold text-muted-foreground mb-2">Quick Search</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[
-                              { label: "Restaurant", icon: UtensilsCrossed },
-                              { label: "Hospital", icon: Hospital },
-                              { label: "Mall", icon: ShoppingBag },
-                              { label: "Station", icon: TrainFront },
-                            ].map((chip) => (
-                              <button
-                                key={chip.label}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-xs font-medium text-foreground hover:bg-accent transition-colors"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setDestination(chip.label);
-                                  searchDestination(chip.label);
-                                }}
-                              >
-                                <chip.icon className="w-3 h-3" />
-                                {chip.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {/* Saved destinations list */}
-                        {savedDests.length > 0 && (
-                          <>
-                            <div className="px-3 py-2 border-b border-border">
-                              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                                <History className="w-3 h-3" /> Recent & Saved
-                              </p>
-                            </div>
-                            {savedDests.map((d) => (
-                              <div
-                                key={d.id}
-                                className="flex items-center gap-1 hover:bg-accent transition-colors border-b border-border last:border-0"
-                              >
-                                <button
-                                  className="flex-1 text-left px-3 py-2.5"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    setSelectedDest({ name: d.name, lat: d.lat, lng: d.lng });
-                                    setDestination(d.name.split(",")[0]);
-                                    setInputFocused(false);
-                                    if (pendingHomeWork) {
-                                      setHomeWork(pendingHomeWork, { name: d.name, lat: d.lat, lng: d.lng });
-                                      toast.success(`${pendingHomeWork === "home" ? "Home" : "Work"} location saved!`);
-                                      setPendingHomeWork(null);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex items-start gap-2">
-                                    {d.name.startsWith("🏠") ? (
-                                      <Home className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                                    ) : d.name.startsWith("🏢") ? (
-                                      <Briefcase className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                                    ) : d.is_favorite ? (
-                                      <Star className="w-4 h-4 mt-0.5 text-accent-foreground shrink-0" />
-                                    ) : (
-                                      <History className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                    )}
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-foreground truncate">{d.name.split(",")[0]}</p>
-                                      <p className="text-xs text-muted-foreground truncate">
-                                        {d.name.split(",").slice(1).join(",").trim() || `Used ${d.use_count}×`}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </button>
-                                <button
-                                  className="p-1.5 hover:text-accent-foreground text-muted-foreground"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    toggleFavorite(d.id, d.is_favorite);
-                                  }}
-                                  title={d.is_favorite ? "Remove from favorites" : "Add to favorites"}
-                                >
-                                  <Star className={`w-3.5 h-3.5 ${d.is_favorite ? "text-accent-foreground fill-current" : ""}`} />
-                                </button>
-                                <button
-                                  className="p-1.5 hover:text-destructive text-muted-foreground mr-1"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    removeDestination(d.id);
-                                  }}
-                                  title="Remove"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Check-In Frequency */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Check-In Timer</Label>
+                    <Select value={settings.journeyCheckInFrequency?.toString() || "none"} onValueChange={(val) => updateSetting("journeyCheckInFrequency", val === "none" ? null : parseInt(val))}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">Every 15 mins</SelectItem>
+                        <SelectItem value="30">Every 30 mins</SelectItem>
+                        <SelectItem value="45">Every 45 mins</SelectItem>
+                        <SelectItem value="60">Every 60 mins</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Transport Mode */}
-                <div className="space-y-2">
-                  <Label>Mode of Transport</Label>
-                  <Select value={transportMode} onValueChange={setTransportMode}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRANSPORT_MODES.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          <span className="flex items-center gap-2">
-                            <m.icon className="w-4 h-4" /> {m.label}
-                          </span>
-                        </SelectItem>
+                {/* Additional Guardians Checklist */}
+                {availableGuardians.length > 0 && (
+                  <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border">
+                    <Label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                       <Users className="w-4 h-4" /> Sharing With
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground leading-snug">Primary Guardian is always notified. Select additional trackers below.</p>
+                    <div className="space-y-2 mt-2">
+                      {availableGuardians.map((guardian) => (
+                        <div key={guardian.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`guardian-${guardian.id}`}
+                            checked={settings.journeyTrackingGuardians.includes(guardian.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateSetting("journeyTrackingGuardians", [...settings.journeyTrackingGuardians, guardian.id]);
+                              } else {
+                                updateSetting("journeyTrackingGuardians", settings.journeyTrackingGuardians.filter(id => id !== guardian.id));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`guardian-${guardian.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {guardian.guardian_name} <span className="text-xs text-muted-foreground">({guardian.relation || 'Guardian'})</span>
+                          </label>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Route Info */}
                 {eta !== null && selectedDest && (
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span>Estimated: <strong>{eta} min</strong></span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Check-in every {eta <= 60 ? "15" : "30"} min
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Map Preview — only after destination selected */}
-                {originPos && selectedDest && routeCoords.length > 0 && (
-                  <div className="rounded-lg overflow-hidden border border-border" style={{ height: 250 }}>
-                    <MapContainer center={[originPos.lat, originPos.lng]} zoom={12} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                      <TileLayer
-                        attribution="&copy; Google"
-                        url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                      />
-                      <FitBounds bounds={mapBounds} />
-                      <Marker position={[originPos.lat, originPos.lng]} icon={userIcon} />
-                      <Marker position={[selectedDest.lat, selectedDest.lng]} icon={destIcon} />
-                      {routeCoords.length > 1 && (
-                        <Polyline positions={routeCoords} pathOptions={{ color: "hsl(213, 53%, 23%)", weight: 3, dashArray: "8 4" }} />
-                      )}
-                    </MapContainer>
+                  <div className="flex items-center justify-center p-3 text-sm font-medium bg-primary/10 text-primary rounded-lg border border-primary/20">
+                    <Clock className="w-4 h-4 mr-2" /> ETA: {eta} mins
                   </div>
                 )}
 
                 <Button
                   onClick={handleStartJourney}
                   disabled={!selectedDest || !originPos || eta === null || loading}
-                  className="w-full"
-                  size="lg"
+                  className="w-full h-12 text-md font-semibold mt-4 shadow-lg shadow-primary/20"
                 >
                   <Navigation className="w-4 h-4 mr-2" />
-                  {loading ? "Starting..." : "Start Journey"}
+                  {loading ? "Calculating..." : "Start Journey"}
                 </Button>
-              </CardContent>
-            </Card>
-            {/* Journey History */}
-            {journeyReports.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-base font-semibold flex items-center gap-2">
-                  <History className="w-4 h-4 text-muted-foreground" />
-                  Past Journeys
-                </h2>
-                {journeyReports.map((r) => (
-                  <JourneyReportCard key={r.id} report={r} />
-                ))}
+
+                {journeyReports.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-border">
+                    <h2 className="text-sm font-semibold flex items-center gap-2 mb-4 text-muted-foreground uppercase tracking-wider">
+                      <History className="w-4 h-4" /> Past Journeys
+                    </h2>
+                    <div className="space-y-3">
+                      {journeyReports.slice(0,3).map((r) => (
+                        <JourneyReportCard key={r.id} report={r} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Journey Alert Overlays — Arriving handled inline via badge + audio in hook */}
+      {/* Alert Overlays */}
       {routeDeviation && !routeDeviationDismissed && (
         <JourneyAlertOverlay
           type="deviation"
@@ -689,7 +664,6 @@ const MapMyJourney = () => {
         />
       )}
 
-      {/* Journey Check-in Popup */}
       <JourneyCheckInPopup
         open={showCheckIn}
         onRespond={respondCheckIn}

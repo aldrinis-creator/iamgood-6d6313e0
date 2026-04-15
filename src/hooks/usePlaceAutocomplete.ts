@@ -22,7 +22,7 @@ interface UsePlaceAutocompleteOptions {
 export function usePlaceAutocomplete({
   origin,
   minChars = 2,
-  debounceMs = 180,
+  debounceMs = 400,
   country = "in",
 }: UsePlaceAutocompleteOptions) {
   const [results, setResults] = useState<PlaceResult[]>([]);

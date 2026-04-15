@@ -83,6 +83,9 @@ export interface UserSettings {
   hasSurgeries: boolean;
   // Guardian-specific
   guardianVoiceAlerts: boolean;
+  // Journey Tracking
+  journeyCheckInFrequency: number | null;
+  journeyTrackingGuardians: string[];
 }
 
 export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
@@ -129,6 +132,8 @@ const DEFAULTS: UserSettings = {
   hasHospitalizations: false,
   hasSurgeries: false,
   guardianVoiceAlerts: true,
+  journeyCheckInFrequency: 15,
+  journeyTrackingGuardians: [],
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle

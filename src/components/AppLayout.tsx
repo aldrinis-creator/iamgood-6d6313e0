@@ -91,6 +91,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 Terms of Service
               </Link>
               <span className="text-muted-foreground">·</span>
+              <span className="text-xs text-muted-foreground font-mono">v1.1.0</span>
+              <span className="text-muted-foreground">·</span>
               <button
                 onClick={() => setShowCookieSettings(true)}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"

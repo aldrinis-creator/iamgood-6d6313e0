@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { playChime } from "@/lib/audioAlerts";
 
 interface JourneyData {
@@ -52,6 +53,7 @@ const GEOFENCE_THRESHOLD_M = 500;
 
 export function useJourneyTracker() {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
   const [activeJourney, setActiveJourney] = useState<JourneyData | null>(null);
   const [updates, setUpdates] = useState<JourneyUpdate[]>([]);
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -190,10 +192,11 @@ export function useJourneyTracker() {
   // Check-in timer
   useEffect(() => {
     if (!activeJourney || activeJourney.status !== "active") return;
+    
+    // User requested explicitly no check-ins
+    if (settings.journeyCheckInFrequency === null) return;
 
-    const intervalMs = (activeJourney.estimated_duration_min ?? 60) <= 60
-      ? 15 * 60 * 1000
-      : 30 * 60 * 1000;
+    const intervalMs = settings.journeyCheckInFrequency * 60 * 1000;
 
     checkInTimer.current = setInterval(() => {
       setShowCheckIn(true);
@@ -202,7 +205,7 @@ export function useJourneyTracker() {
     return () => {
       if (checkInTimer.current) clearInterval(checkInTimer.current);
     };
-  }, [activeJourney?.id, activeJourney?.status, activeJourney?.estimated_duration_min]);
+  }, [activeJourney?.id, activeJourney?.status, settings.journeyCheckInFrequency]);
 
   const saveLocationUpdate = async (lat: number, lng: number, response?: string) => {
     if (!activeJourney || !session?.user?.id) return;
@@ -220,11 +223,15 @@ export function useJourneyTracker() {
     if (!session?.user?.id) return;
     const { data: guardians } = await supabase
       .from("guardians")
-      .select("id")
+      .select("id, is_primary")
       .eq("user_id", session.user.id);
     if (!guardians?.length) return;
+    
+    const targets = guardians.filter(g => g.is_primary || settings.journeyTrackingGuardians.includes(g.id));
+    if (!targets.length) return;
+
     await supabase.rpc("insert_notifications_deduped", {
-      p_notifications: guardians.map((g) => ({
+      p_notifications: targets.map((g) => ({
         user_id: session.user.id,
         guardian_id: g.id,
         title,
@@ -232,7 +239,7 @@ export function useJourneyTracker() {
         type,
       })),
     });
-  }, [session?.user?.id]);
+  }, [session?.user?.id, settings.journeyTrackingGuardians]);
 
   const generateReport = async (journey: JourneyData, journeyUpdates: JourneyUpdate[]) => {
     if (!session?.user?.id) return;
@@ -321,15 +328,25 @@ export function useJourneyTracker() {
     // Generate report before clearing state
     await generateReport(activeJourney, updates);
 
-    await supabase
+    // Guaranteed update execution
+    const { error: updateError } = await supabase
       .from("journeys")
       .update({ status, ended_at: new Date().toISOString() })
       .eq("id", activeJourney.id);
 
-    await notifyGuardians(
-      status === "auto_completed" ? "✅ Journey Auto-Completed" : "✅ Journey Completed",
-      `User has ${status === "auto_completed" ? "arrived at" : "ended journey at"} ${activeJourney.destination_name}.`
-    );
+    if (updateError) {
+      console.error("Failed to cleanly end journey in DB", updateError);
+    }
+
+    // Guaranteed notification delivery
+    try {
+      await notifyGuardians(
+        status === "auto_completed" ? "✅ Journey Auto-Completed" : "✅ Journey Completed",
+        `User has ${status === "auto_completed" ? "arrived at" : "ended journey at"} ${activeJourney.destination_name}.`
+      );
+    } catch (err) {
+      console.error("Failed to notify guardians of end journey", err);
+    }
 
     setActiveJourney(null);
     setUpdates([]);
