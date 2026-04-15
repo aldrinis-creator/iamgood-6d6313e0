@@ -1343,6 +1343,7 @@ export type Database = {
           gender: string | null
           height_m: number | null
           id: string
+          last_active_at: string | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
@@ -1355,6 +1356,7 @@ export type Database = {
           gender?: string | null
           height_m?: number | null
           id: string
+          last_active_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1367,6 +1369,7 @@ export type Database = {
           gender?: string | null
           height_m?: number | null
           id?: string
+          last_active_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string

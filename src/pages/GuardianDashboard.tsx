@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Smartphone, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -220,6 +220,7 @@ const GuardianDashboard = () => {
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
   const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
+  const [wardLastActive, setWardLastActive] = useState<string | null>(null);
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
@@ -262,10 +263,11 @@ const GuardianDashboard = () => {
     // Fetch phone
     const { data: wardProfile } = await supabase
       .from("profiles")
-      .select("phone")
+      .select("phone, last_active_at")
       .eq("id", wardId)
       .single();
     if (wardProfile?.phone) setWardPhone(wardProfile.phone);
+    if ((wardProfile as any)?.last_active_at) setWardLastActive((wardProfile as any).last_active_at);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -420,6 +422,14 @@ const GuardianDashboard = () => {
         .on("postgres_changes", { event: "*", schema: "public", table: "sos_events", filter: `user_id=eq.${wardUserId}` }, () => fetchWardCheckIns())
         .subscribe();
       channels.push(sosChannel);
+
+      const profileChannel = supabase
+        .channel("ward-profile-rt")
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${wardUserId}` }, (payload: any) => {
+          if (payload?.new?.last_active_at) setWardLastActive(payload.new.last_active_at);
+        })
+        .subscribe();
+      channels.push(profileChannel);
     }
 
     return () => { channels.forEach(c => supabase.removeChannel(c)); };
@@ -732,7 +742,7 @@ const GuardianDashboard = () => {
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-lg bg-muted">
-                <Clock className="w-4 h-4 mx-auto text-primary mb-1" />
+                <Smartphone className="w-4 h-4 mx-auto text-primary mb-1" />
                 <p className="text-sm font-semibold">{getLastActiveText()}</p>
                 <p className="text-[10px] text-muted-foreground">Since Last Check-iN</p>
               </div>
@@ -759,9 +769,13 @@ const GuardianDashboard = () => {
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
-                <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <p className="text-sm font-semibold">{formatISTTime(new Date())}</p>
-                <p className="text-[10px] text-muted-foreground">Now</p>
+                <Smartphone className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                <p className="text-sm font-semibold">
+                  {wardLastActive
+                    ? formatDistanceToNow(new Date(wardLastActive), { addSuffix: true })
+                    : "N/A"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Last Active</p>
               </div>
             </div>
           </CardContent>
