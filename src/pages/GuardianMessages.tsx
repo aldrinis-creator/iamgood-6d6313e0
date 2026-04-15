@@ -7,8 +7,10 @@ import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, Check, Clock, Send } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { MessageCircle, Check, Clock, Send, Trash2 } from "lucide-react";
 import { formatISTDateTime } from "@/lib/istTime";
+import { toast } from "sonner";
 
 interface Ping {
   id: string;
@@ -43,7 +45,6 @@ const GuardianMessages = () => {
     if (data) setPings(data as unknown as Ping[]);
     setLoading(false);
 
-    // Mark all unread pings addressed to guardian as read
     if (data?.some((p: any) => !p.guardian_read && ((p.initiated_by || "guardian") === "user" || (p.reply_message && !p.guardian_read)))) {
       await supabase
         .from("guardian_pings")
@@ -56,18 +57,11 @@ const GuardianMessages = () => {
 
   useEffect(() => {
     fetchPings();
-
     if (!session?.user?.id || !selectedWard) return;
     const channel = supabase
       .channel("guardian-messages-page")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "guardian_pings",
-        filter: `guardian_user_id=eq.${session.user.id}`,
-      }, () => fetchPings())
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings", filter: `guardian_user_id=eq.${session.user.id}` }, () => fetchPings())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id, selectedWard?.userId]);
 
@@ -85,15 +79,55 @@ const GuardianMessages = () => {
     fetchPings();
   };
 
+  const deletePing = async (pingId: string) => {
+    await supabase.from("guardian_pings").delete().eq("id", pingId);
+    setPings(prev => prev.filter(p => p.id !== pingId));
+    toast.success("Message cleared");
+  };
+
+  const deleteAllPings = async () => {
+    if (!session?.user?.id || !selectedWard) return;
+    await supabase.from("guardian_pings").delete()
+      .eq("guardian_user_id", session.user.id)
+      .eq("user_id", selectedWard.userId);
+    setPings([]);
+    toast.success("All messages cleared");
+  };
+
   const isSentByGuardian = (p: Ping) => (p.initiated_by || "guardian") === "guardian";
 
   return (
     <AppLayout>
       <div className="space-y-4">
         <WardPicker />
-        <div className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-bold">Messages</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-primary" />
+            <h1 className="text-lg font-bold">Messages</h1>
+          </div>
+          {pings.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-xs text-destructive border-destructive/30">
+                  <Trash2 className="w-3 h-3 mr-1" /> Clear All
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all messages?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all messages with {selectedWard?.name || "this ward"}. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={deleteAllPings} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Clear All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         {loading ? (
@@ -110,14 +144,23 @@ const GuardianMessages = () => {
             return (
               <Card key={p.id}>
                 <CardContent className="p-3 space-y-2">
-                  {/* Original message */}
+                  {/* Clear single message */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                      onClick={() => deletePing(p.id)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" /> Clear
+                    </Button>
+                  </div>
+
                   {sentByGuardian ? (
                     <div className="flex justify-end">
                       <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
                         <p className="text-sm">{p.message}</p>
-                        <p className="text-[10px] opacity-70 text-right mt-1">
-                          {formatISTDateTime(p.created_at)}
-                        </p>
+                        <p className="text-[10px] opacity-70 text-right mt-1">{formatISTDateTime(p.created_at)}</p>
                       </div>
                     </div>
                   ) : (
@@ -125,14 +168,11 @@ const GuardianMessages = () => {
                       <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
                         <span className="text-xs font-medium text-primary">{selectedWard?.name || "Ward"}</span>
                         <p className="text-sm">{p.message}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {formatISTDateTime(p.created_at)}
-                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{formatISTDateTime(p.created_at)}</p>
                       </div>
                     </div>
                   )}
 
-                  {/* Reply */}
                   {p.reply_message ? (
                     <div className={`flex ${sentByGuardian ? "justify-start" : "justify-end"}`}>
                       <div className={`${sentByGuardian ? "bg-muted rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm"} rounded-2xl px-3 py-2 max-w-[80%]`}>
@@ -149,25 +189,13 @@ const GuardianMessages = () => {
                   ) : canReply ? (
                     replyingTo === p.id ? (
                       <div className="flex gap-2 pt-1">
-                        <Input
-                          placeholder="Type a reply..."
-                          value={replyText}
-                          onChange={e => setReplyText(e.target.value)}
-                          onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
-                          className="flex-1"
-                          autoFocus
-                        />
+                        <Input placeholder="Type a reply..." value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => e.key === "Enter" && sendReply(p.id)} className="flex-1" autoFocus />
                         <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
                           <Send className="w-4 h-4" />
                         </Button>
                       </div>
                     ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-primary"
-                        onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
-                      >
+                      <Button variant="ghost" size="sm" className="text-xs text-primary" onClick={() => { setReplyingTo(p.id); setReplyText(""); }}>
                         <Send className="w-3 h-3 mr-1" /> Reply
                       </Button>
                     )

@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, Check, CheckCheck, Send, Clock } from "lucide-react";
+import { MessageCircle, Check, Send, Clock, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatISTDateTime } from "@/lib/istTime";
 import UserPingDialog from "@/components/UserPingDialog";
+import { toast } from "sonner";
 
 interface Ping {
   id: string;
@@ -57,7 +59,6 @@ const Messages = () => {
       guardian_name: guardianMap[p.guardian_user_id] || "Guardian",
     }));
 
-    // Fetch names for unknown guardian IDs
     const unknownIds = [...new Set(allPings.filter(p => !guardianMap[p.guardian_user_id]).map(p => p.guardian_user_id))];
     if (unknownIds.length > 0) {
       const { data: profiles } = await supabase
@@ -73,7 +74,6 @@ const Messages = () => {
       });
     }
 
-    // Mark received pings as read
     const unreadReceivedIds = allPings
       .filter(p => !p.read && (p.initiated_by || "guardian") === "guardian")
       .map(p => p.id);
@@ -91,18 +91,11 @@ const Messages = () => {
 
   useEffect(() => {
     fetchPings();
-
     if (!session?.user?.id) return;
     const channel = supabase
       .channel("user-messages-page")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "guardian_pings",
-        filter: `user_id=eq.${session.user.id}`,
-      }, () => fetchPings())
+      .on("postgres_changes", { event: "*", schema: "public", table: "guardian_pings", filter: `user_id=eq.${session.user.id}` }, () => fetchPings())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id]);
 
@@ -120,7 +113,19 @@ const Messages = () => {
     fetchPings();
   };
 
-  // Determine bubble direction: initiated_by tells us who sent the original message
+  const deletePing = async (pingId: string) => {
+    await supabase.from("guardian_pings").delete().eq("id", pingId);
+    setPings(prev => prev.filter(p => p.id !== pingId));
+    toast.success("Message cleared");
+  };
+
+  const deleteAllPings = async () => {
+    if (!session?.user?.id) return;
+    await supabase.from("guardian_pings").delete().eq("user_id", session.user.id);
+    setPings([]);
+    toast.success("All messages cleared");
+  };
+
   const isSentByUser = (p: Ping) => (p.initiated_by || "guardian") === "user";
 
   return (
@@ -131,7 +136,32 @@ const Messages = () => {
             <MessageCircle className="w-5 h-5 text-primary" />
             Messages
           </h1>
-          <UserPingDialog onSent={fetchPings} />
+          <div className="flex items-center gap-2">
+            {pings.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs text-destructive border-destructive/30">
+                    <Trash2 className="w-3 h-3 mr-1" /> Clear All
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear all messages?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all your messages. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteAllPings} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Clear All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <UserPingDialog onSent={fetchPings} />
+          </div>
         </div>
 
         {loading ? (
@@ -147,39 +177,40 @@ const Messages = () => {
           <div className="space-y-2">
             {pings.map(p => {
               const sentByUser = isSentByUser(p);
-              // The "message" field is the original message from whoever initiated
-              // The "reply_message" is the response from the other party
-              // User can reply to guardian-initiated pings that have no reply yet
               const canReply = !sentByUser && !p.reply_message;
 
               return (
                 <Card key={p.id}>
                   <CardContent className="p-3 space-y-2">
-                    {/* Original message */}
+                    {/* Clear single message */}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                        onClick={() => deletePing(p.id)}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" /> Clear
+                      </Button>
+                    </div>
+
                     {sentByUser ? (
-                      // User sent this — show on right
                       <div className="flex justify-end">
                         <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
                           <p className="text-sm">{p.message}</p>
-                          <p className="text-[10px] opacity-70 text-right mt-1">
-                            {formatISTDateTime(p.created_at)}
-                          </p>
+                          <p className="text-[10px] opacity-70 text-right mt-1">{formatISTDateTime(p.created_at)}</p>
                         </div>
                       </div>
                     ) : (
-                      // Guardian sent this — show on left
                       <div className="flex justify-start">
                         <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
                           <span className="text-xs font-medium text-primary">{p.guardian_name}</span>
                           <p className="text-sm">{p.message}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {formatISTDateTime(p.created_at)}
-                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{formatISTDateTime(p.created_at)}</p>
                         </div>
                       </div>
                     )}
 
-                    {/* Reply */}
                     {p.reply_message ? (
                       <div className={`flex ${sentByUser ? "justify-start" : "justify-end"}`}>
                         <div className={`${sentByUser ? "bg-muted rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm"} rounded-2xl px-3 py-2 max-w-[80%]`}>
@@ -196,25 +227,13 @@ const Messages = () => {
                     ) : canReply ? (
                       replyingTo === p.id ? (
                         <div className="flex gap-2 pt-1">
-                          <Input
-                            placeholder="Type a reply..."
-                            value={replyText}
-                            onChange={e => setReplyText(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
-                            className="flex-1"
-                            autoFocus
-                          />
+                          <Input placeholder="Type a reply..." value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => e.key === "Enter" && sendReply(p.id)} className="flex-1" autoFocus />
                           <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
                             <Send className="w-4 h-4" />
                           </Button>
                         </div>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs text-primary"
-                          onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
-                        >
+                        <Button variant="ghost" size="sm" className="text-xs text-primary" onClick={() => { setReplyingTo(p.id); setReplyText(""); }}>
                           <Send className="w-3 h-3 mr-1" /> Reply
                         </Button>
                       )
