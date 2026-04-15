@@ -1,60 +1,44 @@
-
-
-## Share with Member/s — Appointment WhatsApp Sharing via MSG91
+## Add Per-Guardian Location Sharing Selection
 
 ### Overview
-Replace the static "Share with Doctor" button on each appointment card with an interactive "Share with Member/s" action that opens a contact picker (guardians directory) and sends appointment details via WhatsApp using the existing MSG91 Flow API edge function.
+
+When the user enables "Share Location with Guardians" or "Live Location for Guardians", show a guardian checklist below each toggle so the user can choose which guardians receive location data. The primary guardian is pre-selected by default but can be deselected.
 
 ### Changes
 
-**1. New Component: `src/components/appointments/ShareAppointmentDialog.tsx`**
+**1. `src/hooks/useUserSettings.ts**`
 
-A dialog that:
-- Fetches the user's guardians from the `guardians` table (accepted status, with phone numbers)
-- Displays them as a selectable checklist (name, phone, relation)
-- Allows selecting one or more members
-- On confirm, calls the existing `msg91-send` edge function with a WhatsApp Flow template for each selected recipient
-- Falls back to opening `wa.me` links if MSG91 fails
-- Updates `share_status` to `"shared"` on the appointment row after sending
-- Shows toast confirmation
+- Add two new fields to `UserSettings`:
+  - `locationSharingGuardianIds: string[]` — guardian IDs selected for location sharing
+  - `liveLocationGuardianIds: string[]` — guardian IDs selected for live location
+- Add defaults as empty arrays (empty = share with all, for backward compatibility)
 
-**2. New MSG91 Secret: `MSG91_APPT_SHARE_TEMPLATE_ID`**
+**2. `src/pages/Settings.tsx` — PrivacyTab**
 
-A new runtime secret for the WhatsApp appointment-share template ID. The user will need to create this Flow template in their MSG91 dashboard with variables like `appointment_title`, `date`, `time`, `location`, `doctor_name`.
+- Fetch the user's guardians (accepted status) with `id`, `guardian_name`, `is_primary`
+- Below the "Share Location with Guardians" switch (line 153), when enabled, render a checklist of guardians with checkboxes
+- Below the "Live Location for Guardians" switch (line 160), when enabled, render the same checklist pattern
+- Primary guardian is checked by default when the list is first populated (if `locationSharingGuardianIds` is empty, auto-populate with all guardian IDs, primary first)
+- Each checkbox toggle calls `updateSetting` to persist the selected IDs
+- Do this change in all Settings where there is a Guardian is involved
 
-**3. Modified: `src/pages/Appointments.tsx`**
+**3. `src/hooks/useLocationSync.ts**`
 
-- Import the new `ShareAppointmentDialog`
-- Replace the static "Share with Doctor" `div` (lines 152-158) with a clickable button labeled **"Share with Member/s"**
-- Clicking opens the dialog, passing the appointment data
-- Badge still shows "Shared" / "Pending" based on `share_status`
-
-**4. Edge Function: `supabase/functions/share-appointment-whatsapp/index.ts`**
-
-A dedicated edge function that:
-- Accepts `{ appointment, recipients: [{ phone, name }] }`
-- Reads `MSG91_AUTH_KEY` and `MSG91_APPT_SHARE_TEMPLATE_ID` from env
-- Sends via MSG91 Flow API to each recipient with appointment variables
-- Returns success/failure per recipient
-- Updates the appointment `share_status` to `"shared"` via service-role client
-
-### Files Created
-- `src/components/appointments/ShareAppointmentDialog.tsx`
-- `supabase/functions/share-appointment-whatsapp/index.ts`
-
-### Files Modified
-- `src/pages/Appointments.tsx` — replace share button, add dialog state
-
-### Secret Required
-- `MSG91_APPT_SHARE_TEMPLATE_ID` — user must create a WhatsApp Flow template in MSG91 and provide the template ID
+- When saving location and checking safe zones, filter guardian notifications to only those whose `id` is in `settings.locationSharingGuardianIds` (if non-empty)
 
 ### Flow
+
 ```text
-User taps "Share with Member/s"
-  → Dialog opens with guardian contacts (checkboxes)
-  → User selects members, taps "Share via WhatsApp"
-  → Edge function calls MSG91 Flow API per recipient
-  → share_status updated to "shared"
-  → Toast: "Appointment shared with 2 member(s)"
+User enables "Share Location"
+  → Guardian checklist appears below toggle
+  → Primary guardian pre-checked, others unchecked
+  → User selects/deselects guardians
+  → Selection saved to user_settings via debounced write
+  → Location sync hook respects the selection
 ```
 
+### Files Modified
+
+- `src/hooks/useUserSettings.ts` — add 2 new setting fields
+- `src/pages/Settings.tsx` — add guardian checklists under location toggles
+- `src/hooks/useLocationSync.ts` — filter notifications by selected guardians
