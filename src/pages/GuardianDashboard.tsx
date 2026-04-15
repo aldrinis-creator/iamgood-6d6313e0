@@ -220,6 +220,7 @@ const GuardianDashboard = () => {
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
   const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
+  const [wardLastActive, setWardLastActive] = useState<string | null>(null);
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
@@ -262,10 +263,11 @@ const GuardianDashboard = () => {
     // Fetch phone
     const { data: wardProfile } = await supabase
       .from("profiles")
-      .select("phone")
+      .select("phone, last_active_at")
       .eq("id", wardId)
       .single();
     if (wardProfile?.phone) setWardPhone(wardProfile.phone);
+    if ((wardProfile as any)?.last_active_at) setWardLastActive((wardProfile as any).last_active_at);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -732,7 +734,7 @@ const GuardianDashboard = () => {
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-lg bg-muted">
-                <Clock className="w-4 h-4 mx-auto text-primary mb-1" />
+                <Smartphone className="w-4 h-4 mx-auto text-primary mb-1" />
                 <p className="text-sm font-semibold">{getLastActiveText()}</p>
                 <p className="text-[10px] text-muted-foreground">Since Last Check-iN</p>
               </div>
