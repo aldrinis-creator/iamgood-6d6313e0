@@ -683,7 +683,7 @@ const GuardianDashboard = () => {
               <div className="p-2 rounded-lg bg-muted">
                 <Clock className="w-4 h-4 mx-auto text-primary mb-1" />
                 <p className="text-sm font-semibold">{getLastActiveText()}</p>
-                <p className="text-[10px] text-muted-foreground">Last Active</p>
+                <p className="text-[10px] text-muted-foreground">Since Last Check-iN</p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
                 {(() => {

@@ -41,11 +41,7 @@ const HealthPassport = () => {
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
-    { name: "Wellness", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
-    { name: "Vitals", score: 0, max: 100 },
-    { name: "Nutrition", score: 0, max: 100 },
-    { name: "Face Scan", score: 0, max: 100 },
   ]);
   const [overallScore, setOverallScore] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState<MilestoneConfig | null>(null);
@@ -59,20 +55,12 @@ const HealthPassport = () => {
     const now = new Date();
     const currentHour = now.getHours();
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    const [checkInsRes, activityRes, wellnessSleepRes, wellnessTodayRes, medsRes, medLogsRes, mealLogsRes, nutritionPersonaRes, faceScanRes] = await Promise.all([
+    const [checkInsRes, activityRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes, heart_rate, spo2, bp_systolic, bp_diastolic, temperature_c, glucose_mg_dl").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
-      supabase.from("wellness_logs").select("sleep_hours, sleep_quality").eq("user_id", user.id).eq("log_date", yesterdayStr).maybeSingle(),
-      supabase.from("wellness_logs").select("mood_score, energy_level, mindfulness_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
+      supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("medications").select("id, schedule_times").eq("user_id", user.id).lte("start_date", today),
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
-      supabase.from("meal_logs").select("total_calories, total_protein_g").eq("user_id", user.id).eq("log_date", today),
-      supabase.from("nutrition_personas").select("daily_calorie_goal").eq("user_id", user.id).maybeSingle(),
-      supabase.from("face_scans").select("heart_rate, stress_score").eq("user_id", user.id).gte("scanned_at", `${today}T00:00:00`).order("scanned_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     // 1. Check-iN score
@@ -96,21 +84,7 @@ const HealthPassport = () => {
       activityScore = Math.round(stepsP + distP + calP + activeP);
     }
 
-    // 3. Wellness score
-    const sleepHours = Number(wellnessSleepRes.data?.sleep_hours) || 0;
-    const sleepQuality = Number(wellnessSleepRes.data?.sleep_quality) || 0;
-    const moodScore = Number(wellnessTodayRes.data?.mood_score) || 0;
-    const energyLevel = Number(wellnessTodayRes.data?.energy_level) || 0;
-    const mindfulnessMin = Number(wellnessTodayRes.data?.mindfulness_minutes) || 0;
-    const wellnessScore = Math.round(
-      Math.min(sleepHours / 8, 1) * 20 +
-      Math.min(sleepQuality / 5, 1) * 20 +
-      Math.min(moodScore / 5, 1) * 20 +
-      Math.min(energyLevel / 5, 1) * 20 +
-      Math.min(mindfulnessMin / 15, 1) * 20
-    );
-
-    // 4. Medications score
+    // 3. Medications score
     const meds = medsRes.data ?? [];
     const logs = medLogsRes.data ?? [];
     let totalDoses = 0;
@@ -119,66 +93,13 @@ const HealthPassport = () => {
       ? Math.round(Math.min(logs.filter(l => l.status === "taken").length / totalDoses, 1) * 100)
       : 100;
 
-    // 5. Vitals Score — with face scan fallback
-    const faceScan = faceScanRes.data;
-    let vitalsScore = 0;
-    if (act || faceScan) {
-      const hr = (act?.heart_rate ?? 0) || (faceScan?.heart_rate ?? 0);
-      if (hr > 0) vitalsScore += (hr >= 50 && hr <= 100) ? 20 : 10;
-
-      const spo2 = Number(act?.spo2) || 0;
-      if (spo2 > 0) vitalsScore += spo2 > 95 ? 20 : spo2 > 90 ? 10 : 5;
-
-      const sys = act?.bp_systolic; const dia = act?.bp_diastolic;
-      if (sys && dia) vitalsScore += (sys >= 90 && sys <= 140 && dia >= 60 && dia <= 90) ? 20 : 10;
-
-      const temp = Number(act?.temperature_c);
-      if (temp > 0) vitalsScore += (temp >= 36 && temp <= 37.5) ? 20 : 10;
-
-      const glu = act?.glucose_mg_dl;
-      if (glu && glu > 0) vitalsScore += (glu >= 70 && glu <= 140) ? 20 : 10;
-
-      // Stress from face scan as bonus (replaces one missing vital slot)
-      if (faceScan?.stress_score != null && faceScan.stress_score > 0) {
-        const stressNorm = Math.max(0, 100 - faceScan.stress_score);
-        if (!sys && !dia) vitalsScore += Math.round((stressNorm / 100) * 20);
-      }
-    }
-
-    // 6. Nutrition Score
-    const meals = mealLogsRes.data ?? [];
-    let nutritionScore = 0;
-    if (meals.length >= 1) nutritionScore += 30;
-    if (meals.length >= 2) nutritionScore += 20;
-    const totalCalToday = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
-    const calGoal = nutritionPersonaRes.data?.daily_calorie_goal || 2000;
-    if (totalCalToday > 0 && Math.abs(totalCalToday - calGoal) <= calGoal * 0.2) nutritionScore += 25;
-    const totalProteinToday = meals.reduce((s, m) => s + (Number(m.total_protein_g) || 0), 0);
-    const proteinCalPct = totalCalToday > 0 ? (totalProteinToday * 4 / totalCalToday) * 100 : 0;
-    if (proteinCalPct >= 10) nutritionScore += 25;
-
-    // 7. Face Scan score
-    let faceScanScore = 0;
-    if (faceScan) {
-      faceScanScore += 40; // completed a scan today
-      const fsHr = faceScan.heart_rate ?? 0;
-      if (fsHr >= 50 && fsHr <= 100) faceScanScore += 30;
-      else if (fsHr > 0) faceScanScore += 15;
-      if (faceScan.stress_score != null && faceScan.stress_score < 50) faceScanScore += 30;
-      else if (faceScan.stress_score != null && faceScan.stress_score < 75) faceScanScore += 15;
-    }
-
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
-      { name: "Wellness", score: wellnessScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
-      { name: "Vitals", score: vitalsScore, max: 100 },
-      { name: "Nutrition", score: nutritionScore, max: 100 },
-      { name: "Face Scan", score: faceScanScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 7);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 3);
 
     setCategories(newCategories);
     setOverallScore(overall);
@@ -190,10 +111,10 @@ const HealthPassport = () => {
       overall,
       checkin: checkInScore,
       activity: activityScore,
-      wellness: wellnessScore,
+      wellness: 0,
       medications: medScore,
-      vitals: vitalsScore,
-      nutrition: nutritionScore,
+      vitals: 0,
+      nutrition: 0,
     }, { onConflict: "user_id,score_date" });
 
     for (const ms of MILESTONES) {
@@ -219,11 +140,7 @@ const HealthPassport = () => {
   const categoryRoutes: Record<string, string> = {
     "Check-iN": "/dashboard",
     "Activity": "/my-health?tool=Activity",
-    "Wellness": "/my-health?tool=Wellness",
     "Medications": "/my-health?tool=Tablets",
-    "Vitals": "/my-health?tool=Vitals",
-    "Nutrition": "/my-health?tool=Nutrition",
-    "Face Scan": "/my-health?tool=FaceScan",
   };
 
   const handleCategoryTap = (cat: CategoryScore) => {
