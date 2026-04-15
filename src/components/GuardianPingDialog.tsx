@@ -37,6 +37,9 @@ const GuardianPingDialog = ({ wardUserId, wardName }: Props) => {
         guardian_user_id: session.user.id,
         user_id: wardUserId,
         message: finalMsg,
+        initiated_by: "guardian",
+        read: false,
+        guardian_read: true,
       } as any);
     setSending(false);
     if (error) {

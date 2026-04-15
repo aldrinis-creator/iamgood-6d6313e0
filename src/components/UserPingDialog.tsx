@@ -58,7 +58,10 @@ const UserPingDialog = ({ onSent }: Props) => {
         user_id: session.user.id,
         guardian_user_id: selectedGuardian,
         message: message.trim(),
-      });
+        initiated_by: "user",
+        read: true,
+        guardian_read: false,
+      } as any);
     setSending(false);
     if (error) {
       toast.error("Failed to send message");

@@ -52,9 +52,9 @@ const UserPingOverlay = () => {
         table: "guardian_pings",
         filter: `guardian_user_id=eq.${session.user.id}`,
       }, (payload: any) => {
-        const p = payload.new as Ping;
-        // Ignore pings sent by this guardian (outgoing messages)
-        if (p.user_id === session.user.id) return;
+        const p = payload.new as any;
+        // Only show overlay for user-initiated pings (ward sent to guardian)
+        if ((p.initiated_by || "guardian") !== "user") return;
         setPing(p);
         setVisible(true);
         playChime();
