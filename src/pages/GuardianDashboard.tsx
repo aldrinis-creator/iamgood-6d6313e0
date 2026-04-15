@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Smartphone, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -759,9 +759,13 @@ const GuardianDashboard = () => {
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-muted">
-                <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <p className="text-sm font-semibold">{formatISTTime(new Date())}</p>
-                <p className="text-[10px] text-muted-foreground">Now</p>
+                <Smartphone className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                <p className="text-sm font-semibold">
+                  {wardLastActive
+                    ? formatDistanceToNow(new Date(wardLastActive), { addSuffix: true })
+                    : "N/A"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Last Active</p>
               </div>
             </div>
           </CardContent>

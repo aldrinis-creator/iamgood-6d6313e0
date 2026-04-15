@@ -22,6 +22,7 @@ import ReminderOverlay from "@/components/ReminderOverlay";
 import useLocationSync from "@/hooks/useLocationSync";
 import SOSActiveBar from "@/components/SOSActiveBar";
 import useAbnormalPatternCheck from "@/hooks/useAbnormalPatternCheck";
+import useActivityHeartbeat from "@/hooks/useActivityHeartbeat";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -30,6 +31,7 @@ const UserOnlyHooks = () => {
   useExerciseReminder();
   useLocationSync();
   useAbnormalPatternCheck();
+  useActivityHeartbeat();
   return null;
 };
 
