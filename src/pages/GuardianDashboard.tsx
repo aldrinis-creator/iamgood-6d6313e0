@@ -467,6 +467,57 @@ const GuardianDashboard = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // --- Auto-collapsing Alerts ---
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Medications summary ---
+  const [medDetailsOpen, setMedDetailsOpen] = useState(false);
+  const medDetailsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [medDoseSummary, setMedDoseSummary] = useState<{ taken: number; total: number } | null>(null);
+
+  // --- Data analysis sheet ---
+  const [dataAnalysisSheet, setDataAnalysisSheet] = useState<"vitals" | "activity" | "emergency" | "nutrition" | "facescan" | "wellness" | null>(null);
+
+  // Fetch medication dose summary
+  const fetchMedSummary = useCallback(async () => {
+    if (!wardUserId) return;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const [{ data: meds }, { data: logs }] = await Promise.all([
+      supabase.from("medications").select("id, schedule_times").eq("user_id", wardUserId),
+      supabase.from("medication_logs").select("status").eq("user_id", wardUserId)
+        .gte("scheduled_at", todayStart.toISOString()).lte("scheduled_at", todayEnd.toISOString()),
+    ]);
+    const total = meds?.reduce((s, m: any) => s + (m.schedule_times?.length || 0), 0) || 0;
+    const taken = logs?.filter((l: any) => l.status === "taken" || l.status === "taken_late").length || 0;
+    setMedDoseSummary({ taken, total });
+  }, [wardUserId]);
+
+  useEffect(() => { fetchMedSummary(); }, [fetchMedSummary]);
+
+  // Auto-open/close alerts based on unread or active journey
+  useEffect(() => {
+    const hasActiveJourney = !!document.querySelector("[data-journey-active]"); // proxy
+    if (unreadCount > 0 || hasActiveJourney) {
+      setAlertsOpen(true);
+      if (alertsTimerRef.current) clearTimeout(alertsTimerRef.current);
+    } else if (alertsOpen) {
+      alertsTimerRef.current = setTimeout(() => setAlertsOpen(false), 5 * 60 * 1000);
+    }
+    return () => { if (alertsTimerRef.current) clearTimeout(alertsTimerRef.current); };
+  }, [unreadCount]);
+
+  // Auto-collapse med details after 5 min
+  useEffect(() => {
+    if (medDetailsOpen) {
+      medDetailsTimerRef.current = setTimeout(() => setMedDetailsOpen(false), 5 * 60 * 1000);
+    }
+    return () => { if (medDetailsTimerRef.current) clearTimeout(medDetailsTimerRef.current); };
+  }, [medDetailsOpen]);
+
   const CHECK_IN_HOURS = [7, 12, 19];
   const formatCheckInTime = (scheduled_at: string) => {
     // Extract local hour from the stored timestamp and map to known check-in labels
