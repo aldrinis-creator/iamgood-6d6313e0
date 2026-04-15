@@ -108,8 +108,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && !loginInProgress && <BatteryWarning />}
         {!loginInProgress && <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />}
         {!loginInProgress && <ReminderOverlay />}
-        {role === "user" && !loginInProgress && <GuardianPingOverlay />}
-        {role === "guardian" && !loginInProgress && <UserPingOverlay />}
       </div>
     </div>
   );
