@@ -422,6 +422,14 @@ const GuardianDashboard = () => {
         .on("postgres_changes", { event: "*", schema: "public", table: "sos_events", filter: `user_id=eq.${wardUserId}` }, () => fetchWardCheckIns())
         .subscribe();
       channels.push(sosChannel);
+
+      const profileChannel = supabase
+        .channel("ward-profile-rt")
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${wardUserId}` }, (payload: any) => {
+          if (payload?.new?.last_active_at) setWardLastActive(payload.new.last_active_at);
+        })
+        .subscribe();
+      channels.push(profileChannel);
     }
 
     return () => { channels.forEach(c => supabase.removeChannel(c)); };
