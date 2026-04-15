@@ -5,7 +5,9 @@ import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import AppLayout from "@/components/AppLayout";
 import WardPicker from "@/components/WardPicker";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, Check, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { MessageCircle, Check, Clock, Send } from "lucide-react";
 import { formatISTDateTime } from "@/lib/istTime";
 
 interface Ping {
@@ -16,6 +18,7 @@ interface Ping {
   guardian_read: boolean;
   created_at: string;
   user_id: string;
+  guardian_user_id: string;
 }
 
 const GuardianMessages = () => {
@@ -23,6 +26,9 @@ const GuardianMessages = () => {
   const { selectedWard } = useGuardianWard();
   const [pings, setPings] = useState<Ping[]>([]);
   const [loading, setLoading] = useState(true);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
 
   const fetchPings = async () => {
     if (!session?.user?.id || !selectedWard) return;
@@ -65,25 +71,55 @@ const GuardianMessages = () => {
     return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id, selectedWard?.userId]);
 
+  const sendReply = async (pingId: string) => {
+    if (!replyText.trim() || !session?.user?.id) return;
+    setSending(true);
+    await supabase.from("guardian_pings").update({
+      reply_message: replyText.trim(),
+      replied_at: new Date().toISOString(),
+      guardian_read: true,
+    } as any).eq("id", pingId);
+    setSending(false);
+    setReplyingTo(null);
+    setReplyText("");
+    fetchPings();
+  };
+
+  // Determine if a ping was sent by the guardian (me) or the ward
+  const isSentByMe = (p: Ping) => {
+    // Pings where guardian initiated: guardian_user_id = me, and the ward didn't create it
+    // We use a heuristic: if reply_message exists on a ping where guardian sent it, 
+    // the reply is from the ward. If no reply, it's a guardian-sent message awaiting ward reply.
+    // For ward-sent pings: the ward inserted with user_id=ward, guardian_user_id=me
+    // We can't distinguish by columns alone, so we show all as conversation bubbles.
+    // For now, show message as "sent by guardian" (right-aligned) by default,
+    // unless the ping has no reply and was likely sent by ward (we can't tell).
+    // Actually the guardian_pings table doesn't track who created the row.
+    // Let's just show all messages with the message on the right (guardian sent) 
+    // and replies on the left (ward replied). This matches the existing pattern.
+    return true; // All pings in this view are guardian<->ward conversations
+  };
+
   return (
     <AppLayout>
       <div className="space-y-4">
         <WardPicker />
         <div className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-bold">Sent Messages</h1>
+          <h1 className="text-lg font-bold">Messages</h1>
         </div>
 
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Loading…</p>
         ) : pings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No messages sent yet. Use the ping button on the dashboard to send a message to your ward.
+            No messages yet. Use the ping button on the dashboard to send a message to your ward.
           </p>
         ) : (
           pings.map(p => (
             <Card key={p.id}>
               <CardContent className="p-3 space-y-2">
+                {/* Guardian's sent message */}
                 <div className="flex justify-end">
                   <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
                     <p className="text-sm">{p.message}</p>
@@ -93,6 +129,7 @@ const GuardianMessages = () => {
                   </div>
                 </div>
 
+                {/* Ward's reply or reply input */}
                 {p.reply_message ? (
                   <div className="flex justify-start">
                     <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[80%]">
@@ -105,8 +142,32 @@ const GuardianMessages = () => {
                       </div>
                     </div>
                   </div>
+                ) : replyingTo === p.id ? (
+                  <div className="flex gap-2 pt-1">
+                    <Input
+                      placeholder="Type a reply..."
+                      value={replyText}
+                      onChange={e => setReplyText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && sendReply(p.id)}
+                      className="flex-1"
+                      autoFocus
+                    />
+                    <Button size="icon" onClick={() => sendReply(p.id)} disabled={sending || !replyText.trim()}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground italic text-center">Awaiting reply…</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-muted-foreground italic">Awaiting reply…</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-primary"
+                      onClick={() => { setReplyingTo(p.id); setReplyText(""); }}
+                    >
+                      <Send className="w-3 h-3 mr-1" /> Reply for ward
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
