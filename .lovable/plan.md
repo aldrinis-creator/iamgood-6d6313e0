@@ -1,31 +1,60 @@
 
 
-## Fix Google Maps API Key Configuration
+## Share with Member/s — Appointment WhatsApp Sharing via MSG91
 
-### Problem
-`VITE_` prefixed variables are build-time environment variables and cannot be stored as Lovable Cloud runtime secrets. Runtime secrets are only accessible by backend edge functions, not the frontend.
+### Overview
+Replace the static "Share with Doctor" button on each appointment card with an interactive "Share with Member/s" action that opens a contact picker (guardians directory) and sends appointment details via WhatsApp using the existing MSG91 Flow API edge function.
 
-### Solution
-Google Maps API keys are **publishable keys** — they are designed to be exposed in client-side code and secured via domain/referrer restrictions in the Google Cloud Console. This is the same pattern used by all Google Maps implementations.
+### Changes
 
-**Option chosen: Build Secret approach**
+**1. New Component: `src/components/appointments/ShareAppointmentDialog.tsx`**
 
-1. **You (the user) add a Build Secret**:
-   - Go to **Workspace Settings → Build Secrets**
-   - Add a secret named `VITE_GOOGLE_MAPS_API_KEY`
-   - Paste your new Places API key as the value
-   - This makes it available as `import.meta.env.VITE_GOOGLE_MAPS_API_KEY` during build
+A dialog that:
+- Fetches the user's guardians from the `guardians` table (accepted status, with phone numbers)
+- Displays them as a selectable checklist (name, phone, relation)
+- Allows selecting one or more members
+- On confirm, calls the existing `msg91-send` edge function with a WhatsApp Flow template for each selected recipient
+- Falls back to opening `wa.me` links if MSG91 fails
+- Updates `share_status` to `"shared"` on the appointment row after sending
+- Shows toast confirmation
 
-2. **No code changes needed** — `src/lib/googleMaps.ts` already reads `import.meta.env.VITE_GOOGLE_MAPS_API_KEY` from the previous update.
+**2. New MSG91 Secret: `MSG91_APPT_SHARE_TEMPLATE_ID`**
 
-### Important
-- Build Secrets are configured at the **workspace level** (not project level) in **Workspace Settings → Build Secrets**
-- This is different from the Cloud → Secrets panel you were using
-- After adding the build secret, trigger a new build for it to take effect
+A new runtime secret for the WhatsApp appointment-share template ID. The user will need to create this Flow template in their MSG91 dashboard with variables like `appointment_title`, `date`, `time`, `location`, `doctor_name`.
 
-### Alternative (if Build Secrets feel complex)
-I can update `src/lib/googleMaps.ts` to hardcode your new key directly. This is safe for publishable API keys — just share the key value with me.
+**3. Modified: `src/pages/Appointments.tsx`**
+
+- Import the new `ShareAppointmentDialog`
+- Replace the static "Share with Doctor" `div` (lines 152-158) with a clickable button labeled **"Share with Member/s"**
+- Clicking opens the dialog, passing the appointment data
+- Badge still shows "Shared" / "Pending" based on `share_status`
+
+**4. Edge Function: `supabase/functions/share-appointment-whatsapp/index.ts`**
+
+A dedicated edge function that:
+- Accepts `{ appointment, recipients: [{ phone, name }] }`
+- Reads `MSG91_AUTH_KEY` and `MSG91_APPT_SHARE_TEMPLATE_ID` from env
+- Sends via MSG91 Flow API to each recipient with appointment variables
+- Returns success/failure per recipient
+- Updates the appointment `share_status` to `"shared"` via service-role client
+
+### Files Created
+- `src/components/appointments/ShareAppointmentDialog.tsx`
+- `supabase/functions/share-appointment-whatsapp/index.ts`
 
 ### Files Modified
-None — only a workspace-level build secret needs to be added by you.
+- `src/pages/Appointments.tsx` — replace share button, add dialog state
+
+### Secret Required
+- `MSG91_APPT_SHARE_TEMPLATE_ID` — user must create a WhatsApp Flow template in MSG91 and provide the template ID
+
+### Flow
+```text
+User taps "Share with Member/s"
+  → Dialog opens with guardian contacts (checkboxes)
+  → User selects members, taps "Share via WhatsApp"
+  → Edge function calls MSG91 Flow API per recipient
+  → share_status updated to "shared"
+  → Toast: "Appointment shared with 2 member(s)"
+```
 
