@@ -6,8 +6,6 @@ import NavTabs from "@/components/NavTabs";
 import SOSButton from "@/components/SOSButton";
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import FallDetectionOverlay from "@/components/FallDetectionOverlay";
-import GuardianPingOverlay from "@/components/GuardianPingOverlay";
-import UserPingOverlay from "@/components/UserPingOverlay";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
