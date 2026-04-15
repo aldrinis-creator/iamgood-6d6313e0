@@ -1,37 +1,26 @@
 
 
-## Fix Pop-up Blocked Error in Medical Vault
+## Remove 4 Health Passport Categories & Rename "Last Active"
 
-### Problem
-The Medical Vault uses `window.open()` to display record details in a new browser tab. This is blocked by browsers and WebViews (especially in Capacitor apps), causing the "Pop-up blocked" error.
+### Changes
 
-### Solution
-Replace the popup window approach with an **in-page Dialog/Modal** that renders the record details, attachment preview, and action buttons directly inside the app.
+**1. User Health Passport (`src/components/HealthPassport.tsx`)**
+- Remove Wellness, Vitals, Nutrition, and Face Scan from initial state, `newCategories` array, `categoryRoutes`, and the upsert call
+- Keep only: Check-iN, Activity, Medications (3 categories)
+- Change overall divisor from 7 to 3
+- Remove unused Supabase queries (wellness_logs, meal_logs, nutrition_personas, face_scans) and their scoring logic
+- Remove unused imports if any
 
-### Implementation
+**2. Guardian Ward Health Passport (`src/components/WardHealthPassport.tsx`)**
+- Same changes: remove 4 categories from state, scoring, `newCategories`, and upsert
+- Change overall divisor from 7 to 3
+- Remove unused Supabase queries and scoring blocks
 
-**File: `src/pages/MedicalVault.tsx`**
-
-1. Add new state variables:
-   - `viewRecord: MedicalRecord | null` — the record being viewed
-   - `viewSignedUrl: string` — signed URL for the attachment
-   - `viewLoading: boolean` — loading state while fetching signed URL
-
-2. Replace `openRecordViewWindow()` with a simpler function that sets state:
-   - Sets `viewRecord = r`, `viewLoading = true`
-   - Fetches signed URL if `r.file_url` exists
-   - Sets `viewSignedUrl` and `viewLoading = false`
-
-3. Add a new `<Dialog>` at the bottom of the JSX that renders when `viewRecord` is set:
-   - Record details (title, type, date, doctor, hospital)
-   - Description/notes section (pre-wrapped)
-   - Attachment section: inline `<img>` for images, `<iframe>` for PDFs, download button for all files
-   - Action buttons: Download, Share (WhatsApp/Email), Print (using `window.print()` on current page or a hidden iframe)
-
-4. Remove `buildRecordViewHtml()` function and the `buildLetterheadHtml` import (if only used here — check first)
-
-5. Keep print functionality by using a hidden iframe approach or `window.print()` scoped to dialog content
+**3. Guardian Dashboard (`src/pages/GuardianDashboard.tsx`)**
+- Line 686: Change `"Last Active"` to `"Since Last Check-iN"`
 
 ### Files to modify
-- `src/pages/MedicalVault.tsx` — replace popup with in-page Dialog for record viewing
+- `src/components/HealthPassport.tsx`
+- `src/components/WardHealthPassport.tsx`
+- `src/pages/GuardianDashboard.tsx` (line 686)
 
