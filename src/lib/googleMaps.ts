@@ -2,9 +2,13 @@
 
 let loadPromise: Promise<void> | null = null;
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyC2I7F0chcShNVSf2OCsOA3h6EUPcD1GSU";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 export function loadGoogleMapsAPI(): Promise<void> {
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error("VITE_GOOGLE_MAPS_API_KEY not configured"));
+  }
+
   if (loadPromise) return loadPromise;
 
   if ((window as any).google?.maps) {
