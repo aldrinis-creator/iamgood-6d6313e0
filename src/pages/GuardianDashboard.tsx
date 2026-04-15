@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert } from "lucide-react";
+import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Clock, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
+import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -465,6 +467,57 @@ const GuardianDashboard = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // --- Auto-collapsing Alerts ---
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Medications summary ---
+  const [medDetailsOpen, setMedDetailsOpen] = useState(false);
+  const medDetailsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [medDoseSummary, setMedDoseSummary] = useState<{ taken: number; total: number } | null>(null);
+
+  // --- Data analysis sheet ---
+  const [dataAnalysisSheet, setDataAnalysisSheet] = useState<"vitals" | "activity" | "emergency" | "nutrition" | "facescan" | "wellness" | null>(null);
+
+  // Fetch medication dose summary
+  const fetchMedSummary = useCallback(async () => {
+    if (!wardUserId) return;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const [{ data: meds }, { data: logs }] = await Promise.all([
+      supabase.from("medications").select("id, schedule_times").eq("user_id", wardUserId),
+      supabase.from("medication_logs").select("status").eq("user_id", wardUserId)
+        .gte("scheduled_at", todayStart.toISOString()).lte("scheduled_at", todayEnd.toISOString()),
+    ]);
+    const total = meds?.reduce((s, m: any) => s + (m.schedule_times?.length || 0), 0) || 0;
+    const taken = logs?.filter((l: any) => l.status === "taken" || l.status === "taken_late").length || 0;
+    setMedDoseSummary({ taken, total });
+  }, [wardUserId]);
+
+  useEffect(() => { fetchMedSummary(); }, [fetchMedSummary]);
+
+  // Auto-open/close alerts based on unread or active journey
+  useEffect(() => {
+    const hasActiveJourney = !!document.querySelector("[data-journey-active]"); // proxy
+    if (unreadCount > 0 || hasActiveJourney) {
+      setAlertsOpen(true);
+      if (alertsTimerRef.current) clearTimeout(alertsTimerRef.current);
+    } else if (alertsOpen) {
+      alertsTimerRef.current = setTimeout(() => setAlertsOpen(false), 5 * 60 * 1000);
+    }
+    return () => { if (alertsTimerRef.current) clearTimeout(alertsTimerRef.current); };
+  }, [unreadCount]);
+
+  // Auto-collapse med details after 5 min
+  useEffect(() => {
+    if (medDetailsOpen) {
+      medDetailsTimerRef.current = setTimeout(() => setMedDetailsOpen(false), 5 * 60 * 1000);
+    }
+    return () => { if (medDetailsTimerRef.current) clearTimeout(medDetailsTimerRef.current); };
+  }, [medDetailsOpen]);
+
   const CHECK_IN_HOURS = [7, 12, 19];
   const formatCheckInTime = (scheduled_at: string) => {
     // Extract local hour from the stored timestamp and map to known check-in labels
@@ -593,8 +646,6 @@ const GuardianDashboard = () => {
               <Button variant="outline" size="sm" className="mt-2" onClick={resolveSOS}>
                 ✓ Resolve / Mark Safe
               </Button>
-
-              {/* Emergency Health Card + Vitals shown during SOS */}
               {wardUserId && (
                 <div className="mt-3 space-y-2">
                   <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />
@@ -716,7 +767,7 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Missed Check-in Alert (elevated) */}
+        {/* Missed Check-in Alert */}
         {(() => {
           const missedCount = todayCheckIns.filter(ci => ci.status === "missed").length;
           return missedCount > 0 ? (
@@ -739,31 +790,16 @@ const GuardianDashboard = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleCallUser("phone")}>
-                📞 Mobile Call
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleCallUser("whatsapp")}>
-                💬 WhatsApp
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleCallUser("flash")}>
-                ⚡ Flash Call
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCallUser("phone")}>📞 Mobile Call</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCallUser("whatsapp")}>💬 WhatsApp</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCallUser("flash")}>⚡ Flash Call</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            className="flex-col h-auto py-4 bg-success hover:bg-success/90"
-            size="lg"
-            onClick={handleRoute}
-            disabled={!wardLocation}
-          >
+          <Button className="flex-col h-auto py-4 bg-success hover:bg-success/90" size="lg" onClick={handleRoute} disabled={!wardLocation}>
             <Navigation className="w-5 h-5 mb-1" />
             <span className="text-xs">Route</span>
           </Button>
-          <Button
-            className="flex-col h-auto py-4 bg-destructive hover:bg-destructive/90"
-            size="lg"
-            onClick={() => setShowAmbulance(!showAmbulance)}
-          >
+          <Button className="flex-col h-auto py-4 bg-destructive hover:bg-destructive/90" size="lg" onClick={() => setShowAmbulance(!showAmbulance)}>
             <Navigation className="w-5 h-5 mb-1" />
             <span className="text-xs">Ambulance</span>
           </Button>
@@ -772,35 +808,7 @@ const GuardianDashboard = () => {
 
         {showAmbulance && <AmbulanceBooking />}
 
-        {/* Notification Alerts */}
-        {unreadCount > 0 && (
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Bell className="w-5 h-5 text-destructive" />
-                <h3 className="font-semibold text-sm">
-                  Alerts <Badge variant="destructive" className="ml-1">{unreadCount}</Badge>
-                </h3>
-              </div>
-              {notifications.filter(n => !n.read).slice(0, 3).map(n => (
-                <div key={n.id} className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{n.title}</p>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatISTTime(n.created_at)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{n.message}</p>
-                  <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>
-                    Dismiss
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Today's Check-iNs */}
+        {/* ===== TODAY'S CHECK-INS (moved above Alerts) ===== */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -831,10 +839,48 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* ===== ALERTS (auto-collapsing) ===== */}
+        <Collapsible open={alertsOpen} onOpenChange={setAlertsOpen}>
+          <CollapsibleTrigger asChild>
+            <Card className="cursor-pointer hover:border-primary/20 transition-colors">
+              <CardContent className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-destructive" />
+                  <span className="text-sm font-semibold">Alerts</span>
+                  {unreadCount > 0 && <Badge variant="destructive" className="text-[10px]">{unreadCount}</Badge>}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${alertsOpen ? "rotate-180" : ""}`} />
+              </CardContent>
+            </Card>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-1">
+            {unreadCount > 0 ? (
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardContent className="p-4 space-y-2">
+                  {notifications.filter(n => !n.read).slice(0, 5).map(n => (
+                    <div key={n.id} className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{n.title}</p>
+                        <span className="text-[10px] text-muted-foreground">{formatISTTime(n.created_at)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{n.message}</p>
+                      <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>Dismiss</Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-4 text-center text-sm text-muted-foreground">No active alerts</CardContent>
+              </Card>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Active Journey Tracker */}
         {wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
 
-        {/* Live Location (consent-gated) — collapsible dropdown */}
+        {/* Location (collapsible) */}
         <CollapsibleSection
           title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
           icon={<MapPin className="w-5 h-5 text-primary" />}
@@ -870,32 +916,125 @@ const GuardianDashboard = () => {
           </Card>
         </CollapsibleSection>
 
-        {/* Collapsible ward modules */}
+        {/* ===== MEDICATIONS SUMMARY ===== */}
+        {wardUserId && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-semibold">{wardName}'s Medications</span>
+                </div>
+              </div>
+              {medDoseSummary && medDoseSummary.total > 0 ? (
+                <>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {medDoseSummary.taken} of {medDoseSummary.total} doses taken
+                      </span>
+                      <span className="font-medium">
+                        {Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)}%
+                      </span>
+                    </div>
+                    <Progress value={Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)} className="h-2" />
+                  </div>
+                  {!medDetailsOpen ? (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setMedDetailsOpen(true)}>
+                      View Details <ChevronRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
+                      <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
+                      <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setMedDetailsOpen(false)}>
+                        Collapse
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : medDoseSummary && medDoseSummary.total === 0 ? (
+                <p className="text-sm text-muted-foreground text-center">No medications scheduled</p>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Loading…</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== DATA ANALYSIS TILE GRID ===== */}
         {wardUserId && (
           <div className="space-y-2">
-            <CollapsibleSection title={`${wardName}'s Medications`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">💊</Badge>} defaultOpen={true}>
-              <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
-              <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
-              <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title={`${wardName}'s Vitals`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">❤️</Badge>}>
-              <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title={`${wardName}'s Activity`} icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🏃</Badge>}>
-              <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-
-            <CollapsibleSection title="Emergency Health Card" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">🆔</Badge>}>
-              <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
-              <CareJournal wardUserId={wardUserId} />
-            </CollapsibleSection>
+            <h3 className="text-sm font-semibold text-muted-foreground px-1">{wardName}'s Data Analysis</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { key: "vitals" as const, icon: <Heart className="w-5 h-5" />, label: "Vitals", color: "text-destructive" },
+                { key: "activity" as const, icon: <Activity className="w-5 h-5" />, label: "Activity", color: "text-success" },
+                { key: "emergency" as const, icon: <IdCard className="w-5 h-5" />, label: "Emergency Card", color: "text-primary" },
+                { key: "nutrition" as const, icon: <Apple className="w-5 h-5" />, label: "Nutrition", color: "text-amber-500" },
+                { key: "facescan" as const, icon: <ScanFace className="w-5 h-5" />, label: "Face Scan", color: "text-primary" },
+                { key: "wellness" as const, icon: <Smile className="w-5 h-5" />, label: "Wellness", color: "text-success" },
+              ].map(tile => (
+                <Card
+                  key={tile.key}
+                  className="cursor-pointer hover:border-primary/30 transition-colors"
+                  onClick={() => setDataAnalysisSheet(tile.key)}
+                >
+                  <CardContent className="p-3 flex flex-col items-center justify-center text-center gap-1.5">
+                    <div className={tile.color}>{tile.icon}</div>
+                    <span className="text-xs font-medium">{tile.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* Data Analysis Sheet */}
+        <Sheet open={!!dataAnalysisSheet} onOpenChange={(o) => !o && setDataAnalysisSheet(null)}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>
+                {dataAnalysisSheet === "vitals" && `${wardName}'s Vitals`}
+                {dataAnalysisSheet === "activity" && `${wardName}'s Activity`}
+                {dataAnalysisSheet === "emergency" && "Emergency Health Card"}
+                {dataAnalysisSheet === "nutrition" && `${wardName}'s Nutrition`}
+                {dataAnalysisSheet === "facescan" && `${wardName}'s Face Scan`}
+                {dataAnalysisSheet === "wellness" && `${wardName}'s Wellness`}
+              </SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-3">
+              {wardUserId && dataAnalysisSheet === "vitals" && <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />}
+              {wardUserId && dataAnalysisSheet === "activity" && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
+              {wardUserId && dataAnalysisSheet === "emergency" && <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />}
+              {wardUserId && dataAnalysisSheet === "nutrition" && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Apple className="w-10 h-10 mx-auto mb-2 text-amber-500" />
+                  <p className="text-sm">Nutrition data will be available once wearable is integrated.</p>
+                </div>
+              )}
+              {wardUserId && dataAnalysisSheet === "facescan" && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ScanFace className="w-10 h-10 mx-auto mb-2 text-primary" />
+                  <p className="text-sm">Face Scan data will be available once wearable is integrated.</p>
+                </div>
+              )}
+              {wardUserId && dataAnalysisSheet === "wellness" && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Smile className="w-10 h-10 mx-auto mb-2 text-success" />
+                  <p className="text-sm">Wellness data will be available once wearable is integrated.</p>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Care Journal */}
+        {wardUserId && (
+          <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
+            <CareJournal wardUserId={wardUserId} />
+          </CollapsibleSection>
         )}
       </div>
     </AppLayout>
