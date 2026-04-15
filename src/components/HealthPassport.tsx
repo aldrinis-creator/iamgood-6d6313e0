@@ -55,9 +55,6 @@ const HealthPassport = () => {
     const now = new Date();
     const currentHour = now.getHours();
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
     const [checkInsRes, activityRes, medsRes, medLogsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
