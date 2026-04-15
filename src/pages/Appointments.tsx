@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
+import ShareAppointmentDialog from "@/components/appointments/ShareAppointmentDialog";
 
 const Appointments = () => {
   const { session } = useAuth();
