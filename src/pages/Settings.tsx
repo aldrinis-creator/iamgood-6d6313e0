@@ -56,7 +56,49 @@ const TYPE_LABELS: Record<string, string> = {
   objection: "Processing Objection",
 };
 
-const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: any; navigate: any; guardians: Guardian[] }) => {
+const GuardianChecklist = ({
+  guardians,
+  selectedIds,
+  settingKey,
+  updateSetting,
+}: {
+  guardians: Guardian[];
+  selectedIds: string[];
+  settingKey: "locationSharingGuardianIds" | "liveLocationGuardianIds";
+  updateSetting: (key: any, value: any) => void;
+}) => {
+  // If empty (first time), auto-populate with all guardian IDs (primary first)
+  const effectiveIds = selectedIds.length > 0
+    ? selectedIds
+    : guardians.map((g) => g.id);
+
+  const toggle = (guardianId: string) => {
+    const current = effectiveIds;
+    const next = current.includes(guardianId)
+      ? current.filter((id) => id !== guardianId)
+      : [...current, guardianId];
+    updateSetting(settingKey, next);
+  };
+
+  return (
+    <div className="pl-4 pb-2 space-y-1.5">
+      <p className="text-xs text-muted-foreground font-medium">Select guardians:</p>
+      {guardians.map((g) => (
+        <label key={g.id} className="flex items-center gap-2 cursor-pointer py-1">
+          <Checkbox
+            checked={effectiveIds.includes(g.id)}
+            onCheckedChange={() => toggle(g.id)}
+          />
+          <span className="text-sm">{g.guardian_name}</span>
+          {g.is_primary && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Primary</Badge>
+          )}
+        </label>
+      ))}
+    </div>
+  );
+};
+
   const queryClient = useQueryClient();
   const { settings, updateSetting } = useUserSettings();
 
