@@ -110,7 +110,7 @@ const AQIWidget = () => {
     }
   };
 
-  useEffect(() => {
+  const fetchDefaultLocation = () => {
     if (!navigator.geolocation) {
       setLoading(false);
       setError(true);
@@ -124,7 +124,30 @@ const AQIWidget = () => {
         toast.error("Location access needed for Air Quality index");
       }
     );
+  };
+
+  useEffect(() => {
+    fetchDefaultLocation();
   }, []);
+
+  // 10-minute inactivity revert
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    // If we're looking at a custom location, start a 10-minute timer to revert to Current Location
+    if (aqiData?.locationName && aqiData.locationName !== "Current Location") {
+      timeoutRef.current = setTimeout(() => {
+        toast("Returning to Current Location due to inactivity.");
+        setLoading(true);
+        fetchDefaultLocation();
+      }, 10 * 60 * 1000); // 10 minutes
+    }
+    
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [aqiData?.locationName, searchQuery]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
