@@ -151,13 +151,17 @@ const Appointments = () => {
                   </p>
                 )}
 
-                <div className="flex items-center justify-center gap-2 border rounded-md py-2 text-sm">
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => setShareAppointment(apt)}
+                >
                   <Share2 className="w-4 h-4" />
-                  Share with Doctor
+                  Share with Member/s
                   <Badge variant={apt.share_status === "shared" ? "default" : "secondary"} className="text-xs">
                     {apt.share_status === "shared" ? "Shared" : "Pending"}
                   </Badge>
-                </div>
+                </Button>
 
                 {apt.alarm_enabled && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
