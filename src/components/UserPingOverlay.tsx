@@ -3,17 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageCircle, Heart, Send, X } from "lucide-react";
+import { MessageCircle, Send, X } from "lucide-react";
 import { playChime } from "@/lib/audioAlerts";
 
 interface Ping {
   id: string;
-  guardian_user_id: string;
+  user_id: string;
   message: string;
   created_at: string;
 }
 
-const GuardianPingOverlay = () => {
+const UserPingOverlay = () => {
   const { session } = useAuth();
   const [ping, setPing] = useState<Ping | null>(null);
   const [reply, setReply] = useState("");
@@ -22,7 +22,7 @@ const GuardianPingOverlay = () => {
 
   const dismiss = useCallback(async () => {
     if (ping) {
-      await supabase.from("guardian_pings").update({ read: true }).eq("id", ping.id);
+      await supabase.from("guardian_pings").update({ guardian_read: true }).eq("id", ping.id);
     }
     setVisible(false);
     setPing(null);
@@ -35,7 +35,7 @@ const GuardianPingOverlay = () => {
     await supabase.from("guardian_pings").update({
       reply_message: reply.trim(),
       replied_at: new Date().toISOString(),
-      read: true,
+      guardian_read: true,
     } as any).eq("id", ping.id);
     setSending(false);
     dismiss();
@@ -45,16 +45,16 @@ const GuardianPingOverlay = () => {
     if (!session?.user?.id) return;
 
     const channel = supabase
-      .channel("user-pings-overlay")
+      .channel("guardian-pings-overlay")
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "guardian_pings",
-        filter: `user_id=eq.${session.user.id}`,
+        filter: `guardian_user_id=eq.${session.user.id}`,
       }, (payload: any) => {
         const p = payload.new as Ping;
-        // Ignore pings sent by this user (outgoing messages)
-        if (p.guardian_user_id === session.user.id) return;
+        // Ignore pings sent by this guardian (outgoing messages)
+        if (p.user_id === session.user.id) return;
         setPing(p);
         setVisible(true);
         playChime();
@@ -79,11 +79,11 @@ const GuardianPingOverlay = () => {
 
         <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
           style={{ animation: "ping-pulse 1.5s ease-in-out infinite" }}>
-          <Heart className="w-8 h-8 text-primary" style={{ animation: "ping-heart 1s ease-in-out infinite" }} />
+          <MessageCircle className="w-8 h-8 text-primary" style={{ animation: "ping-heart 1s ease-in-out infinite" }} />
         </div>
 
         <p className="text-lg font-semibold text-foreground">{ping.message}</p>
-        <p className="text-xs text-muted-foreground">From your Guardian</p>
+        <p className="text-xs text-muted-foreground">From your Ward</p>
 
         <div className="flex gap-2">
           <Input
@@ -122,4 +122,4 @@ const GuardianPingOverlay = () => {
   );
 };
 
-export default GuardianPingOverlay;
+export default UserPingOverlay;

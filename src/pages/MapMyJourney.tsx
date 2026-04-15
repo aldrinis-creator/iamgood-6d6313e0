@@ -680,14 +680,7 @@ const MapMyJourney = () => {
         )}
       </div>
 
-      {/* Journey Alert Overlays */}
-      {arrivingSoon && !arrivingSoonDismissed && (
-        <JourneyAlertOverlay
-          type="arriving"
-          message={`You are approaching ${activeJourney?.destination_name || "your destination"}.`}
-          onDismiss={() => setArrivingSoonDismissed(true)}
-        />
-      )}
+      {/* Journey Alert Overlays — Arriving handled inline via badge + audio in hook */}
       {routeDeviation && !routeDeviationDismissed && (
         <JourneyAlertOverlay
           type="deviation"
