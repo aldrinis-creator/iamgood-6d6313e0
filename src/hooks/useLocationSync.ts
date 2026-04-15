@@ -86,8 +86,19 @@ export default function useLocationSync() {
 
         if (!guardians || guardians.length === 0) return;
 
-        // Insert notifications for all guardians
-        const notifications = guardians.map((g) => ({
+        // Filter by user's locationSharingGuardianIds if set
+        const selectedIds = settings.locationSharingGuardianIds;
+        const filteredGuardians = selectedIds && selectedIds.length > 0
+          ? guardians.filter((g) => {
+              // Match by guardian row id (from guardians table)
+              return selectedIds.includes(g.guardian_user_id!);
+            })
+          : guardians;
+
+        if (filteredGuardians.length === 0) return;
+
+        // Insert notifications for selected guardians
+        const notifications = filteredGuardians.map((g) => ({
           user_id: g.guardian_user_id!,
           title: "⚠️ Outside Safe Zone",
           message: `${userName} has left the "${nearest.name}" safe zone area.`,

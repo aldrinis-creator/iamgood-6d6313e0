@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
@@ -55,10 +56,54 @@ const TYPE_LABELS: Record<string, string> = {
   objection: "Processing Objection",
 };
 
-const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
+const GuardianChecklist = ({
+  guardians,
+  selectedIds,
+  settingKey,
+  updateSetting,
+}: {
+  guardians: Guardian[];
+  selectedIds: string[];
+  settingKey: "locationSharingGuardianIds" | "liveLocationGuardianIds";
+  updateSetting: (key: any, value: any) => void;
+}) => {
+  // If empty (first time), auto-populate with all guardian IDs (primary first)
+  const effectiveIds = selectedIds.length > 0
+    ? selectedIds
+    : guardians.map((g) => g.id);
+
+  const toggle = (guardianId: string) => {
+    const current = effectiveIds;
+    const next = current.includes(guardianId)
+      ? current.filter((id) => id !== guardianId)
+      : [...current, guardianId];
+    updateSetting(settingKey, next);
+  };
+
+  return (
+    <div className="pl-4 pb-2 space-y-1.5">
+      <p className="text-xs text-muted-foreground font-medium">Select guardians:</p>
+      {guardians.map((g) => (
+        <label key={g.id} className="flex items-center gap-2 cursor-pointer py-1">
+          <Checkbox
+            checked={effectiveIds.includes(g.id)}
+            onCheckedChange={() => toggle(g.id)}
+          />
+          <span className="text-sm">{g.guardian_name}</span>
+          {g.is_primary && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Primary</Badge>
+          )}
+        </label>
+      ))}
+    </div>
+  );
+};
+
+const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: any; navigate: any; guardians: Guardian[] }) => {
   const queryClient = useQueryClient();
   const { settings, updateSetting } = useUserSettings();
 
+  const acceptedGuardians = useMemo(() => allGuardians.filter(g => g.status === "accepted"), [allGuardians]);
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["privacy_requests", session?.user?.id],
     queryFn: async () => {
@@ -152,6 +197,14 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
             </div>
             <Switch checked={settings.shareLocation} onCheckedChange={(v) => updateSetting("shareLocation", v)} />
           </div>
+          {settings.shareLocation && acceptedGuardians.length > 0 && (
+            <GuardianChecklist
+              guardians={acceptedGuardians}
+              selectedIds={settings.locationSharingGuardianIds}
+              settingKey="locationSharingGuardianIds"
+              updateSetting={updateSetting}
+            />
+          )}
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium">Live Location for Guardians</p>
@@ -159,6 +212,14 @@ const PrivacyTab = ({ session, navigate }: { session: any; navigate: any }) => {
             </div>
             <Switch checked={(settings as any).shareLocationWithGuardian !== false} onCheckedChange={(v) => updateSetting("shareLocationWithGuardian" as any, v)} />
           </div>
+          {(settings as any).shareLocationWithGuardian !== false && acceptedGuardians.length > 0 && (
+            <GuardianChecklist
+              guardians={acceptedGuardians}
+              selectedIds={settings.liveLocationGuardianIds}
+              settingKey="liveLocationGuardianIds"
+              updateSetting={updateSetting}
+            />
+          )}
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="text-sm font-medium">Share Health Data</p>
@@ -908,7 +969,7 @@ const Settings = () => {
 
         {/* ============ PRIVACY TAB ============ */}
         {activeTab === "privacy" && (
-          <PrivacyTab session={session} navigate={navigate} />
+          <PrivacyTab session={session} navigate={navigate} guardians={guardians} />
         )}
       </div>
     </AppLayout>
