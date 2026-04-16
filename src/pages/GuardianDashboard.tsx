@@ -486,8 +486,7 @@ const GuardianDashboard = () => {
   const medDetailsTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [medDoseSummary, setMedDoseSummary] = useState<{ taken: number; total: number } | null>(null);
 
-  // --- Data analysis sheet ---
-  const [dataAnalysisSheet, setDataAnalysisSheet] = useState<"vitals" | "activity" | "emergency" | "nutrition" | "facescan" | "wellness" | null>(null);
+  // Data analysis now opens in new tab — state removed
 
   // Fetch medication dose summary
   const fetchMedSummary = useCallback(async () => {
