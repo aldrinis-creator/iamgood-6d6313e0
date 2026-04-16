@@ -13,64 +13,79 @@ import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { printReceipt } from "@/lib/receiptPdf";
+import { cn } from "@/lib/utils";
 
 const plans = [
   {
-    key: "free",
-    name: "Free",
-    icon: Gift,
-    monthly: 0,
-    yearly: 0,
-    features: [
-      "SOS Emergency Alert",
-      "1 Guardian",
-      "Emergency Profile",
-      "Emergency First Aid Guides",
-      "Basic Vitals (manual)",
-    ],
-    excluded: [
-      "Medication Manager",
-      "Activity Tracking",
-      "Medical Vault",
-      "AI Health Tools",
-      "Advanced Vitals",
-    ],
-  },
-  {
     key: "basic",
     name: "Basic",
-    icon: Star,
+    icon: Shield,
     monthly: 99,
     yearly: 999,
     features: [
-      "Everything in Free",
+      "SOS Emergency Alert",
+      "2 Guardians",
+      "Emergency Profile",
+      "Messaging",
+      "Basic Vitals - Using the Mobile",
+      "Services (Ambulance included)",
+      "Appointments",
+      "Map My Journey 5/month",
+    ],
+    excluded: [
       "3 Daily Check-iNs",
       "Medication Manager",
+      "Advanced Wearable Vitals",
       "Basic Activity Tracking",
-      "Medical Vault (view)",
-      "Basic Inactivity Alerts",
+      "AQI Suite",
+      "Medical Vault",
     ],
-    excluded: ["AI Health Tools", "5 Guardians", "Advanced Vitals", "Priority Ambulance"],
   },
   {
-    key: "pro",
-    name: "Pro",
-    icon: Crown,
+    key: "premium",
+    name: "Premium",
+    icon: Star,
     monthly: 199,
     yearly: 1999,
     popular: true,
     features: [
       "Everything in Basic",
-      "Unlimited Check-iNs",
+      "3 Guardians",
+      "3 Daily Check-iNs",
+      "Medication Manager",
+      "Advanced Vitals - using external Wearable",
+      "Basic Activity Tracking - using the Mobile",
+      "AQI Suite",
+      "AI Health Tools - No Medical Vault",
+      "Basic Inactivity Alerts",
+    ],
+    excluded: [
       "Up to 5 Guardians",
-      "AI Symptom Checker",
-      "Document Analyzer",
-      "Face Scan & Vitals",
-      "Nutrition Advisor (AI)",
-      "Priority Ambulance",
+      "Medical Vault",
       "Wellness AI Insights",
-      "PDF Export / Sharing",
-      "Journey Geofencing",
+      "Safety Zones & Fall Detection",
+      "Health Vitals (ECG, HR, SpO2, BP)",
+      "Multiple sports modes & Gesture control"
+    ],
+  },
+  {
+    key: "premium-plus",
+    name: "Premium Plus",
+    icon: Crown,
+    monthly: 999,
+    yearly: 9999,
+    badge: "Includes Smart Ring",
+    features: [
+      "Everything in Premium",
+      "Up to 5 Guardians",
+      "Unlimited Check-iNs",
+      "Medical Vault",
+      "Wellness AI Insights",
+      "Safety Zones",
+      "Fall Detection",
+      "Health Vitals (ECG, HR, SpO2, BP, EDA)",
+      "Step counting & Multiple sports modes",
+      "Gesture control",
     ],
     excluded: [],
   },
@@ -126,7 +141,7 @@ const Subscription = () => {
     const discounts: Record<string, number> = {};
     let lastValid: { discount_type: string; discount_value: number } | null = null;
 
-    for (const planKey of ["basic", "pro"]) {
+    for (const planKey of ["basic", "premium", "premium-plus"]) {
       const { data } = await supabase.functions.invoke("validate-coupon", {
         body: { code, plan_type: planKey, billing_cycle: billing },
       });
@@ -155,7 +170,7 @@ const Subscription = () => {
     setCouponLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("validate-coupon", {
-        body: { code, plan_type: "pro", billing_cycle: billing },
+        body: { code, plan_type: "premium", billing_cycle: billing },
       });
 
       if (error || !data?.valid) {
@@ -209,7 +224,7 @@ const Subscription = () => {
     setSearchParams({}, { replace: true });
   };
 
-  const planLabel = successPlan === "pro" ? "Pro" : successPlan === "basic" ? "Basic" : successPlan;
+  const planLabel = successPlan === "premium" ? "Premium" : successPlan === "premium-plus" ? "Premium Plus" : successPlan === "basic" ? "Basic" : successPlan;
   const billingLabel = successBilling === "yearly" ? "Yearly" : "Monthly";
   const planData = plans.find((p) => p.key === successPlan);
   const paidAmount = planData
@@ -320,6 +335,22 @@ const Subscription = () => {
           </div>
         ) : (
         <>
+        {/* HUGE 30-DAY TRIAL BANNER */}
+        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground shadow-lg mb-6 backdrop-blur-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-10">
+            <Gift className="w-48 h-48" />
+          </div>
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-center sm:text-left">
+              <h2 className="text-2xl font-bold tracking-tight">Try Premium Free for 30 Days</h2>
+              <p className="text-primary-foreground/90 font-medium">Access all features effortlessly. Cancel anytime.</p>
+            </div>
+            <Button variant="secondary" className="font-bold py-6 px-6 shadow-xl hover:scale-105 transition-transform" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
+              Start Your Free Trial
+            </Button>
+          </div>
+        </div>
+
         <div className="text-center space-y-2">
           <h1 className="text-xl font-bold">Choose Your Plan</h1>
           <p className="text-sm text-muted-foreground">
@@ -412,70 +443,72 @@ const Subscription = () => {
           </CollapsibleContent>
         </Collapsible>
 
-        {plans.map((plan) => {
-          const isCurrentPlan =
-            (plan.key === "free" && !isActive) ||
-            (isActive && subscription?.plan_type === plan.key);
-          const isFree = plan.key === "free";
-          const { original, discounted } = getDisplayPrice(plan);
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {plans.map((plan) => {
+            const isCurrentPlan = isActive && subscription?.plan_type === plan.key;
+            const { original, discounted } = getDisplayPrice(plan);
 
-          return (
-            <Card key={plan.key} className={plan.popular ? "border-2 border-primary relative" : ""}>
-              {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full">
-                  Most Popular
-                </span>
-              )}
-              {isCurrentPlan && (
-                <span className="absolute -top-3 right-4 bg-success text-white text-xs px-3 py-1 rounded-full">
-                  Current Plan
-                </span>
-              )}
-              <CardHeader className="pb-2 pt-4">
-                <CardTitle className="flex items-center gap-2">
-                  <plan.icon className="w-5 h-5 text-primary" />
-                  {plan.name}
-                </CardTitle>
-                <div className="flex items-baseline gap-1">
-                  {isFree ? (
-                    <span className="text-3xl font-bold">Free</span>
-                  ) : discounted !== null ? (
-                    <>
-                      <span className="text-lg line-through text-muted-foreground">₹{original}</span>
-                      <span className="text-3xl font-bold text-success">₹{discounted}</span>
-                    </>
-                  ) : (
-                    <span className="text-3xl font-bold">₹{original}</span>
-                  )}
-                  {!isFree && (
-                    <span className="text-sm text-muted-foreground">
+            return (
+              <Card key={plan.key} className={cn("relative flex flex-col", plan.popular ? "border-2 border-primary" : "")}>
+                {plan.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full z-10 font-medium">
+                    Most Popular
+                  </span>
+                )}
+                {/* @ts-ignore - badge exists on Premium Plus */}
+                {plan.badge && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs px-3 py-1 rounded-full z-10 font-bold whitespace-nowrap">
+                    {/* @ts-ignore */}
+                    {plan.badge}
+                  </span>
+                )}
+                {isCurrentPlan && (
+                  <span className="absolute -top-3 right-4 bg-success text-white text-xs px-3 py-1 rounded-full z-10">
+                    Current Plan
+                  </span>
+                )}
+                <CardHeader className="pb-2 pt-5">
+                  <CardTitle className="flex items-center gap-2">
+                    <plan.icon className="w-5 h-5 text-primary" />
+                    {plan.name}
+                  </CardTitle>
+                  <div className="flex items-baseline gap-1 mt-2">
+                    {discounted !== null ? (
+                      <>
+                        <span className="text-lg line-through text-muted-foreground">₹{original}</span>
+                        <span className="text-3xl font-bold text-success">₹{discounted}</span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-bold">₹{original}</span>
+                    )}
+                    <span className="text-sm text-muted-foreground font-medium">
                       /{billing === "monthly" ? "mo" : "yr"}
                     </span>
+                  </div>
+                  {/* @ts-ignore */}
+                  {plan.key === "premium-plus" && (
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-1">
+                      Includes 1-Year Free Content Subscription & One-Time Wearable Charge. Data charges applicable after Year 1.
+                    </p>
                   )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  {plan.features.map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-success shrink-0" />
-                      {f}
-                    </div>
-                  ))}
-                  {plan.excluded.map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-sm text-muted-foreground line-through">
-                      <span className="w-4 h-4 shrink-0" />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-                {isFree ? (
-                  <Button className="w-full" variant="outline" size="lg" disabled>
-                    {isCurrentPlan ? "Current Plan" : "Free Forever"}
-                  </Button>
-                ) : (
+                </CardHeader>
+                <CardContent className="space-y-4 flex-1 flex flex-col pt-2">
+                  <div className="space-y-2.5 flex-1">
+                    {plan.features.map((f) => (
+                      <div key={f} className="flex items-start gap-2 text-sm leading-snug">
+                        <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                    {plan.excluded.map((f) => (
+                      <div key={f} className="flex items-start gap-2 text-sm text-muted-foreground line-through opacity-70 leading-snug">
+                        <span className="w-4 h-4 shrink-0 mt-0.5 border border-muted-foreground/30 rounded-sm" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
                   <Button
-                    className={`w-full ${plan.popular ? "bg-primary" : ""}`}
+                    className={cn("w-full mt-4", plan.popular ? "bg-primary" : "")}
                     variant={plan.popular ? "default" : "outline"}
                     size="lg"
                     disabled={isCurrentPlan || loading}
@@ -485,16 +518,20 @@ const Subscription = () => {
                       "Current Plan"
                     ) : (
                       <span className="flex items-center gap-2">
-                        {plan.popular ? "Go Pro" : "Choose Basic"}
+                        {plan.key === "premium-plus" ? "Get Smart Ring Bundle" : `Choose ${plan.name}`}
                         <ExternalLink className="w-4 h-4" />
                       </span>
                     )}
                   </Button>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-center text-muted-foreground mt-6 max-w-md mx-auto italic">
+          *Ambulance booking service is standard for all packages at set prices according to your location.
+        </p>
 
         <p className="text-xs text-center text-muted-foreground px-4">
           You'll be redirected to our secure payment page at futurewave.in to complete your purchase.
