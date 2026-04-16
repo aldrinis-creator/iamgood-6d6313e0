@@ -1,10 +1,9 @@
 import { useEffect, useRef, useCallback } from "react";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
-// loginInProgress guard added below
 import { supabase } from "@/integrations/supabase/client";
 import { formatISTDateTime } from "@/lib/istTime";
 
@@ -12,8 +11,10 @@ import { formatISTDateTime } from "@/lib/istTime";
 // check-missed-checkins cron. The client only handles user-facing alerts.
 
 const CHECK_IN_HOURS = [7, 12, 19];
-const POST_GRACE_INTERVAL_MIN = 10;
-const POST_GRACE_MAX_REMINDERS = 3;
+const PRE_ALERT_MIN = 5; // notification 5 min before
+const POPUP_DELAY_MIN = 5; // popup 5 min after
+const POPUP_INTERVAL_MIN = 10; // 10 min between popups
+const MAX_POPUPS = 3;
 
 const formatHour = (h: number) => {
   if (h === 0) return "12:00 AM";
@@ -22,18 +23,16 @@ const formatHour = (h: number) => {
   return `${h - 12}:00 PM`;
 };
 
-
 const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
   const { pauseMode, loginInProgress } = useApp();
-  // Track post-grace reminder counts: slotKey → { count, lastFiredAt }
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
-  // Track slots where we already sent the final missed notification
   const missedSentRef = useRef<Set<string>>(new Set());
 
   const fireAlert = useCallback((message: string) => {
+    if (isOverlayVisible()) return; // skip audio if popup already showing
     if (settings.voiceReminders) {
       playVoiceReminder(message);
     } else if (settings.audioAlerts) {
@@ -42,7 +41,6 @@ const useCheckInAudio = () => {
     if (settings.vibration && navigator.vibrate) {
       navigator.vibrate([200, 100, 200]);
     }
-    showBrowserNotification("Check-iN", message);
   }, [settings.voiceReminders, settings.audioAlerts, settings.vibration]);
 
   const isCheckInResponded = useCallback(async (windowHour: number, now: Date): Promise<boolean> => {
@@ -73,43 +71,30 @@ const useCheckInAudio = () => {
     if (pauseMode !== "active") return;
     if (loginInProgress) return;
     const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
     const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-    // --- DUE alerts: fire once at the check-in hour (initial reminder) ---
-    for (let i = 0; i < CHECK_IN_HOURS.length; i++) {
-      const h = CHECK_IN_HOURS[i];
-      const dueKey = `due-${dateKey}-${h}`;
-      if (hour === h && minute < 5 && !firedRef.current.has(dueKey)) {
-        const responded = await isCheckInResponded(h, now);
-        if (!responded) {
-          firedRef.current.add(dueKey);
-          const ts = formatISTDateTime(now);
-          fireAlert(`[${ts}] We hope you are well, Please Check-iN`);
-          showReminderOverlay({
-            type: "checkin",
-            title: "Check-In Reminder",
-            message: `[${ts}] You haven't checked in yet. Please tap below to let us know you're okay.`,
-            reminderCount: `Reminder — ${formatHour(h)}`,
-          });
-        }
-      }
-    }
-
-    // --- Post-grace escalation: 60+ minutes past check-in hour ---
     for (const h of CHECK_IN_HOURS) {
       const scheduledAt = new Date(now);
       scheduledAt.setHours(h, 0, 0, 0);
       const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
+
+      const preKey = `checkin-pre-${dateKey}-${h}`;
       const missedKey = `missed-${dateKey}-${h}`;
 
-      // Cap at end of today (23:59) — no spillover from previous days
-      const todayEnd = new Date(now);
-      todayEnd.setHours(23, 59, 59, 999);
-      const maxDiffMin = (todayEnd.getTime() - scheduledAt.getTime()) / 60_000;
+      // --- T-5: Browser notification only (no popup, no audio) ---
+      if (diffMin >= -PRE_ALERT_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
+        const responded = await isCheckInResponded(h, now);
+        if (!responded) {
+          firedRef.current.add(preKey);
+          const ts = formatISTDateTime(now);
+          if (!isOverlayVisible()) {
+            showBrowserNotification("Check-iN", `[${ts}] Check-iN due at ${formatHour(h)}`);
+          }
+        }
+      }
 
-      if (diffMin >= 60 && diffMin < Math.min(maxDiffMin, 1440) && !missedSentRef.current.has(missedKey)) {
+      // --- T+5 / T+15 / T+25: Popup overlays 1/3, 2/3, 3/3 ---
+      if (diffMin >= POPUP_DELAY_MIN && !missedSentRef.current.has(missedKey)) {
         const responded = await isCheckInResponded(h, now);
         if (responded) {
           missedSentRef.current.add(missedKey);
@@ -119,38 +104,41 @@ const useCheckInAudio = () => {
         const state = postGraceRef.current.get(missedKey) || { count: 0, lastFiredAt: 0 };
         const minSinceLast = (now.getTime() - state.lastFiredAt) / 60_000;
 
-        if (state.count < POST_GRACE_MAX_REMINDERS && (state.count === 0 || minSinceLast >= POST_GRACE_INTERVAL_MIN)) {
-          // Fire a post-grace reminder
+        // Calculate expected trigger times: T+5, T+15, T+25
+        const expectedMin = POPUP_DELAY_MIN + state.count * POPUP_INTERVAL_MIN;
+
+        if (state.count < MAX_POPUPS && diffMin >= expectedMin && (state.count === 0 || minSinceLast >= POPUP_INTERVAL_MIN)) {
           state.count += 1;
           state.lastFiredAt = now.getTime();
           postGraceRef.current.set(missedKey, state);
 
           const ts = formatISTDateTime(now);
-          fireAlert(`[${ts}] Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS}: You missed your ${formatHour(h)} Check-iN. Please check in now.`);
+          const msg = state.count === 1
+            ? `[${ts}] You haven't checked in yet. Please tap below to let us know you're okay.`
+            : `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`;
+
+          fireAlert(msg);
           showReminderOverlay({
             type: "checkin",
-            title: "Missed Check-In",
-            message: `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`,
-            reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${formatHour(h)}`,
+            title: state.count === 1 ? "Check-In Reminder" : "Missed Check-In",
+            message: msg,
+            reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${formatHour(h)}`,
           });
-        } else if (state.count >= POST_GRACE_MAX_REMINDERS && minSinceLast >= POST_GRACE_INTERVAL_MIN) {
-          // All 3 reminders exhausted — final escalation: ONE guardian notification
+        } else if (state.count >= MAX_POPUPS && minSinceLast >= POPUP_INTERVAL_MIN) {
+          // Final escalation
           missedSentRef.current.add(missedKey);
 
-          // Escalated alert to user
           const tsf = formatISTDateTime(now);
-          playVoiceReminder(`[${tsf}] You have not checked in after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians are being notified.`);
+          playVoiceReminder(`[${tsf}] You have not checked in after ${MAX_POPUPS} reminders. Your guardians are being notified.`);
           playChime();
           if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
           showReminderOverlay({
             type: "checkin",
             title: "Check-In Missed",
-            message: `[${tsf}] You missed your ${formatHour(h)} Check-iN after ${POST_GRACE_MAX_REMINDERS} reminders. Your guardians have been notified.`,
+            message: `[${tsf}] You missed your ${formatHour(h)} Check-iN after ${MAX_POPUPS} reminders. Your guardians have been notified.`,
             reminderCount: `Final — ${formatHour(h)}`,
           });
-
-          // Guardian notifications are handled by the server-side cron job
         }
       }
     }
@@ -165,7 +153,7 @@ const useCheckInAudio = () => {
     postGraceRef.current.forEach((_, k) => {
       if (!k.includes(dateKey)) postGraceRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded, session?.user?.id]);
+  }, [pauseMode, fireAlert, isCheckInResponded, session?.user?.id, loginInProgress]);
 
   useEffect(() => {
     check();
