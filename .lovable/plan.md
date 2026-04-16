@@ -1,26 +1,26 @@
 
 
-## Create LAUNCH50 Coupon
+## Add Emergency First Aid Tile + Remove Vault from My Profile
 
-Insert the LAUNCH50 coupon into the `coupons` table with the specified parameters.
+### Overview
+1. Add "Emergency First Aid" as a top-level tile on the My Health grid (alongside Tablets, Activity, Vitals, etc.)
+2. Remove the Medical Vault link from the My Profile page header menu — keep it only accessible via My Health
 
-```sql
-INSERT INTO public.coupons (
-  code,
-  discount_type,
-  discount_value,
-  applicable_plans,
-  expires_at,
-  max_uses,
-  is_active
-) VALUES (
-  'LAUNCH50',
-  'percentage',
-  50,
-  '{basic,pro}',
-  '2026-12-31T23:59:59+05:30',
-  200,
-  true
-);
-```
+### Changes
+
+**1. `src/pages/MyHealth.tsx`**
+- Add `ShieldAlert` icon import (already imported)
+- Add a new entry to `healthTools` array: `{ icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" }`
+- Add `"Emergency First Aid": EmergencyFirstAid` to `toolComponents` map so it opens directly from the tile (not through Health Tools sub-menu)
+- Keep the existing sub-item inside Health Tools as well for discoverability
+
+**2. `src/components/AppHeader.tsx`**
+- Remove the "Medical Vault" `DropdownMenuItem` (lines 48-52) from the user menu
+- Remove the `ShieldCheck` icon import since it's no longer used
+
+### Files
+| File | Action |
+|------|--------|
+| `src/pages/MyHealth.tsx` | Add Emergency First Aid to top-level grid + toolComponents |
+| `src/components/AppHeader.tsx` | Remove Medical Vault menu item |
 
