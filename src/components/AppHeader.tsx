@@ -1,4 +1,4 @@
-import { User, LogOut, Settings, UserCircle, ShieldCheck } from "lucide-react";
+import { User, LogOut, Settings, UserCircle } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import AQIWidget from "@/components/AQIWidget";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
@@ -45,11 +45,6 @@ const AppHeader = () => {
               <DropdownMenuItem onClick={() => navigate("/my-profile")}>
                 <UserCircle className="w-4 h-4 mr-2" /> My Profile
               </DropdownMenuItem>
-              {role === "user" && (
-                <DropdownMenuItem onClick={() => navigate("/medical-vault")}>
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Medical Vault
-                </DropdownMenuItem>
-              )}
               <DropdownMenuItem asChild>
                 <AccessibilityMenu renderAsMenuItem={true} />
               </DropdownMenuItem>
