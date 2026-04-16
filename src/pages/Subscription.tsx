@@ -90,6 +90,7 @@ const plans = [
       "Health Vitals (ECG, HR, SpO2, BP, EDA)",
       "Step counting & Multiple sports modes",
       "Gesture control",
+      "Connectivity using Bluetooth, Mobile / Satellite networks",
     ] as Array<string | { label: string; sub: string }>,
     excluded: [],
   },
