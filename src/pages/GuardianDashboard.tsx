@@ -853,6 +853,53 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* ===== MEDICATIONS SUMMARY (moved above Alerts) ===== */}
+        {wardUserId && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-semibold">{wardName}'s Medications</span>
+                </div>
+              </div>
+              {medDoseSummary && medDoseSummary.total > 0 ? (
+                <>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {medDoseSummary.taken} of {medDoseSummary.total} doses taken
+                      </span>
+                      <span className="font-medium">
+                        {Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)}%
+                      </span>
+                    </div>
+                    <Progress value={Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)} className="h-2" />
+                  </div>
+                  {!medDetailsOpen ? (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setMedDetailsOpen(true)}>
+                      View Details <ChevronRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
+                      <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
+                      <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setMedDetailsOpen(false)}>
+                        Collapse
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : medDoseSummary && medDoseSummary.total === 0 ? (
+                <p className="text-sm text-muted-foreground text-center">No medications scheduled</p>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Loading…</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* ===== ALERTS (auto-collapsing) ===== */}
         <Collapsible open={alertsOpen} onOpenChange={setAlertsOpen}>
           <CollapsibleTrigger asChild>
@@ -930,119 +977,18 @@ const GuardianDashboard = () => {
           </Card>
         </CollapsibleSection>
 
-        {/* ===== MEDICATIONS SUMMARY ===== */}
+        {/* ===== DATA ANALYSIS LINK ===== */}
         {wardUserId && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Pill className="w-5 h-5 text-primary" />
-                  <span className="text-sm font-semibold">{wardName}'s Medications</span>
-                </div>
+          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => window.open("/guardian/reports", "_blank")}>
+            <CardContent className="p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                <span className="text-sm font-semibold">{wardName}'s Data Analysis</span>
               </div>
-              {medDoseSummary && medDoseSummary.total > 0 ? (
-                <>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {medDoseSummary.taken} of {medDoseSummary.total} doses taken
-                      </span>
-                      <span className="font-medium">
-                        {Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)}%
-                      </span>
-                    </div>
-                    <Progress value={Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)} className="h-2" />
-                  </div>
-                  {!medDetailsOpen ? (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setMedDetailsOpen(true)}>
-                      View Details <ChevronRight className="w-3 h-3 ml-1" />
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
-                      <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
-                      <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
-                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setMedDetailsOpen(false)}>
-                        Collapse
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : medDoseSummary && medDoseSummary.total === 0 ? (
-                <p className="text-sm text-muted-foreground text-center">No medications scheduled</p>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center">Loading…</p>
-              )}
+              <span className="text-xs text-primary font-medium">View Reports →</span>
             </CardContent>
           </Card>
         )}
-
-        {/* ===== DATA ANALYSIS TILE GRID ===== */}
-        {wardUserId && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground px-1">{wardName}'s Data Analysis</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: "vitals" as const, icon: <Heart className="w-5 h-5" />, label: "Vitals", color: "text-destructive" },
-                { key: "activity" as const, icon: <Activity className="w-5 h-5" />, label: "Activity", color: "text-success" },
-                { key: "emergency" as const, icon: <IdCard className="w-5 h-5" />, label: "Emergency Card", color: "text-primary" },
-                { key: "nutrition" as const, icon: <Apple className="w-5 h-5" />, label: "Nutrition", color: "text-amber-500" },
-                { key: "facescan" as const, icon: <ScanFace className="w-5 h-5" />, label: "Face Scan", color: "text-primary" },
-                { key: "wellness" as const, icon: <Smile className="w-5 h-5" />, label: "Wellness", color: "text-success" },
-              ].map(tile => (
-                <Card
-                  key={tile.key}
-                  className="cursor-pointer hover:border-primary/30 transition-colors"
-                  onClick={() => setDataAnalysisSheet(tile.key)}
-                >
-                  <CardContent className="p-3 flex flex-col items-center justify-center text-center gap-1.5">
-                    <div className={tile.color}>{tile.icon}</div>
-                    <span className="text-xs font-medium">{tile.label}</span>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Data Analysis Sheet */}
-        <Sheet open={!!dataAnalysisSheet} onOpenChange={(o) => !o && setDataAnalysisSheet(null)}>
-          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>
-                {dataAnalysisSheet === "vitals" && `${wardName}'s Vitals`}
-                {dataAnalysisSheet === "activity" && `${wardName}'s Activity`}
-                {dataAnalysisSheet === "emergency" && "Emergency Health Card"}
-                {dataAnalysisSheet === "nutrition" && `${wardName}'s Nutrition`}
-                {dataAnalysisSheet === "facescan" && `${wardName}'s Face Scan`}
-                {dataAnalysisSheet === "wellness" && `${wardName}'s Wellness`}
-              </SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-3">
-              {wardUserId && dataAnalysisSheet === "vitals" && <WardVitalsSummary wardUserId={wardUserId} wardName={wardName} />}
-              {wardUserId && dataAnalysisSheet === "activity" && <WardActivitySummary wardUserId={wardUserId} wardName={wardName} />}
-              {wardUserId && dataAnalysisSheet === "emergency" && <EmergencyCardGated wardUserId={wardUserId} wardName={wardName} />}
-              {wardUserId && dataAnalysisSheet === "nutrition" && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Apple className="w-10 h-10 mx-auto mb-2 text-amber-500" />
-                  <p className="text-sm">Nutrition data will be available once wearable is integrated.</p>
-                </div>
-              )}
-              {wardUserId && dataAnalysisSheet === "facescan" && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <ScanFace className="w-10 h-10 mx-auto mb-2 text-primary" />
-                  <p className="text-sm">Face Scan data will be available once wearable is integrated.</p>
-                </div>
-              )}
-              {wardUserId && dataAnalysisSheet === "wellness" && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Smile className="w-10 h-10 mx-auto mb-2 text-success" />
-                  <p className="text-sm">Wellness data will be available once wearable is integrated.</p>
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
 
         {/* Care Journal */}
         {wardUserId && (
