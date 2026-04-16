@@ -115,6 +115,7 @@ const Subscription = () => {
   const [couponCode, setCouponCode] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null);
+  const [preRegisterEmail, setPreRegisterEmail] = useState("");
 
   useEffect(() => {
     const status = searchParams.get("status");
