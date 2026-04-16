@@ -978,7 +978,7 @@ const GuardianDashboard = () => {
 
         {/* ===== DATA ANALYSIS LINK ===== */}
         {wardUserId && (
-          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => window.open("/guardian/reports", "_blank")}>
+          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => navigate("/guardian/reports")}>
             <CardContent className="p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
