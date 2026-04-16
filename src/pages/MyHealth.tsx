@@ -35,6 +35,7 @@ const healthTools = [
   { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
   { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
+  { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
 ];
 
 const healthToolsSubItems = [
@@ -66,6 +67,7 @@ const toolComponents: Record<string, React.FC> = {
   "Services": HealthServices,
   "Face Scan": FaceScan,
   "Vitals": VitalsMonitor,
+  "Emergency First Aid": EmergencyFirstAid,
 };
 
 const MyHealth = () => {
