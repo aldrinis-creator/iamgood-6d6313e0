@@ -74,6 +74,7 @@ const plans = [
     icon: Crown,
     monthly: 999,
     yearly: 9999,
+    mrp: 14999,
     badge: "Includes Smart Ring",
     features: [
       "Everything in Premium",
