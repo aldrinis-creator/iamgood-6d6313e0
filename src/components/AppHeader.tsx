@@ -34,7 +34,7 @@ const AppHeader = () => {
         </div>
         <div className="flex items-center gap-3">
           <NotificationCenter />
-          <AQIWidget />
+          <AQIWidget role={role} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">

@@ -27,7 +27,7 @@ interface AQIData {
   locationName?: string;
 }
 
-const AQIWidget = () => {
+const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
   const [aqiData, setAqiData] = useState<AQIData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -225,7 +225,10 @@ const AQIWidget = () => {
           <div className="p-4 bg-card">
             <div className="flex items-center gap-2 mb-3">
               <MapPin className="w-4 h-4 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground truncate font-medium">{aqiData.locationName}</p>
+              <p
+                className={cn("text-xs text-muted-foreground truncate font-medium", role === "guardian" && "cursor-pointer underline")}
+                onClick={() => { if (role === "guardian") toast.info("Subscribe as a User"); }}
+              >{aqiData.locationName}</p>
             </div>
             <div className="flex items-center gap-4">
               <div className={cn(
@@ -272,6 +275,7 @@ const AQIWidget = () => {
           </div>
 
           {/* Search Bar */}
+          {role !== "guardian" && (
           <div className="p-3 bg-muted/20">
             <form onSubmit={handleSearch} className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-1">
@@ -297,6 +301,7 @@ const AQIWidget = () => {
               </div>
             </form>
           </div>
+          )}
           
         </PopoverContent>
       )}
