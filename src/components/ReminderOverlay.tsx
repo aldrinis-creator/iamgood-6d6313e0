@@ -15,6 +15,10 @@ interface ReminderData {
 // Global event system for triggering reminders
 const REMINDER_EVENT = "app:reminder-overlay";
 
+// Global visibility flag for deconfliction — other hooks check this
+let _overlayVisible = false;
+export const isOverlayVisible = () => _overlayVisible;
+
 export const showReminderOverlay = (data: ReminderData) => {
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
@@ -36,6 +40,7 @@ const ReminderOverlay = () => {
   const dismiss = useCallback((acknowledged: boolean = false) => {
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
     setVisible(false);
+    _overlayVisible = false;
 
     if (acknowledged && reminder) {
       acknowledgedRef.current.add(getReminderKey(reminder));
@@ -79,12 +84,14 @@ const ReminderOverlay = () => {
 
     setReminder(data);
     setVisible(true);
+    _overlayVisible = true;
     ensureAudioReady();
 
     // Auto-dismiss after 30 seconds
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
     autoDismissRef.current = setTimeout(() => {
       setVisible(false);
+      _overlayVisible = false;
       setTimeout(() => setReminder(null), 300);
       // Schedule next repeat if not at max
       if (count < MAX_SHOWS) {
@@ -107,6 +114,7 @@ const ReminderOverlay = () => {
   const handleDismiss = () => {
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
     setVisible(false);
+    _overlayVisible = false;
     setTimeout(() => setReminder(null), 300);
     // Schedule next repeat if under max shows
     if (reminder) {
