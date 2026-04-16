@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const notifyGuardiansMissed = async (userId: string, medNames: string[], scheduledTimes: string[]) => {
@@ -20,18 +20,11 @@ const notifyGuardiansMissed = async (userId: string, medNames: string[], schedul
   }
 };
 
-const POST_GRACE_INTERVAL_MIN = 10;
-const POST_GRACE_MAX_REMINDERS = 3;
-const POST_GRACE_START_MIN = 30;
+const PRE_ALERT_MIN = 5; // browser notification 5 min before
+const POPUP_DELAY_MIN = 5; // first popup 5 min after scheduled time
+const POPUP_INTERVAL_MIN = 10; // 10 min between popups (T+5, T+15, T+25)
+const MAX_POPUPS = 3;
 const HARD_CUTOFF_MIN = 60;
-
-interface MedInfo {
-  id: string;
-  name: string;
-  dosage: string;
-  alarm_mode: string;
-  schedule_times: string[];
-}
 
 const useMedicationAlarms = () => {
   const { session } = useAuth();
@@ -47,8 +40,6 @@ const useMedicationAlarms = () => {
     if (!session?.user?.id) return;
 
     const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
     const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
     const { data: meds } = await supabase
@@ -59,18 +50,12 @@ const useMedicationAlarms = () => {
 
     if (!meds || meds.length === 0) return;
 
-    // Phase 1: Collect into batched maps
-    const initialSlots = new Map<string, string[]>(); // timeStr → medNames
-    const postGraceSlots = new Map<string, string[]>(); // timeStr → medNames (untaken)
-    const finalSlots = new Map<string, { names: string[]; medsToLog: Array<{ id: string; scheduledAt: Date }> }>(); 
-    const firedMedNames: string[] = [];
-
+    // Pre-fetch all medication logs for today
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    // Pre-fetch all medication logs for today to avoid repeated queries
     const medIds = meds.map((m) => m.id);
     const { data: allLogs } = await supabase
       .from("medication_logs")
@@ -81,28 +66,32 @@ const useMedicationAlarms = () => {
       .lte("scheduled_at", todayEnd.toISOString());
 
     const logs = allLogs || [];
+    const ts = formatISTDateTime(now);
+
+    // Phase 1: Collect into batched maps per time slot
+    const preAlertSlots = new Map<string, string[]>(); // T-5 notification
+    const popupSlots = new Map<string, string[]>(); // T+5/+15/+25 popups
+    const finalSlots = new Map<string, { names: string[]; medsToLog: Array<{ id: string; scheduledAt: Date }> }>();
+    const firedMedNames: string[] = [];
 
     for (const med of meds) {
       for (const timeStr of med.schedule_times) {
         const [h, m] = timeStr.split(":").map(Number);
-        const slotKey = `med-slot-${dateKey}-${timeStr}`;
-        const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
-
         const scheduledAt = new Date(now);
         scheduledAt.setHours(h, m || 0, 0, 0);
         const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
 
-        // --- Initial alarm (T+0): collect into batch ---
-        if (h === hour && (m === undefined ? minute < 10 : Math.abs(minute - (m || 0)) < 10) && !firedRef.current.has(slotKey)) {
-          firedRef.current.add(slotKey);
-          firedMedNames.push(med.name);
+        const preKey = `med-pre-${dateKey}-${timeStr}`;
+        const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
 
-          if (!initialSlots.has(timeStr)) initialSlots.set(timeStr, []);
-          initialSlots.get(timeStr)!.push(med.name);
+        // --- T-5: Browser notification only ---
+        if (diffMin >= -PRE_ALERT_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
+          if (!preAlertSlots.has(timeStr)) preAlertSlots.set(timeStr, []);
+          preAlertSlots.get(timeStr)!.push(med.name);
         }
 
-        // --- Post-grace (T+30 to T+60): collect untaken ---
-        if (diffMin >= POST_GRACE_START_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
+        // --- T+5 to T+35: Popup reminders 1/3, 2/3, 3/3 ---
+        if (diffMin >= POPUP_DELAY_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           const takenLog = logs.some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
             return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && l.status === "taken";
@@ -113,11 +102,11 @@ const useMedicationAlarms = () => {
             continue;
           }
 
-          if (!postGraceSlots.has(timeStr)) postGraceSlots.set(timeStr, []);
-          postGraceSlots.get(timeStr)!.push(med.name);
+          if (!popupSlots.has(timeStr)) popupSlots.set(timeStr, []);
+          popupSlots.get(timeStr)!.push(med.name);
         }
 
-        // --- Final escalation (T+60-75): collect for batch ---
+        // --- Final escalation (T+60): log missed + guardian notify ---
         if (diffMin >= HARD_CUTOFF_MIN && diffMin < HARD_CUTOFF_MIN + 15 && !missedSentRef.current.has(missedKey)) {
           const alreadyTaken = logs.some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
@@ -147,62 +136,63 @@ const useMedicationAlarms = () => {
       }
     }
 
-    // Phase 2: Fire ONE batched alert per time slot
+    // Phase 2: Fire batched alerts
 
-    // --- Initial alarms ---
-    const ts = formatISTDateTime(now);
-    for (const [timeStr, names] of initialSlots) {
-      const combined = names.join(", ");
-      if (settings.voiceReminders) {
-        playVoiceReminder(`[${ts}] Your medications are due: ${combined}. Remember to take your tablets.`);
-      } else if (settings.audioAlerts) {
-        playChime();
+    // --- Pre-alert notifications (T-5) ---
+    for (const [timeStr, names] of preAlertSlots) {
+      const preKey = `med-pre-${dateKey}-${timeStr}`;
+      if (!firedRef.current.has(preKey)) {
+        firedRef.current.add(preKey);
+        const combined = names.join(", ");
+        if (!isOverlayVisible()) {
+          showBrowserNotification("Medication Coming Up", `[${ts}] ${combined} due at ${timeStr}`);
+        }
       }
-      if (settings.vibration && navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
-      }
-      showBrowserNotification("Medication Reminder", `[${ts}] Time to take: ${combined}`);
-      showReminderOverlay({
-        type: "medication",
-        title: "Medication Reminder",
-        message: `[${ts}] Time to take: ${combined}`,
-        reminderCount: `Scheduled — ${timeStr}`,
-      });
     }
 
-    // --- Post-grace reminders (batched per time slot) ---
-    for (const [timeStr, names] of postGraceSlots) {
-      const missedKey = `missed-postGrace-${dateKey}-${timeStr}`;
-      const state = postGraceRef.current.get(missedKey) || { count: 0, lastFiredAt: 0 };
+    // --- Popup reminders (T+5, T+15, T+25) ---
+    for (const [timeStr, names] of popupSlots) {
+      const graceKey = `med-popup-${dateKey}-${timeStr}`;
+      const state = postGraceRef.current.get(graceKey) || { count: 0, lastFiredAt: 0 };
       const minSinceLast = (now.getTime() - state.lastFiredAt) / 60_000;
 
-      if (state.count < POST_GRACE_MAX_REMINDERS && (state.count === 0 || minSinceLast >= POST_GRACE_INTERVAL_MIN)) {
+      const [h, m] = timeStr.split(":").map(Number);
+      const scheduledAt = new Date(now);
+      scheduledAt.setHours(h, m || 0, 0, 0);
+      const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
+      const expectedMin = POPUP_DELAY_MIN + state.count * POPUP_INTERVAL_MIN;
+
+      if (state.count < MAX_POPUPS && diffMin >= expectedMin && (state.count === 0 || minSinceLast >= POPUP_INTERVAL_MIN)) {
         state.count += 1;
         state.lastFiredAt = now.getTime();
-        postGraceRef.current.set(missedKey, state);
+        postGraceRef.current.set(graceKey, state);
 
         const combined = names.join(", ");
-        if (settings.voiceReminders) {
-          playVoiceReminder(`[${ts}] You have not taken your medication: ${combined}. Please take your tablets now.`);
-        } else if (settings.audioAlerts) {
-          playChime();
+        firedMedNames.push(...names);
+
+        if (!isOverlayVisible()) {
+          if (settings.voiceReminders) {
+            playVoiceReminder(`[${ts}] ${state.count === 1 ? "Your medications are due" : "You have not taken your medication"}: ${combined}. ${state.count === 1 ? "Remember to take your tablets." : "Please take your tablets now."}`);
+          } else if (settings.audioAlerts) {
+            playChime();
+          }
         }
+
         if (settings.vibration && navigator.vibrate) {
           navigator.vibrate([200, 100, 200]);
         }
-        showBrowserNotification("Medication Overdue", `[${ts}] Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${combined}`);
+
         showReminderOverlay({
           type: "medication",
-          title: "Medication Overdue",
-          message: `[${ts}] You have not taken: ${combined}. Please take your tablets now.`,
-          reminderCount: `Reminder ${state.count} of ${POST_GRACE_MAX_REMINDERS} — ${timeStr}`,
+          title: state.count === 1 ? "Medication Reminder" : "Medication Overdue",
+          message: `[${ts}] ${state.count === 1 ? "Time to take" : "You have not taken"}: ${combined}`,
+          reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${timeStr}`,
         });
       }
     }
 
-    // --- Final escalation (batched alert, per-med DB logs) ---
+    // --- Final escalation (batched) ---
     for (const [timeStr, { names, medsToLog }] of finalSlots) {
-      // Insert individual missed logs
       for (const { id, scheduledAt } of medsToLog) {
         await supabase.from("medication_logs").insert({
           medication_id: id,
@@ -214,20 +204,19 @@ const useMedicationAlarms = () => {
 
       if (medsToLog.length > 0) {
         const combined = names.join(", ");
-        playVoiceReminder(`[${ts}] You have not taken your medication after 3 reminders: ${combined}. Please take your tablets now.`);
+        playVoiceReminder(`[${ts}] You have not taken your medication after ${MAX_POPUPS} reminders: ${combined}. Please take your tablets now.`);
         playChime();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
-        // Batched guardian notification
         notifyGuardiansMissed(
           session.user.id,
           names,
-          medsToLog.map((m) => m.scheduledAt.toISOString())
+          medsToLog.map((ml) => ml.scheduledAt.toISOString())
         );
       }
     }
 
-    // Guardian in-app notifications for initial alarms
+    // Guardian in-app notifications for initial popup
     if (firedMedNames.length > 0) {
       const { data: guardians } = await supabase
         .from("guardians")
@@ -260,7 +249,7 @@ const useMedicationAlarms = () => {
     postGraceRef.current.forEach((_, k) => {
       if (!k.includes(dateKey)) postGraceRef.current.delete(k);
     });
-  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode]);
+  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode, loginInProgress]);
 
   useEffect(() => {
     check();

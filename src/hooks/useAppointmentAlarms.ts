@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const ALERT_LEAD: Record<string, number> = {
@@ -16,6 +16,8 @@ const ALERT_LEAD: Record<string, number> = {
   "2hr": 120,
   "1day": 1440,
 };
+
+const PRE_NOTIFICATION_MIN = 5; // browser notification 5 min before popup
 
 const useAppointmentAlarms = () => {
   const { session } = useAuth();
@@ -55,25 +57,38 @@ const useAppointmentAlarms = () => {
         const leadMin = ALERT_LEAD[alert.lead!] ?? 15;
         const alertTime = new Date(apptTime.getTime() - leadMin * 60_000);
         const diffMin = (now.getTime() - alertTime.getTime()) / 60_000;
-        const firedKey = `appt-${dateKey}-${appt.id}-${alert.key}`;
 
-        if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(firedKey)) {
-          firedRef.current.add(firedKey);
+        const preKey = `appt-pre-${dateKey}-${appt.id}-${alert.key}`;
+        const popupKey = `appt-${dateKey}-${appt.id}-${alert.key}`;
+
+        // T-5 before alert time: browser notification only
+        if (diffMin >= -PRE_NOTIFICATION_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
+          firedRef.current.add(preKey);
+          const ts = formatISTDateTime(now);
+          if (!isOverlayVisible()) {
+            showBrowserNotification("Appointment Reminder", `[${ts}] ${appt.title} starts in ${leadMin + Math.round(-diffMin)} minutes`);
+          }
+        }
+
+        // At alert time: popup overlay
+        if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(popupKey)) {
+          firedRef.current.add(popupKey);
 
           const ts = formatISTDateTime(now);
           const message = `[${ts}] ${appt.title} starts in ${leadMin} minutes`;
 
-          if (settings.voiceReminders) {
-            playVoiceReminder(message);
-          } else if (settings.audioAlerts) {
-            playChime();
+          if (!isOverlayVisible()) {
+            if (settings.voiceReminders) {
+              playVoiceReminder(message);
+            } else if (settings.audioAlerts) {
+              playChime();
+            }
+            showBrowserNotification("Appointment Reminder", message);
           }
 
           if (settings.vibration && navigator.vibrate) {
             navigator.vibrate([200, 100, 200]);
           }
-
-          showBrowserNotification("Appointment Reminder", message);
 
           showReminderOverlay({
             type: "appointment",
@@ -89,7 +104,7 @@ const useAppointmentAlarms = () => {
     firedRef.current.forEach((k) => {
       if (!k.includes(dateKey)) firedRef.current.delete(k);
     });
-  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode]);
+  }, [session?.user?.id, settings.voiceReminders, settings.audioAlerts, settings.vibration, pauseMode, loginInProgress]);
 
   useEffect(() => {
     check();

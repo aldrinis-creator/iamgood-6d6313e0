@@ -2,12 +2,13 @@ import { useEffect, useRef, useCallback } from "react";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-// loginInProgress guard
-import { showReminderOverlay } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const EXERCISE_HOURS = [8, 18];
 const EXERCISE_MESSAGE = "Hey, don't forget to undertake your Exercises Activity";
+const PRE_ALERT_MIN = 5; // notification fires 5 min before
+const POPUP_DELAY_MIN = 5; // popup fires 5 min after
 
 const formatHour = (h: number) => {
   if (h < 12) return `${h}:00 AM`;
@@ -26,29 +27,40 @@ const useExerciseReminder = () => {
     if (!settings.exerciseReminder) return;
 
     const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
     const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
     for (const h of EXERCISE_HOURS) {
-      const key = `exercise-${dateKey}-${h}`;
-      if (hour === h && minute < 5 && !firedRef.current.has(key)) {
-        firedRef.current.add(key);
+      const scheduledAt = new Date(now);
+      scheduledAt.setHours(h, 0, 0, 0);
+      const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
 
+      const preKey = `exercise-pre-${dateKey}-${h}`;
+      const popupKey = `exercise-popup-${dateKey}-${h}`;
+
+      // T-5: Browser notification only (no popup, no audio)
+      if (diffMin >= -PRE_ALERT_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
+        firedRef.current.add(preKey);
+        const ts = formatISTDateTime(now);
+        showBrowserNotification("Exercise Reminder", `[${ts}] ${EXERCISE_MESSAGE} at ${formatHour(h)}`);
+      }
+
+      // T+5: Popup overlay (skip if overlay already visible)
+      if (diffMin >= POPUP_DELAY_MIN && diffMin < POPUP_DELAY_MIN + 5 && !firedRef.current.has(popupKey)) {
+        firedRef.current.add(popupKey);
         const ts = formatISTDateTime(now);
         const msgWithTs = `[${ts}] ${EXERCISE_MESSAGE}`;
 
-        if (settings.voiceReminders) {
-          playVoiceReminder(msgWithTs);
-        } else if (settings.audioAlerts) {
-          playChime();
+        if (!isOverlayVisible()) {
+          if (settings.voiceReminders) {
+            playVoiceReminder(msgWithTs);
+          } else if (settings.audioAlerts) {
+            playChime();
+          }
         }
 
         if (settings.vibration && navigator.vibrate) {
           navigator.vibrate([200, 100, 200]);
         }
-
-        showBrowserNotification("Exercise Reminder", msgWithTs);
 
         showReminderOverlay({
           type: "exercise",
@@ -63,7 +75,7 @@ const useExerciseReminder = () => {
     firedRef.current.forEach((k) => {
       if (!k.includes(dateKey)) firedRef.current.delete(k);
     });
-  }, [pauseMode, settings.voiceReminders, settings.audioAlerts, settings.vibration]);
+  }, [pauseMode, settings.voiceReminders, settings.audioAlerts, settings.vibration, settings.exerciseReminder, loginInProgress]);
 
   useEffect(() => {
     check();
