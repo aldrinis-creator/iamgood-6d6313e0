@@ -1,20 +1,21 @@
 
 
-## Fix: Data Analysis Link Not Opening
+## Guardian AQI: View-Only, No Location Search
 
-### Problem
-The `window.open("/guardian/reports", "_blank")` on the Card's `onClick` handler may fail in certain mobile browsers or PWA contexts where `window.open` with `_blank` is blocked (popup blocker) since it's not triggered by a direct anchor click.
-
-### Solution
-Replace the Card `onClick` + `window.open` approach with a proper `<a>` tag or use React Router's `useNavigate` to navigate within the same tab (since opening a new tab in a PWA is unreliable). Given the guardian context/providers need to wrap the reports page, navigating in the same tab is more reliable.
-
-**`src/pages/GuardianDashboard.tsx`** (line 981)
-- Replace `window.open("/guardian/reports", "_blank")` with React Router `useNavigate()("/guardian/reports")`
-- This ensures the link works reliably in PWA, mobile browsers, and desktop
-- The GuardianReports page already has its own `WardPicker` so context is preserved
+### Change
+Pass the user's `role` from `useApp()` into `AQIWidget`. When role is `"guardian"`:
+- Show AQI data normally (current location auto-fetch still works)
+- Hide the search bar section entirely
+- If the location name area is tapped, show a toast: "Subscribe as a User"
 
 ### Files
-| File | Action |
-|------|--------|
-| `src/pages/GuardianDashboard.tsx` | Replace `window.open` with `useNavigate` |
+
+**`src/components/AppHeader.tsx`**
+- Pass `role` to AQIWidget: `<AQIWidget role={role} />`
+
+**`src/components/AQIWidget.tsx`**
+- Add `role?: "user" | "guardian"` prop (default `"user"`)
+- Wrap the search bar section (lines ~225-260) with `{role !== "guardian" && (...)}`
+- On the location name `<p>` element, add an `onClick` handler: if `role === "guardian"`, call `toast.info("Subscribe as a User")` and return
+- No other changes — guardians still see AQI badge, pollutants, temperature, and health advisory
 
