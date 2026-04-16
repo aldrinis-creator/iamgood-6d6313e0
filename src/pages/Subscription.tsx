@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart, Printer } from "lucide-react";
+import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart, Printer, Mail } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
@@ -74,6 +74,7 @@ const plans = [
     icon: Crown,
     monthly: 999,
     yearly: 9999,
+    mrp: 14999,
     badge: "Includes Smart Ring",
     features: [
       "Everything in Premium",
@@ -114,6 +115,7 @@ const Subscription = () => {
   const [couponCode, setCouponCode] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null);
+  const [preRegisterEmail, setPreRegisterEmail] = useState("");
 
   useEffect(() => {
     const status = searchParams.get("status");
@@ -507,22 +509,56 @@ const Subscription = () => {
                       </div>
                     ))}
                   </div>
-                  <Button
-                    className={cn("w-full mt-4", plan.popular ? "bg-primary" : "")}
-                    variant={plan.popular ? "default" : "outline"}
-                    size="lg"
-                    disabled={isCurrentPlan || loading}
-                    onClick={() => handleChoosePlan(plan.key)}
-                  >
-                    {isCurrentPlan ? (
-                      "Current Plan"
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        {plan.key === "premium-plus" ? "Get Smart Ring Bundle" : `Choose ${plan.name}`}
-                        <ExternalLink className="w-4 h-4" />
-                      </span>
-                    )}
-                  </Button>
+                  {plan.key === "premium-plus" ? (
+                    <div className="mt-4 rounded-xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.8)] p-4 text-primary-foreground space-y-3">
+                      <h3 className="text-lg font-bold text-center">Pre-Register Now</h3>
+                      <div className="flex items-baseline justify-center gap-2">
+                        <span className="text-sm line-through opacity-70">₹14,999</span>
+                        <span className="text-2xl font-bold">₹9,999</span>
+                        <span className="text-xs opacity-80">/yr</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          placeholder="Your email"
+                          value={preRegisterEmail}
+                          onChange={(e) => setPreRegisterEmail(e.target.value)}
+                          className="flex-1 bg-white/20 border-white/30 text-primary-foreground placeholder:text-primary-foreground/60"
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="shrink-0 gap-1.5 font-semibold"
+                          onClick={() => {
+                            const email = preRegisterEmail.trim();
+                            if (!email) { toast.error("Please enter your email"); return; }
+                            window.location.href = `mailto:checkin_support@futurewave.in?subject=${encodeURIComponent("Pre-Register Premium Plus")}&body=${encodeURIComponent(`Hi, I'd like to pre-register for the Premium Plus Smart Ring bundle.\n\nEmail: ${email}`)}`;
+                            toast.success("Opening email client…");
+                          }}
+                        >
+                          <Mail className="w-4 h-4" /> Notify Me
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-center opacity-70">We'll notify you when the Smart Ring is available</p>
+                    </div>
+                  ) : (
+                    <Button
+                      className={cn("w-full mt-4", plan.popular ? "bg-primary" : "")}
+                      variant={plan.popular ? "default" : "outline"}
+                      size="lg"
+                      disabled={isCurrentPlan || loading}
+                      onClick={() => handleChoosePlan(plan.key)}
+                    >
+                      {isCurrentPlan ? (
+                        "Current Plan"
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          {`Choose ${plan.name}`}
+                          <ExternalLink className="w-4 h-4" />
+                        </span>
+                      )}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );
