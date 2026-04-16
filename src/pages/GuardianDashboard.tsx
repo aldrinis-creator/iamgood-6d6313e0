@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -198,6 +199,7 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones =
 };
 
 const GuardianDashboard = () => {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { toast } = useToast();
@@ -978,7 +980,7 @@ const GuardianDashboard = () => {
 
         {/* ===== DATA ANALYSIS LINK ===== */}
         {wardUserId && (
-          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => window.open("/guardian/reports", "_blank")}>
+          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => navigate("/guardian/reports")}>
             <CardContent className="p-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
