@@ -29,26 +29,30 @@ const VoiceQueryButton = () => {
     try {
       const { data, error } = await supabase.functions.invoke("voice-query", { body: { query: text } });
       console.log("[voice-query] response:", { data, error });
+
+      let serverMsg: string | undefined;
       if (error) {
-        // Try to extract server-sent error message from FunctionsHttpError context
-        let serverMsg: string | undefined;
         try {
           const ctx: any = (error as any).context;
           if (ctx && typeof ctx.json === "function") {
-            const body = await ctx.json();
-            serverMsg = body?.error || body?.detail;
+            const b = await ctx.json();
+            serverMsg = b?.error || b?.detail;
+          } else if (ctx && typeof ctx.text === "function") {
+            const txt = await ctx.text();
+            try { serverMsg = JSON.parse(txt)?.error; } catch { serverMsg = txt?.slice(0, 200); }
           }
         } catch { /* ignore */ }
-        throw new Error(serverMsg || error.message || "Edge function error");
+        throw new Error(serverMsg || error.message || "Voice assistant is temporarily unavailable.");
       }
       if ((data as any)?.error) throw new Error((data as any).error);
+
       const reply = (data as any)?.answer ?? "Sorry, I couldn't find an answer.";
       setAnswer(reply);
       setPhase("speaking");
       await speak(reply);
     } catch (e: any) {
       console.error("[voice-query] failed:", e);
-      const msg = e?.message || "Sorry, something went wrong.";
+      const msg = e?.message || "Voice assistant is temporarily unavailable.";
       setAnswer(msg);
       toast.error(msg);
     } finally {
