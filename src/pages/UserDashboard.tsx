@@ -323,6 +323,8 @@ const UserDashboard = () => {
           onComplete={() => setShowOnboarding(false)}
         />
       )}
+
+      <VoiceQueryButton />
     </AppLayout>
   );
 };
