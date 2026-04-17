@@ -26,6 +26,15 @@ const VoiceQueryButton = () => {
     setTranscript(text);
     setAnswer("");
     setPhase("thinking");
+
+    // Create utterance synchronously inside the gesture context so iOS/Safari will allow speak() later
+    const utterance = "speechSynthesis" in window ? new SpeechSynthesisUtterance("") : null;
+    if (utterance) {
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("voice-query", { body: { query: text } });
       console.log("[voice-query] response:", { data, error });
@@ -49,7 +58,26 @@ const VoiceQueryButton = () => {
       const reply = (data as any)?.answer ?? "Sorry, I couldn't find an answer.";
       setAnswer(reply);
       setPhase("speaking");
-      await speak(reply);
+
+      await ensureAudioReady();
+
+      if (utterance && "speechSynthesis" in window) {
+        await new Promise<void>((resolve) => {
+          try {
+            window.speechSynthesis.cancel();
+            utterance.text = reply;
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+            window.speechSynthesis.speak(utterance);
+            // Safety timeout in case onend never fires
+            setTimeout(() => resolve(), Math.max(4000, reply.length * 90));
+          } catch {
+            resolve();
+          }
+        });
+      } else {
+        await speak(reply);
+      }
     } catch (e: any) {
       console.error("[voice-query] failed:", e);
       const msg = e?.message || "Voice assistant is temporarily unavailable.";
