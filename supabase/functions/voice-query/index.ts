@@ -106,13 +106,12 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims?.sub) {
-      console.error("[voice-query] invalid JWT:", claimsErr?.message);
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user?.id) {
+      console.error("[voice-query] invalid JWT:", userErr?.message);
       return json({ error: "Your session has expired. Please sign in again." }, 401);
     }
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
 
     let body: any;
     try { body = await req.json(); } catch { return json({ error: "Invalid request body." }, 400); }
