@@ -33,3 +33,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.admin-coupons]
     verify_jwt = false
+  [functions.voice-query]
+    verify_jwt = true
