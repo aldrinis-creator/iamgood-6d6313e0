@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import OnboardingWizard from "@/components/OnboardingWizard";
+import VoiceQueryButton from "@/components/VoiceQueryButton";
 import { formatISTTime } from "@/lib/istTime";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
