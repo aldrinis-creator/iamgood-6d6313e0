@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Loader2, Volume2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
@@ -16,24 +16,84 @@ const SAMPLES = [
   "Did I take my medications today?",
 ];
 
+const waitForVoices = async () => {
+  if (!("speechSynthesis" in window)) return;
+
+  if (window.speechSynthesis.getVoices().length > 0) return;
+
+  await new Promise<void>((resolve) => {
+    const synth = window.speechSynthesis;
+
+    const handleVoicesChanged = () => {
+      cleanup();
+      resolve();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      cleanup();
+      resolve();
+    }, 1200);
+
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      synth.removeEventListener?.("voiceschanged", handleVoicesChanged);
+    };
+
+    synth.addEventListener?.("voiceschanged", handleVoicesChanged, { once: true });
+  });
+};
+
+const getPreferredVoice = () => {
+  if (!("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const locale = (navigator.language || "en-US").toLowerCase();
+  const baseLocale = locale.split("-")[0];
+
+  return (
+    voices.find((voice) => voice.lang?.toLowerCase() === locale) ??
+    voices.find((voice) => voice.lang?.toLowerCase().startsWith(baseLocale)) ??
+    voices[0]
+  );
+};
+
 const VoiceQueryButton = () => {
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [answer, setAnswer] = useState("");
   const [open, setOpen] = useState(false);
+  const preparedUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const prepareUtterance = useCallback(() => {
+    if (!("speechSynthesis" in window)) return null;
+
+    const utterance = new SpeechSynthesisUtterance("");
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.lang = navigator.language || "en-US";
+
+    preparedUtteranceRef.current = utterance;
+
+    try {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.resume();
+    } catch {
+      // ignore
+    }
+
+    return utterance;
+  }, []);
 
   const sendQuery = useCallback(async (text: string) => {
     setTranscript(text);
     setAnswer("");
     setPhase("thinking");
 
-    // Create utterance synchronously inside the gesture context so iOS/Safari will allow speak() later
-    const utterance = "speechSynthesis" in window ? new SpeechSynthesisUtterance("") : null;
-    if (utterance) {
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-    }
+    const utterance = preparedUtteranceRef.current ?? prepareUtterance();
+    preparedUtteranceRef.current = null;
 
     try {
       const { data, error } = await supabase.functions.invoke("voice-query", { body: { query: text } });
@@ -62,19 +122,49 @@ const VoiceQueryButton = () => {
       await ensureAudioReady();
 
       if (utterance && "speechSynthesis" in window) {
-        await new Promise<void>((resolve) => {
+        await waitForVoices();
+
+        const preferredVoice = getPreferredVoice();
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+          utterance.lang = preferredVoice.lang;
+        }
+
+        const started = await new Promise<boolean>((resolve) => {
+          let hasStarted = false;
+          let settled = false;
+          let startTimeout = 0;
+          let finishTimeout = 0;
+
+          const finish = (value: boolean) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(startTimeout);
+            window.clearTimeout(finishTimeout);
+            resolve(value);
+          };
+
           try {
             window.speechSynthesis.cancel();
+            window.speechSynthesis.resume();
             utterance.text = reply;
-            utterance.onend = () => resolve();
-            utterance.onerror = () => resolve();
+            utterance.onstart = () => {
+              hasStarted = true;
+            };
+            utterance.onend = () => finish(hasStarted);
+            utterance.onerror = () => finish(false);
             window.speechSynthesis.speak(utterance);
-            // Safety timeout in case onend never fires
-            setTimeout(() => resolve(), Math.max(4000, reply.length * 90));
+
+            startTimeout = window.setTimeout(() => finish(false), 1500);
+            finishTimeout = window.setTimeout(() => finish(hasStarted), Math.max(4000, reply.length * 90));
           } catch {
-            resolve();
+            finish(false);
           }
         });
+
+        if (!started) {
+          await speak(reply);
+        }
       } else {
         await speak(reply);
       }
@@ -95,6 +185,12 @@ const VoiceQueryButton = () => {
   useEffect(() => {
     if (listening) setPhase("listening");
   }, [listening]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.getVoices();
+  }, []);
 
   useEffect(() => {
     if (error) {
@@ -121,6 +217,7 @@ const VoiceQueryButton = () => {
     }
     setTranscript("");
     setAnswer("");
+    prepareUtterance();
     await ensureAudioReady();
     start();
   };
@@ -132,6 +229,7 @@ const VoiceQueryButton = () => {
     setPhase("idle");
     setTranscript("");
     setAnswer("");
+    preparedUtteranceRef.current = null;
   };
 
   if (!isSpeechRecognitionSupported()) return null;
