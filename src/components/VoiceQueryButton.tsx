@@ -28,18 +28,27 @@ const VoiceQueryButton = () => {
     setPhase("thinking");
     try {
       const { data, error } = await supabase.functions.invoke("voice-query", { body: { query: text } });
-      if (error) throw error;
+      console.log("[voice-query] response:", { data, error });
+      if (error) {
+        // Try to extract server-sent error message from FunctionsHttpError context
+        let serverMsg: string | undefined;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            serverMsg = body?.error || body?.detail;
+          }
+        } catch { /* ignore */ }
+        throw new Error(serverMsg || error.message || "Edge function error");
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
       const reply = (data as any)?.answer ?? "Sorry, I couldn't find an answer.";
       setAnswer(reply);
       setPhase("speaking");
       await speak(reply);
     } catch (e: any) {
-      console.error(e);
-      const msg = e?.message?.includes("402")
-        ? "AI credits exhausted. Please add credits in workspace settings."
-        : e?.message?.includes("429")
-        ? "Too many requests. Please try again shortly."
-        : "Sorry, something went wrong.";
+      console.error("[voice-query] failed:", e);
+      const msg = e?.message || "Sorry, something went wrong.";
       setAnswer(msg);
       toast.error(msg);
     } finally {

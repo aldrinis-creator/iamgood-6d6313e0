@@ -9,6 +9,9 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+const PRIMARY_MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODEL = "google/gemini-3-flash-preview";
+
 // IST helpers
 const IST_OFFSET_MIN = 330;
 const istToday = () => {
@@ -18,7 +21,6 @@ const istToday = () => {
 };
 const istDayBounds = () => {
   const today = istToday();
-  // IST midnight = UTC of (today 00:00 IST) → subtract 5h30
   const start = new Date(`${today}T00:00:00+05:30`).toISOString();
   const end = new Date(`${today}T23:59:59.999+05:30`).toISOString();
   return { start, end, today };
@@ -36,9 +38,11 @@ const tools = [
 
 async function runTool(name: string, supabase: any, userId: string): Promise<any> {
   const { start, end, today } = istDayBounds();
+  console.log(`[tool] running ${name} for user=${userId} day=${today}`);
   switch (name) {
     case "get_refills_due": {
-      const { data } = await supabase.from("medications").select("name, remaining_quantity, low_stock_threshold").eq("user_id", userId);
+      const { data, error } = await supabase.from("medications").select("name, remaining_quantity, low_stock_threshold").eq("user_id", userId);
+      if (error) console.error("[tool] get_refills_due error:", error);
       const due = (data ?? []).filter((m: any) => Number(m.remaining_quantity) <= Number(m.low_stock_threshold));
       return { count: due.length, medications: due };
     }
@@ -91,21 +95,37 @@ async function runTool(name: string, supabase: any, userId: string): Promise<any
   }
 }
 
+async function callAI(model: string, body: any) {
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, ...body }),
+  });
+  return resp;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!authHeader) {
+      console.error("[voice-query] missing Authorization header");
+      return new Response(JSON.stringify({ error: "Unauthorized — please sign in." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } });
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!user) {
+      console.error("[voice-query] no user from JWT");
+      return new Response(JSON.stringify({ error: "Unauthorized — session expired." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const { query } = await req.json();
     if (!query || typeof query !== "string") {
       return new Response(JSON.stringify({ error: "Missing query" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    console.log(`[voice-query] user=${user.id} query="${query}"`);
 
     const systemPrompt = `You are Check-iN's voice assistant. The user just spoke a question. Pick the most relevant tool to answer it. After receiving tool results, respond in 1-2 short, natural sentences suitable for being spoken aloud. Use IST. Be concrete with numbers. If no relevant data, say so kindly.`;
 
@@ -114,55 +134,57 @@ Deno.serve(async (req) => {
       { role: "user", content: query },
     ];
 
-    // First call — let model pick a tool
-    const firstResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages, tools, tool_choice: "auto" }),
-    });
+    // First call — try primary model, fall back to preview
+    let firstResp = await callAI(PRIMARY_MODEL, { messages, tools, tool_choice: "auto" });
+    let modelUsed = PRIMARY_MODEL;
+    if (!firstResp.ok && firstResp.status >= 500) {
+      console.warn(`[voice-query] primary model ${PRIMARY_MODEL} failed (${firstResp.status}), trying fallback`);
+      firstResp = await callAI(FALLBACK_MODEL, { messages, tools, tool_choice: "auto" });
+      modelUsed = FALLBACK_MODEL;
+    }
+    console.log(`[voice-query] first call status=${firstResp.status} model=${modelUsed}`);
+
     if (firstResp.status === 429) return new Response(JSON.stringify({ error: "Rate limit, please try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (firstResp.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in workspace settings." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!firstResp.ok) {
       const t = await firstResp.text();
-      console.error("AI first call failed:", firstResp.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("[voice-query] AI first call failed:", firstResp.status, t);
+      return new Response(JSON.stringify({ error: `AI gateway error (${firstResp.status})`, detail: t.slice(0, 500) }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const firstData = await firstResp.json();
     const choice = firstData.choices?.[0]?.message;
     const toolCalls = choice?.tool_calls ?? [];
+    console.log(`[voice-query] tool_calls count=${toolCalls.length} content="${(choice?.content ?? "").slice(0, 100)}"`);
 
     if (!toolCalls.length) {
-      const answer = choice?.content ?? "I'm not sure how to answer that yet.";
+      const answer = choice?.content?.trim() || "I'm not sure how to answer that yet. Try asking about medications, nutrition, calories, check-ins, or appointments.";
       return new Response(JSON.stringify({ answer, tool: null }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Execute first tool call
     const call = toolCalls[0];
     const toolName = call.function?.name;
     const toolResult = await runTool(toolName, supabase, user.id);
+    console.log(`[voice-query] tool ${toolName} result keys: ${Object.keys(toolResult || {}).join(",")}`);
 
-    // Second call — compose spoken answer
     const messages2: any[] = [
       ...messages,
       { role: "assistant", content: choice.content ?? null, tool_calls: toolCalls },
       { role: "tool", tool_call_id: call.id, content: JSON.stringify(toolResult) },
     ];
-    const secondResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages: messages2 }),
-    });
+    const secondResp = await callAI(modelUsed, { messages: messages2 });
+    console.log(`[voice-query] second call status=${secondResp.status}`);
     if (!secondResp.ok) {
       const t = await secondResp.text();
-      console.error("AI second call failed:", secondResp.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("[voice-query] AI second call failed:", secondResp.status, t);
+      return new Response(JSON.stringify({ error: `AI gateway error (${secondResp.status})`, detail: t.slice(0, 500) }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const secondData = await secondResp.json();
-    const answer = secondData.choices?.[0]?.message?.content ?? "I couldn't generate a response.";
+    const answer = secondData.choices?.[0]?.message?.content?.trim() || "I got the data but couldn't phrase a response. Please try again.";
+    console.log(`[voice-query] answer="${answer.slice(0, 120)}"`);
 
     return new Response(JSON.stringify({ answer, tool: toolName, data: toolResult }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    console.error("voice-query error:", e);
+    console.error("[voice-query] uncaught error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
