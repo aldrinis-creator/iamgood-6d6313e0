@@ -553,7 +553,7 @@ const NutritionAdvisor = () => {
       });
       if (error) throw error;
       setSaved(true);
-      toast.success("Meal saved to your calorie tracker!");
+      toast.success("Meal saved to Nutrition Metrics!");
     } catch {
       toast.error("Failed to save meal");
     } finally {
@@ -795,7 +795,7 @@ const NutritionAdvisor = () => {
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2 text-success font-semibold text-sm">
                       <Save className="w-4 h-4" />
-                      Save to Calorie Tracker
+                      Save to Nutrition Metrics
                     </div>
                     <Select value={mealType} onValueChange={setMealType}>
                       <SelectTrigger className="h-9">
@@ -870,7 +870,7 @@ const NutritionAdvisor = () => {
 
       <Button variant="outline" className="w-full" onClick={() => setShowTracker(true)}>
         <BarChart3 className="w-4 h-4 mr-2" />
-        Calorie Tracker
+        Nutrition Metrics
       </Button>
     </div>
   );

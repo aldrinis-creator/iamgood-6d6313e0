@@ -9,7 +9,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subDays, addDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import NutritionTrendChart, { type NutritionTrendPoint } from "./NutritionTrendChart";
+
+interface MealItem {
+  sodium_mg?: number;
+  potassium_mg?: number;
+}
 
 interface MealLog {
   id: string;
@@ -22,6 +27,7 @@ interface MealLog {
   total_fiber_g: number;
   log_date: string;
   logged_at: string;
+  items?: MealItem[];
 }
 
 const MEAL_TYPE_LABELS: Record<string, string> = {
@@ -102,13 +108,28 @@ const CalorieTracker = () => {
     } else {
       days = eachDayOfInterval({ start: subDays(now, 29), end: now });
     }
-    const byDate: Record<string, number> = {};
+    const byDate: Record<string, { protein: number; fiber: number; sodium: number; potassium: number }> = {};
     allLogs.forEach((l) => {
-      byDate[l.log_date] = (byDate[l.log_date] || 0) + l.total_calories;
+      const cur = byDate[l.log_date] || { protein: 0, fiber: 0, sodium: 0, potassium: 0 };
+      cur.protein += Number(l.total_protein_g) || 0;
+      cur.fiber += Number(l.total_fiber_g) || 0;
+      const items = Array.isArray(l.items) ? l.items : [];
+      items.forEach((it) => {
+        cur.sodium += Number(it?.sodium_mg) || 0;
+        cur.potassium += Number(it?.potassium_mg) || 0;
+      });
+      byDate[l.log_date] = cur;
     });
-    return days.map((d) => {
+    return days.map<NutritionTrendPoint>((d) => {
       const ds = format(d, "yyyy-MM-dd");
-      return { date: ds, label: chartRange === "week" ? format(d, "EEE") : format(d, "dd"), calories: byDate[ds] || 0 };
+      const v = byDate[ds] || { protein: 0, fiber: 0, sodium: 0, potassium: 0 };
+      return {
+        label: chartRange === "week" ? format(d, "EEE") : format(d, "dd"),
+        protein: Math.round(v.protein),
+        fiber: Math.round(v.fiber),
+        sodium: Math.round(v.sodium),
+        potassium: Math.round(v.potassium),
+      };
     });
   }, [allLogs, chartRange]);
 
@@ -227,25 +248,14 @@ const CalorieTracker = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-bold">Calorie Trend</h3>
+            <h3 className="text-sm font-bold">Nutrition Trend</h3>
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant={chartRange === "week" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setChartRange("week")}>Week</Button>
             <Button size="sm" variant={chartRange === "month" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setChartRange("month")}>Month</Button>
           </div>
         </div>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-              <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }} formatter={(val: number) => [`${val} kcal`, "Calories"]} />
-              <ReferenceLine y={calorieGoal} stroke="hsl(var(--destructive))" strokeDasharray="5 5" label={{ value: "Goal", fontSize: 10, fill: "hsl(var(--destructive))" }} />
-              <Bar dataKey="calories" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <NutritionTrendChart data={chartData} height={200} />
       </div>
     </div>
   );
