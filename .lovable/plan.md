@@ -1,34 +1,65 @@
 
+## What that message means
 
-## Fix Voice Assistant — deploy + harden error handling
+The mic flow is probably reaching the Voice Assistant endpoint, but the endpoint is rejecting the request before it returns a normal answer. In plain English: the voice feature is not answering your question yet because the backend is failing first.
 
-### Diagnosis
-- The `voice-query` edge function has **zero logs**, meaning the request never reached it. Most likely cause: function not deployed yet (it was created in the previous turn but deployment may have failed silently).
-- The client's catch-all error message ("Sorry, something went wrong.") hides the real cause, so we can't distinguish between deploy failure, model rejection, or auth issue.
+## Most likely cause I found
 
-### Fix
+`voice-query` is configured differently from the project’s other working functions:
 
-1. **Redeploy `voice-query`** explicitly via `supabase--deploy_edge_functions` and confirm with `curl_edge_functions`.
+- `supabase/config.toml` has `voice-query` set to `verify_jwt = true`
+- the function code also does its own auth check with `auth.getUser()`
+- the function uses a smaller CORS header list than other working functions
 
-2. **Improve error surfacing in `VoiceQueryButton.tsx`** — show the actual error message from the edge function (e.g. "AI gateway error", "Unauthorized") instead of a generic toast. Log the full `error` object to console.
+That combination can cause the platform to reject the request early, which is why the app only shows the generic “Edge Function returned a non-2xx status code” message instead of a useful explanation.
 
-3. **Harden `voice-query/index.ts`**:
-   - Log every step (received query, chosen tool, tool result size, AI status codes) so we can debug from edge logs.
-   - Handle the case where the model returns no `tool_calls` AND no content (fallback message).
-   - Validate model name — switch default to `google/gemini-2.5-flash` (more stable than `gemini-3-flash-preview` for tool calling) with `gemini-3-flash-preview` retained as fallback.
-   - Return a more specific error body so the client can surface it.
+## Fix plan
 
-4. **Verify end-to-end** by curling the deployed function with a test query and reading the new logs.
+1. **Align `voice-query` with the project’s working function pattern**
+   - Change `voice-query` to the same auth model used by other web-called functions
+   - Keep auth validation inside the function code
+   - Remove the config mismatch that can block the request before logs appear
 
-### Files
-| File | Action |
-|------|--------|
-| `supabase/functions/voice-query/index.ts` | Add logging, switch default model to `google/gemini-2.5-flash`, fallback for empty responses |
-| `src/components/VoiceQueryButton.tsx` | Surface real error message; log full error to console |
+2. **Harden CORS on `voice-query`**
+   - Expand `Access-Control-Allow-Headers` to the full standard header set already used elsewhere in the app
+   - Make sure `OPTIONS`, success, and error responses all return the same CORS headers
 
-### If still broken after the fix
-If logs reveal the AI gateway rejects tool-calling on Gemini for our payload shape, I'll fall back to a simpler approach: a single non-tool-calling AI call where the model is given a JSON of pre-fetched user context (refills, today's meals, today's meds, score) and asked to answer — slower but bulletproof. We'll decide based on the first round of logs.
+3. **Improve error reporting in `VoiceQueryButton.tsx`**
+   - Parse the function response more defensively
+   - Show user-friendly errors like:
+     - “Please sign in again”
+     - “Voice assistant is temporarily unavailable”
+     - “AI service returned an error”
+   - Avoid the vague non-2xx fallback when the server actually sent a reason
 
-### Drop vs fix recommendation
-**Fix.** The infra is in place; we just need deployment confirmation and better diagnostics. Voice is a high-value differentiator and we're <30 min from working.
+4. **Deploy and verify**
+   - Redeploy `voice-query`
+   - Test it directly with an authenticated function call
+   - Check function logs immediately after a test query
+   - Confirm one real prompt works end-to-end:
+     - refills due
+     - nutrition metrics
+     - calorie goal progress
 
+5. **Fallback if tool-calling is the real issue**
+   - If auth/CORS are fixed but the AI call still fails, simplify the function:
+     - fetch the user’s data first
+     - send that context to AI in one plain request
+     - return a spoken answer without tool-calling
+   - This is less elegant, but more reliable for v1
+
+## Files to update
+
+- `supabase/config.toml`
+- `supabase/functions/voice-query/index.ts`
+- `src/components/VoiceQueryButton.tsx`
+
+## Expected result after the fix
+
+Instead of the generic failure message, the voice assistant should either:
+- answer the question normally, or
+- show a clear reason if something is still wrong
+
+## Recommendation
+
+Do not drop it yet. This looks like an integration/config issue, not a bad feature idea. The fastest next step is to fix auth/CORS alignment first, because that is the most likely blocker.
