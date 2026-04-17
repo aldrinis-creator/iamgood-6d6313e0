@@ -13,6 +13,7 @@ import ReportShareButtons from "@/components/ReportShareButtons";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
 import JourneyReportCard from "@/components/JourneyReportCard";
+import NutritionTrendChart, { type NutritionTrendPoint } from "@/components/NutritionTrendChart";
 
 type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys";
 
@@ -117,14 +118,25 @@ const GuardianReports = () => {
     });
   };
 
-  const buildNutritionTrend = () => {
+  const buildNutritionTrend = (): NutritionTrendPoint[] => {
     return Array.from({ length: 7 }, (_, i) => {
       const date = format(subDays(new Date(), 6 - i), "yyyy-MM-dd");
       const dayMeals = mealLogs.filter(m => m.log_date === date);
+      let sodium = 0;
+      let potassium = 0;
+      dayMeals.forEach((m: any) => {
+        const items = Array.isArray(m.items) ? m.items : [];
+        items.forEach((it: any) => {
+          sodium += Number(it?.sodium_mg) || 0;
+          potassium += Number(it?.potassium_mg) || 0;
+        });
+      });
       return {
-        day: format(subDays(new Date(), 6 - i), "EEE"),
-        calories: dayMeals.reduce((s: number, m: any) => s + (m.total_calories || 0), 0),
-        protein: dayMeals.reduce((s: number, m: any) => s + (Number(m.total_protein_g) || 0), 0),
+        label: format(subDays(new Date(), 6 - i), "EEE"),
+        protein: Math.round(dayMeals.reduce((s: number, m: any) => s + (Number(m.total_protein_g) || 0), 0)),
+        fiber: Math.round(dayMeals.reduce((s: number, m: any) => s + (Number(m.total_fiber_g) || 0), 0)),
+        sodium: Math.round(sodium),
+        potassium: Math.round(potassium),
       };
     });
   };
@@ -287,17 +299,12 @@ const GuardianReports = () => {
         {activeSection === "nutrition" && (
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-base">7-Day Nutrition</CardTitle></CardHeader>
-            <CardContent>
-              <ChartContainer config={chartConfigs.nutrition} className="h-[200px] w-full">
-                <BarChart data={buildNutritionTrend()}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis dataKey="day" tickLine={false} fontSize={12} />
-                  <YAxis hide />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="calories" fill="var(--color-calories)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="protein" fill="var(--color-protein)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold">Nutrition Trend</h3>
+              </div>
+              <NutritionTrendChart data={buildNutritionTrend()} height={200} />
             </CardContent>
           </Card>
         )}
