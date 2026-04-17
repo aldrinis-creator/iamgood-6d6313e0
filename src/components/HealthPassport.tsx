@@ -42,6 +42,7 @@ const HealthPassport = () => {
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
     { name: "Medications", score: 0, max: 100 },
+    { name: "Nutrition", score: 0, max: 100 },
   ]);
   const [overallScore, setOverallScore] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState<MilestoneConfig | null>(null);
@@ -56,11 +57,13 @@ const HealthPassport = () => {
     const currentHour = now.getHours();
 
 
-    const [checkInsRes, activityRes, medsRes, medLogsRes] = await Promise.all([
+    const [checkInsRes, activityRes, medsRes, medLogsRes, mealsRes, personaRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", user.id).eq("log_date", today).maybeSingle(),
       supabase.from("medications").select("id, schedule_times").eq("user_id", user.id).lte("start_date", today),
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", user.id).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
+      supabase.from("meal_logs").select("total_calories, total_protein_g, total_fiber_g").eq("user_id", user.id).eq("log_date", today),
+      supabase.from("nutrition_personas").select("daily_calorie_goal, weight_kg").eq("user_id", user.id).maybeSingle(),
     ]);
 
     // 1. Check-iN score
@@ -93,13 +96,33 @@ const HealthPassport = () => {
       ? Math.round(Math.min(logs.filter(l => l.status === "taken").length / totalDoses, 1) * 100)
       : 100;
 
+    // 4. Nutrition score
+    const meals = mealsRes.data ?? [];
+    const calorieGoal = personaRes.data?.daily_calorie_goal ?? 2000;
+    const weightKg = Number(personaRes.data?.weight_kg) || 0;
+    const totalCal = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
+    const totalProtein = meals.reduce((s, m) => s + (Number(m.total_protein_g) || 0), 0);
+    const totalFiber = meals.reduce((s, m) => s + (Number(m.total_fiber_g) || 0), 0);
+    let calorieP = 0;
+    if (calorieGoal > 0 && totalCal > 0) {
+      const ratio = totalCal / calorieGoal;
+      if (ratio >= 0.8 && ratio <= 1.1) calorieP = 50;
+      else if (ratio < 0.8) calorieP = Math.round((ratio / 0.8) * 50);
+      else calorieP = Math.max(0, Math.round((1 - Math.min((ratio - 1.1) / 0.5, 1)) * 50));
+    }
+    const proteinTarget = weightKg > 0 ? weightKg * 0.8 : 50;
+    const proteinP = Math.min(totalProtein / proteinTarget, 1) * 25;
+    const fiberP = Math.min(totalFiber / 25, 1) * 25;
+    const nutritionScore = Math.round(calorieP + proteinP + fiberP);
+
     const newCategories: CategoryScore[] = [
       { name: "Check-iN", score: checkInScore, max: 100 },
       { name: "Activity", score: activityScore, max: 100 },
       { name: "Medications", score: medScore, max: 100 },
+      { name: "Nutrition", score: nutritionScore, max: 100 },
     ];
 
-    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / 3);
+    const overall = Math.round(newCategories.reduce((sum, c) => sum + c.score, 0) / newCategories.length);
 
     setCategories(newCategories);
     setOverallScore(overall);
@@ -114,7 +137,7 @@ const HealthPassport = () => {
       wellness: 0,
       medications: medScore,
       vitals: 0,
-      nutrition: 0,
+      nutrition: nutritionScore,
     }, { onConflict: "user_id,score_date" });
 
     for (const ms of MILESTONES) {
@@ -141,6 +164,7 @@ const HealthPassport = () => {
     "Check-iN": "/dashboard",
     "Activity": "/my-health?tool=Activity",
     "Medications": "/my-health?tool=Tablets",
+    "Nutrition": "/my-health?tool=Nutrition",
   };
 
   const handleCategoryTap = (cat: CategoryScore) => {
