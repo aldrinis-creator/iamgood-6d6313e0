@@ -1,58 +1,56 @@
 
 
-## Add Nutrition to Health Passport + Nutrition Metrics with Multi-Nutrient Trend
+## Voice Query Assistant — "Hey Check-iN"
 
-### 1. Health Passport — add Nutrition category (User + Guardian view)
+### What it does
+A floating mic button on the User Dashboard. User taps mic → speaks question → app transcribes → AI interprets intent → fetches data → speaks answer back. Wake-word ("Hey Check-iN") optional via continuous listening toggle in Settings.
 
-**`src/components/HealthPassport.tsx`** & **`src/components/WardHealthPassport.tsx`**
-- Add 4th category `"Nutrition"` to the categories array
-- Score formula (0–100): based on today's `meal_logs` totals vs. daily calorie goal (`nutrition_personas.daily_calorie_goal`):
-  - 50 pts: calories within 80–110% of goal (proportional otherwise)
-  - 25 pts: protein ≥ 0.8g/kg body weight (or ≥ 50g fallback)
-  - 25 pts: fiber ≥ 25g
-- Fetch `meal_logs` + `nutrition_personas` for today; compute alongside existing categories
-- Update overall = average of 4 categories (instead of 3)
-- Persist `nutrition` value in `health_passport_scores` upsert (replace `nutrition: 0`)
-- Add navigation route for Nutrition → `/my-health?tool=Nutrition` (User card only)
+### Approach
 
-### 2. Rename Calorie Tracker → Nutrition Metrics + new Nutrition Trend chart
+**Speech input** — Use Web Speech API (`webkitSpeechRecognition`) for free, on-device transcription. Falls back gracefully on unsupported browsers. No new API keys needed for v1.
 
-**`src/components/CalorieTracker.tsx`** (keep file name to avoid import churn)
-- Rename heading "Daily Calorie Goal" stays (it's the goal section), but change the chart section:
-  - Heading "Calorie Trend" → **"Nutrition Trend"**
-  - Replace single-bar Calories chart with a grouped/stacked visual showing **Protein (g), Sodium (mg), Potassium (mg), Fiber (g)** per day
-  - Use a normalized line chart: each nutrient on its own line, with a small toggle (chips) to show/hide each — keeps it simple & powerful
-  - Compute daily totals by summing across `meal_logs.items[]` JSONB (sodium_mg, potassium_mg) and existing `total_protein_g`, `total_fiber_g` columns
-- Where this component is referenced as a label (e.g. NutritionAdvisor's "Calorie Tracker" view button), rename display to **"Nutrition Metrics"**
+**Speech output** — Reuse existing `playVoiceReminder` from `src/lib/audioAlerts.ts` (already-primed `speechSynthesis`).
 
-**`src/components/NutritionAdvisor.tsx`**
-- Find any "Calorie Tracker" label and rename to "Nutrition Metrics"
+**Intent + answer** — One edge function `voice-query` calls Lovable AI (`google/gemini-3-flash-preview`) with **tool calling** to pick the right query handler. Tools:
+- `get_refills_due` — meds where `remaining_quantity <= low_stock_threshold`
+- `get_nutrition_metrics` — today's `meal_logs` totals (cal/protein/fiber/sodium/potassium) vs `nutrition_personas` goal
+- `get_calorie_progress` — today's calories vs daily goal + % + remaining
+- `get_medications_today` — today's `medication_logs` status (taken/pending/missed)
+- `get_check_in_status` — today's `check_ins` rows
+- `get_health_passport_score` — latest `health_passport_scores` row
+- `get_appointments_today` — today's appointments
 
-### 3. Guardian Reports — same Nutrition Trend visual
+The function executes the chosen tool server-side (using user's JWT), then calls AI again to compose a natural spoken answer (1–2 sentences, IST-aware).
 
-**`src/pages/GuardianReports.tsx`**
-- Replace `buildNutritionTrend()` to compute protein, sodium (from items[].sodium_mg), potassium (from items[].potassium_mg), fiber (total_fiber_g) per day
-- Replace the single BarChart with the same toggleable LineChart used in CalorieTracker (extract a shared `NutritionTrendChart` component in `src/components/NutritionTrendChart.tsx` to keep parity)
-- Update `chartConfigs.nutrition` to define 4 series colors
-- Card title stays "7-Day Nutrition" but chart heading inside reads "Nutrition Trend"
+### UI
 
-### 4. Shared component
+**`src/components/VoiceQueryButton.tsx`** (new)
+- Floating mic FAB above SOS button on `/dashboard` (bottom-right, offset)
+- States: idle → listening (pulse) → thinking → speaking
+- Tap to start, tap to cancel
+- Shows transcript + answer in a small dismissible Sheet/Card
+- Sample prompts shown on first open
 
-**`src/components/NutritionTrendChart.tsx`** (new)
-- Props: `data: { label: string; protein: number; sodium: number; potassium: number; fiber: number }[]`, optional `range` selector
-- Renders LineChart with 4 toggleable series (badge chips), legend, tooltip with units (g/mg)
+**Wake-word (Phase 2, behind setting)** — Continuous `SpeechRecognition` loop matching `/hey check[\-\s]?in/i`; off by default (battery cost).
 
 ### Files
+
 | File | Action |
 |------|--------|
-| `src/components/HealthPassport.tsx` | Add Nutrition category + scoring, update overall |
-| `src/components/WardHealthPassport.tsx` | Add Nutrition category + scoring (read-only) |
-| `src/components/CalorieTracker.tsx` | Replace Calorie Trend with Nutrition Trend (4 nutrients) |
-| `src/components/NutritionTrendChart.tsx` | New shared toggleable LineChart |
-| `src/components/NutritionAdvisor.tsx` | Rename "Calorie Tracker" → "Nutrition Metrics" |
-| `src/pages/GuardianReports.tsx` | Use NutritionTrendChart with sodium/potassium from items JSONB |
+| `supabase/functions/voice-query/index.ts` | New — AI tool-calling + data fetch + spoken answer |
+| `src/components/VoiceQueryButton.tsx` | New — mic FAB + transcript/answer UI |
+| `src/hooks/useVoiceRecognition.ts` | New — Web Speech API wrapper |
+| `src/pages/UserDashboard.tsx` | Mount `<VoiceQueryButton />` |
+| `src/lib/audioAlerts.ts` | Export reusable `speak(text)` helper |
+| `mem://features/voice-query` | New memory file documenting the system |
 
-### Notes
-- Sodium/potassium are not stored as table columns; computed by summing `items[]` JSONB per meal log. No DB migration needed.
-- `health_passport_scores.nutrition` column already exists.
+### Notes / decisions
+- **No new secrets** — uses existing `LOVABLE_API_KEY`
+- **Privacy** — transcription happens in browser; only the text query goes to the edge function
+- **User-only** — gated to `role === "user"` (guardians get a future variant for ward queries)
+- **Freemium** — gate behind Pro tier via existing `useFeatureGate` (consistent with other AI features)
+- **Phase 1 = tap-to-talk**. Wake-word added later behind a Settings toggle.
+
+### Open question
+Should I add a Pro-tier gate (`useFeatureGate("Voice Assistant")`) or make it free for all users in v1?
 
