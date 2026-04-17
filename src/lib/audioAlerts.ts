@@ -193,6 +193,37 @@ export const playChime = async () => {
   osc3.stop(now + 1.0);
 };
 
+export const speak = async (message: string): Promise<void> => {
+  await ensureAudioReady();
+  if (!("speechSynthesis" in window)) return;
+  return new Promise((resolve) => {
+    try {
+      window.speechSynthesis.cancel();
+      const silent = new SpeechSynthesisUtterance("");
+      silent.volume = 0;
+      window.speechSynthesis.speak(silent);
+
+      const u = new SpeechSynthesisUtterance(message);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      u.volume = 1.0;
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    } catch {
+      resolve();
+    }
+  });
+};
+
+export const stopSpeaking = () => {
+  try {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  } catch {
+    // ignore
+  }
+};
+
 export const playVoiceReminder = async (message = "It's time for your Check-iN") => {
   await ensureAudioReady();
   if (!("speechSynthesis" in window)) {
