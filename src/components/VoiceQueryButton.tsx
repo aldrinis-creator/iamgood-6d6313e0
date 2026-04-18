@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Loader2, Volume2, X } from "lucide-react";
+import { Mic, Loader2, Volume2, VolumeX, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
-import { speak, stopSpeaking, ensureAudioReady } from "@/lib/audioAlerts";
+import { ensureAudioReady } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-type Phase = "idle" | "listening" | "thinking" | "speaking";
+type Phase = "idle" | "listening" | "thinking" | "ready" | "speaking";
 
 const SAMPLES = [
   "What medications need refilling today?",
@@ -16,47 +16,45 @@ const SAMPLES = [
   "Did I take my medications today?",
 ];
 
-const waitForVoices = async () => {
-  if (!("speechSynthesis" in window)) return;
-
-  if (window.speechSynthesis.getVoices().length > 0) return;
-
-  await new Promise<void>((resolve) => {
-    const synth = window.speechSynthesis;
-
-    const handleVoicesChanged = () => {
-      cleanup();
-      resolve();
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      cleanup();
-      resolve();
-    }, 1200);
-
-    const cleanup = () => {
-      window.clearTimeout(timeoutId);
-      synth.removeEventListener?.("voiceschanged", handleVoicesChanged);
-    };
-
-    synth.addEventListener?.("voiceschanged", handleVoicesChanged, { once: true });
-  });
-};
-
 const getPreferredVoice = () => {
   if (!("speechSynthesis" in window)) return null;
-
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-
   const locale = (navigator.language || "en-US").toLowerCase();
   const baseLocale = locale.split("-")[0];
-
   return (
-    voices.find((voice) => voice.lang?.toLowerCase() === locale) ??
-    voices.find((voice) => voice.lang?.toLowerCase().startsWith(baseLocale)) ??
+    voices.find((v) => v.lang?.toLowerCase() === locale) ??
+    voices.find((v) => v.lang?.toLowerCase().startsWith(baseLocale)) ??
     voices[0]
   );
+};
+
+const speakText = (text: string, onEnd?: () => void) => {
+  if (!("speechSynthesis" in window) || !text) {
+    onEnd?.();
+    return false;
+  }
+  try {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    u.volume = 1.0;
+    u.lang = navigator.language || "en-US";
+    const v = getPreferredVoice();
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    u.onend = () => onEnd?.();
+    u.onerror = () => onEnd?.();
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch {
+    onEnd?.();
+    return false;
+  }
 };
 
 const VoiceQueryButton = () => {
@@ -64,36 +62,40 @@ const VoiceQueryButton = () => {
   const [transcript, setTranscript] = useState("");
   const [answer, setAnswer] = useState("");
   const [open, setOpen] = useState(false);
-  const preparedUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [autoSpoke, setAutoSpoke] = useState(false);
 
-  const prepareUtterance = useCallback(() => {
-    if (!("speechSynthesis" in window)) return null;
-
-    const utterance = new SpeechSynthesisUtterance("");
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    utterance.lang = navigator.language || "en-US";
-
-    preparedUtteranceRef.current = utterance;
-
-    try {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.resume();
-    } catch {
-      // ignore
-    }
-
-    return utterance;
+  // Pre-load voices on mount so they're ready when needed
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.getVoices();
+    const handler = () => window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener?.("voiceschanged", handler);
+    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", handler);
   }, []);
+
+  const stopAll = useCallback(() => {
+    if ("speechSynthesis" in window) {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+    }
+  }, []);
+
+  const handleSpeakTap = useCallback(() => {
+    if (phase === "speaking") {
+      stopAll();
+      setPhase("ready");
+      return;
+    }
+    if (!answer) return;
+    setPhase("speaking");
+    const ok = speakText(answer, () => setPhase("ready"));
+    if (!ok) setPhase("ready");
+  }, [phase, answer, stopAll]);
 
   const sendQuery = useCallback(async (text: string) => {
     setTranscript(text);
     setAnswer("");
+    setAutoSpoke(false);
     setPhase("thinking");
-
-    const utterance = preparedUtteranceRef.current ?? prepareUtterance();
-    preparedUtteranceRef.current = null;
 
     try {
       const { data, error } = await supabase.functions.invoke("voice-query", { body: { query: text } });
@@ -117,63 +119,19 @@ const VoiceQueryButton = () => {
 
       const reply = (data as any)?.answer ?? "Sorry, I couldn't find an answer.";
       setAnswer(reply);
-      setPhase("speaking");
+      setPhase("ready");
 
-      await ensureAudioReady();
-
-      if (utterance && "speechSynthesis" in window) {
-        await waitForVoices();
-
-        const preferredVoice = getPreferredVoice();
-        if (preferredVoice) {
-          utterance.voice = preferredVoice;
-          utterance.lang = preferredVoice.lang;
-        }
-
-        const started = await new Promise<boolean>((resolve) => {
-          let hasStarted = false;
-          let settled = false;
-          let startTimeout = 0;
-          let finishTimeout = 0;
-
-          const finish = (value: boolean) => {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(startTimeout);
-            window.clearTimeout(finishTimeout);
-            resolve(value);
-          };
-
-          try {
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.resume();
-            utterance.text = reply;
-            utterance.onstart = () => {
-              hasStarted = true;
-            };
-            utterance.onend = () => finish(hasStarted);
-            utterance.onerror = () => finish(false);
-            window.speechSynthesis.speak(utterance);
-
-            startTimeout = window.setTimeout(() => finish(false), 1500);
-            finishTimeout = window.setTimeout(() => finish(hasStarted), Math.max(4000, reply.length * 90));
-          } catch {
-            finish(false);
-          }
-        });
-
-        if (!started) {
-          await speak(reply);
-        }
-      } else {
-        await speak(reply);
+      // Best-effort auto-speak: works on desktop & some mobile, silently no-op otherwise
+      const started = speakText(reply, () => setPhase("ready"));
+      if (started) {
+        setAutoSpoke(true);
+        setPhase("speaking");
       }
     } catch (e: any) {
       console.error("[voice-query] failed:", e);
       const msg = e?.message || "Voice assistant is temporarily unavailable.";
       setAnswer(msg);
       toast.error(msg);
-    } finally {
       setPhase("idle");
     }
   }, []);
@@ -185,12 +143,6 @@ const VoiceQueryButton = () => {
   useEffect(() => {
     if (listening) setPhase("listening");
   }, [listening]);
-
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-
-    window.speechSynthesis.getVoices();
-  }, []);
 
   useEffect(() => {
     if (error) {
@@ -206,8 +158,8 @@ const VoiceQueryButton = () => {
       return;
     }
     if (phase === "speaking") {
-      stopSpeaking();
-      setPhase("idle");
+      stopAll();
+      setPhase("ready");
       return;
     }
     if (phase === "thinking") return;
@@ -217,19 +169,28 @@ const VoiceQueryButton = () => {
     }
     setTranscript("");
     setAnswer("");
-    prepareUtterance();
+    setAutoSpoke(false);
     await ensureAudioReady();
+    // Prime speechSynthesis inside the gesture so later speak() calls are more likely to play
+    if ("speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.resume();
+        const primer = new SpeechSynthesisUtterance("");
+        primer.volume = 0;
+        window.speechSynthesis.speak(primer);
+      } catch { /* ignore */ }
+    }
     start();
   };
 
   const handleClose = () => {
     stop();
-    stopSpeaking();
+    stopAll();
     setOpen(false);
     setPhase("idle");
     setTranscript("");
     setAnswer("");
-    preparedUtteranceRef.current = null;
+    setAutoSpoke(false);
   };
 
   if (!isSpeechRecognitionSupported()) return null;
@@ -260,7 +221,7 @@ const VoiceQueryButton = () => {
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
-                  {phase === "listening" ? "Listening…" : phase === "thinking" ? "Thinking…" : phase === "speaking" ? "Speaking" : "Hey Check-iN"}
+                  {phase === "listening" ? "Listening…" : phase === "thinking" ? "Thinking…" : phase === "speaking" ? "Speaking" : phase === "ready" ? "Answer" : "Hey Check-iN"}
                 </h3>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleClose}>
                   <X className="w-4 h-4" />
@@ -285,12 +246,26 @@ const VoiceQueryButton = () => {
               )}
 
               {answer && (
-                <div className="text-sm bg-primary/5 rounded-lg p-3 border border-primary/10">
-                  {answer}
-                </div>
+                <>
+                  <div className="text-sm bg-primary/5 rounded-lg p-3 border border-primary/10">
+                    {answer}
+                  </div>
+                  <Button
+                    onClick={handleSpeakTap}
+                    variant={phase === "speaking" ? "secondary" : "default"}
+                    size="sm"
+                    className="w-full gap-2"
+                  >
+                    {phase === "speaking" ? (
+                      <><VolumeX className="w-4 h-4" /> Stop</>
+                    ) : (
+                      <><Volume2 className="w-4 h-4" /> {autoSpoke ? "Hear again" : "Tap to hear"}</>
+                    )}
+                  </Button>
+                </>
               )}
 
-              {phase === "idle" && (
+              {phase === "idle" && !answer && (
                 <p className="text-[10px] text-center text-muted-foreground">
                   Tap mic to ask • Tap again to cancel
                 </p>
