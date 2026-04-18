@@ -1,65 +1,41 @@
 
-## What that message means
+## Diagnosis
 
-The mic flow is probably reaching the Voice Assistant endpoint, but the endpoint is rejecting the request before it returns a normal answer. In plain English: the voice feature is not answering your question yet because the backend is failing first.
+The audio still doesn't fire because the current implementation has a fatal flaw: the `SpeechSynthesisUtterance` is created in `prepareUtterance()` during the mic tap, but then **the speech recognition runs** (another async gesture-breaker), THEN we hit the network, THEN we try to speak. By that time the gesture context is long gone — even the pre-created utterance won't play on Chrome/Safari mobile because `speak()` itself must be called close to a gesture.
 
-## Most likely cause I found
+Also, the current code has competing speech paths (`utterance` race + `speak()` fallback + `cancel()` calls) that can cancel each other out. And `ensureAudioReady()` resumes the AudioContext — irrelevant to `speechSynthesis`, which is a separate API.
 
-`voice-query` is configured differently from the project’s other working functions:
-
-- `supabase/config.toml` has `voice-query` set to `verify_jwt = true`
-- the function code also does its own auth check with `auth.getUser()`
-- the function uses a smaller CORS header list than other working functions
-
-That combination can cause the platform to reject the request early, which is why the app only shows the generic “Edge Function returned a non-2xx status code” message instead of a useful explanation.
+## Root cause
+`speechSynthesis.speak()` is being called after: tap → STT listening → STT result → network call → speak. Every modern browser treats this as "no user gesture" and silently drops it. The pre-created utterance trick only works if the `speak()` call itself happens very close to the gesture — not minutes later after STT + network.
 
 ## Fix plan
 
-1. **Align `voice-query` with the project’s working function pattern**
-   - Change `voice-query` to the same auth model used by other web-called functions
-   - Keep auth validation inside the function code
-   - Remove the config mismatch that can block the request before logs appear
+### 1. Switch TTS from browser `speechSynthesis` to server-generated audio
+Use Lovable AI's TTS (or a simple inline approach): have the `voice-query` edge function return both `answer` (text) AND `audio` (base64 MP3) generated via a TTS call. Then the client plays it via `new Audio(dataUrl)`, which **is allowed** post-gesture as long as the AudioContext was unlocked once (it already is, via `audioAlerts.ts`).
 
-2. **Harden CORS on `voice-query`**
-   - Expand `Access-Control-Allow-Headers` to the full standard header set already used elsewhere in the app
-   - Make sure `OPTIONS`, success, and error responses all return the same CORS headers
+This bypasses the entire `speechSynthesis` gesture-loss problem.
 
-3. **Improve error reporting in `VoiceQueryButton.tsx`**
-   - Parse the function response more defensively
-   - Show user-friendly errors like:
-     - “Please sign in again”
-     - “Voice assistant is temporarily unavailable”
-     - “AI service returned an error”
-   - Avoid the vague non-2xx fallback when the server actually sent a reason
+### 2. Backend changes (`supabase/functions/voice-query/index.ts`)
+- After getting the AI text answer, call OpenAI TTS via Lovable AI Gateway (`openai/gpt-4o-mini-tts` or similar) to generate MP3.
+- Return `{ answer, audio: "data:audio/mpeg;base64,..." }`.
+- Keep existing context-gathering logic intact.
 
-4. **Deploy and verify**
-   - Redeploy `voice-query`
-   - Test it directly with an authenticated function call
-   - Check function logs immediately after a test query
-   - Confirm one real prompt works end-to-end:
-     - refills due
-     - nutrition metrics
-     - calorie goal progress
+### 3. Client changes (`src/components/VoiceQueryButton.tsx`)
+- Remove all `speechSynthesis` / `SpeechSynthesisUtterance` / `prepareUtterance` / `waitForVoices` code.
+- On receiving response: `const audio = new Audio(data.audio); audio.play();`
+- Update phase to "speaking" while playing, "idle" on `ended`.
+- Keep text display in the card as visual fallback.
+- Tap-to-cancel during "speaking" calls `audio.pause()`.
 
-5. **Fallback if tool-calling is the real issue**
-   - If auth/CORS are fixed but the AI call still fails, simplify the function:
-     - fetch the user’s data first
-     - send that context to AI in one plain request
-     - return a spoken answer without tool-calling
-   - This is less elegant, but more reliable for v1
+### 4. Fallback
+If TTS generation fails server-side, return `audio: null` and the client just shows the text answer (no broken audio attempt).
 
 ## Files to update
+- `supabase/functions/voice-query/index.ts` — add TTS step, return audio
+- `src/components/VoiceQueryButton.tsx` — replace speechSynthesis with `new Audio()`
 
-- `supabase/config.toml`
-- `supabase/functions/voice-query/index.ts`
-- `src/components/VoiceQueryButton.tsx`
-
-## Expected result after the fix
-
-Instead of the generic failure message, the voice assistant should either:
-- answer the question normally, or
-- show a clear reason if something is still wrong
+## Why this will actually work
+`HTMLAudioElement.play()` after gesture unlock is reliable on iOS Safari, Chrome Android, and desktop. We've already unlocked audio in `audioAlerts.ts` on the first tap. `speechSynthesis` is the unreliable one — we drop it.
 
 ## Recommendation
-
-Do not drop it yet. This looks like an integration/config issue, not a bad feature idea. The fastest next step is to fix auth/CORS alignment first, because that is the most likely blocker.
+Do this fix. It's the only path that reliably produces audio on mobile after an async network call.
