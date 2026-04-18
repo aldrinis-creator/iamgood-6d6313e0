@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Loader2, Volume2, X } from "lucide-react";
+import { Mic, Loader2, Volume2, VolumeX, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
-import { speak, stopSpeaking, ensureAudioReady } from "@/lib/audioAlerts";
+import { ensureAudioReady } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-type Phase = "idle" | "listening" | "thinking" | "speaking";
+type Phase = "idle" | "listening" | "thinking" | "ready" | "speaking";
 
 const SAMPLES = [
   "What medications need refilling today?",
