@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
+import UrineCheck from "@/components/health-tools/UrineCheck";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -46,6 +47,7 @@ const healthToolsSubItems = [
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
   { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
+  { icon: TestTube, label: "Urine Check", desc: "Colour & dipstick strip analysis" },
 ];
 
 const subToolComponents: Record<string, React.FC> = {
@@ -56,6 +58,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
+  "Urine Check": UrineCheck,
 };
 
 const toolComponents: Record<string, React.FC> = {
