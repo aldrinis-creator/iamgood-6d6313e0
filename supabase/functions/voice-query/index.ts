@@ -12,8 +12,52 @@ const json = (body: unknown, status = 200) =>
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
 const MODEL = "google/gemini-2.5-flash";
+const TTS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — clear, warm female
+const TTS_MODEL = "eleven_turbo_v2_5";
+
+// Encode binary safely without spread overflow
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+  }
+  return btoa(binary);
+}
+
+async function synthesizeSpeech(text: string): Promise<string | null> {
+  if (!ELEVENLABS_API_KEY || !text) return null;
+  try {
+    const resp = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          model_id: TTS_MODEL,
+          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true, speed: 1.0 },
+        }),
+      }
+    );
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("[voice-query] TTS failed:", resp.status, err.slice(0, 300));
+      return null;
+    }
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    return `data:audio/mpeg;base64,${bytesToBase64(buf)}`;
+  } catch (e) {
+    console.error("[voice-query] TTS exception:", e);
+    return null;
+  }
+}
 
 const IST_OFFSET_MIN = 330;
 const istToday = () => {
@@ -159,7 +203,10 @@ Rules:
       "I couldn't phrase a response. Please try rephrasing your question.";
     console.log(`[voice-query] answer="${answer.slice(0, 120)}"`);
 
-    return json({ answer });
+    const audio = await synthesizeSpeech(answer);
+    console.log(`[voice-query] tts=${audio ? "ok" : "skipped"}`);
+
+    return json({ answer, audio });
   } catch (e) {
     console.error("[voice-query] uncaught error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
