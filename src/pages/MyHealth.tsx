@@ -19,6 +19,7 @@ import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
+import UrineCheck from "@/components/health-tools/UrineCheck";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
