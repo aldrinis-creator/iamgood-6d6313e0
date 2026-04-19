@@ -44,7 +44,6 @@ const healthToolsSubItems = [
   { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
-  { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
   { icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to ID & check against your prescriptions" },
 ];
 
