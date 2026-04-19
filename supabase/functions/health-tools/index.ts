@@ -218,6 +218,8 @@ const taskConfig: Record<string, { model: string; effort?: string }> = {
   prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
   banned_check:            { model: "google/gemini-2.5-flash-lite",  effort: "low" },
   face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
+  urine_color_analysis:    { model: "google/gemini-2.5-flash",       effort: "low" },
+  urine_dipstick_analysis: { model: "google/gemini-2.5-flash",       effort: "medium" },
   wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
 };
 
