@@ -220,6 +220,7 @@ const taskConfig: Record<string, { model: string; effort?: string }> = {
   face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
   urine_color_analysis:    { model: "google/gemini-2.5-flash",       effort: "low" },
   urine_dipstick_analysis: { model: "google/gemini-2.5-flash",       effort: "medium" },
+  pill_identification:     { model: "google/gemini-2.5-flash",       effort: "medium" },
   wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
 };
 
@@ -259,6 +260,14 @@ serve(async (req) => {
         visionPrompt = "Analyze this urine sample photo. Categorize color, estimate hydration, and flag any urgent concerns. Return only the JSON object specified.";
       } else if (type === "urine_dipstick_analysis") {
         visionPrompt = "Analyze this urine dipstick test strip photo. Read each of the 10 reagent pads against the bottle's reference chart if visible. Return only the JSON object specified.";
+      } else if (type === "pill_identification") {
+        const activeMeds = Array.isArray(payload.active_medications) ? payload.active_medications : [];
+        const bannedList = Array.isArray(payload.banned_substances) ? payload.banned_substances : [];
+        const medsBlock = activeMeds.length
+          ? activeMeds.map((m: any) => `- ${m.name}${m.dosage ? ` (${m.dosage})` : ""}`).join("\n")
+          : "(none — user has no active prescriptions on record)";
+        const bannedBlock = bannedList.length ? bannedList.join(", ") : "(none provided)";
+        visionPrompt = `Identify this pill from the photo.\n\nUSER'S ACTIVE MEDICATIONS:\n${medsBlock}\n\nBANNED/RESTRICTED SUBSTANCES IN INDIA (single-substance keywords):\n${bannedBlock}\n\nReturn only the JSON object specified.`;
       }
 
       messages = [
