@@ -14,3 +14,4 @@ Default check-in times: 7AM, 12PM, 7PM
 Reports use browser print-to-PDF via src/lib/reportPdf.ts with WhatsApp/Email sharing
 ReportShareButtons component reusable across all report views
 - [Urine Check](mem://features/urine-check) — Photo-based urine colour + 10-pad dipstick screening with red-flag escalation
+- [Pill Identifier](mem://features/pill-identifier) — Photo-based pill ID with prescription cross-check, banned-drug detection, guardian alerts on mismatch

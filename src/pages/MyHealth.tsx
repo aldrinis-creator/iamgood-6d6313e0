@@ -20,6 +20,7 @@ import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UrineCheck from "@/components/health-tools/UrineCheck";
+import PillIdentifier from "@/components/health-tools/PillIdentifier";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -48,6 +49,7 @@ const healthToolsSubItems = [
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
   { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
   { icon: TestTube, label: "Urine Check", desc: "Colour & dipstick strip analysis" },
+  { icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to ID & check against your prescriptions" },
 ];
 
 const subToolComponents: Record<string, React.FC> = {
@@ -59,6 +61,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
   "Urine Check": UrineCheck,
+  "Pill Identifier": PillIdentifier,
 };
 
 const toolComponents: Record<string, React.FC> = {

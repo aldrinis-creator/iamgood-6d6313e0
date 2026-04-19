@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Pill, Package, Bell, ShieldAlert, Camera, ChevronDown, Settings } from "lucide-react";
+import { Pill, Package, Bell, ShieldAlert, Camera, ChevronDown, Settings, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import TodaySchedule from "./TodaySchedule";
@@ -10,6 +10,7 @@ import RefillOrder, { type OrderItem } from "./RefillOrder";
 import AlarmSettings from "./AlarmSettings";
 import BannedMedications from "./BannedMedications";
 import PrescriptionScanner from "./PrescriptionScanner";
+import PillIdentifier from "@/components/health-tools/PillIdentifier";
 
 export interface AlternativeContext {
   medId: string;
@@ -74,7 +75,7 @@ const MedicationManager = () => {
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
           <Tabs value={manageTab} onValueChange={setManageTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className="w-full grid grid-cols-6">
               <TabsTrigger value="meds" className={`text-xs gap-1 ${lowStockClass}`}>
                 <Pill className="w-3 h-3" /> Meds
               </TabsTrigger>
@@ -83,6 +84,9 @@ const MedicationManager = () => {
               </TabsTrigger>
               <TabsTrigger value="refill" className={`text-xs gap-1 ${lowStockClass}`}>
                 <Package className="w-3 h-3" /> Refill
+              </TabsTrigger>
+              <TabsTrigger value="identify" className="text-xs gap-1">
+                <Search className="w-3 h-3" /> Identify
               </TabsTrigger>
               <TabsTrigger value="banned" className="text-xs gap-1">
                 <ShieldAlert className="w-3 h-3" /> Banned
@@ -110,6 +114,7 @@ const MedicationManager = () => {
                 onRefillDone={checkLowStock}
               />
             </TabsContent>
+            <TabsContent value="identify"><PillIdentifier /></TabsContent>
             <TabsContent value="banned"><BannedMedications /></TabsContent>
             <TabsContent value="alarms"><AlarmSettings /></TabsContent>
           </Tabs>
