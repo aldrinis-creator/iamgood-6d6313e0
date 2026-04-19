@@ -58,6 +58,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
+  "Urine Check": UrineCheck,
 };
 
 const toolComponents: Record<string, React.FC> = {
