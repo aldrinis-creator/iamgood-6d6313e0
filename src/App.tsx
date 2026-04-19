@@ -18,6 +18,7 @@ import GuardianAlerts from "./pages/GuardianAlerts";
 import GuardianReports from "./pages/GuardianReports";
 import GuardianServices from "./pages/GuardianServices";
 import MyHealth from "./pages/MyHealth";
+import Services from "./pages/Services";
 import MedicalVault from "./pages/MedicalVault";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
@@ -59,6 +60,7 @@ const App = () => (
               <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
               <Route path="/messages" element={<UserRoute><Messages /></UserRoute>} />
               <Route path="/journey" element={<UserRoute><MapMyJourney /></UserRoute>} />
+              <Route path="/services" element={<UserRoute><Services /></UserRoute>}/>
               {/* Guardian-only routes */}
               <Route path="/guardian" element={<GuardianRoute><GuardianWardProvider><GuardianDashboard /></GuardianWardProvider></GuardianRoute>} />
               <Route path="/guardian/alerts" element={<GuardianRoute><GuardianWardProvider><GuardianAlerts /></GuardianWardProvider></GuardianRoute>} />

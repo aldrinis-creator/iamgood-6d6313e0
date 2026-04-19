@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UrineCheck from "@/components/health-tools/UrineCheck";
+import TongueAnalysis from "@/components/health-tools/TongueAnalysis";
 import PillIdentifier from "@/components/health-tools/PillIdentifier";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
@@ -30,12 +31,12 @@ const healthTools = [
   { icon: Stethoscope, label: "Health Tools", color: "bg-success/10 text-success" },
   { icon: Ambulance, label: "Ambulance", color: "bg-sos/10 text-sos" },
   { icon: Activity, label: "Activity", color: "bg-primary/10 text-primary" },
-  
   { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
   { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
-  { icon: Wrench, label: "Services", color: "bg-primary/10 text-primary" },
+  { icon: TestTube, label: "Urine Check", color: "bg-success/10 text-success" },
+  { icon: Smile, label: "Tongue Check", color: "bg-primary/10 text-primary" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
   { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
 ];
@@ -48,7 +49,6 @@ const healthToolsSubItems = [
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
   { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
-  { icon: TestTube, label: "Urine Check", desc: "Colour & dipstick strip analysis" },
   { icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to ID & check against your prescriptions" },
 ];
 
@@ -60,7 +60,6 @@ const subToolComponents: Record<string, React.FC> = {
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
-  "Urine Check": UrineCheck,
   "Pill Identifier": PillIdentifier,
 };
 
@@ -70,9 +69,10 @@ const toolComponents: Record<string, React.FC> = {
   "Activity": ActivityTracker,
   "Nutrition": NutritionAdvisor,
   "Wellness": WellnessTracker,
-  "Services": HealthServices,
   "Face Scan": FaceScan,
   "Vitals": VitalsMonitor,
+  "Urine Check": UrineCheck,
+  "Tongue Check": TongueAnalysis,
   "Emergency First Aid": EmergencyFirstAid,
 };
 
