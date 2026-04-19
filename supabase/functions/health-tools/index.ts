@@ -255,6 +255,10 @@ serve(async (req) => {
       } else if (type === "document_analysis") {
         const category = payload.category || "General";
         visionPrompt = `Category: ${category}\n\nPlease read and analyze this medical document image. Extract all text, values, and findings visible in the image and provide a detailed analysis.`;
+      } else if (type === "urine_color_analysis") {
+        visionPrompt = "Analyze this urine sample photo. Categorize color, estimate hydration, and flag any urgent concerns. Return only the JSON object specified.";
+      } else if (type === "urine_dipstick_analysis") {
+        visionPrompt = "Analyze this urine dipstick test strip photo. Read each of the 10 reagent pads against the bottle's reference chart if visible. Return only the JSON object specified.";
       }
 
       messages = [
