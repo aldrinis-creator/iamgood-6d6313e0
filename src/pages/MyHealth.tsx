@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,13 +30,9 @@ const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
   { icon: Stethoscope, label: "Health Tools", color: "bg-success/10 text-success" },
   { icon: Ambulance, label: "Ambulance", color: "bg-sos/10 text-sos" },
-  { icon: Activity, label: "Activity", color: "bg-primary/10 text-primary" },
-  { icon: HeartPulse, label: "Wellness", color: "bg-primary/10 text-primary" },
+  { icon: Eye, label: "Quick Visual Checks", color: "bg-success/10 text-success" },
+  { icon: HeartPulse, label: "Wellness Hub", color: "bg-primary/10 text-primary" },
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
-  { icon: Apple, label: "Nutrition", color: "bg-success/10 text-success" },
-  { icon: ScanFace, label: "Face Scan", color: "bg-success/10 text-success" },
-  { icon: TestTube, label: "Urine Check", color: "bg-success/10 text-success" },
-  { icon: Smile, label: "Tongue Check", color: "bg-primary/10 text-primary" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
   { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
 ];
@@ -52,6 +48,18 @@ const healthToolsSubItems = [
   { icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to ID & check against your prescriptions" },
 ];
 
+const visualChecksSubItems = [
+  { icon: TestTube, label: "Urine Analysis", desc: "Photo-based urine colour & dipstick screening" },
+  { icon: Smile, label: "Tongue Analysis", desc: "Tongue colour, coating & surface insights" },
+  { icon: ScanFace, label: "Face Scan Analysis", desc: "Heart rate & stress via camera PPG" },
+];
+
+const wellnessHubSubItems = [
+  { icon: Activity, label: "Activity", desc: "Steps, exercise & daily movement" },
+  { icon: HeartPulse, label: "Wellness", desc: "Mood, sleep & mindfulness tracking" },
+  { icon: Apple, label: "Nutrition", desc: "Meal logging & AI nutrition advice" },
+];
+
 const subToolComponents: Record<string, React.FC> = {
   "Doctor Visit Report": DoctorVisitReport,
   "Medical Documents": MedicalDocuments,
@@ -61,19 +69,42 @@ const subToolComponents: Record<string, React.FC> = {
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
   "Pill Identifier": PillIdentifier,
+  "Urine Analysis": UrineCheck,
+  "Tongue Analysis": TongueAnalysis,
+  "Face Scan Analysis": FaceScan,
+  "Activity": ActivityTracker,
+  "Wellness": WellnessTracker,
+  "Nutrition": NutritionAdvisor,
+};
+
+// Map sub-tool labels to their feature-gate keys (where they differ)
+const subFeatureKey: Record<string, string> = {
+  "Face Scan Analysis": "Face Scan",
 };
 
 const toolComponents: Record<string, React.FC> = {
   "Tablets": MedicationManager,
   "Ambulance": AmbulanceBooking,
-  "Activity": ActivityTracker,
-  "Nutrition": NutritionAdvisor,
-  "Wellness": WellnessTracker,
-  "Face Scan": FaceScan,
   "Vitals": VitalsMonitor,
-  "Urine Check": UrineCheck,
-  "Tongue Check": TongueAnalysis,
   "Emergency First Aid": EmergencyFirstAid,
+};
+
+const HUB_TOOLS = ["Health Tools", "Quick Visual Checks", "Wellness Hub"];
+
+const hubConfig: Record<string, { items: typeof healthToolsSubItems }> = {
+  "Health Tools": { items: healthToolsSubItems },
+  "Quick Visual Checks": { items: visualChecksSubItems },
+  "Wellness Hub": { items: wellnessHubSubItems },
+};
+
+// Legacy deep-link support: redirect old ?tool=X values to their new hub
+const legacyToolRedirect: Record<string, string> = {
+  "Activity": "Wellness Hub",
+  "Wellness": "Wellness Hub",
+  "Nutrition": "Wellness Hub",
+  "Face Scan": "Quick Visual Checks",
+  "Urine Check": "Quick Visual Checks",
+  "Tongue Check": "Quick Visual Checks",
 };
 
 const MyHealth = () => {
@@ -86,8 +117,10 @@ const MyHealth = () => {
 
   useEffect(() => {
     const tool = searchParams.get("tool");
-    if (tool && (toolComponents[tool] || tool === "Health Tools")) {
-      setSelectedTool(tool);
+    if (!tool) return;
+    const redirected = legacyToolRedirect[tool] ?? tool;
+    if (toolComponents[redirected] || HUB_TOOLS.includes(redirected)) {
+      setSelectedTool(redirected);
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -101,7 +134,8 @@ const MyHealth = () => {
   };
 
   const handleSubToolClick = (label: string) => {
-    gate(label, () => setSelectedSubTool(label));
+    const gateKey = subFeatureKey[label] ?? label;
+    gate(gateKey, () => setSelectedSubTool(label));
   };
 
   if (selectedSubTool) {
@@ -118,7 +152,7 @@ const MyHealth = () => {
     );
   }
 
-  if (selectedTool && selectedTool !== "Health Tools") {
+  if (selectedTool && !HUB_TOOLS.includes(selectedTool)) {
     const ToolComponent = toolComponents[selectedTool];
     return (
       <AppLayout>
@@ -132,16 +166,18 @@ const MyHealth = () => {
     );
   }
 
-  if (selectedTool === "Health Tools") {
+  if (selectedTool && HUB_TOOLS.includes(selectedTool)) {
+    const items = hubConfig[selectedTool].items;
     return (
       <AppLayout>
         <div className="p-4 space-y-4">
           <Button variant="ghost" size="sm" onClick={() => setSelectedTool(null)} className="gap-1">
-            <ArrowLeft className="w-4 h-4" /> Health Tools
+            <ArrowLeft className="w-4 h-4" /> {selectedTool}
           </Button>
           <div className="space-y-2">
-            {healthToolsSubItems.map((item) => {
-              const locked = !canAccess(item.label);
+            {items.map((item) => {
+              const gateKey = subFeatureKey[item.label] ?? item.label;
+              const locked = !canAccess(gateKey);
               return (
                 <Card key={item.label} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleSubToolClick(item.label)}>
                   <CardContent className="p-3 flex items-center gap-3">
