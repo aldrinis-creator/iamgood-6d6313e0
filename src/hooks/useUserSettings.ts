@@ -89,7 +89,16 @@ export interface UserSettings {
   // Per-guardian location sharing
   locationSharingGuardianIds: string[];
   liveLocationGuardianIds: string[];
+  // Voice Query custom prompts
+  voiceQueryPrompts: string[];
 }
+
+export const DEFAULT_VOICE_QUERY_PROMPTS = [
+  "What medications need refilling today?",
+  "How's my nutrition looking?",
+  "Is my calorie goal on track?",
+  "Did I take my medications today?",
+];
 
 export const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
   from: "22:00",
@@ -139,6 +148,12 @@ const DEFAULTS: UserSettings = {
   journeyTrackingGuardians: [],
   locationSharingGuardianIds: [],
   liveLocationGuardianIds: [],
+  voiceQueryPrompts: [
+    "What medications need refilling today?",
+    "How's my nutrition looking?",
+    "Is my calorie goal on track?",
+    "Did I take my medications today?",
+  ],
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle
