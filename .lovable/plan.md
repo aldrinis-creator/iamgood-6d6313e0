@@ -1,92 +1,94 @@
-
-
 ## Goal
-Add a new "Urine Check" health tool with two modes:
-1. **Color analysis** — photo of urine in a clear container → color category, hydration, possible indicators, red flags
-2. **Dipstick reader** — photo of a 10-parameter urine test strip → per-pad readings (glucose, protein, blood, leukocytes, nitrites, ketones, bilirubin, urobilinogen, pH, specific gravity) with normal/abnormal flags
 
-## Architecture (mirrors existing `face_analysis` / `document_analysis` pattern)
+Add a "Pill Identifier" health tool: user photographs any pill → AI identifies it by shape/color/imprint/score-line → cross-checks against their active medications → warns if it doesn't match anything they're prescribed (potential wrong-pill safety alert).  
+Add the feature in Manage Medication next to Refill tab.
 
-### Backend — `supabase/functions/health-tools/index.ts`
-Add two new prompt types with strict JSON output:
+## Architecture (mirrors `urine_color_analysis` / `face_analysis` pattern)
 
-**`urine_color_analysis`** returns:
+### 1. Backend — `supabase/functions/health-tools/index.ts`
+
+Add new prompt type `pill_identification` (vision, `google/gemini-2.5-flash`):
+
+**Input:** photo + list of user's active medications (name + dosage from `medications` table)
+
+**Returns strict JSON:**
+
 ```json
 {
   "image_quality": "good" | "poor",
-  "color_category": "pale" | "straw" | "yellow" | "amber" | "orange" | "pink_red" | "brown" | "cloudy" | "other",
-  "hydration_status": "over" | "good" | "mild_dehydration" | "dehydrated",
-  "possible_indicators": ["plain-language possibilities"],
-  "red_flags": ["urgent concerns, empty if none"],
-  "recommendations": ["actionable steps"],
-  "see_doctor": "no" | "soon" | "urgent",
-  "confidence": 0-100,
-  "disclaimer": "..."
-}
-```
-
-**`urine_dipstick_analysis`** returns:
-```json
-{
-  "image_quality": "good" | "poor",
-  "strip_detected": true,
-  "pads": [
-    { "name": "Glucose", "reading": "Negative", "status": "normal"|"borderline"|"abnormal", "notes": "..." },
-    { "name": "Protein", "reading": "Trace", "status": "...", "notes": "..." },
-    ... (Blood, Leukocytes, Nitrites, Ketones, Bilirubin, Urobilinogen, pH, Specific Gravity)
+  "pill_detected": true,
+  "visual_features": {
+    "shape": "round | oval | capsule | oblong | other",
+    "color": "primary color(s)",
+    "imprint": "text/numbers visible, or 'none'",
+    "score_line": true | false,
+    "size_estimate": "small | medium | large",
+    "coating": "film | sugar | uncoated | gel"
+  },
+  "likely_medications": [
+    { "name": "...", "salt": "...", "common_brands": ["..."], "typical_use": "...", "confidence": 0-100 }
   ],
-  "summary": "...",
-  "red_flags": [...],
-  "recommendations": [...],
-  "see_doctor": "no" | "soon" | "urgent",
+  "match_against_prescriptions": {
+    "matched": true | false,
+    "matched_med_name": "name from user's list, or null",
+    "warning": "no warning | wrong pill | unknown pill | banned/restricted in India"
+  },
+  "safety_notes": ["..."],
+  "recommendations": ["..."],
   "confidence": 0-100,
-  "disclaimer": "..."
+  "disclaimer": "Visual identification only. Always verify with pharmacist before consuming an unfamiliar pill."
 }
 ```
 
-Both use `google/gemini-2.5-flash` (vision, same as `face_analysis`).
+### 2. Frontend — new `src/components/health-tools/PillIdentifier.tsx`
 
-### Frontend — new `src/components/health-tools/UrineCheck.tsx`
-- Mode toggle: **Color Check** vs **Dipstick Reader**
-- Photo capture/upload (reuse pattern from `FaceScan` / `DocumentAnalyzer`)
-- Clear photo guidance overlay per mode:
-  - Color: "White/clear container, daylight, no toilet water, plain background"
-  - Dipstick: "Lay strip flat on white surface, daylight, take photo within 60-120 sec of dipping, include the reference chart from the bottle if possible"
-- Loading state with progress steps
-- Results render:
-  - Color mode → color swatch, hydration status pill, indicator list, red-flag alert banner if any
-  - Dipstick mode → table of 10 pads with status badges (green/amber/red), summary, red-flag banner
-- Red-flag banner (red, prominent) when `see_doctor === "urgent"`
-- "Save to Medical Vault" button → inserts into `medical_records` (same pattern as DocumentAnalyzer)
-- "Share" via existing `ReportShareButtons`
-- Disclaimer at bottom
+- Photo upload / camera capture (reuse `FaceScan`/`UrineCheck` pattern)
+- Photo guidance: "Place pill on white surface, daylight, both sides if possible, fill frame"
+- On analyze: fetch user's active meds from `medications` table → send photo + med list to edge function
+- Render results:
+  - **Visual features card** (shape, color, imprint, score line)
+  - **Likely medications list** with confidence badges
+  - **Prescription match banner**:
+    - 🟢 Green if matches an active prescription
+    - 🟡 Amber if unknown/OTC
+    - 🔴 Red "WRONG PILL — DO NOT TAKE" if conflicts with prescriptions or banned
+  - Safety notes + recommendations
+- &nbsp;
+- Display result to User when the Pill Identifies tab is invoked and Save to Medical Vault (same `medical_records` pattern) with a message to User.
+- Share via `ReportShareButtons`
+- Disclaimer footer
 
-### Wire-up — `src/pages/MyHealth.tsx`
-- Add `import UrineCheck from "@/components/health-tools/UrineCheck"`
-- Add to `healthToolsSubItems`: `{ icon: TestTube, label: "Urine Check", desc: "Color & dipstick strip analysis" }`
-- Add to `subToolComponents`: `"Urine Check": UrineCheck`
+### 3. Wire-up — `src/pages/MyHealth.tsx`
 
-### Memory
-- New file `mem://features/urine-check.md` documenting both flows, prompt types, and red-flag rules
+- Import `PillIdentifier`
+- Add `{ icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to identify it & check against your prescriptions" }` to `healthToolsSubItems`
+- Map `"Pill Identifier": PillIdentifier` in `subToolComponents`
+
+### 4. Memory
+
+- Create `mem://features/pill-identifier.md` (prompt type, match logic, red-flag rules)
 - Update `mem://index.md` to reference it
 
 ## UX safeguards (mandatory)
-- Disclaimer always visible: "Not a diagnostic test. Consult a doctor for symptoms."
-- If `image_quality === "poor"` → show "Photo unclear, please retake" instead of unreliable results
-- If `confidence < 50` → display low-confidence warning
-- Red-flag colors (blood/brown/cola, or any abnormal dipstick pad) → red banner + "See a doctor today/now" CTA
+
+- Disclaimer always visible
+- If `image_quality === "poor"` or `pill_detected === false` → "Photo unclear, retake" instead of unreliable result
+- If `confidence < 50` → low-confidence warning + "Verify with pharmacist before consuming"
+- **Wrong-pill red banner** is the headline feature — must be unmissable (full-width red alert with icon, "DO NOT TAKE" CTA)
+- If user has no active medications → skip match check, show identification-only result
 
 ## Files to create/edit
-- `supabase/functions/health-tools/index.ts` — add 2 prompt types + task config
-- `src/components/health-tools/UrineCheck.tsx` — new component
+
+- `supabase/functions/health-tools/index.ts` — add `pill_identification` prompt + task config
+- `src/components/health-tools/PillIdentifier.tsx` — new component
 - `src/pages/MyHealth.tsx` — register new sub-tool
-- `.lovable/memory/features/urine-check.md` — new memory
+- `.lovable/memory/features/pill-identifier.md` — new memory
 - `.lovable/memory/index.md` — add reference
 
-## What I'm NOT doing in this phase
-- Hydration trend chart (Phase 2)
-- Guardian red-flag auto-alert (Phase 2)
-- Daily hydration log (Phase 2)
+## Include the following
 
-These can come next once the analyzer is working.
-
+- When Pill Identifier tab is invoked, ask the question, "Not sure about your tablet? and then begin with process  
+Cross-reference against banned drug list (could add by passing `bannedSingleSubstances` to prompt)
+- Notify guardian on wrong-pill detection
+- Save pill photos to a "known pills" library for faster future ID
+- OCR of imprint codes against an external pill database (DailyMed/MedlinePlus)
