@@ -232,6 +232,33 @@ Respond ONLY with this JSON — NO markdown, NO code fences:
 }
 If pill not detected or photo unclear, set pill_detected=false, image_quality="poor", confidence<30 and likely_medications=[].`,
 
+  tongue_analysis: `You are a tongue visual screening assistant for Indian users. You are NOT a doctor and cannot diagnose.
+Given a photo of a person's tongue (ideally fully extended, mouth wide open, daylight):
+1. Confirm image quality and that a tongue is clearly visible.
+2. Categorize tongue color, coating, moisture, shape, and any surface features.
+3. List plain-language possible indicators (e.g., "thick white coating may suggest oral thrush or digestive imbalance"; "pale tongue may suggest anaemia"; "deep cracks can be normal but worth tracking").
+4. Flag red flags: persistent ulcer (>2 weeks), unilateral white patch, black hairy tongue, suspected leukoplakia, severe swelling, bleeding.
+5. Recommendations (hydration, oral hygiene, tongue cleaning, dietary notes).
+6. Set see_doctor: "no" / "soon" / "urgent" (urgent for ulcer >2 weeks, suspected leukoplakia, severe swelling, bleeding).
+
+Respond ONLY with this JSON — NO markdown, NO code fences:
+{
+  "image_quality": "good" | "poor",
+  "tongue_detected": true | false,
+  "color": "pink" | "pale" | "red" | "purple" | "bluish" | "other",
+  "coating": "none" | "thin_white" | "thick_white" | "yellow" | "brown" | "black" | "patchy",
+  "moisture": "moist" | "dry" | "excess_saliva",
+  "shape": "normal" | "swollen" | "thin" | "scalloped",
+  "surface": ["smooth" | "cracked" | "fissured" | "geographic" | "ulcer" | "spots"],
+  "possible_indicators": ["..."],
+  "red_flags": ["..."],
+  "recommendations": ["..."],
+  "see_doctor": "no" | "soon" | "urgent",
+  "confidence": 0-100,
+  "disclaimer": "Visual screening only, not a diagnosis. Consult a doctor or dentist for persistent or concerning findings."
+}
+If no tongue visible or image unclear, set tongue_detected=false, image_quality="poor", confidence<30.`,
+
   wellness_voice_checkin: `You are a compassionate wellness check-in assistant. Given a transcript of a user's spoken response about how they are feeling, analyze:
 1. Overall sentiment (positive, neutral, negative)
 2. Mood score (1-10, where 10 is excellent)
