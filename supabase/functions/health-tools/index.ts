@@ -261,6 +261,7 @@ const taskConfig: Record<string, { model: string; effort?: string }> = {
   urine_color_analysis:    { model: "google/gemini-2.5-flash",       effort: "low" },
   urine_dipstick_analysis: { model: "google/gemini-2.5-flash",       effort: "medium" },
   pill_identification:     { model: "google/gemini-2.5-flash",       effort: "medium" },
+  tongue_analysis:         { model: "google/gemini-2.5-flash",       effort: "low" },
   wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
 };
 
@@ -300,6 +301,8 @@ serve(async (req) => {
         visionPrompt = "Analyze this urine sample photo. Categorize color, estimate hydration, and flag any urgent concerns. Return only the JSON object specified.";
       } else if (type === "urine_dipstick_analysis") {
         visionPrompt = "Analyze this urine dipstick test strip photo. Read each of the 10 reagent pads against the bottle's reference chart if visible. Return only the JSON object specified.";
+      } else if (type === "tongue_analysis") {
+        visionPrompt = "Analyze this tongue photo. Identify color, coating, moisture, shape, and any surface features. Flag red flags and set see_doctor level. Return only the JSON object specified.";
       } else if (type === "pill_identification") {
         const activeMeds = Array.isArray(payload.active_medications) ? payload.active_medications : [];
         const bannedList = Array.isArray(payload.banned_substances) ? payload.banned_substances : [];
