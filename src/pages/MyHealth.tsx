@@ -47,6 +47,7 @@ const healthToolsSubItems = [
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
   { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
+  { icon: TestTube, label: "Urine Check", desc: "Colour & dipstick strip analysis" },
 ];
 
 const subToolComponents: Record<string, React.FC> = {
