@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
