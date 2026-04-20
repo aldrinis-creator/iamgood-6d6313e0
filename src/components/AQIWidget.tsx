@@ -83,14 +83,20 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
       const uaqi = data.indexes?.find((idx: any) => idx.code === "uaqi");
       if (!uaqi) throw new Error("No AQI data");
 
-      // 2. Fetch Temperature via free Open-Meteo
+      // 2. Fetch Weather (temp, humidity, precipitation, UV) via free Open-Meteo
       let temp: number | undefined;
+      let humidity: number | undefined;
+      let precipitation: number | undefined;
+      let uvIndex: number | undefined;
       try {
-        const tempRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        const tempRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,precipitation,uv_index&timezone=auto`);
         const tempData = await tempRes.json();
-        temp = tempData?.current_weather?.temperature;
+        temp = tempData?.current?.temperature_2m;
+        humidity = tempData?.current?.relative_humidity_2m;
+        precipitation = tempData?.current?.precipitation;
+        uvIndex = tempData?.current?.uv_index;
       } catch (e) {
-        console.warn("Temperature fetch failed", e);
+        console.warn("Weather fetch failed", e);
       }
 
       setAqiData({
@@ -101,6 +107,9 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
         pollutants: data.pollutants || [],
         elderlyRecommendation: data.healthRecommendations?.elderly,
         temp,
+        humidity,
+        precipitation,
+        uvIndex,
         locationName: locationName || "Current Location"
       });
       setError(false);
