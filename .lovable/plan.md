@@ -1,75 +1,73 @@
-## Suggestion
 
-Great call — this is exactly the right move. The current My Health grid has 12 tiles which is overwhelming on a 430px mobile screen, and the tools naturally cluster into two groups. Grouping them into "Quick Visual Checks" and "Activity Tracker" hubs will:
 
-- Drop the main grid from **12 → 8 tiles** (3×3 minus one = much cleaner)
-- Create discoverable "hubs" for related tools
-- Set up the pattern for future bundles (e.g. Eye/Nail/Skin can join Visual Checks later)
+Let me investigate the Pill Identifier save error and the Health Tools tab.
+<lov-tool-use id="toolu_vrtx_014HUKvNJKtaFjYziaaCnGNw" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/MyHealth.tsx\", \"lines\": \"1-100\"}">
+</lov-tool-use>
 
-One small refinement I'd suggest: rename **"Activity Tracker"** to **"Wellness Hub"** or **"Daily Wellness"** since it bundles Activity + Wellness + Nutrition (all three are daily lifestyle trackers, not just activity). But I'll go with your naming if you prefer.  
-We go with **Wellness Hub**
+<lov-tool-use id="toolu_vrtx_01Gg1TBHugbFzhw2MFPNXMBD" name="security--get_table_schema" integration-id="security" data="">
+</lov-tool-use>
 
----
+<lov-tool-use id="toolu_vrtx_017wjajsKcaQZvXvzg6QajVx" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/MyHealth.tsx\", \"lines\": \"1-100\"}">
+</lov-tool-use>
 
-## Plan
+<lov-tool-use id="toolu_vrtx_01AYhJFE8yimCF3yuu4hQPb4" name="security--get_table_schema" integration-id="security" data="">
+</lov-tool-use>
 
-### 1. New hub component — `src/components/health-tools/QuickVisualChecks.tsx`
+<lov-tool-use id="toolu_vrtx_01Lsr3aG4EKbHFLGme859bDP" name="code--exec" integration-id="code" data="{\"command\": \"grep -n \\\"medical_records\\\" /tool-results/security--get_table_schema/20260420-012917-563755 | head -20\", \"user_facing_description\": \"Looking up medical_records table schema\"}">
+</lov-tool-use>
 
-Sub-navigation page with 3 cards:
+<lov-tool-use id="toolu_vrtx_01TCfZxcikmiZwxdm9txFPH4" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'medical_records' AND table_schema='public' ORDER BY ordinal_position;\"}">
+</lov-tool-use>
+Schema is fine. Let me check if there's a CHECK constraint on `record_type` (since "Lab Reports" is what PillIdentifier inserts).
+<lov-tool-use id="toolu_vrtx_015xtoupqbbGkEERfgdvU7nY" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'public.medical_records'::regclass;\"}">
+</lov-tool-use>
 
-- **Urine Analysis** → renders existing `<UrineCheck />`
-- **Tongue Analysis** → renders existing `<TongueAnalysis />`
-- **Face Scan Analysis** → renders existing `<FaceScan />`
+<lov-tool-use id="toolu_vrtx_01WUg1vEKLEqnQn1ZW2K66jH" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename='medical_records';\"}">
+</lov-tool-use>
+Found it. The `record_type` CHECK constraint does NOT include `"Lab Reports"` (plural) — only `"Lab Report"` (singular). PillIdentifier and TongueAnalysis both insert `"Lab Reports"`, which violates the constraint.
 
-Pattern: same as the existing "Health Tools" sub-page in `MyHealth.tsx` — card list with icon + label + description, click opens the tool with a back button. Each sub-tool keeps its own freemium gate via `useFeatureGate`.
+Let me also check other consumers to align.
+<lov-tool-use id="toolu_vrtx_01VVkci7b1v6fVQPGtKtmU5V" name="code--search_files" integration-id="code" data="{\"query\": \"record_type:\", \"include_patterns\": \"src/**/*.tsx,src/**/*.ts\"}">
+</lov-tool-use>
+Confirmed root cause. Plan ready.
 
-### 2. New hub component — `src/components/health-tools/ActivityTrackerHub.tsx`
+<lov-plan>
 
-Sub-navigation page with 3 cards:
+## Root cause
 
-- **Activity** → renders existing `<ActivityTracker />`
-- **Wellness** → renders existing `<WellnessTracker />`
-- **Nutrition** → renders existing `<NutritionAdvisor />`
-
-Same pattern.
-
-### 3. Restructure `src/pages/MyHealth.tsx`
-
-**New `healthTools` tile list (8 tiles, 3×3 grid with 1 empty or 2×4):**
+The save fails because `medical_records.record_type` has a CHECK constraint listing valid values like `"Lab Report"` (singular), but `PillIdentifier`, `TongueAnalysis`, and `UrineCheck` all insert `"Lab Reports"` (plural) — which violates the constraint and causes the save error shown in the screenshot.
 
 ```
-Tablets · Health Tools · Ambulance
-Quick Visual Checks · Activity Tracker · Vitals
-Vault · Emergency First Aid
+CHECK (record_type IN ('prescription','lab_report','Lab Report',
+                       "Doctor's Diagnosis", 'AI Analysis', ...))
 ```
+`"Lab Reports"` is **not** in the allowed list.
 
-Removed from top-level: Activity, Wellness, Nutrition, Face Scan, Urine Check, Tongue Check (6 tiles)
-Added: Quick Visual Checks, Activity Tracker (2 tiles)
+## Fix — two parts
 
-**Routing logic:** Extend the existing `selectedTool === "Health Tools"` sub-page pattern to also handle `"Quick Visual Checks"` and `"Activity Tracker"`. Each opens its own sub-page with a back button → tool selection cards → tool render.
+### 1. Remove Pill Identifier from Health Tools sub-menu
+Edit `src/pages/MyHealth.tsx`:
+- Remove the `Pill Identifier` entry from `healthToolsSubItems` (line 47)
+- Remove `"Pill Identifier": PillIdentifier` from `subToolComponents` map
+- Remove the now-unused `PillIdentifier` import
 
-**Deep-link support:** `useSearchParams` already handles `?tool=X`. Add support for the two new hub names so existing links to `?tool=Activity` etc. still work (route them through the hub).
+Pill Identifier remains accessible via **Medication Manager → Identify tab** (already wired).
 
-### 4. Icons
+### 2. Fix the Medical Vault save error
+Change the three offending inserts from `"Lab Reports"` → `"Lab Report"` (matches the existing CHECK constraint, no migration needed):
+- `src/components/health-tools/PillIdentifier.tsx` line 191
+- `src/components/health-tools/TongueAnalysis.tsx` line 156
+- `src/components/health-tools/UrineCheck.tsx` line 181
 
-- Quick Visual Checks → `Eye` or `ScanFace` (lucide-react)
-- Wellness Hub → `HeartPulse` or `Activity`
+This is the safest fix — no DB migration, aligns with `VitalsMonitor` which already uses the singular `"Lab Report"`.
 
-### 5. Memory update
-
-Update `mem://style/navigation-hierarchy` (or add a small note) documenting the new My Health hub structure so future changes respect this grouping.
-
----
-
-## Files to create/edit
-
-- **Create**: `src/components/health-tools/QuickVisualChecks.tsx`
-- **Create**: `src/components/health-tools/ActivityTrackerHub.tsx`
-- **Edit**: `src/pages/MyHealth.tsx` (tile restructure + sub-page routing for 2 new hubs)
-- **Edit**: `.lovable/memory/style/navigation-hierarchy.md` (document new hub grouping)
+## Files to edit
+- `src/pages/MyHealth.tsx` — remove Pill Identifier sub-tool entry + import
+- `src/components/health-tools/PillIdentifier.tsx` — `"Lab Reports"` → `"Lab Report"`
+- `src/components/health-tools/TongueAnalysis.tsx` — same
+- `src/components/health-tools/UrineCheck.tsx` — same
 
 ## Out of scope
+- Expanding the DB CHECK constraint (not needed; singular form already valid)
+- Touching Pill Identifier's location inside Medication Manager
 
-- Renaming "Activity Tracker" — will use your name unless you opt for "Wellness Hub"
-- Combining the 3 visual checks into a single 3-photo guided wizard (good Phase 2 — would generate one combined report card)
-- Adding more tools to either hub (Eye/Nail/Skin to Visual Checks; Sleep/Mindfulness to Activity)
