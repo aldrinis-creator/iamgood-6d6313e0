@@ -1,70 +1,33 @@
 
 
-## Yes — fully possible, no API key change needed
+## Plan
 
-The AQI widget already uses **Open-Meteo** (free, no key) for temperature. The same single endpoint can return UV, precipitation, and humidity by just adding parameters to the query — zero new integrations, zero cost, no rate-limit risk.
+Pre-fill sensible defaults in `AddAppointmentDialog` so users only edit when needed.
 
-## Approach
+### Changes to `src/components/appointments/AddAppointmentDialog.tsx`
 
-### 1. Extend the Open-Meteo call in `src/components/AQIWidget.tsx`
+**1. Default `start_date` and `end_date` to today (IST)**
+- Update the `empty` form constant: replace `start_date: ""` and `end_date: ""` with today's date in `yyyy-MM-dd` format using the existing `getISTDateString()` helper from `@/lib/istTime`.
+- Applies only when adding a new appointment (edit mode still loads saved values via existing `useEffect`).
 
-Current call:
-```
-?latitude=..&longitude=..&current_weather=true
-```
+**2. Auto-set `end_time` to start_time + 1 hour**
+- Add an `onChange` handler for the Start Time input that:
+  - Sets `start_time` to the chosen value
+  - If `end_time` is empty OR was the previously auto-computed value, set `end_time = start_time + 1h` (wraps via 24h math; if it crosses midnight, also bump `end_date` to next day)
+- User can still manually override `end_time` afterwards — once they edit it manually, we won't overwrite again (track via a small `endTimeManuallyEdited` ref/state flag).
 
-New call (single request, same endpoint):
-```
-?latitude=..&longitude=..
- &current=temperature_2m,relative_humidity_2m,precipitation,uv_index,weather_code
- &timezone=auto
-```
+**3. Reset behavior**
+- When the dialog reopens for a new appointment, `empty` regenerates today's date fresh (move `empty` from a module constant into a function `makeEmpty()` so the date is always current, not stale from initial module load).
 
-This returns:
-- `temperature_2m` (°C) — replaces existing `current_weather.temperature`
-- `relative_humidity_2m` (%)
-- `precipitation` (mm, last hour)
-- `uv_index` (0–11+ scale)
+### Edge cases handled
+- **Midnight crossover**: If start_time is 23:30, end_time becomes 00:30 and end_date advances by one day.
+- **Edit mode**: Untouched — existing appointments load their saved dates/times.
+- **User manual edit of end_time**: Respected; auto-fill stops once user types in End Time.
 
-### 2. Extend `AQIData` interface
+### Files to edit
+- `src/components/appointments/AddAppointmentDialog.tsx` — single file change
 
-Add: `humidity?: number`, `precipitation?: number`, `uvIndex?: number`.
-
-### 3. UI — popover layout
-
-Add a compact **"Weather"** strip between the existing main readout (AQI circle + temp) and the "Seniors Advisory" section. Four small stat tiles in a 2×2 or 4-col grid:
-
-```
-┌──────────┬──────────┬──────────┬──────────┐
-│ 🌡 28°C  │ 💧 65%   │ ☂ 0.2mm  │ ☀ UV 7   │
-│  Temp    │ Humidity │  Rain    │  High    │
-└──────────┴──────────┴──────────┴──────────┘
-```
-
-- Icons: `Thermometer`, `Droplets`, `CloudRain`, `Sun` (all lucide-react, already in stack)
-- UV color coding: green (0–2 Low), yellow (3–5 Moderate), orange (6–7 High), red (8–10 Very High), purple (11+ Extreme)
-- Humidity color hint for elderly: amber if <30% (dry, respiratory risk) or >70% (heat stress)
-
-The existing temperature pill in the trigger button stays as-is (compact mobile view).
-
-### 4. Optional — senior-friendly advisory line
-
-If `uv_index >= 6` OR `humidity >= 70` OR `precipitation > 0.5`, append a one-line tip below the existing "Seniors Advisory" (or as its own muted line if no AQI advisory present):
-
-- UV ≥ 6: "High UV — wear hat & sunscreen if going out"
-- Humidity ≥ 70: "Humid conditions — stay hydrated"
-- Rain > 0.5mm: "Light rain — slippery surfaces, walk with care"
-
-Keeps the elderly-care theme consistent with the existing AQI advisory.
-
-## Files to edit
-
-- `src/components/AQIWidget.tsx` — single file change (extend fetch, extend interface, add weather strip + optional advisory)
-
-## Out of scope
-
-- Hourly/daily forecast (would need a bigger UI rework)
-- Pollen, wind speed, visibility (easy to add later if requested)
-- Caching weather data (current 10-min inactivity revert already handles freshness)
-- Search results — when user searches a location, weather params will also load for that location automatically (free benefit)
+### Out of scope
+- Changing the default 1-hour duration to a user preference (could be a Settings option later)
+- Validating end > start (no validation exists today; keeping consistent)
 
