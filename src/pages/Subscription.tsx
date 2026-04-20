@@ -65,6 +65,7 @@ const plans = [
       "Medical Vault",
       "Wellness AI Insights",
       "Safety Zones & Fall Detection",
+      "Quick Visual Checks (Urine, Tongue & Face)",
       "Health Vitals (ECG, HR, SpO2, BP)",
       "Multiple sports modes & Gesture control"
     ],
@@ -85,10 +86,11 @@ const plans = [
       "Wellness AI Insights",
       "Safety Zones",
       "Fall Detection",
+      { label: "Quick Visual Checks", sub: "Urine, Tongue & Face Analysis" },
       "Health Vitals (ECG, HR, SpO2, BP, EDA)",
       "Step counting & Multiple sports modes",
       "Gesture control",
-    ],
+    ] as Array<string | { label: string; sub: string }>,
     excluded: [],
   },
 ];
@@ -497,12 +499,20 @@ const Subscription = () => {
                 </CardHeader>
                 <CardContent className="space-y-4 flex-1 flex flex-col pt-2">
                   <div className="space-y-2.5 flex-1">
-                    {plan.features.map((f) => (
-                      <div key={f} className="flex items-start gap-2 text-sm leading-snug">
-                        <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </div>
-                    ))}
+                    {plan.features.map((f) => {
+                      const isObj = typeof f === "object";
+                      const label = isObj ? (f as { label: string }).label : (f as string);
+                      const sub = isObj ? (f as { sub: string }).sub : null;
+                      return (
+                        <div key={label} className="flex items-start gap-2 text-sm leading-snug">
+                          <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <div>{label}</div>
+                            {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
                     {plan.excluded.map((f) => (
                       <div key={f} className="flex items-start gap-2 text-sm text-muted-foreground line-through opacity-70 leading-snug">
                         <span className="w-4 h-4 shrink-0 mt-0.5 border border-muted-foreground/30 rounded-sm" />
