@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const API_KEY = "AIzaSyCQuBmmLMKvQwqD4ydUL8DA8sZ7sIQtLX8";
 const MAX_SEARCHES_PER_DAY = 5;
@@ -31,15 +33,31 @@ interface AQIData {
 }
 
 const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
+  const isGuardian = role === "guardian";
+  let wardUserId: string | null = null;
+  let wardName: string | undefined;
+  try {
+    if (isGuardian) {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const ctx = useGuardianWard();
+      wardUserId = ctx.selectedWard?.userId ?? null;
+      wardName = ctx.selectedWard?.name;
+    }
+  } catch {
+    // not inside provider — ignore
+  }
+
   const [aqiData, setAqiData] = useState<AQIData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [noWardLocation, setNoWardLocation] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchesLeft, setSearchesLeft] = useState(MAX_SEARCHES_PER_DAY);
 
-  // Initialize rate limiting
+  // Initialize rate limiting (user only)
   useEffect(() => {
+    if (isGuardian) return;
     const trackerStr = localStorage.getItem("aqi_search_tracker");
     const today = new Date().toISOString().split("T")[0];
     if (trackerStr) {
@@ -52,7 +70,7 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     } else {
       localStorage.setItem("aqi_search_tracker", JSON.stringify({ date: today, count: 0 }));
     }
-  }, []);
+  }, [isGuardian]);
 
   const incrementSearchTracker = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -69,7 +87,6 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
 
   const fetchEnvironmentData = async (lat: number, lng: number, locationName?: string) => {
     try {
-      // 1. Fetch detailed Air Quality
       const aqiRes = await fetch(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +100,6 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
       const uaqi = data.indexes?.find((idx: any) => idx.code === "uaqi");
       if (!uaqi) throw new Error("No AQI data");
 
-      // 2. Fetch Weather (temp, humidity, precipitation, UV) via free Open-Meteo
       let temp: number | undefined;
       let humidity: number | undefined;
       let precipitation: number | undefined;
@@ -110,15 +126,39 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
         humidity,
         precipitation,
         uvIndex,
-        locationName: locationName || "Current Location"
+        locationName: locationName || (isGuardian ? (wardName ? `${wardName}'s Location` : "Ward Location") : "Current Location")
       });
       setError(false);
+      setNoWardLocation(false);
     } catch {
       setError(true);
       if (!aqiData) toast.error("Failed to load air quality data");
     } finally {
       setLoading(false);
       setSearchLoading(false);
+    }
+  };
+
+  const fetchWardLocation = async () => {
+    if (!wardUserId) {
+      setLoading(false);
+      setNoWardLocation(true);
+      setAqiData(null);
+      return;
+    }
+    const { data } = await supabase
+      .from("user_settings")
+      .select("settings")
+      .eq("user_id", wardUserId)
+      .maybeSingle();
+    const loc = (data?.settings as any)?.lastLocation;
+    if (loc?.lat != null && loc?.lng != null) {
+      setNoWardLocation(false);
+      await fetchEnvironmentData(loc.lat, loc.lng, wardName ? `${wardName}'s Location` : "Ward Location");
+    } else {
+      setLoading(false);
+      setNoWardLocation(true);
+      setAqiData(null);
     }
   };
 
@@ -139,27 +179,33 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
   };
 
   useEffect(() => {
-    fetchDefaultLocation();
-  }, []);
+    setLoading(true);
+    if (isGuardian) {
+      fetchWardLocation();
+    } else {
+      fetchDefaultLocation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuardian, wardUserId]);
 
-  // 10-minute inactivity revert
+  // 10-minute inactivity revert (user only)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    if (isGuardian) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
-    // If we're looking at a custom location, start a 10-minute timer to revert to Current Location
     if (aqiData?.locationName && aqiData.locationName !== "Current Location") {
       timeoutRef.current = setTimeout(() => {
         toast("Returning to Current Location due to inactivity.");
         setLoading(true);
         fetchDefaultLocation();
-      }, 10 * 60 * 1000); // 10 minutes
+      }, 10 * 60 * 1000);
     }
     
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [aqiData?.locationName, searchQuery]);
+  }, [aqiData?.locationName, searchQuery, isGuardian]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,7 +246,8 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     );
   };
 
-  if (error && !aqiData) return null;
+  if (error && !aqiData && !isGuardian) return null;
+  if (isGuardian && !loading && !aqiData && !noWardLocation && !error) return null;
 
   return (
     <Popover>
@@ -230,6 +277,16 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
           </span>
         </button>
       </PopoverTrigger>
+      {!loading && !aqiData && isGuardian && noWardLocation && (
+        <PopoverContent align="end" className="w-[280px] p-4">
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              Ward location not shared yet. Air quality and weather will appear once your ward shares their location.
+            </p>
+          </div>
+        </PopoverContent>
+      )}
       {!loading && aqiData && (
         <PopoverContent align="end" className="w-[320px] p-0 overflow-hidden divide-y divide-border">
           
