@@ -246,7 +246,8 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     );
   };
 
-  if (error && !aqiData) return null;
+  if (error && !aqiData && !isGuardian) return null;
+  if (isGuardian && !loading && !aqiData && !noWardLocation && !error) return null;
 
   return (
     <Popover>
