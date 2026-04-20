@@ -1305,6 +1305,39 @@ export type Database = {
         }
         Relationships: []
       }
+      premium_plus_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          notified_at: string | null
+          phone: string | null
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          notified_at?: string | null
+          phone?: string | null
+          source?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          notified_at?: string | null
+          phone?: string | null
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       privacy_requests: {
         Row: {
           created_at: string
