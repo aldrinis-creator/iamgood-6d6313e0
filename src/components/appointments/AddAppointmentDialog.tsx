@@ -23,21 +23,43 @@ interface Props {
   appointments: any[];
 }
 
-const empty = {
-  title: "",
-  description: "",
-  start_date: "",
-  start_time: "",
-  end_date: "",
-  end_time: "",
-  appointment_type: "in-person",
-  recurrence: "none",
-  location: "",
-  doctor_name: "",
-  alarm_enabled: true,
-  alarm_sound: "default",
-  first_alert: "15min",
-  second_alert: "none",
+const makeEmpty = () => {
+  const today = getISTDateString();
+  return {
+    title: "",
+    description: "",
+    start_date: today,
+    start_time: "",
+    end_date: today,
+    end_time: "",
+    appointment_type: "in-person",
+    recurrence: "none",
+    location: "",
+    doctor_name: "",
+    alarm_enabled: true,
+    alarm_sound: "default",
+    first_alert: "15min",
+    second_alert: "none",
+  };
+};
+
+const addOneHour = (timeStr: string, dateStr: string): { time: string; date: string } => {
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return { time: "", date: dateStr };
+  const total = h * 60 + m + 60;
+  const newH = Math.floor(total / 60) % 24;
+  const newM = total % 60;
+  const crossesMidnight = total >= 24 * 60;
+  let newDate = dateStr;
+  if (crossesMidnight && dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    newDate = d.toISOString().slice(0, 10);
+  }
+  return {
+    time: `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`,
+    date: newDate,
+  };
 };
 
 const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Props) => {
