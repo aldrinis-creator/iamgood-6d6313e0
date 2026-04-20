@@ -35,6 +35,7 @@ import GuardianMessages from "./pages/GuardianMessages";
 import MapMyJourney from "./pages/MapMyJourney";
 import Unsubscribe from "./pages/Unsubscribe";
 import AdminCoupons from "./pages/AdminCoupons";
+import AdminVerify from "./pages/AdminVerify";
 import AdminRoute from "./components/AdminRoute";
 
 const queryClient = new QueryClient();
@@ -80,6 +81,7 @@ const App = () => (
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               {/* Admin routes */}
+              <Route path="/admin/verify" element={<ProtectedRoute><AdminVerify /></ProtectedRoute>} />
               <Route path="/admin/coupons" element={<AdminRoute><AdminCoupons /></AdminRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
