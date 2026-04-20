@@ -376,20 +376,31 @@ const Subscription = () => {
         ) : (
         <>
         {/* HUGE 7-DAY TRIAL BANNER */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground shadow-lg mb-6 backdrop-blur-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-10">
-            <Gift className="w-48 h-48" />
-          </div>
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="space-y-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold tracking-tight">Try Premium Free for 7 Days</h2>
-              <p className="text-primary-foreground/90 font-medium">Access all features effortlessly. Cancel anytime.</p>
+        {showTrialBanner && (
+          <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground shadow-lg mb-6 backdrop-blur-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-10">
+              <Gift className="w-48 h-48" />
             </div>
-            <Button variant="secondary" className="font-bold py-6 px-6 shadow-xl hover:scale-105 transition-transform" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
-              Start Your Free Trial
-            </Button>
+            <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <h2 className="text-2xl font-bold tracking-tight">Try Premium Free for 7 Days</h2>
+                <p className="text-primary-foreground/90 font-medium">Access all features effortlessly. Cancel anytime.</p>
+              </div>
+              <Button
+                variant="secondary"
+                className="font-bold py-6 px-6 shadow-xl hover:scale-105 transition-transform"
+                onClick={handleStartTrial}
+                disabled={trialLoading}
+              >
+                {trialLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Starting…</>
+                ) : (
+                  "Start Your Free Trial"
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="text-center space-y-2">
           <h1 className="text-xl font-bold">Choose Your Plan</h1>
@@ -399,17 +410,30 @@ const Subscription = () => {
         </div>
 
         {isActive && subscription && (
-          <Card className="border-2 border-success bg-success/5">
-            <CardContent className="py-3 px-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">
-                  Active: {subscription.plan_type === "pro" ? "Pro" : "Basic"} ({subscription.billing_cycle})
+          <Card className={cn("border-2", isTrial ? "border-primary bg-primary/5" : "border-success bg-success/5")}>
+            <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">
+                  {isTrial
+                    ? "Free Trial — Pro"
+                    : `Active: ${subscription.plan_type === "pro" ? "Pro" : "Basic"} (${subscription.billing_cycle})`}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Expires {new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  {isTrial
+                    ? `Trial ends in ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} · ${new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                    : `Expires ${new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
                 </p>
               </div>
-              <Badge variant="secondary" className="bg-success/20 text-success border-0">Active</Badge>
+              <div className="flex items-center gap-2 shrink-0">
+                {isTrial && (
+                  <Button size="sm" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })}>
+                    Upgrade Now
+                  </Button>
+                )}
+                <Badge variant="secondary" className={isTrial ? "bg-primary/15 text-primary border-0" : "bg-success/20 text-success border-0"}>
+                  {isTrial ? "Trial" : "Active"}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
         )}
