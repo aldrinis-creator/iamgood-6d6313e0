@@ -21,7 +21,6 @@ import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UrineCheck from "@/components/health-tools/UrineCheck";
 import TongueAnalysis from "@/components/health-tools/TongueAnalysis";
-import PillIdentifier from "@/components/health-tools/PillIdentifier";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -44,7 +43,6 @@ const healthToolsSubItems = [
   { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
-  { icon: Pill, label: "Pill Identifier", desc: "Photograph any pill to ID & check against your prescriptions" },
 ];
 
 const visualChecksSubItems = [
@@ -67,7 +65,6 @@ const subToolComponents: Record<string, React.FC> = {
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
   "Emergency First Aid": EmergencyFirstAid,
-  "Pill Identifier": PillIdentifier,
   "Urine Analysis": UrineCheck,
   "Tongue Analysis": TongueAnalysis,
   "Face Scan Analysis": FaceScan,

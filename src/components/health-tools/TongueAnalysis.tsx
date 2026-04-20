@@ -153,7 +153,7 @@ const TongueAnalysis = () => {
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
         title,
-        record_type: "Lab Reports",
+        record_type: "Lab Report",
         description: JSON.stringify(result, null, 2),
         file_name: fileName,
         file_url: fileUrl,
