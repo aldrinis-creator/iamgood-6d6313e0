@@ -24,6 +24,9 @@ interface AQIData {
   pollutants: Pollutant[];
   elderlyRecommendation?: string;
   temp?: number;
+  humidity?: number;
+  precipitation?: number;
+  uvIndex?: number;
   locationName?: string;
 }
 
