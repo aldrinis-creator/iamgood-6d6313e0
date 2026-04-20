@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import AppLayout from "@/components/AppLayout";
+import AdminLayout from "@/components/AdminLayout";
 
 interface Coupon {
   id: string;
@@ -141,16 +141,11 @@ const AdminCoupons = () => {
   };
 
   return (
-    <AppLayout>
+    <AdminLayout title="Coupon Management">
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Coupon Management</h1>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <a href="/admin/waitlist">Waitlist</a>
-            </Button>
-            <Button onClick={openCreate} size="sm"><Plus className="w-4 h-4 mr-1" />Create Coupon</Button>
-          </div>
+          <Button onClick={openCreate} size="sm"><Plus className="w-4 h-4 mr-1" />Create Coupon</Button>
         </div>
 
         {loading ? (
@@ -284,7 +279,7 @@ const AdminCoupons = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </AdminLayout>
   );
 };
 
