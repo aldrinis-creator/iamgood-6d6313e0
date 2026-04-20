@@ -1,43 +1,65 @@
+## Plan — Persist Premium Plus pre-registrations to a waitlist
+
+A small backend addition so every "Notify Me" tap is captured in the database, even if the user never actually sends the mailto email.
+
+### 1. New table: `premium_plus_waitlist`
 
 
-## Plan — Polish the Premium Plus Smart Ring card
+| Column        | Type                                          | Notes                                    |
+| ------------- | --------------------------------------------- | ---------------------------------------- |
+| `id`          | `uuid` PK                                     | `gen_random_uuid()`                      |
+| `email`       | `text` NOT NULL                               | normalized lowercase, **UNIQUE**         |
+| `user_id`     | `uuid` nullable                               | populated from `auth.uid()` if logged in |
+| `phone`       | `text` nullable                               | from profile if logged in                |
+| `full_name`   | `text` nullable                               | from profile if logged in                |
+| `source`      | `text` NOT NULL default `'subscription_page'` | future-proof for other entry points      |
+| `notified_at` | `timestamptz` nullable                        | set when launch email goes out           |
+| `created_at`  | `timestamptz` NOT NULL default `now()`        | &nbsp;                                   |
 
-Single-file change to `src/pages/Subscription.tsx`, Premium Plus block (lines ~523-572).
 
-### 1. Remove white background behind the ring + add gloss
+**RLS:**
 
-- Drop the white radial glow (`bg-gradient-radial from-white/40 …`) and the white inner border ring. Let the ring sit directly on the navy card.
-- Add a subtle **gloss highlight** on the ring image itself:
-  - Wrap `<img>` in a relative container.
-  - Overlay a top-left diagonal highlight: a small absolutely-positioned `div` with `bg-gradient-to-br from-white/40 via-white/0 to-transparent` clipped to a circle, `mix-blend-overlay`, sitting above the image.
-  - Add a soft outer rim shadow via `drop-shadow-[0_0_18px_rgba(255,255,255,0.25)]` on the image for premium sheen (no white plate).
-- Keep `Coming Soon` badge in top-right.
+- Enable RLS.
+- `INSERT` policy for `anon` + `authenticated`: `with check (true)` — anyone can join the waitlist (no enumeration risk because there's no SELECT for them).
+- `SELECT` / `UPDATE` / `DELETE`: service_role only (admin-only via edge function later).
+- Unique index on `lower(email)` to prevent dupes.
 
-### 2. Add asterisk to "Tracking" + footnote under Notify Me
+### 2. Wire `Subscription.tsx` to write before navigating to mailto
 
-- In the caption (line 541) change the trailing word to `…24×7 mobile / satellite Tracking*`.
-- Add a new line **below** the "We'll notify you when the Smart Ring is available" paragraph:
-  - `* Data charges as applicable after Year 1.` — same `text-[10px] opacity-70 text-center` styling.
+In the existing `<a href="mailto:…">` Notify Me anchor:
 
-### 3. Add "Special Offer" label above "Pre-Register Now"
+- Add an `onClick` handler that runs BEFORE the mailto opens:
+  - Validate email (already done).
+  - Fire-and-forget `supabase.from("premium_plus_waitlist").upsert({ email: normalizedEmail, user_id: user?.id ?? null, phone: profile?.phone ?? null, full_name: profile?.full_name ?? null }, { onConflict: "email", ignoreDuplicates: true })`.
+  - Show `toast.success("You're on the waitlist! Opening email to confirm…")`.
+  - Don't `preventDefault` — the mailto still opens as a confirmation/personal touch.
+  - On DB error: still let mailto proceed (don't block the user), but log the error.
 
-- Insert above the `<h3>Pre-Register Now</h3>` (line 543):
-  - A centered pill: `Special Offer` — small uppercase tracking-wider, e.g. `bg-warning text-warning-foreground text-[10px] font-bold px-2.5 py-0.5 rounded-full` in a flex-center wrapper.
+This way: the lead is captured even if the user closes the mail client, but they still get the familiar mailto confirmation flow.
 
-### 4. Make "Notify Me" a hyperlink (anchor) instead of a button-with-onClick
+### 3. Optional auto-confirmation email (recommended, low effort)
 
-- Replace the `<Button onClick={…}>` with an `<a>` styled like the current secondary button (reusing `buttonVariants({ variant: "secondary", size: "sm" })` from `@/components/ui/button`).
-- `href` is computed inline from `preRegisterEmail` state — when empty, render the anchor `aria-disabled` + `pointer-events-none opacity-60` and a tooltip-less guard; when filled, `href = "mailto:checkin_support@futurewave.in?subject=…&body=…"`.
-- On click (when valid): show the existing `toast.success("Opening email client…")` via `onClick`. When email is empty, `preventDefault` + `toast.error("Please enter your email")`.
-- Keeps the same Mail icon + label text.
+Instead of (or alongside) mailto:
 
-### Files to edit
+- Trigger `send-transactional-email` with a new template `premium-plus-waitlist-confirmation` after successful insert.
+- Confirms enrollment + sets expectations ("We'll email you when the Smart Ring ships in late 2026").
+- Uses existing branded React Email pipeline — no new infra.
 
-- `src/pages/Subscription.tsx` — Premium Plus card block only (no other plans / no logic outside this card).
+If you want this, I'll add it in the same change. Otherwise the mailto stays as the user-facing confirmation.
+
+### Files to touch
+
+- **Migration:** new table + RLS + unique index.
+- **Edit:** `src/pages/Subscription.tsx` — `onClick` upsert in the Notify Me anchor.
+- **(Optional) Create:** `supabase/functions/_shared/transactional-email-templates/premium-plus-waitlist-confirmation.tsx` + register in `registry.ts`.
 
 ### Out of scope
 
-- Pricing, plan structure, coupons.
-- Other plan cards.
-- The Smart Ring image asset itself (no re-export — gloss is pure CSS overlay).
+- Admin UI to view/export the waitlist (can be added later — for now you can query via the database panel).
+- Double opt-in / verification email (premature — entry is already low-friction).
+- Removing the mailto entirely (keeps a human signal channel + works as user-side receipt).
 
+### Question before I implement
+
+Do you want the **auto-confirmation email** added now, or just the silent waitlist capture for v1?  
+add auto-confirmation email now.
