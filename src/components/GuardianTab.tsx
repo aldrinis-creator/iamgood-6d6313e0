@@ -284,7 +284,7 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
         open={showUpgrade}
         onOpenChange={setShowUpgrade}
         featureName="Guardian Limit"
-        requiredPlan={plan === "free" ? "basic" : "pro"}
+        requiredPlan={plan === "free" ? "basic" : "premium"}
         description={`Your current plan allows ${guardianLimit} guardian(s). Upgrade to add more.`}
       />
     </TabsContent>

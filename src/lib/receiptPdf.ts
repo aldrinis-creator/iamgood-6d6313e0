@@ -23,7 +23,11 @@ function formatIST(iso: string): string {
 
 export function printReceipt(data: ReceiptData) {
   const receiptNo = data.id.slice(0, 8).toUpperCase();
-  const planName = data.plan_type === "pro" ? "Pro" : "Basic";
+  const planName = data.plan_type === "premium-plus"
+    ? "Premium Plus"
+    : (data.plan_type === "premium" || data.plan_type === "pro")
+      ? "Premium"
+      : "Basic";
   const billingLabel = data.billing_cycle === "yearly" ? "Yearly" : "Monthly";
   const amount = (data.amount_paise / 100).toFixed(2);
 

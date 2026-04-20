@@ -15,8 +15,11 @@ function jsonRes(body: Record<string, unknown>, status = 200) {
 
 const PLAN_PRICES: Record<string, Record<string, number>> = {
   basic: { monthly: 99, yearly: 999 },
-  pro: { monthly: 199, yearly: 1999 },
+  premium: { monthly: 199, yearly: 1999 },
+  "premium-plus": { monthly: 999, yearly: 9999 },
 };
+
+const VALID_PLANS = Object.keys(PLAN_PRICES);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -34,7 +37,7 @@ Deno.serve(async (req) => {
       return jsonRes({ valid: false, reason: "Missing required fields" }, 400);
     }
 
-    if (!["basic", "pro"].includes(plan_type)) {
+    if (!VALID_PLANS.includes(plan_type)) {
       return jsonRes({ valid: false, reason: "Invalid plan" }, 400);
     }
 
@@ -63,25 +66,26 @@ Deno.serve(async (req) => {
       return jsonRes({ valid: false, reason: "Invalid coupon code" });
     }
 
-    // Check expiry
     if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
       return jsonRes({ valid: false, reason: "Coupon has expired" });
     }
 
-    // Check usage limit
     if (coupon.max_uses !== null && coupon.used_count >= coupon.max_uses) {
       return jsonRes({ valid: false, reason: "Coupon usage limit reached" });
     }
 
-    // Check applicable plan
-    if (!coupon.applicable_plans.includes(plan_type)) {
+    // Backwards compat: treat legacy 'pro' in applicable_plans as 'premium'
+    const applicablePlans: string[] = (coupon.applicable_plans || []).map(
+      (p: string) => (p === "pro" ? "premium" : p)
+    );
+
+    if (!applicablePlans.includes(plan_type)) {
       return jsonRes({
         valid: false,
         reason: `Coupon not applicable for ${plan_type} plan`,
       });
     }
 
-    // Calculate discounted price
     const originalPrice = PLAN_PRICES[plan_type][billing_cycle];
     let discountedPrice: number;
 

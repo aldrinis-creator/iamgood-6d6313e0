@@ -48,9 +48,12 @@ export function useSubscription() {
     subscription,
     loading,
     isActive: !!subscription,
-    isPro: subscription?.plan_type === "pro",
+    // Treat legacy 'pro' as 'premium' for backwards compat
+    isPro: subscription?.plan_type === "premium" || subscription?.plan_type === "pro",
+    isPremium: subscription?.plan_type === "premium" || subscription?.plan_type === "pro",
+    isPremiumPlus: subscription?.plan_type === "premium-plus",
     isBasic: subscription?.plan_type === "basic",
-    plan: subscription?.plan_type ?? null,
+    plan: subscription?.plan_type === "pro" ? "premium" : (subscription?.plan_type ?? null),
     isTrial,
     trialDaysLeft,
   };

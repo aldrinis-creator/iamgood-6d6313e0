@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
           code: code.toUpperCase().trim(),
           discount_type: discount_type || "percentage",
           discount_value,
-          applicable_plans: applicable_plans || ["basic", "pro"],
+          applicable_plans: applicable_plans || ["basic", "premium"],
           expires_at: expires_at || null,
           max_uses: max_uses || null,
           is_active: is_active ?? true,
