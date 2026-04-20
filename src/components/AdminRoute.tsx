@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Toggle to enable mandatory 2FA step-up for admin routes.
 // All 2FA infrastructure (tables, edge function, /admin/verify page) remains intact when false.
-const ADMIN_2FA_ENABLED = false;
+const ADMIN_2FA_ENABLED = true;
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -28,16 +28,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     if (!ADMIN_2FA_ENABLED) return;
     if (!user || isAdmin !== true) return;
     const token = sessionStorage.getItem("admin_step_up_token");
-    if (!token) { setStepUpValid(false); return; }
-    supabase.functions.invoke("admin-2fa", { body: { action: "validate", token } })
-      .then(({ data, error }) => {
-        if (error || data?.error || !data?.success) {
-          sessionStorage.removeItem("admin_step_up_token");
-          setStepUpValid(false);
-        } else {
-          setStepUpValid(true);
-        }
-      });
+    if (!token) {
+      setStepUpValid(false);
+      return;
+    }
+    supabase.functions.invoke("admin-2fa", { body: { action: "validate", token } }).then(({ data, error }) => {
+      if (error || data?.error || !data?.success) {
+        sessionStorage.removeItem("admin_step_up_token");
+        setStepUpValid(false);
+      } else {
+        setStepUpValid(true);
+      }
+    });
   }, [user, isAdmin]);
 
   if (loading || (user && isAdmin === null) || (isAdmin === true && stepUpValid === null)) {
