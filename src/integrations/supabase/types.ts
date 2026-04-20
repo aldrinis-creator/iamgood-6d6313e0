@@ -1379,6 +1379,7 @@ export type Database = {
           last_active_at: string | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
+          trial_started_at: string | null
           updated_at: string
           weight_kg: number | null
         }
@@ -1392,6 +1393,7 @@ export type Database = {
           last_active_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          trial_started_at?: string | null
           updated_at?: string
           weight_kg?: number | null
         }
@@ -1405,6 +1407,7 @@ export type Database = {
           last_active_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          trial_started_at?: string | null
           updated_at?: string
           weight_kg?: number | null
         }
@@ -1562,6 +1565,7 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          is_trial: boolean
           plan_type: string
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
@@ -1577,6 +1581,7 @@ export type Database = {
           created_at?: string
           expires_at: string
           id?: string
+          is_trial?: boolean
           plan_type: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
@@ -1592,6 +1597,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          is_trial?: boolean
           plan_type?: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
@@ -1856,6 +1862,7 @@ export type Database = {
         Returns: number
       }
       expire_stale_nominations: { Args: never; Returns: number }
+      expire_stale_subscriptions: { Args: never; Returns: number }
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
       guardian_ward_count: {
         Args: { _guardian_email: string }
