@@ -106,7 +106,7 @@ const Subscription = () => {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
-  const { subscription, isActive, loading } = useSubscription();
+  const { subscription, isActive, loading, isTrial, trialDaysLeft } = useSubscription();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -119,6 +119,41 @@ const Subscription = () => {
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null);
   const [preRegisterEmail, setPreRegisterEmail] = useState("");
+  const [trialLoading, setTrialLoading] = useState(false);
+
+  const trialUsed = !!(profile as any)?.trial_started_at;
+  const isGuardian = (profile as any)?.role === "guardian";
+  const showTrialBanner = !isActive && !trialUsed && !isGuardian;
+
+  const handleStartTrial = async () => {
+    if (!user) {
+      navigate("/register");
+      return;
+    }
+    if (isActive) {
+      toast.info("You already have an active subscription.");
+      return;
+    }
+    if (trialUsed) {
+      toast.error("Free trial already used on this account.");
+      return;
+    }
+    setTrialLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("start-trial", { body: {} });
+      if (error || (data && (data as any).error)) {
+        toast.error(((data as any)?.error) || error?.message || "Could not start trial");
+        return;
+      }
+      toast.success("Your 7-day Premium trial is active!");
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start trial");
+    } finally {
+      setTrialLoading(false);
+    }
+  };
 
   useEffect(() => {
     const status = searchParams.get("status");
