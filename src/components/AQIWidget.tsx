@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Wind, Loader2, Thermometer, MapPin, Search } from "lucide-react";
+import { Wind, Loader2, Thermometer, MapPin, Search, Droplets, CloudRain, Sun } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
