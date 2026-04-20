@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const ALERT_LEAD: Record<string, number> = {
@@ -71,7 +71,8 @@ const useAppointmentAlarms = () => {
         }
 
         // At alert time: popup overlay
-        if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(popupKey)) {
+        const slotKey = `appt-${dateKey}-${appt.id}-${alert.key}`;
+        if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(popupKey) && !isReminderAcknowledged(slotKey)) {
           firedRef.current.add(popupKey);
 
           const ts = formatISTDateTime(now);
@@ -95,6 +96,7 @@ const useAppointmentAlarms = () => {
             title: "Appointment",
             message,
             reminderCount: `${appt.start_time}`,
+            slotKey,
           });
         }
       }

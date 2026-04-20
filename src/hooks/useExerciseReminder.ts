@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const EXERCISE_HOURS = [8, 18];
@@ -44,8 +44,9 @@ const useExerciseReminder = () => {
         showBrowserNotification("Exercise Reminder", `[${ts}] ${EXERCISE_MESSAGE} at ${formatHour(h)}`);
       }
 
-      // T+5: Popup overlay (skip if overlay already visible)
-      if (diffMin >= POPUP_DELAY_MIN && diffMin < POPUP_DELAY_MIN + 5 && !firedRef.current.has(popupKey)) {
+      // T+5: Popup overlay (skip if overlay already visible or user acknowledged)
+      const slotKey = `exercise-${dateKey}-${h}`;
+      if (diffMin >= POPUP_DELAY_MIN && diffMin < POPUP_DELAY_MIN + 5 && !firedRef.current.has(popupKey) && !isReminderAcknowledged(slotKey)) {
         firedRef.current.add(popupKey);
         const ts = formatISTDateTime(now);
         const msgWithTs = `[${ts}] ${EXERCISE_MESSAGE}`;
@@ -67,6 +68,7 @@ const useExerciseReminder = () => {
           title: "Exercise Time",
           message: msgWithTs,
           reminderCount: `Scheduled — ${formatHour(h)}`,
+          slotKey,
         });
       }
     }
