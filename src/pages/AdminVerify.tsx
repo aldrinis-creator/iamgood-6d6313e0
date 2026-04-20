@@ -24,10 +24,12 @@ export default function AdminVerify() {
   const [verifying, setVerifying] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const sentOnceRef = useRef(false);
 
   const sendCode = async () => {
     setSending(true);
+    setDeliveryError(null);
     const { data, error } = await supabase.functions.invoke("admin-2fa", { body: { action: "send" } });
     setSending(false);
     if (error || data?.error) {
@@ -35,10 +37,21 @@ export default function AdminVerify() {
       if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("too many")) {
         setLocked(true);
       }
+      const details = [data?.smsError, data?.emailError].filter(Boolean).join(" • ");
+      setDeliveryError(details ? `${msg} — ${details}` : msg);
       toast({ title: "Couldn't send code", description: msg, variant: "destructive" });
       return;
     }
     setCooldown(RESEND_COOLDOWN);
+    // Partial-success warning: one channel worked, other failed
+    if (data?.smsError || data?.emailError) {
+      const partial: string[] = [];
+      if (data.sms) partial.push("SMS sent");
+      else if (data.smsError) partial.push(`SMS failed: ${data.smsError}`);
+      if (data.email) partial.push("Email sent");
+      else if (data.emailError) partial.push(`Email failed: ${data.emailError}`);
+      setDeliveryError(partial.join(" • "));
+    }
     toast({ title: "Code sent", description: "Check your SMS and email." });
   };
 
@@ -101,6 +114,11 @@ export default function AdminVerify() {
               </div>
             ) : (
               <>
+                {deliveryError && (
+                  <div className="p-3 rounded-md bg-destructive/10 text-destructive text-xs break-words">
+                    {deliveryError}
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <InputOTP maxLength={6} value={code} onChange={setCode} disabled={verifying}>
                     <InputOTPGroup>
