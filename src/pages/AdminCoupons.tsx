@@ -35,7 +35,7 @@ const EMPTY: Partial<Coupon> = {
   code: "",
   discount_type: "percentage",
   discount_value: 0,
-  applicable_plans: ["basic", "pro"],
+  applicable_plans: ["basic", "premium"],
   expires_at: null,
   max_uses: null,
   is_active: true,
@@ -145,7 +145,12 @@ const AdminCoupons = () => {
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Coupon Management</h1>
-          <Button onClick={openCreate} size="sm"><Plus className="w-4 h-4 mr-1" />Create Coupon</Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href="/admin/waitlist">Waitlist</a>
+            </Button>
+            <Button onClick={openCreate} size="sm"><Plus className="w-4 h-4 mr-1" />Create Coupon</Button>
+          </div>
         </div>
 
         {loading ? (
@@ -219,10 +224,14 @@ const AdminCoupons = () => {
             <div>
               <Label className="mb-2 block">Applicable Plans</Label>
               <div className="flex gap-4">
-                {["basic", "pro"].map((plan) => (
-                  <label key={plan} className="flex items-center gap-2 capitalize">
-                    <Checkbox checked={(editing.applicable_plans || []).includes(plan)} onCheckedChange={() => togglePlan(plan)} />
-                    {plan}
+                {[
+                  { key: "basic", label: "Basic" },
+                  { key: "premium", label: "Premium" },
+                  { key: "premium-plus", label: "Premium Plus" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2">
+                    <Checkbox checked={(editing.applicable_plans || []).includes(key)} onCheckedChange={() => togglePlan(key)} />
+                    {label}
                   </label>
                 ))}
               </div>

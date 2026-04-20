@@ -415,8 +415,14 @@ const Subscription = () => {
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">
                   {isTrial
-                    ? "Free Trial — Pro"
-                    : `Active: ${subscription.plan_type === "pro" ? "Pro" : "Basic"} (${subscription.billing_cycle})`}
+                    ? "Free Trial — Premium"
+                    : `Active: ${
+                        subscription.plan_type === "premium-plus"
+                          ? "Premium Plus"
+                          : (subscription.plan_type === "premium" || subscription.plan_type === "pro")
+                            ? "Premium"
+                            : "Basic"
+                      } (${subscription.billing_cycle})`}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isTrial

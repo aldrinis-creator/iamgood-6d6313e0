@@ -1,4 +1,4 @@
-export type PlanTier = "free" | "basic" | "pro";
+export type PlanTier = "free" | "basic" | "premium" | "premium-plus";
 
 export const FEATURE_TIERS: Record<string, PlanTier> = {
   // Always free
@@ -6,28 +6,28 @@ export const FEATURE_TIERS: Record<string, PlanTier> = {
   "Emergency First Aid": "free",
   "Emergency Profile": "free",
   "Basic Vitals": "free",
+  "Ambulance": "free",
 
   // Basic tier
   "Tablets": "basic",
   "Activity": "basic",
   "Vault": "basic",
   "Services": "basic",
-
-  // Pro tier
-  "Health Tools": "pro",
-  "Symptom Checker": "pro",
-  "Document Analyzer": "pro",
-  "Doctor Visit Report": "pro",
-  "Medication Info": "pro",
-  "Tele-Consult": "pro",
-  "Nutrition": "pro",
-  "Face Scan": "pro",
-  "Wellness": "pro",
-  "Ambulance": "free",
-  "Vitals": "pro",
-  "Geofencing": "pro",
-  "PDF Export": "pro",
   "Guardian Limit": "basic",
+
+  // Premium tier
+  "Health Tools": "premium",
+  "Symptom Checker": "premium",
+  "Document Analyzer": "premium",
+  "Doctor Visit Report": "premium",
+  "Medication Info": "premium",
+  "Tele-Consult": "premium",
+  "Nutrition": "premium",
+  "Face Scan": "premium",
+  "Wellness": "premium",
+  "Vitals": "premium",
+  "Geofencing": "premium",
+  "PDF Export": "premium",
 };
 
 export const FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -51,24 +51,38 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   "Guardian Limit": "Add more guardians to your safety network.",
 };
 
-const TIER_RANK: Record<PlanTier, number> = { free: 0, basic: 1, pro: 2 };
+const TIER_RANK: Record<PlanTier, number> = {
+  free: 0,
+  basic: 1,
+  premium: 2,
+  "premium-plus": 3,
+};
+
+/** Normalize legacy plan keys (e.g. 'pro' → 'premium') so old data keeps working. */
+function normalizePlan(plan: string | null | undefined): PlanTier {
+  if (!plan) return "free";
+  if (plan === "pro") return "premium";
+  if (plan in TIER_RANK) return plan as PlanTier;
+  return "free";
+}
 
 export function canAccessFeature(
   userPlan: string | null,
   feature: string
 ): boolean {
   const requiredTier = FEATURE_TIERS[feature] ?? "free";
-  const userTier = (userPlan as PlanTier) ?? "free";
+  const userTier = normalizePlan(userPlan);
   return TIER_RANK[userTier] >= TIER_RANK[requiredTier];
 }
 
 /** Returns the maximum number of guardians allowed for a given plan */
 export function getGuardianLimit(plan: string | null): number {
-  const tier = (plan as PlanTier) ?? "free";
+  const tier = normalizePlan(plan);
   switch (tier) {
     case "free": return 1;
     case "basic": return 3;
-    case "pro": return 5;
+    case "premium": return 5;
+    case "premium-plus": return 10;
     default: return 1;
   }
 }

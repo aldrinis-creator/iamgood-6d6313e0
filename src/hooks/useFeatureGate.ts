@@ -24,8 +24,8 @@ export function useFeatureGate() {
 
   const upgradeDialogOpen = !!upgradeFeature;
   const requiredPlan = upgradeFeature
-    ? (FEATURE_TIERS[upgradeFeature] ?? "pro") as PlanTier
-    : "pro" as PlanTier;
+    ? (FEATURE_TIERS[upgradeFeature] ?? "premium") as PlanTier
+    : "premium" as PlanTier;
   const upgradeDescription = upgradeFeature
     ? FEATURE_DESCRIPTIONS[upgradeFeature] ?? ""
     : "";
