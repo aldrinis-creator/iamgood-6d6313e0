@@ -340,14 +340,14 @@ const Subscription = () => {
           </div>
         ) : (
         <>
-        {/* HUGE 30-DAY TRIAL BANNER */}
+        {/* HUGE 7-DAY TRIAL BANNER */}
         <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-6 text-primary-foreground shadow-lg mb-6 backdrop-blur-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-10">
             <Gift className="w-48 h-48" />
           </div>
           <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="space-y-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold tracking-tight">Try Premium Free for 30 Days</h2>
+              <h2 className="text-2xl font-bold tracking-tight">Try Premium Free for 7 Days</h2>
               <p className="text-primary-foreground/90 font-medium">Access all features effortlessly. Cancel anytime.</p>
             </div>
             <Button variant="secondary" className="font-bold py-6 px-6 shadow-xl hover:scale-105 transition-transform" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
