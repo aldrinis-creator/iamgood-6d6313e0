@@ -522,6 +522,24 @@ const Subscription = () => {
                   </div>
                   {plan.key === "premium-plus" ? (
                     <div className="mt-4 rounded-xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.8)] p-4 text-primary-foreground space-y-3">
+                      {/* Smart Ring hero visual */}
+                      <div className="relative flex justify-center pt-2 pb-1">
+                        <span className="absolute top-0 right-0 bg-warning text-warning-foreground text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md z-10">
+                          <Sparkles className="w-3 h-3" /> Coming Soon
+                        </span>
+                        <div className="relative w-32 h-32 flex items-center justify-center">
+                          <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/40 via-white/10 to-transparent blur-xl animate-pulse" />
+                          <div className="absolute inset-2 rounded-full border-2 border-white/30 animate-pulse" />
+                          <img
+                            src={smartRingImage}
+                            alt="Smart Ring"
+                            className="relative w-28 h-28 object-contain drop-shadow-2xl"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-center opacity-90 leading-snug px-2">
+                        Smart Ring — Continuous ECG, HR, SpO₂, BP, Sleep tracking, and 24×7 mobile / satellite Tracking
+                      </p>
                       <h3 className="text-lg font-bold text-center">Pre-Register Now</h3>
                       <div className="flex items-baseline justify-center gap-2">
                         <span className="text-sm line-through opacity-70">₹14,999</span>
