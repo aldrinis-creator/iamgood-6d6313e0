@@ -65,12 +65,14 @@ const addOneHour = (timeStr: string, dateStr: string): { time: string; date: str
 const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Props) => {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(makeEmpty);
+  const endTimeManuallyEdited = useRef(false);
 
   useEffect(() => {
     if (editId) {
       const apt = appointments.find((a) => a.id === editId);
       if (apt) {
+        endTimeManuallyEdited.current = true;
         setForm({
           title: apt.title || "",
           description: apt.description || "",
@@ -89,7 +91,8 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
         });
       }
     } else {
-      setForm(empty);
+      endTimeManuallyEdited.current = false;
+      setForm(makeEmpty());
     }
   }, [editId, open]);
 
