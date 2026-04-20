@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const API_KEY = "AIzaSyCQuBmmLMKvQwqD4ydUL8DA8sZ7sIQtLX8";
 const MAX_SEARCHES_PER_DAY = 5;
