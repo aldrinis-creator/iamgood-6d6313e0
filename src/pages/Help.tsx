@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search } from "lucide-react";
+import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search, Crown } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "book-open": <BookOpen className="w-5 h-5 text-primary" />,
   "alert-circle": <AlertCircle className="w-5 h-5 text-destructive" />,
   "shield-lock": <ShieldAlert className="w-5 h-5 text-primary" />,
+  crown: <Crown className="w-5 h-5 text-warning" />,
 };
 
 type HelpTab = "faq" | "contact" | "settings" | "privacy" | "terms";
@@ -62,6 +63,43 @@ const Help = () => {
     await signOut();
     toast.success("Logged out successfully");
     navigate("/login");
+  };
+
+  const handleDownloadFaq = () => {
+    const lines: string[] = [];
+    lines.push(`# Check-iN FAQ — v${FAQ_VERSION}`);
+    lines.push("");
+    lines.push(`_Generated ${new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}_`);
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+    for (const section of faqSections) {
+      lines.push(`## ${section.title}`);
+      lines.push("");
+      for (const item of section.items) {
+        lines.push(`### Q: ${item.question}`);
+        lines.push("");
+        lines.push(item.answer);
+        lines.push("");
+      }
+      lines.push("---");
+      lines.push("");
+    }
+    lines.push("");
+    lines.push("> This document is for informational purposes only and does not constitute medical advice. For emergencies, always call your local emergency number (112 in India).");
+    lines.push("");
+    lines.push(`_Check-iN by Future Wave · checkin_support@futurewave.in_`);
+
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Check-iN-FAQ-${FAQ_VERSION}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("FAQ downloaded");
   };
 
   const filteredSections = useMemo(() => {
@@ -145,7 +183,7 @@ const Help = () => {
               <p className="text-sm text-muted-foreground">
                 Learn about all the features and how to use My Health Companion effectively.
               </p>
-              <Button variant="outline" size="sm" className="shrink-0 gap-1.5">
+              <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={handleDownloadFaq}>
                 <Download className="w-4 h-4" />
                 Download
               </Button>
