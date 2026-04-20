@@ -277,6 +277,16 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
           </span>
         </button>
       </PopoverTrigger>
+      {!loading && !aqiData && isGuardian && noWardLocation && (
+        <PopoverContent align="end" className="w-[280px] p-4">
+          <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              Ward location not shared yet. Air quality and weather will appear once your ward shares their location.
+            </p>
+          </div>
+        </PopoverContent>
+      )}
       {!loading && aqiData && (
         <PopoverContent align="end" className="w-[320px] p-0 overflow-hidden divide-y divide-border">
           
