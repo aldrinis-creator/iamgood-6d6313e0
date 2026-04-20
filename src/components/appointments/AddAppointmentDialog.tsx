@@ -185,11 +185,33 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Start Time *</Label>
-              <Input type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
+              <Input
+                type="time"
+                value={form.start_time}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setForm((p) => {
+                    const next = { ...p, start_time: newStart };
+                    if (newStart && !endTimeManuallyEdited.current) {
+                      const { time, date } = addOneHour(newStart, p.start_date);
+                      next.end_time = time;
+                      next.end_date = date;
+                    }
+                    return next;
+                  });
+                }}
+              />
             </div>
             <div>
               <Label>End Time</Label>
-              <Input type="time" value={form.end_time} onChange={(e) => set("end_time", e.target.value)} />
+              <Input
+                type="time"
+                value={form.end_time}
+                onChange={(e) => {
+                  endTimeManuallyEdited.current = true;
+                  set("end_time", e.target.value);
+                }}
+              />
             </div>
           </div>
 
