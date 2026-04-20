@@ -1,32 +1,42 @@
 
 
-## Plan
+## Root cause
 
-When the user changes the **Start Date**, auto-sync the **End Date** to match — same pattern as the existing Start Time → End Time auto-sync.
+When the user taps the action button on a medication/check-in popup, two things break:
 
-### Change to `src/components/appointments/AddAppointmentDialog.tsx`
+1. **`handleAction` does a full-page navigation via `window.location.href`** → the entire React app reloads → in-memory acknowledgement state in `ReminderOverlay.tsx` (`acknowledgedRef`, `showCountRef`) AND the throttling state in the alarm hooks (`postGraceRef`, `missedSentRef`, `firedRef`) is wiped. Within ≤30 seconds the `useMedicationAlarms` / `useCheckInAudio` interval re-fires the same overdue slot popup from scratch.
+2. **The acknowledgement key includes a per-minute timestamp** (`[${formatISTDateTime(now)}]` is part of `message`, and `getReminderKey` hashes the message). So even without reload, the next tick produces a different key and bypasses `acknowledgedRef`.
+3. **Result**: user lands on Medication / Check-iN tab, popup re-appears within seconds covering the screen — they can't tap "Mark taken" or "Check-In Now" before being interrupted again.
 
-**1. Track manual end-date edits**
-- Add a new ref: `endDateManuallyEdited = useRef(false)` (mirrors existing `endTimeManuallyEdited` pattern).
-- Reset to `false` when dialog opens for a new appointment; set to `true` when loading an existing appointment for edit.
+## Fix
 
-**2. Auto-sync End Date on Start Date change**
-- Replace the current `Start Date` input's simple `onChange={(e) => set("start_date", e.target.value)}` with a handler that:
-  - Sets `start_date` to the new value
-  - If `endDateManuallyEdited.current === false`, also sets `end_date = newStartDate`
-- User can still edit End Date independently — once they do, set `endDateManuallyEdited.current = true` and stop auto-syncing.
+### 1. Use SPA navigation instead of full reload — `src/components/ReminderOverlay.tsx`
+- Replace `window.location.href = …` with `react-router-dom`'s `useNavigate()`. This keeps `acknowledgedRef` / counters intact across the navigation.
 
-**3. Mark End Date as manually edited on user input**
-- Add `onChange` to the End Date input that flips `endDateManuallyEdited.current = true` before calling `set("end_date", …)`.
+### 2. Make the acknowledgement key stable (slot-based, not message-based) — `src/components/ReminderOverlay.tsx`
+- Extend `ReminderData` with an optional `slotKey?: string` (e.g. `"med-08:00"` or `"checkin-7"`).
+- Change `getReminderKey` to prefer `slotKey` when present, falling back to current behavior for safety.
+- Persist `acknowledgedRef` to `sessionStorage` so it survives any incidental reload (defence in depth).
 
-### Edge case interaction with existing Start Time → End Time logic
-- The existing `addOneHour` helper already handles midnight crossover by bumping `end_date`. Order of operations: if user picks Start Date first then Start Time, both auto-sync correctly (End Date follows Start Date; if Start Time crosses midnight, End Date advances one more day — still correct).
-- If user picks Start Time first (which already sets end_date via midnight logic) and then changes Start Date, the new Start Date wins for End Date (still respects "user hasn't manually edited end date").
+### 3. Emit a stable `slotKey` from the alarm hooks
+- **`src/hooks/useMedicationAlarms.ts`** — pass `slotKey: \`med-${dateKey}-${timeStr}\`` in every `showReminderOverlay({...})` call.
+- **`src/hooks/useCheckInAudio.ts`** — pass `slotKey: \`checkin-${dateKey}-${h}\`` similarly.
 
-### Files to edit
-- `src/components/appointments/AddAppointmentDialog.tsx` — single file change
+### 4. Suppress re-firing for the same slot once acknowledged — alarm hooks
+- Expose a small helper `isReminderAcknowledged(slotKey: string): boolean` from `ReminderOverlay.tsx` (reads the same `sessionStorage`-backed set).
+- In both hooks, before scheduling/firing the next popup for a slot, skip if `isReminderAcknowledged(slotKey)` is true. This stops the 30s tick from re-opening the popup the user already acted on.
+- For medications: clear the acknowledgement automatically once the underlying log row flips to `taken`/`taken_late` (so the slot is naturally cleaned up).
 
-### Out of scope
-- Validating End Date ≥ Start Date (no validation exists today; staying consistent)
-- Multi-day duration preference
+### 5. Grace window after action — `ReminderOverlay.tsx` + hooks
+- After `handleAction`, set a short suppression window (e.g. 2 minutes) keyed by `slotKey` → during this window the overlay refuses to re-show even if the alarm hook calls `showReminderOverlay`. Gives the user uninterrupted time on the target tab to mark the medication taken or check in.
+
+## Files to edit
+- `src/components/ReminderOverlay.tsx` — switch to `useNavigate`, add `slotKey` field, sessionStorage-backed ack set, post-action suppression window, exported `isReminderAcknowledged`.
+- `src/hooks/useMedicationAlarms.ts` — pass `slotKey`, skip firing when acknowledged.
+- `src/hooks/useCheckInAudio.ts` — pass `slotKey`, skip firing when acknowledged.
+
+## Out of scope
+- Redesigning the overlay UX (still modal, still auto-dismissing).
+- Changing the T-5 / T+5 / T+15 / T+25 cadence (works correctly; only re-fire-after-acknowledgement is buggy).
+- Server-side cron behavior for missed-checkin guardian alerts (untouched).
 
