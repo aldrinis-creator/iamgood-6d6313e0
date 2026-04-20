@@ -16,6 +16,7 @@ import { template as guardianInvitation } from './guardian-invitation.tsx'
 import { template as missedCheckinAlert } from './missed-checkin-alert.tsx'
 import { template as sosAlert } from './sos-alert.tsx'
 import { template as vitalAnomalyAlert } from './vital-anomaly-alert.tsx'
+import { template as premiumPlusWaitlistConfirmation } from './premium-plus-waitlist-confirmation.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'contact-confirmation': contactConfirmation,
@@ -25,4 +26,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'missed-checkin-alert': missedCheckinAlert,
   'sos-alert': sosAlert,
   'vital-anomaly-alert': vitalAnomalyAlert,
+  'premium-plus-waitlist-confirmation': premiumPlusWaitlistConfirmation,
 }

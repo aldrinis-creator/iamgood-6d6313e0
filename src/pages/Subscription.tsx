@@ -105,7 +105,7 @@ interface CouponResult {
 const Subscription = () => {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { subscription, isActive, loading } = useSubscription();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -574,7 +574,34 @@ const Subscription = () => {
                               toast.error("Please enter your email");
                               return;
                             }
-                            toast.success("Opening email client…");
+                            const normalizedEmail = email.toLowerCase();
+                            // Fire-and-forget: capture lead + send confirmation email.
+                            // Do not block the mailto.
+                            (async () => {
+                              const { error: insertError } = await supabase
+                                .from("premium_plus_waitlist")
+                                .insert({
+                                  email: normalizedEmail,
+                                  user_id: user?.id ?? null,
+                                  phone: profile?.phone ?? null,
+                                  full_name: profile?.full_name ?? null,
+                                });
+                              // Ignore unique-violation duplicates (23505); log other errors.
+                              if (insertError && insertError.code !== "23505") {
+                                console.error("Waitlist insert failed", insertError);
+                                return;
+                              }
+                              // Send branded confirmation email (idempotent per email).
+                              supabase.functions.invoke("send-transactional-email", {
+                                body: {
+                                  templateName: "premium-plus-waitlist-confirmation",
+                                  recipientEmail: normalizedEmail,
+                                  idempotencyKey: `pp-waitlist-${normalizedEmail}`,
+                                  templateData: { name: profile?.full_name ?? undefined },
+                                },
+                              }).catch((err) => console.error("Waitlist email failed", err));
+                            })();
+                            toast.success("You're on the waitlist! Opening email to confirm…");
                           }}
                         >
                           <Mail className="w-4 h-4" /> Notify Me
