@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Heart, Pill, CalendarClock, X, Dumbbell } from "lucide-react";
 import { ensureAudioReady, playVoiceReminder, playChime } from "@/lib/audioAlerts";
 import { toast } from "sonner";
@@ -10,6 +11,8 @@ interface ReminderData {
   title: string;
   message: string;
   reminderCount?: string;
+  /** Stable, slot-based key (e.g. "med-2026-3-20-08:00", "checkin-2026-3-20-7"). When provided, dedup uses this instead of message hash. */
+  slotKey?: string;
 }
 
 // Global event system for triggering reminders
@@ -19,7 +22,66 @@ const REMINDER_EVENT = "app:reminder-overlay";
 let _overlayVisible = false;
 export const isOverlayVisible = () => _overlayVisible;
 
+const ACK_STORAGE_KEY = "reminder:acknowledged-slots";
+const SUPPRESS_STORAGE_KEY = "reminder:suppressed-until";
+const POST_ACTION_SUPPRESS_MS = 2 * 60_000; // 2 minutes
+
+const loadAckSet = (): Set<string> => {
+  try {
+    const raw = sessionStorage.getItem(ACK_STORAGE_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+};
+
+const saveAckSet = (set: Set<string>) => {
+  try {
+    sessionStorage.setItem(ACK_STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+};
+
+const loadSuppressMap = (): Map<string, number> => {
+  try {
+    const raw = sessionStorage.getItem(SUPPRESS_STORAGE_KEY);
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw) as Record<string, number>));
+  } catch {
+    return new Map();
+  }
+};
+
+const saveSuppressMap = (m: Map<string, number>) => {
+  try {
+    const obj: Record<string, number> = {};
+    m.forEach((v, k) => { obj[k] = v; });
+    sessionStorage.setItem(SUPPRESS_STORAGE_KEY, JSON.stringify(obj));
+  } catch {}
+};
+
+/** Check if a slot is currently acknowledged or within the post-action suppression window. */
+export const isReminderAcknowledged = (slotKey: string): boolean => {
+  if (!slotKey) return false;
+  const ack = loadAckSet();
+  if (ack.has(slotKey)) return true;
+  const supp = loadSuppressMap();
+  const until = supp.get(slotKey);
+  if (until && until > Date.now()) return true;
+  return false;
+};
+
+/** Manually clear an acknowledgement (e.g. when medication log flips to taken — slot naturally resolved). */
+export const clearReminderAcknowledgement = (slotKey: string) => {
+  const ack = loadAckSet();
+  if (ack.delete(slotKey)) saveAckSet(ack);
+  const supp = loadSuppressMap();
+  if (supp.delete(slotKey)) saveSuppressMap(supp);
+};
+
 export const showReminderOverlay = (data: ReminderData) => {
+  // Hard guard: if already acknowledged or suppressed, swallow the event entirely.
+  if (data.slotKey && isReminderAcknowledged(data.slotKey)) return;
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
 
@@ -27,15 +89,16 @@ const AUTO_DISMISS_MS = 30_000; // 30 seconds
 const REPEAT_INTERVAL_MS = 5 * 60_000; // 5 minutes
 const MAX_SHOWS = 3;
 
-const getReminderKey = (data: ReminderData) => `${data.type}:${data.title}:${data.message}`;
+const getReminderKey = (data: ReminderData) =>
+  data.slotKey || `${data.type}:${data.title}:${data.message}`;
 
 const ReminderOverlay = () => {
+  const navigate = useNavigate();
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout>>();
   const repeatTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const showCountRef = useRef<Map<string, number>>(new Map());
-  const acknowledgedRef = useRef<Set<string>>(new Set());
 
   const dismiss = useCallback((acknowledged: boolean = false) => {
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
@@ -43,7 +106,14 @@ const ReminderOverlay = () => {
     _overlayVisible = false;
 
     if (acknowledged && reminder) {
-      acknowledgedRef.current.add(getReminderKey(reminder));
+      const key = getReminderKey(reminder);
+      const ack = loadAckSet();
+      ack.add(key);
+      saveAckSet(ack);
+      // Post-action suppression window
+      const supp = loadSuppressMap();
+      supp.set(key, Date.now() + POST_ACTION_SUPPRESS_MS);
+      saveSuppressMap(supp);
     }
 
     setTimeout(() => setReminder(null), 300);
@@ -53,7 +123,10 @@ const ReminderOverlay = () => {
     if (repeatTimerRef.current) clearTimeout(repeatTimerRef.current);
     repeatTimerRef.current = setTimeout(() => {
       const key = getReminderKey(data);
-      if (acknowledgedRef.current.has(key)) return;
+      if (loadAckSet().has(key)) return;
+      const supp = loadSuppressMap();
+      const until = supp.get(key);
+      if (until && until > Date.now()) return;
       showReminderOverlay(data);
     }, REPEAT_INTERVAL_MS);
   }, []);
@@ -62,8 +135,11 @@ const ReminderOverlay = () => {
     const data = (e as CustomEvent<ReminderData>).detail;
     const key = getReminderKey(data);
 
-    // If already acknowledged, don't show again
-    if (acknowledgedRef.current.has(key)) return;
+    // If already acknowledged or in suppression window, don't show
+    if (loadAckSet().has(key)) return;
+    const supp = loadSuppressMap();
+    const until = supp.get(key);
+    if (until && until > Date.now()) return;
 
     const count = (showCountRef.current.get(key) || 0) + 1;
     showCountRef.current.set(key, count);
@@ -128,15 +204,16 @@ const ReminderOverlay = () => {
 
   const handleAction = () => {
     ensureAudioReady();
-    dismiss(true); // acknowledged
-    if (reminder?.type === "checkin") {
+    const target = reminder?.type;
+    dismiss(true); // acknowledged + 2-min suppression
+    if (target === "checkin") {
       window.dispatchEvent(new CustomEvent("app:checkin-from-overlay"));
-    } else if (reminder?.type === "medication") {
-      window.location.href = "/my-health?tool=Tablets";
-    } else if (reminder?.type === "appointment") {
-      window.location.href = "/appointments";
-    } else if (reminder?.type === "exercise") {
-      window.location.href = "/my-health";
+    } else if (target === "medication") {
+      navigate("/my-health?tool=Tablets");
+    } else if (target === "appointment") {
+      navigate("/appointments");
+    } else if (target === "exercise") {
+      navigate("/my-health");
     }
   };
 
