@@ -349,10 +349,15 @@ const Login = () => {
         </form>
 
         <div className="text-center space-y-2">
-          <button className="text-sm text-primary font-medium" onClick={() => navigate("/register")}>
-            Don't have an account? <span className="underline">Register</span>
-          </button>
-          <br />
+          <div className="flex items-center justify-center gap-3 text-sm">
+            <button className="text-primary font-medium" onClick={() => navigate("/register")}>
+              Don't have an account? <span className="underline">Register</span>
+            </button>
+            <span className="text-muted-foreground">·</span>
+            <button className="text-primary font-medium underline" onClick={() => navigate("/admin/login")}>
+              Login as Admin
+            </button>
+          </div>
           <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
         </div>
       </div>

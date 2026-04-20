@@ -179,6 +179,54 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_credentials: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          last_login_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      admin_login_attempts: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          id: string
+          ip: string | null
+          success: boolean
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          success?: boolean
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       admin_step_up_tokens: {
         Row: {
           created_at: string
