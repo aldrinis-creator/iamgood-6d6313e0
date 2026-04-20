@@ -1,67 +1,88 @@
+## Answers + Plan
 
+### 1. Why "Premium" isn't in the Active Plans checkbox
 
-## Plan — Fix Admin 2FA: SMS + Email actually deliver
+**Naming mismatch between the Subscription page and the coupon system.**
 
-### Root causes found
+- The Subscription page (and Razorpay checkout URL) uses plan keys: `basic`, `premium`, `premium-plus`.
+- The Coupon admin and `validate-coupon` edge function only know two legacy keys: `basic` and `pro`.
+- The Premium Plus tier is also missing entirely (it's waitlist-only right now, but coupons should still be configurable for it once it launches).
 
-1. **Email**: No verified email domain is configured for the project, so every send-transactional-email invoke is rejected by the email API with `403 no_matching_sender` and DLQ'd. The admin-2fa function's "success" log was misleading — it only checked if the invoke didn't throw, not actual delivery.
-2. **SMS**: admin-2fa uses MSG91's legacy `/api/v5/otp` endpoint with the project's Flow template ID. That template was created for the Flow API (`/api/v5/flow`), so the OTP endpoint silently no-ops. The working `send-otp` function uses `/api/v5/flow` with `{ template_id, recipients: [{ mobiles, var1: code }] }`.
-3. **Misleading audit metadata**: `sms:true` / `email:true` are recorded based on `!error` from invoke / `res.ok`, not actual MSG91 success body or queue delivery. Hides failures.
+Result: any coupon you create can only ever apply to `basic` or `pro` — and since the checkout sends `premium` / `premium-plus`, a coupon will never validate at checkout for those tiers.
 
-### Fixes
+### 2. Where to find Premium Plus pre-registration emails
 
-**1. Switch SMS to MSG91 Flow API** (`supabase/functions/admin-2fa/index.ts`)
+They're stored in the database table `premium_plus_waitlist` (columns: `email`, `full_name`, `phone`, `user_id`, `source`, `created_at`, `notified_at`). RLS blocks all client reads — only service_role can access. **There is no admin UI to view this table today.**
 
-Replace the `/api/v5/otp` call with the Flow API pattern that already works in `send-otp`:
-```ts
-const res = await fetch("https://control.msg91.com/api/v5/flow", {
-  method: "POST",
-  headers: { "Content-Type": "application/json", authkey: msg91Key, accept: "application/json" },
-  body: JSON.stringify({
-    template_id: otpTemplate,
-    recipients: [{ mobiles: phoneDigits, var1: code }],
-  }),
-});
-const json = await res.json().catch(() => ({}));
-smsOk = res.ok && (json?.type === "success" || json?.message === "Request accepted");
-```
+---
 
-Also log the response body when not OK so future failures are debuggable.
+## Proposed fix
 
-**2. Set up Lovable email domain + infrastructure**
+### A. Align coupon plan keys with the Subscription page
 
-The project has zero email domains configured, which is also why the broader app's transactional emails (welcome, SOS, guardian invites, etc.) would all fail. This is a one-time setup and benefits the entire app, not just admin 2FA.
+Update both the admin UI and the validator to use `basic`, `premium`, `premium-plus` (matching what checkout actually sends). Backfill existing `pro` rows to `premium` so old coupons keep working.
 
-I'll guide the user through the email setup dialog. Once DNS is verified, the existing `admin-2fa-code` template and queued sends will deliver automatically without any further code change.
+**Database migration**
 
-**3. Honest success reporting** (admin-2fa)
+- Update existing coupon rows: `applicable_plans` containing `'pro'` → replace with `'premium'`.
+- Update the table default for `applicable_plans` from `{basic,pro}` to `{basic,premium}`.
 
-Stop returning `success: true` on the send action when both channels failed. New behavior:
-- If both SMS and email fail → return 502 with `{ error: "Could not deliver code via SMS or email", smsError, emailError }` so the AdminVerify page surfaces a real error instead of a fake "Code sent" toast.
-- Audit metadata records the actual response details (status code + short error snippet), not just booleans.
+**Edge function — `validate-coupon**`
 
-**4. AdminVerify UX improvement**
+- Add `premium` and `premium-plus` to `PLAN_PRICES` map (using the prices from Subscription.tsx: premium ₹199/₹1999, premium-plus ₹999/₹9999).
+- Update the allowed `plan_type` validation list.
 
-When the send response includes `smsError` / `emailError`, show them in the existing error banner (already wired for `locked`). No layout change — just better surfacing of failures.
+**Admin UI — `AdminCoupons.tsx**`
+
+- Replace the two-checkbox `["basic", "pro"]` block with three checkboxes: `Basic`, `Premium`, `Premium Plus`.
+- Update `EMPTY.applicable_plans` default to `["basic", "premium"]`.
+
+**Edge function — `admin-coupons**`
+
+- Update the `create` action's default `applicable_plans` fallback from `["basic", "pro"]` to `["basic", "premium"]`.
+
+### B. New admin page: Premium Plus Waitlist
+
+Add `/admin/waitlist` so you can see who's pre-registered without going to the database.
+
+**Edge function — `admin-waitlist**` (service_role, admin-only, mirrors the `admin-coupons` auth pattern)
+
+- `action: "list"` → returns all waitlist rows ordered by `created_at` desc.
+- `action: "export"` → returns CSV string for download.
+- `action: "mark_notified"` → sets `notified_at = now()` for a given id (useful when Premium Plus launches).
+
+**Page — `src/pages/AdminWaitlist.tsx**`
+
+- Table: Email, Name, Phone, Source, Joined date, Notified status.
+- Header: total count + "Export CSV" button.
+- Per-row "Mark notified" toggle.
+- Wrapped in `AppLayout` + `AdminRoute` like the coupon page.
+
+**Routing — `src/App.tsx**`
+
+- Add `/admin/waitlist` inside `<AdminRoute>`.
+
+**Optional small nicety:** add a "Waitlist" link on the Coupons page header so you can flip between admin tools without typing URLs (or build the small admin nav menu mentioned earlier — I'll skip it unless you want it now).   
+Go ahead with this Optional plan.
 
 ### Files
 
+**Create**
+
+- Migration: backfill `pro` → `premium`, update `applicable_plans` default.
+- `supabase/functions/admin-waitlist/index.ts`
+- `src/pages/AdminWaitlist.tsx`
+
 **Edit**
-- `supabase/functions/admin-2fa/index.ts` — Flow API for SMS, real success detection, honest 502 on dual-failure, richer audit log.
-- `src/pages/AdminVerify.tsx` — surface returned `smsError`/`emailError` text in the existing banner.
 
-**Setup (interactive)**
-- Email domain configuration dialog — one-time, benefits all transactional emails project-wide.
+- `supabase/functions/validate-coupon/index.ts` — add premium & premium-plus pricing/validation.
+- `supabase/functions/admin-coupons/index.ts` — default plan list fix.
+- `src/pages/AdminCoupons.tsx` — three-checkbox plan picker.
+- `src/App.tsx` — register `/admin/waitlist` route.
+- `supabase/config.toml` — add `[functions.admin-waitlist]` block.
 
-### Why this fixes it
+### Plan for the following too;
 
-- SMS will use the same working Flow API call that `send-otp` already uses successfully every day → real delivery to +91 7045868482.
-- Once the email domain is verified, the `admin-2fa-code` template that's already queued and registered will start delivering to checkin_support@futurewave.in on the next queue cycle.
-- Failures stop being silent: the AdminVerify page will tell you exactly which channel broke if anything regresses later.
-
-### Out of scope
-
-- Changing the email template content (already styled and registered correctly).
-- Modifying the verify/validate flow (working as designed).
-- Switching email providers (Lovable Emails is the right choice).
-
+- Building a generic admin nav sidebar (separate small task).
+- Notifying waitlist users automatically when Premium Plus launches.
+- Refactoring the legacy `pro` references inside `featureGating.ts` — those gate AI features and don't affect coupons; want consistent naming everywhere.
