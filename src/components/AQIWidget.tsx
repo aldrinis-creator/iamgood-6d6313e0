@@ -262,12 +262,66 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
             </div>
           </div>
 
+          {/* Weather Strip */}
+          {(aqiData.humidity !== undefined || aqiData.precipitation !== undefined || aqiData.uvIndex !== undefined || aqiData.temp !== undefined) && (
+            <div className="px-3 py-3 bg-card">
+              <div className="grid grid-cols-4 gap-2">
+                {aqiData.temp !== undefined && (
+                  <div className="flex flex-col items-center gap-0.5 p-2 rounded-md bg-muted/40">
+                    <Thermometer className="w-4 h-4 text-orange-500" />
+                    <span className="text-xs font-bold">{Math.round(aqiData.temp)}°C</span>
+                    <span className="text-[9px] text-muted-foreground uppercase">Temp</span>
+                  </div>
+                )}
+                {aqiData.humidity !== undefined && (
+                  <div className="flex flex-col items-center gap-0.5 p-2 rounded-md bg-muted/40">
+                    <Droplets className={cn("w-4 h-4", aqiData.humidity < 30 || aqiData.humidity > 70 ? "text-amber-500" : "text-sky-500")} />
+                    <span className="text-xs font-bold">{Math.round(aqiData.humidity)}%</span>
+                    <span className="text-[9px] text-muted-foreground uppercase">Humidity</span>
+                  </div>
+                )}
+                {aqiData.precipitation !== undefined && (
+                  <div className="flex flex-col items-center gap-0.5 p-2 rounded-md bg-muted/40">
+                    <CloudRain className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs font-bold">{aqiData.precipitation.toFixed(1)}mm</span>
+                    <span className="text-[9px] text-muted-foreground uppercase">Rain</span>
+                  </div>
+                )}
+                {aqiData.uvIndex !== undefined && (
+                  <div className="flex flex-col items-center gap-0.5 p-2 rounded-md bg-muted/40">
+                    <Sun className={cn("w-4 h-4",
+                      aqiData.uvIndex < 3 ? "text-emerald-500" :
+                      aqiData.uvIndex < 6 ? "text-yellow-500" :
+                      aqiData.uvIndex < 8 ? "text-orange-500" :
+                      aqiData.uvIndex < 11 ? "text-red-500" : "text-purple-500"
+                    )} />
+                    <span className="text-xs font-bold">UV {Math.round(aqiData.uvIndex)}</span>
+                    <span className="text-[9px] text-muted-foreground uppercase">
+                      {aqiData.uvIndex < 3 ? "Low" : aqiData.uvIndex < 6 ? "Mod" : aqiData.uvIndex < 8 ? "High" : aqiData.uvIndex < 11 ? "V.High" : "Extreme"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Health Recommendation */}
-          {aqiData.elderlyRecommendation && (
-            <div className="px-4 py-3 bg-muted/30">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                <strong className="text-foreground">Seniors Advisory:</strong> {aqiData.elderlyRecommendation}
-              </p>
+          {(aqiData.elderlyRecommendation || (aqiData.uvIndex ?? 0) >= 6 || (aqiData.humidity ?? 0) >= 70 || (aqiData.precipitation ?? 0) > 0.5) && (
+            <div className="px-4 py-3 bg-muted/30 space-y-1.5">
+              {aqiData.elderlyRecommendation && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <strong className="text-foreground">Seniors Advisory:</strong> {aqiData.elderlyRecommendation}
+                </p>
+              )}
+              {(aqiData.uvIndex ?? 0) >= 6 && (
+                <p className="text-xs leading-relaxed text-muted-foreground">☀ High UV — wear hat &amp; sunscreen if going out.</p>
+              )}
+              {(aqiData.humidity ?? 0) >= 70 && (
+                <p className="text-xs leading-relaxed text-muted-foreground">💧 Humid conditions — stay hydrated.</p>
+              )}
+              {(aqiData.precipitation ?? 0) > 0.5 && (
+                <p className="text-xs leading-relaxed text-muted-foreground">☂ Light rain — slippery surfaces, walk with care.</p>
+              )}
             </div>
           )}
 
