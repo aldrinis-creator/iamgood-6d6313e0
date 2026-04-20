@@ -1,55 +1,82 @@
-## Plan
 
-Three coordinated changes to surface the new Quick Visual Checks feature, refresh FAQs, and showcase the Smart Ring in Premium Plus.
 
-### 1. Add the user's Smart Ring image as a project asset
+## Plan — Finish parked issues 1, 2, 3
 
-- Copy `user-uploads://image-106.png` → `src/assets/smart-ring.png` so it can be imported and bundled.
+Three approved-but-not-yet-implemented fixes, executed in one batch.
 
-### 2. Premium Plus card — surface "Quick Visual Checks" + show Smart Ring visual (`src/pages/Subscription.tsx`)
+---
 
-- **Add feature line** to the `premium-plus` plan's `features` array:
-  - `"Quick Visual Checks"` with a sub-line `"Urine, Tongue & Face Analysis"` rendered as a 2-line item (small muted second line under the main feature).
-  - Render: extend the feature row to optionally accept `{ label, sub }` objects so only this entry shows the second line; rest stay strings (backward compatible).
-- **Smart Ring visual block** — inside the existing Premium Plus "Pre-Register Now" gradient card, add a hero image block at the top:
-  - Imported `smart-ring.png` displayed in a circular glow frame (radial gradient backdrop, soft shadow, subtle pulse animation via Tailwind `animate-pulse` on the glow ring only — not the image).
-  - Caption: "Smart Ring — Continuous ECG, HR, SpO₂, BP, Sleep tracking, and 24x7 mobile / satellite Tracking".
-  - Badge overlay: "Coming Soon" pill in top-right.
-- **Also add to Premium plan's `excluded` list**: `"Quick Visual Checks (Urine, Tongue & Face)"` so the upgrade incentive is visible from the Premium tier.
+### Issue 1 — Reminder overlay re-fires after user taps action button
 
-### 3. FAQ refresh (`src/data/faqData.ts`) + downloadable document (`src/pages/Help.tsx`)
+**Root cause:** `handleAction` in `ReminderOverlay.tsx` uses `window.location.href` → full page reload → in-memory acknowledgement state (`acknowledgedRef`, `showCountRef`) and alarm-hook throttling state (`postGraceRef`, `missedSentRef`, `firedRef`) are wiped → next 30s tick re-fires the same popup.
 
-**A. Add two new FAQ sections** (insert after "Health Tools"):
+**Fix:**
+- `src/components/ReminderOverlay.tsx`
+  - Replace `window.location.href = "/path"` with `useNavigate()` from `react-router-dom` so the React tree (and in-memory refs) survives the action.
+  - Before navigating, persist the slot acknowledgement to `sessionStorage` via the existing `saveAckSet()` helper using the `slotKey` passed in by the firing hook. Also write a 2-minute "post-action suppression" entry via `saveSuppressMap()` so even hooks that re-mount won't re-fire immediately.
+  - Export `isReminderAcknowledged(slotKey)` and `isReminderSuppressed(slotKey)` helpers (acknowledgement helper already exists per file summary — confirm and add suppression helper if missing).
+  - On `handleDismiss` keep current behavior (does NOT acknowledge — only acknowledgement-via-action stops the cadence).
 
-1. `**Quick Visual Checks**` (icon: `scan`)
-  - What is Quick Visual Checks?
-  - How does Urine Analysis work? (colour + 10-pad dipstick, photo tips, see-doctor severity)
-  - How does Tongue Analysis work? (colour, coating, surface insights)
-  - How does Face Analysis work? (HR/SpO₂/stress via camera, photo & video modes)
-  - Is my image stored? (Vault opt-in, otherwise discarded after analysis)
-  - When are guardians auto-alerted? (urgent / soon red-flag flow)
-2. `**Premium Plus & Smart Ring**` (icon: `crown` — add `<Crown />` to `iconMap` in `Help.tsx`)
-  - What's included in Premium Plus? (everything in Premium + unlimited check-ins, Vault, Wellness AI, Safe Zones, Fall Detection, Quick Visual Checks)
-  - What is the Smart Ring and what does it measure? (ECG, HR, SpO₂, BP, EDA, sleep, multiple sports modes, gesture control)
-  - When will the Smart Ring ship? (pre-register; we email when available)
-  - What does ₹9,999/yr include? (1-year content subscription + one-time wearable charge; data charges from Year 2)
+- `src/hooks/useMedicationAlarms.ts`
+  - Pass `slotKey: \`med-${dateKey}-${timeSlot}\`` into every `showReminderOverlay()` call.
+  - Before firing the T+5 / T+15 / T+25 popup, skip if `isReminderAcknowledged(slotKey)` is true.
 
-- Bump `FAQ_VERSION` to today's date (`2026-04-20`).
+- `src/hooks/useCheckInAudio.ts`
+  - Already passes `slotKey: \`checkin-${dateKey}-${h}\`` and already checks `isReminderAcknowledged` (per file content). Verify the same `slotKey` shape is used inside `ReminderOverlay`'s `handleAction` when persisting.
 
-**B. Wire up the existing "Download" button in `Help.tsx**`:
+- `src/hooks/useExerciseReminder.ts` and `src/hooks/useAppointmentAlarms.ts`
+  - Add `slotKey` to their `showReminderOverlay` calls (e.g. `exercise-${dateKey}-${h}`, `appt-${appointmentId}-${alertLabel}`) and check `isReminderAcknowledged` before re-firing — for consistency, even though the bug was reported on med + check-in.
 
-- Implement `handleDownloadFaq()` that builds a single Markdown blob from `faqSections` (title → Q/A list) plus a header (`Check-iN FAQ — v{FAQ_VERSION}`) and footer disclaimer, then triggers a download as `Check-iN-FAQ-{FAQ_VERSION}.md`.
-- Markdown is lightweight, opens in any text/markdown viewer, and stays in sync automatically with FAQ data on every future update (no manual PDF maintenance).
+**Out of scope:** Changing the T-5 / T+5 / T+15 / T+25 cadence; server-side missed-checkin guardian cron.
 
-### Files to edit / create
+---
 
-- **Create**: `src/assets/smart-ring.png` (copied from upload)
-- **Edit**: `src/pages/Subscription.tsx` — feature item with sub-line support, Smart Ring hero in Premium Plus card, add Quick Visual Checks to features/excluded
-- **Edit**: `src/data/faqData.ts` — two new sections + version bump
-- **Edit**: `src/pages/Help.tsx` — wire Download button to generate Markdown FAQ file, add `crown` to `iconMap`
+### Issue 2 — Guardian AQI widget shows "--" because it asks for guardian's own location
+
+Already shipped per prior summary (`src/components/AQIWidget.tsx` updated to use ward's `lastLocation` from `user_settings`). **Verification step only:**
+
+- Re-read `src/components/AQIWidget.tsx` to confirm:
+  - `role === "guardian"` branch skips `navigator.geolocation`.
+  - Reads `wardUserId` from `useGuardianWard()` and queries `user_settings.settings.lastLocation`.
+  - Re-fetches when `wardUserId` changes (effect dep).
+  - Shows "Ward location not shared yet" fallback inside the popover.
+  - Search box and 10-min revert timer are disabled for guardians.
+- If any of the above are missing, patch them. If all present, no code changes — just confirm in the response.
+
+---
+
+### Issue 3 — FAQ refresh, Smart Ring visual, downloadable FAQ document
+
+Already shipped per prior summary (`smart-ring.png` created; `Subscription.tsx`, `faqData.ts`, `Help.tsx` updated). **Verification step only:**
+
+- Re-read the four files to confirm:
+  - `src/assets/smart-ring.png` exists and is non-empty (the diff at the top of this turn shows the binary was actually written — good).
+  - `src/data/faqData.ts` has `FAQ_VERSION = "2026-04-20"` and the two new sections (`Quick Visual Checks`, `Premium Plus & Smart Ring`).
+  - `src/pages/Subscription.tsx` renders the Smart Ring hero block in the Premium Plus card with "Coming Soon" badge + caption, and the `Quick Visual Checks` feature with sub-line.
+  - `src/pages/Help.tsx` `handleDownloadFaq` builds Markdown from `faqSections` and triggers download as `Check-iN-FAQ-2026-04-20.md`; `Crown` icon is in `iconMap`.
+- Patch any gaps; otherwise just confirm.
+
+---
+
+### Files to edit (Issue 1, definitely)
+
+- `src/components/ReminderOverlay.tsx` — `useNavigate` instead of `window.location.href`; persist ack + suppression on action; export suppression helper.
+- `src/hooks/useMedicationAlarms.ts` — pass `slotKey`, check ack before re-firing.
+- `src/hooks/useExerciseReminder.ts` — pass `slotKey`, check ack.
+- `src/hooks/useAppointmentAlarms.ts` — pass `slotKey`, check ack.
+- `src/hooks/useCheckInAudio.ts` — verify slotKey shape matches what overlay persists.
+
+### Files to verify (Issues 2 & 3) — patch only if gaps found
+
+- `src/components/AQIWidget.tsx`
+- `src/data/faqData.ts`
+- `src/pages/Subscription.tsx`
+- `src/pages/Help.tsx`
+- `src/assets/smart-ring.png`
 
 ### Out of scope
 
-- PDF generation for the FAQ (Markdown is simpler and stays auto-fresh; can be upgraded to PDF later if needed)
-- Changing pricing or plan structure
-- Adding Smart Ring telemetry/integration code (hardware doesn't exist yet — visual-only)
+- International rollout (parked).
+- Per-user timezone refactor.
+- PDF (vs. Markdown) FAQ export.
+
