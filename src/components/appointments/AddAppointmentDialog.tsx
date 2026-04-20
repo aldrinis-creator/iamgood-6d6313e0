@@ -94,6 +94,7 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
       }
     } else {
       endTimeManuallyEdited.current = false;
+      endDateManuallyEdited.current = false;
       setForm(makeEmpty());
     }
   }, [editId, open]);
