@@ -1,88 +1,91 @@
-## Answers + Plan
 
-### 1. Why "Premium" isn't in the Active Plans checkbox
 
-**Naming mismatch between the Subscription page and the coupon system.**
+## Plan — Admin Sidebar + Waitlist Auto-Notify on Launch
 
-- The Subscription page (and Razorpay checkout URL) uses plan keys: `basic`, `premium`, `premium-plus`.
-- The Coupon admin and `validate-coupon` edge function only know two legacy keys: `basic` and `pro`.
-- The Premium Plus tier is also missing entirely (it's waitlist-only right now, but coupons should still be configurable for it once it launches).
+Two features: a shared admin navigation sidebar replacing the current ad-hoc links, and a "Notify All" button on the waitlist page that sends a launch email to all un-notified waitlist users.
 
-Result: any coupon you create can only ever apply to `basic` or `pro` — and since the checkout sends `premium` / `premium-plus`, a coupon will never validate at checkout for those tiers.
+### A. Generic Admin Sidebar
 
-### 2. Where to find Premium Plus pre-registration emails
+**New component — `src/components/AdminSidebar.tsx`**
 
-They're stored in the database table `premium_plus_waitlist` (columns: `email`, `full_name`, `phone`, `user_id`, `source`, `created_at`, `notified_at`). RLS blocks all client reads — only service_role can access. **There is no admin UI to view this table today.**
+A lightweight sidebar using the existing `SidebarProvider` + `Sidebar` components from `src/components/ui/sidebar.tsx`. Three nav items:
+- Coupons (`/admin/coupons`) — Ticket icon
+- Waitlist (`/admin/waitlist`) — Users icon
+- Logout — LogOut icon (calls `signOut`, navigates to `/admin/login`)
 
----
+Uses `NavLink` from `src/components/NavLink.tsx` for active-route highlighting. Collapsible to icon-only mode. `SidebarTrigger` in a small header bar so it is always accessible.
 
-## Proposed fix
+**New layout wrapper — `src/components/AdminLayout.tsx`**
 
-### A. Align coupon plan keys with the Subscription page
+Replaces `AppLayout` on admin pages. Structure:
+```text
+SidebarProvider
+  div.min-h-screen.flex.w-full
+    AdminSidebar
+    div.flex-1.flex.flex-col
+      header (SidebarTrigger + page title)
+      main (children)
+```
 
-Update both the admin UI and the validator to use `basic`, `premium`, `premium-plus` (matching what checkout actually sends). Backfill existing `pro` rows to `premium` so old coupons keep working.
+No NavTabs, no SOSButton, no check-in hooks, no footer disclaimer — admin pages don't need any of that.
 
-**Database migration**
+**Edit admin pages** (`AdminCoupons.tsx`, `AdminWaitlist.tsx`)
+- Replace `<AppLayout>` with `<AdminLayout>`.
+- Remove the manual `<Link to="/admin/...">` navigation buttons (sidebar handles it).
 
-- Update existing coupon rows: `applicable_plans` containing `'pro'` → replace with `'premium'`.
-- Update the table default for `applicable_plans` from `{basic,pro}` to `{basic,premium}`.
+**Edit `src/App.tsx`** — no route changes needed; only the layout wrapper inside each page changes.
 
-**Edge function — `validate-coupon**`
+### B. Waitlist Auto-Notify on Launch
 
-- Add `premium` and `premium-plus` to `PLAN_PRICES` map (using the prices from Subscription.tsx: premium ₹199/₹1999, premium-plus ₹999/₹9999).
-- Update the allowed `plan_type` validation list.
+**New action in `admin-waitlist` edge function — `action: "notify_all"`**
 
-**Admin UI — `AdminCoupons.tsx**`
+- Fetches all waitlist rows where `notified_at IS NULL`.
+- For each row, invokes `send-transactional-email` with a new `premium-plus-launch` template, passing `{ name: row.full_name }` as `templateData` and `idempotencyKey: "pp-launch-{row.id}"`.
+- Updates `notified_at = now()` for each successfully queued row.
+- Returns `{ queued: N, failed: N }`.
+- Guard: if zero un-notified rows exist, returns immediately with `{ queued: 0 }`.
 
-- Replace the two-checkbox `["basic", "pro"]` block with three checkboxes: `Basic`, `Premium`, `Premium Plus`.
-- Update `EMPTY.applicable_plans` default to `["basic", "premium"]`.
+**New email template — `premium-plus-launch.tsx`**
 
-**Edge function — `admin-coupons**`
+A branded React Email template announcing the Premium Plus Smart Ring is now available. Mirrors the styling of the existing `premium-plus-waitlist-confirmation.tsx`. Content:
+- Heading: "Premium Plus is here, {name}!"
+- Body: The Smart Ring is ready to ship. Early-bird pricing active.
+- CTA button linking to the subscription page.
+- Contact section (same as waitlist confirmation).
 
-- Update the `create` action's default `applicable_plans` fallback from `["basic", "pro"]` to `["basic", "premium"]`.
+Register in `registry.ts` as `'premium-plus-launch'`.
 
-### B. New admin page: Premium Plus Waitlist
+**Frontend — `AdminWaitlist.tsx`**
 
-Add `/admin/waitlist` so you can see who's pre-registered without going to the database.
+Add a "Notify All" button in the header (next to Export CSV). Behavior:
+- Shows count of un-notified entries (e.g., "Notify 12 users").
+- On click, opens a confirmation `AlertDialog`: "Send launch email to X waitlist users?"
+- On confirm, calls `invoke({ action: "notify_all" })`.
+- Shows toast with results ("Queued 12 emails").
+- Refreshes the list so `notified_at` timestamps update.
+- Disabled when no un-notified entries exist.
 
-**Edge function — `admin-waitlist**` (service_role, admin-only, mirrors the `admin-coupons` auth pattern)
+**Important caveat — Email domain not configured**
 
-- `action: "list"` → returns all waitlist rows ordered by `created_at` desc.
-- `action: "export"` → returns CSV string for download.
-- `action: "mark_notified"` → sets `notified_at = now()` for a given id (useful when Premium Plus launches).
-
-**Page — `src/pages/AdminWaitlist.tsx**`
-
-- Table: Email, Name, Phone, Source, Joined date, Notified status.
-- Header: total count + "Export CSV" button.
-- Per-row "Mark notified" toggle.
-- Wrapped in `AppLayout` + `AdminRoute` like the coupon page.
-
-**Routing — `src/App.tsx**`
-
-- Add `/admin/waitlist` inside `<AdminRoute>`.
-
-**Optional small nicety:** add a "Waitlist" link on the Coupons page header so you can flip between admin tools without typing URLs (or build the small admin nav menu mentioned earlier — I'll skip it unless you want it now).   
-Go ahead with this Optional plan.
+No email domain is set up for this project yet. The "Notify All" button will work (emails get queued), but they will not actually deliver until the email domain is configured and DNS is verified. The plan includes showing a warning banner on the waitlist page if email sending is not yet active, with a note to set up the email domain.
 
 ### Files
 
 **Create**
-
-- Migration: backfill `pro` → `premium`, update `applicable_plans` default.
-- `supabase/functions/admin-waitlist/index.ts`
-- `src/pages/AdminWaitlist.tsx`
+- `src/components/AdminSidebar.tsx` — sidebar nav component
+- `src/components/AdminLayout.tsx` — admin layout wrapper (SidebarProvider + AdminSidebar + content area)
+- `supabase/functions/_shared/transactional-email-templates/premium-plus-launch.tsx` — launch notification email
 
 **Edit**
+- `src/pages/AdminCoupons.tsx` — swap `AppLayout` for `AdminLayout`, remove manual nav links
+- `src/pages/AdminWaitlist.tsx` — swap `AppLayout` for `AdminLayout`, remove manual nav links, add "Notify All" button + AlertDialog
+- `supabase/functions/admin-waitlist/index.ts` — add `notify_all` action
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register `premium-plus-launch`
 
-- `supabase/functions/validate-coupon/index.ts` — add premium & premium-plus pricing/validation.
-- `supabase/functions/admin-coupons/index.ts` — default plan list fix.
-- `src/pages/AdminCoupons.tsx` — three-checkbox plan picker.
-- `src/App.tsx` — register `/admin/waitlist` route.
-- `supabase/config.toml` — add `[functions.admin-waitlist]` block.
+**Deploy**
+- `admin-waitlist` and `send-transactional-email` edge functions after changes
 
-### Plan for the following too;
+### Email domain setup
 
-- Building a generic admin nav sidebar (separate small task).
-- Notifying waitlist users automatically when Premium Plus launches.
-- Refactoring the legacy `pro` references inside `featureGating.ts` — those gate AI features and don't affect coupons; want consistent naming everywhere.
+After implementation, the email domain needs to be configured for actual delivery. This is a one-time interactive setup step.
+
