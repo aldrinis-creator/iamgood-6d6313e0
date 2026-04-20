@@ -117,23 +117,43 @@ Deno.serve(async (req) => {
         { user_id: user.id, code_hash: codeHash, channel: "email", expires_at: expiresAt },
       ]);
 
-      // Send SMS via MSG91
+      // Send SMS via MSG91 Flow API (matches send-otp's working pattern)
       const msg91Key = Deno.env.get("MSG91_AUTH_KEY");
       const otpTemplate = Deno.env.get("MSG91_OTP_TEMPLATE_ID");
       let smsOk = false;
+      let smsError: string | null = null;
       if (msg91Key && otpTemplate) {
         try {
           const phoneDigits = config.phone.replace(/^\+/, "");
-          const smsRes = await fetch(`https://control.msg91.com/api/v5/otp?template_id=${otpTemplate}&mobile=${phoneDigits}&otp=${code}`, {
+          const smsRes = await fetch("https://control.msg91.com/api/v5/flow", {
             method: "POST",
-            headers: { "authkey": msg91Key, "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              authkey: msg91Key,
+              accept: "application/json",
+            },
+            body: JSON.stringify({
+              template_id: otpTemplate,
+              recipients: [{ mobiles: phoneDigits, var1: code }],
+            }),
           });
-          smsOk = smsRes.ok;
-        } catch {}
+          const smsJson = await smsRes.json().catch(() => ({} as any));
+          smsOk = smsRes.ok && (smsJson?.type === "success" || smsJson?.message === "Request accepted" || !!smsJson?.request_id);
+          if (!smsOk) {
+            smsError = `MSG91 ${smsRes.status}: ${JSON.stringify(smsJson).slice(0, 200)}`;
+            console.error("admin-2fa SMS failed:", smsError);
+          }
+        } catch (e) {
+          smsError = `SMS exception: ${(e as Error).message}`;
+          console.error("admin-2fa SMS exception:", e);
+        }
+      } else {
+        smsError = "MSG91 not configured";
       }
 
       // Send Email via send-transactional-email
       let emailOk = false;
+      let emailError: string | null = null;
       try {
         const emailRes = await adminClient.functions.invoke("send-transactional-email", {
           body: {
@@ -143,12 +163,41 @@ Deno.serve(async (req) => {
             templateData: { code, expiresInMinutes: 5 },
           },
         });
-        emailOk = !emailRes.error;
-      } catch {}
+        if (emailRes.error) {
+          emailError = `Email invoke error: ${emailRes.error.message || JSON.stringify(emailRes.error).slice(0, 200)}`;
+          console.error("admin-2fa email failed:", emailError);
+        } else if ((emailRes.data as any)?.error) {
+          emailError = `Email API error: ${JSON.stringify((emailRes.data as any).error).slice(0, 200)}`;
+          console.error("admin-2fa email failed:", emailError);
+        } else {
+          emailOk = true;
+        }
+      } catch (e) {
+        emailError = `Email exception: ${(e as Error).message}`;
+        console.error("admin-2fa email exception:", e);
+      }
 
-      await logAudit(adminClient, user.id, "2fa_sent", req, { sms: smsOk, email: emailOk });
+      await logAudit(adminClient, user.id, "2fa_sent", req, {
+        sms: smsOk, email: emailOk,
+        smsError: smsError || undefined,
+        emailError: emailError || undefined,
+      });
 
-      return new Response(JSON.stringify({ success: true, sms: smsOk, email: emailOk }), {
+      // Honest reporting: if BOTH channels failed, return 502
+      if (!smsOk && !emailOk) {
+        return new Response(JSON.stringify({
+          error: "Could not deliver code via SMS or email",
+          smsError, emailError,
+        }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true, sms: smsOk, email: emailOk,
+        smsError: smsOk ? undefined : smsError,
+        emailError: emailOk ? undefined : emailError,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
