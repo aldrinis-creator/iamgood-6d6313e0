@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart, Printer, Mail } from "lucide-react";
+import { Check, Star, Crown, ExternalLink, Gift, Tag, Loader2, CheckCircle2, ArrowRight, Shield, Pill, Heart, Printer, Mail, Sparkles } from "lucide-react";
+import smartRingImage from "@/assets/smart-ring.png";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
@@ -64,6 +65,7 @@ const plans = [
       "Medical Vault",
       "Wellness AI Insights",
       "Safety Zones & Fall Detection",
+      "Quick Visual Checks (Urine, Tongue & Face)",
       "Health Vitals (ECG, HR, SpO2, BP)",
       "Multiple sports modes & Gesture control"
     ],
@@ -84,10 +86,11 @@ const plans = [
       "Wellness AI Insights",
       "Safety Zones",
       "Fall Detection",
+      { label: "Quick Visual Checks", sub: "Urine, Tongue & Face Analysis" },
       "Health Vitals (ECG, HR, SpO2, BP, EDA)",
       "Step counting & Multiple sports modes",
       "Gesture control",
-    ],
+    ] as Array<string | { label: string; sub: string }>,
     excluded: [],
   },
 ];
@@ -496,12 +499,20 @@ const Subscription = () => {
                 </CardHeader>
                 <CardContent className="space-y-4 flex-1 flex flex-col pt-2">
                   <div className="space-y-2.5 flex-1">
-                    {plan.features.map((f) => (
-                      <div key={f} className="flex items-start gap-2 text-sm leading-snug">
-                        <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </div>
-                    ))}
+                    {plan.features.map((f) => {
+                      const isObj = typeof f === "object";
+                      const label = isObj ? (f as { label: string }).label : (f as string);
+                      const sub = isObj ? (f as { sub: string }).sub : null;
+                      return (
+                        <div key={label} className="flex items-start gap-2 text-sm leading-snug">
+                          <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <div>{label}</div>
+                            {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
                     {plan.excluded.map((f) => (
                       <div key={f} className="flex items-start gap-2 text-sm text-muted-foreground line-through opacity-70 leading-snug">
                         <span className="w-4 h-4 shrink-0 mt-0.5 border border-muted-foreground/30 rounded-sm" />
@@ -511,6 +522,24 @@ const Subscription = () => {
                   </div>
                   {plan.key === "premium-plus" ? (
                     <div className="mt-4 rounded-xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.8)] p-4 text-primary-foreground space-y-3">
+                      {/* Smart Ring hero visual */}
+                      <div className="relative flex justify-center pt-2 pb-1">
+                        <span className="absolute top-0 right-0 bg-warning text-warning-foreground text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md z-10">
+                          <Sparkles className="w-3 h-3" /> Coming Soon
+                        </span>
+                        <div className="relative w-32 h-32 flex items-center justify-center">
+                          <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/40 via-white/10 to-transparent blur-xl animate-pulse" />
+                          <div className="absolute inset-2 rounded-full border-2 border-white/30 animate-pulse" />
+                          <img
+                            src={smartRingImage}
+                            alt="Smart Ring"
+                            className="relative w-28 h-28 object-contain drop-shadow-2xl"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-center opacity-90 leading-snug px-2">
+                        Smart Ring — Continuous ECG, HR, SpO₂, BP, Sleep tracking, and 24×7 mobile / satellite Tracking
+                      </p>
                       <h3 className="text-lg font-bold text-center">Pre-Register Now</h3>
                       <div className="flex items-baseline justify-center gap-2">
                         <span className="text-sm line-through opacity-70">₹14,999</span>

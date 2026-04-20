@@ -1,5 +1,5 @@
 // FAQ data — update this file whenever FAQs change.
-// Last updated: 2026-04-07
+// Last updated: 2026-04-20
 
 export interface FaqItem {
   question: string;
@@ -12,7 +12,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-04-07";
+export const FAQ_VERSION = "2026-04-20";
 
 export const faqSections: FaqSection[] = [
   {
@@ -466,6 +466,58 @@ export const faqSections: FaqSection[] = [
       {
         question: "Is my consultation data private?",
         answer: "Absolutely. All consultation recordings and analyses are stored securely and only accessible by you. The AI analysis includes a medical disclaimer."
+      },
+    ],
+  },
+  {
+    title: "Quick Visual Checks",
+    icon: "scan",
+    items: [
+      {
+        question: "What is Quick Visual Checks?",
+        answer: "Quick Visual Checks is a Premium Plus suite of AI-powered visual analysis tools — Urine Analysis, Tongue Analysis, and Face Analysis — that let you screen common health indicators in seconds, right from your phone camera. Results are instant, with clear guidance on whether to monitor, see a doctor soon, or seek urgent care."
+      },
+      {
+        question: "How does Urine Analysis work?",
+        answer: "Capture a clear photo of your urine sample (cup) and, optionally, a 10-pad dipstick. Our AI evaluates colour, clarity, and the dipstick pads (glucose, protein, blood, leukocytes, ketones, pH, etc.) to flag abnormalities. For best results, use natural light, a white background, and capture within 60 seconds of dipping. Severe red-flags (e.g., visible blood, very high glucose) trigger a 'See a doctor urgently' banner."
+      },
+      {
+        question: "How does Tongue Analysis work?",
+        answer: "Take a well-lit, full-mouth-open photo of your tongue. The AI assesses colour (pale, red, purple), coating (white, yellow, thick/thin), texture, and surface markings to surface possible indicators of dehydration, digestive issues, vitamin deficiencies, or oral health concerns. This is a screening tool — not a diagnosis."
+      },
+      {
+        question: "How does Face Analysis work?",
+        answer: "Face Analysis uses your phone camera to estimate Heart Rate, SpO₂, and Stress Level via remote photoplethysmography (rPPG). Two modes are available: a quick photo mode for snapshot vitals, and a 30-second video mode for higher-confidence readings with HRV. Results can be auto-saved into your Wellness Score."
+      },
+      {
+        question: "Are my photos stored?",
+        answer: "By default, images are processed in-memory and discarded immediately after analysis — only the structured results are saved. If you opt in, you can save the photo to your Medical Vault for future reference. We never share your images with third parties."
+      },
+      {
+        question: "When are my guardians auto-alerted?",
+        answer: "If a Quick Visual Check detects a red-flag classified as 'Urgent' (e.g., signs of severe dehydration, gross haematuria, or very abnormal vitals), your primary guardian receives an SMS/WhatsApp alert with the result summary. 'See doctor soon' results notify only you — no guardian alert."
+      },
+    ],
+  },
+  {
+    title: "Premium Plus & Smart Ring",
+    icon: "crown",
+    items: [
+      {
+        question: "What's included in Premium Plus?",
+        answer: "Premium Plus includes everything in Premium — plus unlimited daily Check-iNs, the full Medical Vault, Wellness AI Insights, Safe Zones with geofencing, Fall Detection, and the new Quick Visual Checks suite (Urine, Tongue & Face Analysis). It also bundles the Smart Ring wearable for continuous vitals monitoring."
+      },
+      {
+        question: "What is the Smart Ring and what does it measure?",
+        answer: "The Smart Ring is a discreet wearable that continuously tracks ECG, Heart Rate, SpO₂, Blood Pressure trends, EDA (stress), and sleep stages. It supports multiple sports modes, step counting, gesture controls, and 24x7 mobile/satellite tracking for safety in low-coverage areas."
+      },
+      {
+        question: "When will the Smart Ring ship?",
+        answer: "The Smart Ring is in advanced development. Pre-register your email on the Premium Plus card and we'll notify you the moment it's available for shipping in your region."
+      },
+      {
+        question: "What does ₹9,999/yr include?",
+        answer: "The ₹9,999/year Premium Plus subscription includes a 1-year content & service subscription plus a one-time wearable charge for the Smart Ring (saving ₹5,000 vs the ₹14,999 MRP). From Year 2 onward, only the standard data/subscription charges apply — the ring is yours to keep."
       },
     ],
   },
