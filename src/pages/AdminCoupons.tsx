@@ -279,7 +279,7 @@ const AdminCoupons = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </AdminLayout>
   );
 };
 

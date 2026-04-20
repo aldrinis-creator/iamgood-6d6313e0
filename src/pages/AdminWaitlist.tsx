@@ -1,13 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
-import { Download, CheckCircle2, Circle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Download, CheckCircle2, Circle, Send, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import AppLayout from "@/components/AppLayout";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import AdminLayout from "@/components/AdminLayout";
 
 interface WaitlistEntry {
   id: string;
@@ -23,6 +33,8 @@ interface WaitlistEntry {
 const AdminWaitlist = () => {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   const invoke = useCallback(async (body: Record<string, unknown>, raw = false) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -58,6 +70,11 @@ const AdminWaitlist = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const unNotifiedCount = useMemo(
+    () => entries.filter((e) => !e.notified_at).length,
+    [entries]
+  );
+
   const exportCsv = async () => {
     try {
       const csv = await invoke({ action: "export" }, true);
@@ -87,21 +104,54 @@ const AdminWaitlist = () => {
     }
   };
 
+  const notifyAll = async () => {
+    setNotifying(true);
+    try {
+      const result = await invoke({ action: "notify_all" });
+      const { queued = 0, failed = 0 } = result || {};
+      if (queued > 0) {
+        toast.success(`Queued ${queued} email${queued === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}`);
+      } else {
+        toast.info("No un-notified entries to send");
+      }
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setNotifying(false);
+      setConfirmOpen(false);
+    }
+  };
+
   return (
-    <AppLayout>
+    <AdminLayout title="Premium Plus Waitlist">
       <div className="p-4 max-w-5xl mx-auto space-y-4">
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Email delivery requires domain setup</AlertTitle>
+          <AlertDescription>
+            Notifications will be queued, but they will only deliver once the email sender domain is configured and DNS verified.
+          </AlertDescription>
+        </Alert>
+
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-xl font-bold">Premium Plus Waitlist</h1>
             <p className="text-sm text-muted-foreground">
               {entries.length} pre-registration{entries.length === 1 ? "" : "s"}
+              {unNotifiedCount > 0 && ` · ${unNotifiedCount} pending`}
             </p>
           </div>
           <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/admin/coupons">Coupons</Link>
+            <Button
+              onClick={() => setConfirmOpen(true)}
+              size="sm"
+              disabled={!unNotifiedCount || notifying}
+            >
+              <Send className="w-4 h-4 mr-1" />
+              Notify {unNotifiedCount || ""} {unNotifiedCount === 1 ? "user" : "users"}
             </Button>
-            <Button onClick={exportCsv} size="sm" disabled={!entries.length}>
+            <Button onClick={exportCsv} variant="outline" size="sm" disabled={!entries.length}>
               <Download className="w-4 h-4 mr-1" />Export CSV
             </Button>
           </div>
@@ -155,7 +205,24 @@ const AdminWaitlist = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send launch email to {unNotifiedCount} {unNotifiedCount === 1 ? "user" : "users"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This queues the Premium Plus launch announcement to every pending waitlist member. Each recipient receives the email once.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={notifying}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={notifyAll} disabled={notifying}>
+              {notifying ? "Sending…" : "Send"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AdminLayout>
   );
 };
 
