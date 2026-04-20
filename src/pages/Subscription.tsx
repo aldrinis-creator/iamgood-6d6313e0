@@ -528,18 +528,23 @@ const Subscription = () => {
                           <Sparkles className="w-3 h-3" /> Coming Soon
                         </span>
                         <div className="relative w-32 h-32 flex items-center justify-center">
-                          <div className="absolute inset-0 rounded-full bg-gradient-radial from-white/40 via-white/10 to-transparent blur-xl animate-pulse" />
-                          <div className="absolute inset-2 rounded-full border-2 border-white/30 animate-pulse" />
                           <img
                             src={smartRingImage}
                             alt="Smart Ring"
-                            className="relative w-28 h-28 object-contain drop-shadow-2xl"
+                            className="relative w-28 h-28 object-contain drop-shadow-[0_0_18px_rgba(255,255,255,0.25)]"
                           />
+                          {/* Gloss highlight overlay */}
+                          <div className="pointer-events-none absolute inset-2 rounded-full bg-gradient-to-br from-white/40 via-white/0 to-transparent mix-blend-overlay" />
                         </div>
                       </div>
                       <p className="text-[11px] text-center opacity-90 leading-snug px-2">
-                        Smart Ring — Continuous ECG, HR, SpO₂, BP, Sleep tracking, and 24×7 mobile / satellite Tracking
+                        Smart Ring — Continuous ECG, HR, SpO₂, BP, Sleep tracking, and 24×7 mobile / satellite Tracking*
                       </p>
+                      <div className="flex justify-center">
+                        <span className="bg-warning text-warning-foreground text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                          Special Offer
+                        </span>
+                      </div>
                       <h3 className="text-lg font-bold text-center">Pre-Register Now</h3>
                       <div className="flex items-baseline justify-center gap-2">
                         <span className="text-sm line-through opacity-70">₹14,999</span>
@@ -554,21 +559,29 @@ const Subscription = () => {
                           onChange={(e) => setPreRegisterEmail(e.target.value)}
                           className="flex-1 bg-white/20 border-white/30 text-primary-foreground placeholder:text-primary-foreground/60"
                         />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="shrink-0 gap-1.5 font-semibold"
-                          onClick={() => {
+                        <a
+                          href={preRegisterEmail.trim() ? `mailto:checkin_support@futurewave.in?subject=${encodeURIComponent("Pre-Register Premium Plus")}&body=${encodeURIComponent(`Hi, I'd like to pre-register for the Premium Plus Smart Ring bundle.\n\nEmail: ${preRegisterEmail.trim()}`)}` : "#"}
+                          aria-disabled={!preRegisterEmail.trim()}
+                          className={cn(
+                            buttonVariants({ variant: "secondary", size: "sm" }),
+                            "shrink-0 gap-1.5 font-semibold",
+                            !preRegisterEmail.trim() && "opacity-60 cursor-not-allowed",
+                          )}
+                          onClick={(e) => {
                             const email = preRegisterEmail.trim();
-                            if (!email) { toast.error("Please enter your email"); return; }
-                            window.location.href = `mailto:checkin_support@futurewave.in?subject=${encodeURIComponent("Pre-Register Premium Plus")}&body=${encodeURIComponent(`Hi, I'd like to pre-register for the Premium Plus Smart Ring bundle.\n\nEmail: ${email}`)}`;
+                            if (!email) {
+                              e.preventDefault();
+                              toast.error("Please enter your email");
+                              return;
+                            }
                             toast.success("Opening email client…");
                           }}
                         >
                           <Mail className="w-4 h-4" /> Notify Me
-                        </Button>
+                        </a>
                       </div>
                       <p className="text-[10px] text-center opacity-70">We'll notify you when the Smart Ring is available</p>
+                      <p className="text-[10px] text-center opacity-70">* Data charges as applicable after Year 1.</p>
                     </div>
                   ) : (
                     <Button
