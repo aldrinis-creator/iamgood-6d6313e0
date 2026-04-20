@@ -143,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     flushPendingSettings();
+    sessionStorage.removeItem("admin_step_up_token");
     await supabase.auth.signOut();
     setProfile(null);
   };

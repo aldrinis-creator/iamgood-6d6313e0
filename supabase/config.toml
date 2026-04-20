@@ -35,3 +35,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.voice-query]
     verify_jwt = false
+  [functions.admin-2fa]
+    verify_jwt = false
