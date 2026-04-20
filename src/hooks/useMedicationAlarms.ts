@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
-import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged, clearReminderAcknowledgement } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
 const notifyGuardiansMissed = async (userId: string, medNames: string[], scheduledTimes: string[]) => {
@@ -94,13 +94,19 @@ const useMedicationAlarms = () => {
         if (diffMin >= POPUP_DELAY_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           const takenLog = logs.some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
-            return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && l.status === "taken";
+            return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && (l.status === "taken" || l.status === "taken_late");
           });
 
           if (takenLog) {
             missedSentRef.current.add(missedKey);
+            // Slot resolved naturally — clear any lingering acknowledgement
+            clearReminderAcknowledgement(`med-${dateKey}-${timeStr}`);
             continue;
           }
+
+          // Skip if user already acknowledged this slot's popup (within suppression window)
+          const slotKey = `med-${dateKey}-${timeStr}`;
+          if (isReminderAcknowledged(slotKey)) continue;
 
           if (!popupSlots.has(timeStr)) popupSlots.set(timeStr, []);
           popupSlots.get(timeStr)!.push(med.name);
@@ -187,6 +193,7 @@ const useMedicationAlarms = () => {
           title: state.count === 1 ? "Medication Reminder" : "Medication Overdue",
           message: `[${ts}] ${state.count === 1 ? "Time to take" : "You have not taken"}: ${combined}`,
           reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${timeStr}`,
+          slotKey: `med-${dateKey}-${timeStr}`,
         });
       }
     }

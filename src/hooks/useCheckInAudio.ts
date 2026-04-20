@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { showReminderOverlay, isOverlayVisible } from "@/components/ReminderOverlay";
+import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged } from "@/components/ReminderOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,6 +101,10 @@ const useCheckInAudio = () => {
           continue;
         }
 
+        // Skip if user acknowledged the popup (within 2-min post-action suppression window)
+        const slotKey = `checkin-${dateKey}-${h}`;
+        if (isReminderAcknowledged(slotKey)) continue;
+
         const state = postGraceRef.current.get(missedKey) || { count: 0, lastFiredAt: 0 };
         const minSinceLast = (now.getTime() - state.lastFiredAt) / 60_000;
 
@@ -123,6 +127,7 @@ const useCheckInAudio = () => {
             title: state.count === 1 ? "Check-In Reminder" : "Missed Check-In",
             message: msg,
             reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${formatHour(h)}`,
+            slotKey: `checkin-${dateKey}-${h}`,
           });
         } else if (state.count >= MAX_POPUPS && minSinceLast >= POPUP_INTERVAL_MIN) {
           // Final escalation
