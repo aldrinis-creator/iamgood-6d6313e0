@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getISTDateString } from "@/lib/istTime";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -22,32 +23,56 @@ interface Props {
   appointments: any[];
 }
 
-const empty = {
-  title: "",
-  description: "",
-  start_date: "",
-  start_time: "",
-  end_date: "",
-  end_time: "",
-  appointment_type: "in-person",
-  recurrence: "none",
-  location: "",
-  doctor_name: "",
-  alarm_enabled: true,
-  alarm_sound: "default",
-  first_alert: "15min",
-  second_alert: "none",
+const makeEmpty = () => {
+  const today = getISTDateString();
+  return {
+    title: "",
+    description: "",
+    start_date: today,
+    start_time: "",
+    end_date: today,
+    end_time: "",
+    appointment_type: "in-person",
+    recurrence: "none",
+    location: "",
+    doctor_name: "",
+    alarm_enabled: true,
+    alarm_sound: "default",
+    first_alert: "15min",
+    second_alert: "none",
+  };
+};
+
+const addOneHour = (timeStr: string, dateStr: string): { time: string; date: string } => {
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return { time: "", date: dateStr };
+  const total = h * 60 + m + 60;
+  const newH = Math.floor(total / 60) % 24;
+  const newM = total % 60;
+  const crossesMidnight = total >= 24 * 60;
+  let newDate = dateStr;
+  if (crossesMidnight && dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    newDate = d.toISOString().slice(0, 10);
+  }
+  return {
+    time: `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`,
+    date: newDate,
+  };
 };
 
 const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Props) => {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState(makeEmpty);
+  const endTimeManuallyEdited = useRef(false);
 
   useEffect(() => {
     if (editId) {
       const apt = appointments.find((a) => a.id === editId);
       if (apt) {
+        endTimeManuallyEdited.current = true;
         setForm({
           title: apt.title || "",
           description: apt.description || "",
@@ -66,7 +91,8 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
         });
       }
     } else {
-      setForm(empty);
+      endTimeManuallyEdited.current = false;
+      setForm(makeEmpty());
     }
   }, [editId, open]);
 
@@ -159,11 +185,33 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Start Time *</Label>
-              <Input type="time" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
+              <Input
+                type="time"
+                value={form.start_time}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setForm((p) => {
+                    const next = { ...p, start_time: newStart };
+                    if (newStart && !endTimeManuallyEdited.current) {
+                      const { time, date } = addOneHour(newStart, p.start_date);
+                      next.end_time = time;
+                      next.end_date = date;
+                    }
+                    return next;
+                  });
+                }}
+              />
             </div>
             <div>
               <Label>End Time</Label>
-              <Input type="time" value={form.end_time} onChange={(e) => set("end_time", e.target.value)} />
+              <Input
+                type="time"
+                value={form.end_time}
+                onChange={(e) => {
+                  endTimeManuallyEdited.current = true;
+                  set("end_time", e.target.value);
+                }}
+              />
             </div>
           </div>
 
