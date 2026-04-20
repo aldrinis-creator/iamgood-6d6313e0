@@ -67,12 +67,14 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
   const queryClient = useQueryClient();
   const [form, setForm] = useState(makeEmpty);
   const endTimeManuallyEdited = useRef(false);
+  const endDateManuallyEdited = useRef(false);
 
   useEffect(() => {
     if (editId) {
       const apt = appointments.find((a) => a.id === editId);
       if (apt) {
         endTimeManuallyEdited.current = true;
+        endDateManuallyEdited.current = true;
         setForm({
           title: apt.title || "",
           description: apt.description || "",
