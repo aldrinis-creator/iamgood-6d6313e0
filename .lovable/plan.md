@@ -2,32 +2,31 @@
 
 ## Plan
 
-Pre-fill sensible defaults in `AddAppointmentDialog` so users only edit when needed.
+When the user changes the **Start Date**, auto-sync the **End Date** to match — same pattern as the existing Start Time → End Time auto-sync.
 
-### Changes to `src/components/appointments/AddAppointmentDialog.tsx`
+### Change to `src/components/appointments/AddAppointmentDialog.tsx`
 
-**1. Default `start_date` and `end_date` to today (IST)**
-- Update the `empty` form constant: replace `start_date: ""` and `end_date: ""` with today's date in `yyyy-MM-dd` format using the existing `getISTDateString()` helper from `@/lib/istTime`.
-- Applies only when adding a new appointment (edit mode still loads saved values via existing `useEffect`).
+**1. Track manual end-date edits**
+- Add a new ref: `endDateManuallyEdited = useRef(false)` (mirrors existing `endTimeManuallyEdited` pattern).
+- Reset to `false` when dialog opens for a new appointment; set to `true` when loading an existing appointment for edit.
 
-**2. Auto-set `end_time` to start_time + 1 hour**
-- Add an `onChange` handler for the Start Time input that:
-  - Sets `start_time` to the chosen value
-  - If `end_time` is empty OR was the previously auto-computed value, set `end_time = start_time + 1h` (wraps via 24h math; if it crosses midnight, also bump `end_date` to next day)
-- User can still manually override `end_time` afterwards — once they edit it manually, we won't overwrite again (track via a small `endTimeManuallyEdited` ref/state flag).
+**2. Auto-sync End Date on Start Date change**
+- Replace the current `Start Date` input's simple `onChange={(e) => set("start_date", e.target.value)}` with a handler that:
+  - Sets `start_date` to the new value
+  - If `endDateManuallyEdited.current === false`, also sets `end_date = newStartDate`
+- User can still edit End Date independently — once they do, set `endDateManuallyEdited.current = true` and stop auto-syncing.
 
-**3. Reset behavior**
-- When the dialog reopens for a new appointment, `empty` regenerates today's date fresh (move `empty` from a module constant into a function `makeEmpty()` so the date is always current, not stale from initial module load).
+**3. Mark End Date as manually edited on user input**
+- Add `onChange` to the End Date input that flips `endDateManuallyEdited.current = true` before calling `set("end_date", …)`.
 
-### Edge cases handled
-- **Midnight crossover**: If start_time is 23:30, end_time becomes 00:30 and end_date advances by one day.
-- **Edit mode**: Untouched — existing appointments load their saved dates/times.
-- **User manual edit of end_time**: Respected; auto-fill stops once user types in End Time.
+### Edge case interaction with existing Start Time → End Time logic
+- The existing `addOneHour` helper already handles midnight crossover by bumping `end_date`. Order of operations: if user picks Start Date first then Start Time, both auto-sync correctly (End Date follows Start Date; if Start Time crosses midnight, End Date advances one more day — still correct).
+- If user picks Start Time first (which already sets end_date via midnight logic) and then changes Start Date, the new Start Date wins for End Date (still respects "user hasn't manually edited end date").
 
 ### Files to edit
 - `src/components/appointments/AddAppointmentDialog.tsx` — single file change
 
 ### Out of scope
-- Changing the default 1-hour duration to a user preference (could be a Settings option later)
-- Validating end > start (no validation exists today; keeping consistent)
+- Validating End Date ≥ Start Date (no validation exists today; staying consistent)
+- Multi-day duration preference
 
