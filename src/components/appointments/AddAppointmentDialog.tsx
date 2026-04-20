@@ -67,12 +67,14 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
   const queryClient = useQueryClient();
   const [form, setForm] = useState(makeEmpty);
   const endTimeManuallyEdited = useRef(false);
+  const endDateManuallyEdited = useRef(false);
 
   useEffect(() => {
     if (editId) {
       const apt = appointments.find((a) => a.id === editId);
       if (apt) {
         endTimeManuallyEdited.current = true;
+        endDateManuallyEdited.current = true;
         setForm({
           title: apt.title || "",
           description: apt.description || "",
@@ -92,6 +94,7 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
       }
     } else {
       endTimeManuallyEdited.current = false;
+      endDateManuallyEdited.current = false;
       setForm(makeEmpty());
     }
   }, [editId, open]);
@@ -174,11 +177,31 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Start Date *</Label>
-              <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
+              <Input
+                type="date"
+                value={form.start_date}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setForm((p) => {
+                    const next = { ...p, start_date: newStart };
+                    if (!endDateManuallyEdited.current) {
+                      next.end_date = newStart;
+                    }
+                    return next;
+                  });
+                }}
+              />
             </div>
             <div>
               <Label>End Date</Label>
-              <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} />
+              <Input
+                type="date"
+                value={form.end_date}
+                onChange={(e) => {
+                  endDateManuallyEdited.current = true;
+                  set("end_date", e.target.value);
+                }}
+              />
             </div>
           </div>
 
