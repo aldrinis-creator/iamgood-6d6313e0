@@ -105,7 +105,7 @@ interface CouponResult {
 const Subscription = () => {
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { subscription, isActive, loading } = useSubscription();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
