@@ -83,6 +83,43 @@ Deno.serve(async (req) => {
         return json(data);
       }
 
+      case "notify_all": {
+        const { data: rows, error: fetchErr } = await adminClient
+          .from("premium_plus_waitlist")
+          .select("id, email, full_name")
+          .is("notified_at", null);
+        if (fetchErr) throw fetchErr;
+        if (!rows || rows.length === 0) return json({ queued: 0, failed: 0 });
+
+        let queued = 0;
+        let failed = 0;
+        for (const row of rows) {
+          try {
+            const { error: invokeErr } = await adminClient.functions.invoke(
+              "send-transactional-email",
+              {
+                body: {
+                  templateName: "premium-plus-launch",
+                  recipientEmail: row.email,
+                  idempotencyKey: `pp-launch-${row.id}`,
+                  templateData: { name: row.full_name },
+                },
+              }
+            );
+            if (invokeErr) throw invokeErr;
+            await adminClient
+              .from("premium_plus_waitlist")
+              .update({ notified_at: new Date().toISOString() })
+              .eq("id", row.id);
+            queued++;
+          } catch (e) {
+            console.error("notify_all failed for", row.email, e);
+            failed++;
+          }
+        }
+        return json({ queued, failed });
+      }
+
       default:
         return json({ error: "Invalid action" }, 400);
     }
