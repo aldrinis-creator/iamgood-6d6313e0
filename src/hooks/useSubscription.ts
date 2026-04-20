@@ -30,10 +30,19 @@ export function useSubscription() {
         amount_paise: number;
         coupon_code: string | null;
         razorpay_payment_id: string | null;
+        is_trial: boolean | null;
       } | null;
     },
     staleTime: 5 * 60 * 1000,
   });
+
+  const isTrial = !!subscription?.is_trial;
+  const trialDaysLeft = isTrial && subscription
+    ? Math.max(
+        0,
+        Math.ceil((new Date(subscription.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+      )
+    : 0;
 
   return {
     subscription,
@@ -42,5 +51,7 @@ export function useSubscription() {
     isPro: subscription?.plan_type === "pro",
     isBasic: subscription?.plan_type === "basic",
     plan: subscription?.plan_type ?? null,
+    isTrial,
+    trialDaysLeft,
   };
 }
