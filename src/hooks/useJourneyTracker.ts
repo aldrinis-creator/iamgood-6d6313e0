@@ -67,6 +67,9 @@ export function useJourneyTracker() {
   const [arrivingSoonDismissed, setArrivingSoonDismissed] = useState(false);
   const [routeDeviationDismissed, setRouteDeviationDismissed] = useState(false);
 
+  // Auto-SOS escalation state
+  const [pendingAutoSos, setPendingAutoSos] = useState(false);
+
   // Deviation tracking for report
   const deviationCountRef = useRef(0);
   const maxDeviationRef = useRef(0);
@@ -77,6 +80,14 @@ export function useJourneyTracker() {
   const autoEndTimer = useRef<ReturnType<typeof setTimeout>>();
   const arrivedAt = useRef<number | null>(null);
   const deviationNotifiedAt = useRef<number>(0);
+
+  // Feature 1: battery alert (one-shot per journey)
+  const batteryAlertSentRef = useRef(false);
+
+  // Feature 2: deviation -> auto-SOS escalation
+  const deviationEscalationTimer = useRef<ReturnType<typeof setTimeout>>();
+  const escalationFiredRef = useRef(false);
+  const checkInRespondedRef = useRef(false);
 
   // Fetch active journey on mount
   useEffect(() => {
