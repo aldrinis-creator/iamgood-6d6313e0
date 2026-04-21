@@ -15,9 +15,10 @@ interface PharmacyOrderRequest {
 }
 
 function normalizePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  // MSG91 expects E.164 without '+'. Default to India (91) if 10 digits.
-  if (digits.length === 10) return `91${digits}`;
+  let digits = (raw || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 10) digits = "91" + digits;
   return digits;
 }
 
@@ -30,11 +31,17 @@ Deno.serve(async (req) => {
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
     const templateId = Deno.env.get("MSG91_PHARMACY_TEMPLATE_ID");
 
+    console.log("[send-pharmacy-order] invoked", {
+      hasAuth: !!authKey,
+      hasTpl: !!templateId,
+      tplPreview: templateId ? `${templateId.slice(0, 8)}…` : null,
+    });
+
     if (!authKey || !templateId) {
-      console.error("MSG91 not configured", { hasAuth: !!authKey, hasTpl: !!templateId });
+      console.error("[send-pharmacy-order] MSG91 not configured");
       return new Response(
-        JSON.stringify({ error: "MSG91 not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "MSG91 not configured" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -50,20 +57,19 @@ Deno.serve(async (req) => {
 
     if (!pharmacy_phone || !patient_name || !doctor_name || !hospital_name || !order_date || !items_text) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Missing required fields" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const mobile = normalizePhone(pharmacy_phone);
-    if (mobile.length < 10) {
+    if (mobile.length < 11) {
       return new Response(
-        JSON.stringify({ error: "Invalid phone number" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Invalid phone number" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Cap items text length so it stays within WA template limits
     const safeItems = items_text.slice(0, 900);
 
     const payload = {
@@ -81,6 +87,8 @@ Deno.serve(async (req) => {
       ],
     };
 
+    console.log("[send-pharmacy-order] calling MSG91", { mobile, template_id: templateId });
+
     const res = await fetch(MSG91_FLOW_URL, {
       method: "POST",
       headers: {
@@ -90,18 +98,39 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const result = await res.json();
-    console.log("MSG91 pharmacy order response:", JSON.stringify(result));
+    const rawText = await res.text();
+    let result: unknown = rawText;
+    try { result = JSON.parse(rawText); } catch { /* not JSON */ }
+
+    console.log("[send-pharmacy-order] MSG91 response", {
+      status: res.status,
+      body: rawText.slice(0, 500),
+    });
+
+    // MSG91 returns HTTP 200 even for failures — must inspect body.type === "success"
+    const r = result as Record<string, unknown> | string;
+    const msgType = typeof r === "object" && r !== null ? (r as any).type : null;
+    const isSuccess = res.ok && (msgType === "success" || (typeof r === "object" && (r as any).message && !msgType));
+
+    if (!isSuccess) {
+      const errMsg = (typeof r === "object" && r !== null && ((r as any).message || (r as any).error)) || `HTTP ${res.status}`;
+      return new Response(
+        JSON.stringify({ success: false, error: String(errMsg), result, http_status: res.status }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const requestId = typeof r === "object" && r !== null ? (r as any).message : null;
 
     return new Response(
-      JSON.stringify({ success: res.ok, result }),
-      { status: res.ok ? 200 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: true, request_id: requestId, result }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("send-pharmacy-order error:", err);
+    console.error("[send-pharmacy-order] uncaught error:", err);
     return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: String(err) }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
