@@ -106,34 +106,52 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   } | null>(null);
   const [sending, setSending] = useState(false);
 
-  // Fetch guardian-placed orders
-  useEffect(() => {
+  // Load all pending-receipt orders for this user (self + guardian-placed) + realtime
+  const loadPendingOrders = useCallback(async () => {
     if (!session?.user?.id) return;
-    const fetchOrders = async () => {
-      const { data } = await supabase
-        .from("medication_orders" as any)
-        .select("*")
-        .eq("user_id", session.user.id)
-        .eq("status", "ordered")
-        .order("created_at", { ascending: false });
-      if (data) {
-        // Fetch orderer names
-        const enriched = await Promise.all((data as any[]).map(async (order: any) => {
-          if (order.ordered_by !== session.user.id) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name")
-              .eq("id", order.ordered_by)
-              .single();
-            return { ...order, orderer_name: profile?.full_name || "Guardian" };
-          }
-          return { ...order, orderer_name: null };
-        }));
-        setGuardianOrders(enriched.filter((o: any) => o.ordered_by !== session.user.id));
+    const { data } = await supabase
+      .from("medication_orders" as any)
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("status", "pending_receipt")
+      .order("created_at", { ascending: false });
+    if (!data) return;
+    const enriched = await Promise.all((data as any[]).map(async (order: any) => {
+      let orderer_name: string | null = null;
+      if (order.ordered_by !== session.user.id) {
+        const { data: profile } = await supabase
+          .from("profiles").select("full_name").eq("id", order.ordered_by).single();
+        orderer_name = profile?.full_name || "Guardian";
       }
-    };
-    fetchOrders();
+      return { ...order, orderer_name };
+    }));
+    setPendingOrders(enriched as PendingOrder[]);
+    setPendingReceivedQtys((prev) => {
+      const next = { ...prev };
+      for (const o of enriched) {
+        if (!next[o.id]) {
+          next[o.id] = Object.fromEntries(
+            (o.items as any[])
+              .filter((it: any) => it.med_id && !String(it.med_id).startsWith("ja-"))
+              .map((it: any) => [it.med_id, it.total_quantity ?? it.qty])
+          );
+        }
+      }
+      return next;
+    });
+    setGuardianOrders([]);
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    loadPendingOrders();
+    if (!session?.user?.id) return;
+    const channel = supabase
+      .channel(`med-orders-${session.user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "medication_orders", filter: `user_id=eq.${session.user.id}` },
+        () => loadPendingOrders())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadPendingOrders, session?.user?.id]);
 
   const markReceived = async () => {
     setMarkingReceived(true);
