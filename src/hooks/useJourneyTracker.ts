@@ -455,22 +455,64 @@ export function useJourneyTracker() {
     setArrivingSoonDismissed(false);
     setRouteDeviation(false);
     setRouteDeviationDismissed(false);
+    setPendingAutoSos(false);
     setExpectedRoute([]);
     deviationCountRef.current = 0;
     maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
+    batteryAlertSentRef.current = false;
+    escalationFiredRef.current = false;
+    checkInRespondedRef.current = false;
     if (autoEndTimer.current) clearTimeout(autoEndTimer.current);
     if (checkInTimer.current) clearInterval(checkInTimer.current);
+    if (deviationEscalationTimer.current) clearTimeout(deviationEscalationTimer.current);
   };
 
   const respondCheckIn = async (response: string) => {
     setShowCheckIn(false);
+    checkInRespondedRef.current = true;
+    // Cancel any pending deviation escalation
+    if (deviationEscalationTimer.current) {
+      clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = undefined;
+    }
     if (currentPos) {
       await saveLocationUpdate(currentPos.lat, currentPos.lng, response);
       await notifyGuardians("💬 Journey Check-in", `User responded: "${response}"`);
     }
   };
+
+  const cancelAutoSos = useCallback(() => {
+    setPendingAutoSos(false);
+    // Note: escalationFiredRef stays true so we don't re-escalate this journey
+  }, []);
+
+  const notifyAutoSosFired = useCallback(async () => {
+    if (!activeJourney) return;
+    await notifyGuardians(
+      "🚨 Auto-SOS Triggered",
+      `Auto-SOS triggered for user en route to ${activeJourney.destination_name}: route deviation + no check-in response.`,
+      "auto_sos"
+    );
+  }, [activeJourney, notifyGuardians]);
+
+  const createShareToken = useCallback(async (): Promise<string | null> => {
+    if (!activeJourney || !session?.user?.id) return null;
+    const { data, error } = await supabase
+      .from("journey_share_tokens")
+      .insert({
+        journey_id: activeJourney.id,
+        user_id: session.user.id,
+      })
+      .select("token")
+      .single();
+    if (error || !data) {
+      console.error("Failed to create share token", error);
+      return null;
+    }
+    return data.token;
+  }, [activeJourney, session?.user?.id]);
 
   return {
     activeJourney,
@@ -484,6 +526,10 @@ export function useJourneyTracker() {
     routeDeviation,
     routeDeviationDismissed,
     setRouteDeviationDismissed,
+    pendingAutoSos,
+    cancelAutoSos,
+    notifyAutoSosFired,
+    createShareToken,
     startJourney,
     endJourney,
     respondCheckIn,
