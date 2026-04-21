@@ -275,12 +275,16 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   };
 
   const sendWhatsApp = async () => {
-    const num = pharmacyNumber.replace(/\s+/g, "").replace(/^\+/, "");
+    const num = pharmacyNumber.replace(/\D/g, "");
     if (!num || num.length < 10) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
+
+    // CRITICAL: open a blank window SYNCHRONOUSLY (within the click event) so
+    // popup blockers don't kill the wa.me fallback after the await below.
+    const popup = window.open("", "_blank");
 
     const patientName =
       session?.user?.user_metadata?.full_name ||
@@ -293,11 +297,31 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
       .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
       .join("\n");
 
-    const fallback = () => {
-      const text = encodeURIComponent(buildOrderText());
-      window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+    const waUrl = `https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`;
+    const itemsSnapshot = [...orderItems];
+
+    const finalize = (via: "msg91" | "browser") => {
+      setPendingReceipt({
+        items: itemsSnapshot,
+        sentAt: Date.now(),
+        via,
+        pharmacyNumber,
+      });
+      setPendingReceivedQtys(
+        Object.fromEntries(
+          itemsSnapshot
+            .filter((it) => !it.med.id.startsWith("ja-"))
+            .map((it) => [it.med.id, it.med.total_quantity])
+        )
+      );
+      setLastSendInfo({ via, pharmacyNumber, itemCount: itemsSnapshot.length });
+      setOrderItems([]);
+      setOrderConfirmed(false);
+      setShowDoctorForm(false);
+      setTimeout(() => setLastSendInfo(null), 6000);
     };
 
+    setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
         body: {
@@ -310,17 +334,56 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         },
       });
       if (error || !data?.success) {
-        console.warn("MSG91 failed, falling back to wa.me", error || data);
-        toast.info("Opening WhatsApp as fallback...");
-        fallback();
-        return;
+        console.warn("MSG91 failed, falling back to wa.me:", JSON.stringify(error || data));
+        if (popup) popup.location.href = waUrl;
+        else window.open(waUrl, "_blank");
+        toast.info("Opened WhatsApp as fallback");
+        finalize("browser");
+      } else {
+        if (popup) popup.close();
+        toast.success("Order sent to pharmacy via WhatsApp ✓");
+        finalize("msg91");
       }
-      toast.success("Order sent to pharmacy via WhatsApp ✓");
     } catch (e) {
-      console.warn("send-pharmacy-order error, falling back", e);
-      toast.info("Opening WhatsApp as fallback...");
-      fallback();
+      console.warn("send-pharmacy-order error, falling back:", JSON.stringify(e));
+      if (popup) popup.location.href = waUrl;
+      else window.open(waUrl, "_blank");
+      toast.info("Opened WhatsApp as fallback");
+      finalize("browser");
     }
+    setSending(false);
+  };
+
+  // Mark pending-receipt items as received (after async send completes)
+  const markPendingReceived = async () => {
+    if (!pendingReceipt) return;
+    setMarkingPendingReceived(true);
+    try {
+      for (const item of pendingReceipt.items) {
+        if (item.med.id.startsWith("ja-")) continue;
+        const qty = pendingReceivedQtys[item.med.id] ?? item.med.total_quantity;
+        await supabase
+          .from("medications")
+          .update({ remaining_quantity: qty })
+          .eq("id", item.med.id);
+      }
+      toast.success("Stock updated successfully!");
+      setPendingReceipt(null);
+      setPendingReceivedQtys({});
+      load();
+      onRefillDone?.();
+    } catch {
+      toast.error("Failed to update stock");
+    }
+    setMarkingPendingReceived(false);
+  };
+
+  const resendLastOrder = () => {
+    if (!pendingReceipt) return;
+    const num = pendingReceipt.pharmacyNumber.replace(/\D/g, "");
+    const text = `🏥 *Medication Order Resend*\n\n` +
+      pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const saveAsPdf = () => {
