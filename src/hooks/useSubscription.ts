@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const { data: subscription, isLoading: loading } = useQuery({
     queryKey: ["subscription", user?.id],
@@ -36,13 +36,49 @@ export function useSubscription() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isTrial = !!subscription?.is_trial;
+  // Admin override: treat admins as premium-plus regardless of subscription.
+  // Option B (profile.role) with Option A (user_roles table) fallback.
+  const profileIsAdmin = profile?.role === "admin";
+
+  const { data: roleIsAdmin } = useQuery({
+    queryKey: ["is-admin", user?.id],
+    enabled: !!user?.id && !profileIsAdmin,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user!.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      return !!data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const isAdmin = profileIsAdmin || !!roleIsAdmin;
+
+  const isTrial = !isAdmin && !!subscription?.is_trial;
   const trialDaysLeft = isTrial && subscription
     ? Math.max(
         0,
         Math.ceil((new Date(subscription.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
       )
     : 0;
+
+  if (isAdmin) {
+    return {
+      subscription,
+      loading,
+      isActive: true,
+      isPro: true,
+      isPremium: true,
+      isPremiumPlus: true,
+      isBasic: false,
+      plan: "premium-plus" as const,
+      isTrial: false,
+      trialDaysLeft: 0,
+    };
+  }
 
   return {
     subscription,
