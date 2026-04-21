@@ -350,7 +350,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   };
 
   if (loading) return <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>;
-  if (meds.length === 0 && !pendingReceipt && !lastSendInfo) return null;
+  if (meds.length === 0 && pendingOrders.length === 0 && !lastSendInfo) return null;
 
   return (
     <div className="space-y-3">
