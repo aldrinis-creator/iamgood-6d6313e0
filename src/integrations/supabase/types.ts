@@ -1273,6 +1273,9 @@ export type Database = {
           id: string
           items: Json
           ordered_by: string
+          pharmacy_phone: string | null
+          received_at: string | null
+          send_method: string | null
           status: string
           user_id: string
         }
@@ -1283,6 +1286,9 @@ export type Database = {
           id?: string
           items?: Json
           ordered_by: string
+          pharmacy_phone?: string | null
+          received_at?: string | null
+          send_method?: string | null
           status?: string
           user_id: string
         }
@@ -1293,6 +1299,9 @@ export type Database = {
           id?: string
           items?: Json
           ordered_by?: string
+          pharmacy_phone?: string | null
+          received_at?: string | null
+          send_method?: string | null
           status?: string
           user_id?: string
         }
