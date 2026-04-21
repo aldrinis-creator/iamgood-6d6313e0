@@ -1,45 +1,54 @@
 
 
-## Plan — Independent Contact Us form in dropdown
+## Plan — Add Client-Side Validation to Contact Us Form
 
-Keep the dropdown "Contact Us" item, but instead of routing to the Help page's "Get in Touch" tab, open the Contact Us form as a standalone surface. Help's "Get in Touch" remains untouched and unrelated.
+Enhance the ContactUsForm with real-time field-level validation, inline error messages, and a disabled submit button when the form is invalid.
 
-### Changes
+### Changes to `src/components/ContactUsForm.tsx`
 
-**1. New file: `src/pages/ContactUs.tsx`**
-- Standalone page wrapped in `AppLayout`.
-- Page header: "Contact Us" with short subtitle ("Have a question, found a bug, or want to suggest a feature? Send us a message.").
-- Renders the existing `<ContactUsForm />` (already matches the screenshot: Full Name, Email, Phone with country code, Subject dropdown, Message with `0/1000` counter, Send Message button).
-- No VaultGate — public-facing form, accessible to any authenticated user.
+**1. Add validation state tracking**
+- Add `touched` state to track which fields have been interacted with
+- Add `errors` state derived from zod schema validation
+- Compute `isFormValid` boolean from schema validation
 
-**2. `src/App.tsx` — Register route**
-- Add `/contact-us` route inside `ProtectedRoute` (shared by both user and guardian roles, like `/my-profile` and `/help`).
+**2. Real-time validation on change/blur**
+- Validate on field blur (mark field as touched)
+- Re-validate all fields on any change to keep error states current
+- Show inline error messages below each invalid field
 
-**3. `src/components/AppHeader.tsx` — Update dropdown link**
-- Change the "Contact Us" dropdown item's navigation from `/help?tab=contact` to `/contact-us`.
-- Keep `Send` icon and label.
+**3. Visual error states**
+- Add `data-error` attribute or conditional class for invalid fields
+- Style: red border (`border-destructive`), red error text below field
+- Keep existing `maxLength` indicators
 
-**4. `src/pages/Help.tsx` — De-link from Contact Us**
-- Remove the "Get in Touch" tab entirely (it was the renamed Contact Us tab and is now redundant).
-- Remove `"contact"` from the `HelpTab` union and from the `tabs` array.
-- Remove the `useSearchParams` `?tab=contact` handling for that value.
-- Help retains FAQ, Settings, Privacy, Terms tabs only.
+**4. Disable submit button when invalid**
+- Change `disabled={submitting}` to `disabled={submitting || !isFormValid}`
+- Add visual distinction for disabled state (already handled by Button component)
 
-**5. `src/pages/MyProfile.tsx` — No change**
-- Already cleaned up in previous step (no Contact Us tab, no Tabs wrapper). Leave as is.
+**5. Error message display**
+- Below each field: `<p className="text-xs text-destructive mt-1">{errors.full_name}</p>` (conditional)
+- Keep toast error as fallback for any unexpected validation failures
 
-### Files
+### Implementation details
 
-**Create**
-- `src/pages/ContactUs.tsx`
+```typescript
+// New state
+const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-**Edit**
-- `src/App.tsx`
-- `src/components/AppHeader.tsx`
-- `src/pages/Help.tsx`
+// Derived validation
+const validation = contactSchema.safeParse({ full_name: fullName, email, phone, subject, message });
+const errors = validation.success ? {} : validation.error.issues.reduce((acc, i) => {
+  acc[i.path[0]] = i.message;
+  return acc;
+}, {} as Record<string, string>);
+const isFormValid = validation.success;
+
+// Field blur handler
+const handleBlur = (field: string) => setTouched(p => ({ ...p, [field]: true }));
+```
 
 ### Out of scope
-- No DB / RLS / edge function changes — `contact_submissions` and `admin-contacts` stay as-is.
-- No changes to `ContactUsForm.tsx` — it already matches the screenshot exactly.
-- No changes to `MyProfile.tsx`.
+- No server-side changes — validation remains client-side only (server has RLS)
+- No changes to `contact_submissions` table schema
+- No changes to admin-contacts edge function
 
