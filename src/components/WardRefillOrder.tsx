@@ -446,8 +446,9 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
                   <Badge variant="secondary" className="text-[10px] ml-auto">Saved</Badge>
                 </div>
               )}
-              <Button className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-white" onClick={sendWhatsApp}>
-                <MessageCircle className="w-4 h-4 mr-2" /> Send to Pharmacy via WhatsApp
+              <Button className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-white" onClick={sendWhatsApp} disabled={sending}>
+                {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}
+                {sending ? "Sending..." : "Send to Pharmacy via WhatsApp"}
               </Button>
             </CardContent>
           </Card>
