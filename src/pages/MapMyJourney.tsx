@@ -257,6 +257,24 @@ const MapMyJourney = () => {
     toast.success("Journey ended safely ✅");
   };
 
+  const handleShareLiveLink = async () => {
+    const token = await createShareToken();
+    if (!token) {
+      toast.error("Could not create share link");
+      return;
+    }
+    const url = `${window.location.origin}/j/${token}`;
+    const msg = `I'm sharing my live journey with you. Track me here: ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    toast.success("Live tracking link opened in WhatsApp");
+  };
+
+  const handleAutoSosTrigger = async () => {
+    await notifyAutoSosFired();
+    triggerSOS();
+    cancelAutoSos();
+  };
+
   // Map bounds
   const mapBounds = (() => {
     if (activeJourney && currentPos) {
