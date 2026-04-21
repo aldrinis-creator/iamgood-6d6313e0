@@ -3,8 +3,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MSG91_FLOW_URL = "https://control.msg91.com/api/v5/flow";
-const MSG91_REPORT_URL = "https://control.msg91.com/api/v5/report"; // /{request_id}/wa
+// MSG91 WhatsApp Outbound Bulk endpoint (the correct one for WA templates).
+const MSG91_WA_URL =
+  "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
+
+// Defaults from the working curl the user shared.
+const DEFAULT_INTEGRATED_NUMBER = "917045868482";
+const DEFAULT_TEMPLATE_NAME = "medication_order_notification";
+const DEFAULT_NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
+const DEFAULT_LANG = "en_US";
 
 interface PharmacyOrderRequest {
   pharmacy_phone: string;
@@ -23,43 +30,8 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
-async function pollDeliveryStatus(requestId: string, authKey: string): Promise<{
-  state: string;
-  raw: unknown;
-} | null> {
-  // Try a few endpoint variants — MSG91's report URL pattern has changed over time.
-  const candidates = [
-    `${MSG91_REPORT_URL}/${requestId}/wa`,
-    `${MSG91_REPORT_URL}/${requestId}`,
-    `https://control.msg91.com/api/v5/wa/report/${requestId}`,
-  ];
-  for (const url of candidates) {
-    try {
-      const r = await fetch(url, { headers: { authkey: authKey, accept: "application/json" } });
-      const text = await r.text();
-      let body: any = text;
-      try { body = JSON.parse(text); } catch { /* not json */ }
-      console.log("[send-pharmacy-order] poll", { url, status: r.status, body: text.slice(0, 400) });
-      if (r.ok && typeof body === "object" && body) {
-        // Try to extract a state field from common shapes
-        const data = body.data || body.report || body;
-        const state =
-          data?.status ||
-          data?.delivery_status ||
-          data?.state ||
-          (Array.isArray(data) && data[0]?.status) ||
-          "unknown";
-        return { state: String(state), raw: body };
-      }
-    } catch (e) {
-      console.warn("[send-pharmacy-order] poll error", { url, err: String(e) });
-    }
-  }
-  return null;
-}
-
 Deno.serve(async (req) => {
-  console.log("[send-pharmacy-order] request received", { method: req.method, url: req.url });
+  console.log("[send-pharmacy-order] request received", { method: req.method });
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -67,23 +39,31 @@ Deno.serve(async (req) => {
 
   try {
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    const templateId = Deno.env.get("MSG91_PHARMACY_TEMPLATE_ID");
+    const integratedNumber =
+      Deno.env.get("MSG91_INTEGRATED_NUMBER") || DEFAULT_INTEGRATED_NUMBER;
+    const templateName =
+      Deno.env.get("MSG91_PHARMACY_TEMPLATE_NAME") || DEFAULT_TEMPLATE_NAME;
+    const namespace =
+      Deno.env.get("MSG91_PHARMACY_TEMPLATE_ID") || DEFAULT_NAMESPACE;
+    const langCode = Deno.env.get("MSG91_PHARMACY_LANG") || DEFAULT_LANG;
 
-    console.log("[send-pharmacy-order] invoked", {
+    console.log("[send-pharmacy-order] config", {
       hasAuth: !!authKey,
-      hasTpl: !!templateId,
-      tplPreview: templateId ? `${templateId.slice(0, 8)}…` : null,
+      integratedNumber,
+      templateName,
+      namespace,
+      langCode,
     });
 
-    if (!authKey || !templateId) {
-      console.error("[send-pharmacy-order] MSG91 not configured");
+    if (!authKey) {
+      console.error("[send-pharmacy-order] MSG91_AUTH_KEY missing");
       return new Response(
         JSON.stringify({ success: false, error: "MSG91 not configured" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const body = await req.json() as PharmacyOrderRequest;
+    const body = (await req.json()) as PharmacyOrderRequest;
     const {
       pharmacy_phone,
       patient_name,
@@ -108,26 +88,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    const safeItems = items_text.slice(0, 900);
+    const safeItems = (items_text || "").slice(0, 900);
 
     const payload = {
-      template_id: templateId,
-      short_url: "0",
-      recipients: [
-        {
-          mobiles: mobile,
-          patient_name,
-          doctor_name,
-          hospital_name,
-          order_date,
-          items_list: safeItems,
+      integrated_number: integratedNumber,
+      content_type: "template",
+      payload: {
+        messaging_product: "whatsapp",
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: langCode, policy: "deterministic" },
+          namespace,
+          to_and_components: [
+            {
+              to: [mobile],
+              components: {
+                body_1: { type: "text", value: patient_name },
+                body_2: { type: "text", value: doctor_name },
+                body_3: { type: "text", value: hospital_name },
+                body_4: { type: "text", value: order_date },
+                body_5: { type: "text", value: safeItems },
+              },
+            },
+          ],
         },
-      ],
+      },
     };
 
-    console.log("[send-pharmacy-order] calling MSG91", { mobile, template_id: templateId });
+    console.log("[send-pharmacy-order] calling MSG91 WA", {
+      mobile,
+      templateName,
+      namespace,
+    });
 
-    const res = await fetch(MSG91_FLOW_URL, {
+    const res = await fetch(MSG91_WA_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -140,55 +135,37 @@ Deno.serve(async (req) => {
     let result: unknown = rawText;
     try { result = JSON.parse(rawText); } catch { /* not JSON */ }
 
-    console.log("[send-pharmacy-order] MSG91 response", {
+    console.log("[send-pharmacy-order] MSG91 WA response", {
       status: res.status,
-      body: rawText.slice(0, 500),
+      body: rawText.slice(0, 600),
     });
 
-    const r = result as Record<string, unknown> | string;
-    const msgType = typeof r === "object" && r !== null ? (r as any).type : null;
-    const isSuccess = res.ok && (msgType === "success" || (typeof r === "object" && (r as any).message && !msgType));
+    const obj = (typeof result === "object" && result !== null) ? (result as Record<string, unknown>) : null;
+    const msgType = obj?.type as string | undefined;
+    const requestId = obj?.request_id ?? obj?.message ?? null;
+    const errorMsg = (obj?.message && msgType === "error")
+      ? String(obj.message)
+      : (obj?.error ? String(obj.error) : null);
+
+    const isSuccess = res.ok && (msgType === "success" || (!!requestId && msgType !== "error"));
 
     if (!isSuccess) {
-      const errMsg = (typeof r === "object" && r !== null && ((r as any).message || (r as any).error)) || `HTTP ${res.status}`;
       return new Response(
-        JSON.stringify({ success: false, error: String(errMsg), result, http_status: res.status }),
+        JSON.stringify({
+          success: false,
+          error: errorMsg || `HTTP ${res.status}`,
+          http_status: res.status,
+          result,
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const requestId: string | null = typeof r === "object" && r !== null ? String((r as any).message ?? "") : null;
-
-    // Poll MSG91 report API to get the actual WhatsApp delivery state.
-    let deliveryState = "queued";
-    let deliveryRaw: unknown = null;
-    if (requestId) {
-      // Wait briefly so MSG91 has time to record an initial state.
-      await new Promise((r) => setTimeout(r, 2500));
-      const poll = await pollDeliveryStatus(requestId, authKey);
-      if (poll) {
-        deliveryState = poll.state;
-        deliveryRaw = poll.raw;
-      }
-    }
-
-    // Treat known terminal failures as failure so the client can fall back to wa.me.
-    const failedStates = ["failed", "rejected", "undelivered", "expired", "blocked", "invalid"];
-    const ds = String(deliveryState).toLowerCase();
-    const deliveryFailed = failedStates.some((s) => ds.includes(s));
-
-    console.log("[send-pharmacy-order] delivery verdict", {
-      requestId, deliveryState, deliveryFailed,
-    });
-
     return new Response(
       JSON.stringify({
-        success: !deliveryFailed,
-        delivery_state: deliveryState,
-        delivery_failed: deliveryFailed,
+        success: true,
         request_id: requestId,
         result,
-        delivery_report: deliveryRaw,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
