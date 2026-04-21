@@ -856,7 +856,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
                     className="text-base"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Include country code (e.g., +91 for India).
+                    Include country code (e.g., +91 for India). First-time pharmacies may need to reply to your WhatsApp Business message once before automated messages are accepted.
                   </p>
                   <Button
                     variant="outline"
