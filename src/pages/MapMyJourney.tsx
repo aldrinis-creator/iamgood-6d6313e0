@@ -418,6 +418,10 @@ const MapMyJourney = () => {
                   </div>
                 )}
 
+                <Button variant="outline" onClick={handleShareLiveLink} className="w-full h-11 text-sm font-medium gap-2">
+                  <Share2 className="w-4 h-4" /> Share live link via WhatsApp
+                </Button>
+
                 <Button variant="destructive" onClick={handleEndJourney} className="w-full h-12 text-md font-semibold mt-2">
                   End Journey
                 </Button>
