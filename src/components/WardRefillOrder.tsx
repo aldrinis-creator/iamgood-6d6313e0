@@ -374,46 +374,56 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
         </Card>
       )}
 
-      {/* Pending receipt card */}
-      {pendingReceipt && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Package className="w-4 h-4 text-primary" />
-                Order sent — pending receipt
-              </h4>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={resendLastOrder}>
-                <MessageCircle className="w-3 h-3 mr-1" /> Send again
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Sent to {pendingReceipt.pharmacyNumber} via {pendingReceipt.via === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}.
-            </p>
-            {pendingReceipt.items.map((item) => (
-              <div key={item.med.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex-1 truncate">{item.med.name}</span>
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-20 h-8 text-center text-sm"
-                  value={pendingReceivedQtys[item.med.id] ?? item.med.total_quantity}
-                  onChange={(e) => setPendingReceivedQtys(prev => ({ ...prev, [item.med.id]: parseInt(e.target.value) || 0 }))}
-                />
+      {/* Persistent pending orders (DB-backed) */}
+      {pendingOrders.map((order) => {
+        const qtys = pendingReceivedQtys[order.id] || {};
+        return (
+          <Card key={order.id} className="border-primary/30 bg-primary/5">
+            <CardContent className="p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Package className="w-4 h-4 text-primary" />
+                  {order.orderer_name ? `Order from ${order.orderer_name}` : "Order sent — pending receipt"}
+                </h4>
+                {order.pharmacy_phone && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => resendOrder(order)}>
+                    <MessageCircle className="w-3 h-3 mr-1" /> Send again
+                  </Button>
+                )}
               </div>
-            ))}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingReceipt(null)}>
-                Dismiss
-              </Button>
-              <Button size="sm" className="flex-1" disabled={markingPendingReceived} onClick={markPendingReceived}>
-                {markingPendingReceived ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-                ✓ Received
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              {order.pharmacy_phone && (
+                <p className="text-xs text-muted-foreground">
+                  Sent to {order.pharmacy_phone} via {order.send_method === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}.
+                </p>
+              )}
+              {order.items.filter((it) => it.med_id).map((item) => (
+                <div key={item.med_id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex-1 truncate">{item.name}</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-20 h-8 text-center text-sm"
+                    value={qtys[item.med_id] ?? item.total_quantity ?? item.qty}
+                    onChange={(e) => setPendingReceivedQtys(prev => ({
+                      ...prev,
+                      [order.id]: { ...(prev[order.id] || {}), [item.med_id]: parseInt(e.target.value) || 0 }
+                    }))}
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" disabled={dismissingOrder === order.id} onClick={() => dismissPendingOrder(order)}>
+                  Dismiss
+                </Button>
+                <Button size="sm" className="flex-1" disabled={markingPendingReceived === order.id} onClick={() => markPendingReceived(order)}>
+                  {markingPendingReceived === order.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Medications Received
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {meds.length > 0 && <>
       {/* Low Stock Alerts */}
