@@ -50,7 +50,7 @@ const AppHeader = () => {
               <DropdownMenuItem onClick={() => navigate("/my-profile")}>
                 <UserCircle className="w-4 h-4 mr-2" /> My Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/help?tab=contact")}>
+              <DropdownMenuItem onClick={() => navigate("/contact-us")}>
                 <Send className="w-4 h-4 mr-2" /> Contact Us
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

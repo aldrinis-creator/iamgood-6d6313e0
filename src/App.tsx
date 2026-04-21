@@ -29,6 +29,7 @@ import Appointments from "./pages/Appointments";
 import Help from "./pages/Help";
 import Messages from "./pages/Messages";
 import MyProfile from "./pages/MyProfile";
+import ContactUs from "./pages/ContactUs";
 import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
 import GuardianMessages from "./pages/GuardianMessages";
@@ -77,6 +78,7 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
               <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
+              <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
               {/* Public routes */}
               <Route path="/e/:token" element={<EmergencyProfile />} />
               <Route path="/install" element={<Install />} />
