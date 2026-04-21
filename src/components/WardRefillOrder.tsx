@@ -148,12 +148,15 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   };
 
   const sendWhatsApp = async () => {
-    const num = pharmacyNumber.replace(/\s+/g, "").replace(/^\+/, "");
+    const num = pharmacyNumber.replace(/\D/g, "");
     if (!num || num.length < 10) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
+
+    // Open blank window synchronously so popup blockers don't kill the fallback.
+    const popup = window.open("", "_blank");
 
     const orderDate = new Date().toLocaleDateString("en-IN", {
       day: "2-digit", month: "short", year: "numeric",
@@ -161,11 +164,21 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     const itemsText = orderItems
       .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
       .join("\n");
+    const waUrl = `https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`;
+    const itemsSnapshot = [...orderItems];
 
-    const fallback = () => {
-      window.open(`https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`, "_blank");
+    const finalize = (via: "msg91" | "browser") => {
+      setPendingReceipt({ items: itemsSnapshot, sentAt: Date.now(), via, pharmacyNumber });
+      setPendingReceivedQtys(
+        Object.fromEntries(itemsSnapshot.map((it) => [it.med.id, it.med.total_quantity]))
+      );
+      setLastSendInfo({ via, pharmacyNumber, itemCount: itemsSnapshot.length });
+      setOrderItems([]);
+      setOrderConfirmed(false);
+      setTimeout(() => setLastSendInfo(null), 6000);
     };
 
+    setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
         body: {
@@ -178,17 +191,53 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
         },
       });
       if (error || !data?.success) {
-        console.warn("MSG91 failed, falling back to wa.me", error || data);
-        toast.info("Opening WhatsApp as fallback...");
-        fallback();
-        return;
+        console.warn("MSG91 failed, falling back to wa.me:", JSON.stringify(error || data));
+        if (popup) popup.location.href = waUrl;
+        else window.open(waUrl, "_blank");
+        toast.info("Opened WhatsApp as fallback");
+        finalize("browser");
+      } else {
+        if (popup) popup.close();
+        toast.success(`Order sent to pharmacy for ${wardName} ✓`);
+        finalize("msg91");
       }
-      toast.success(`Order sent to pharmacy for ${wardName} ✓`);
     } catch (e) {
-      console.warn("send-pharmacy-order error, falling back", e);
-      toast.info("Opening WhatsApp as fallback...");
-      fallback();
+      console.warn("send-pharmacy-order error, falling back:", JSON.stringify(e));
+      if (popup) popup.location.href = waUrl;
+      else window.open(waUrl, "_blank");
+      toast.info("Opened WhatsApp as fallback");
+      finalize("browser");
     }
+    setSending(false);
+  };
+
+  const markPendingReceived = async () => {
+    if (!pendingReceipt) return;
+    setMarkingPendingReceived(true);
+    try {
+      for (const item of pendingReceipt.items) {
+        const qty = pendingReceivedQtys[item.med.id] ?? item.med.total_quantity;
+        await supabase
+          .from("medications")
+          .update({ remaining_quantity: qty })
+          .eq("id", item.med.id);
+      }
+      toast.success("Stock updated successfully!");
+      setPendingReceipt(null);
+      setPendingReceivedQtys({});
+      load();
+    } catch {
+      toast.error("Failed to update stock");
+    }
+    setMarkingPendingReceived(false);
+  };
+
+  const resendLastOrder = () => {
+    if (!pendingReceipt) return;
+    const num = pendingReceipt.pharmacyNumber.replace(/\D/g, "");
+    const text = `🏥 *Medication Order Resend for ${wardName}*\n\n` +
+      pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const saveAsPdf = () => {
