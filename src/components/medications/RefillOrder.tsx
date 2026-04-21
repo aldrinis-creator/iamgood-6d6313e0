@@ -447,6 +447,73 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   return (
     <div className="space-y-4">
+      {/* Send confirmation banner (auto-hides after 6s) */}
+      {lastSendInfo && (
+        <Card className="border-success/40 bg-success/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-6 h-6 text-success shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-success">Order sent to pharmacy</h4>
+                <p className="text-xs text-muted-foreground">
+                  via WhatsApp ({lastSendInfo.via === "msg91" ? "MSG91" : "browser link"}) · {lastSendInfo.itemCount} item{lastSendInfo.itemCount === 1 ? "" : "s"}
+                </p>
+                <p className="text-xs text-muted-foreground">To: {lastSendInfo.pharmacyNumber}</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setLastSendInfo(null)}>
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending receipt — persists until user marks as received */}
+      {pendingReceipt && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Order sent — pending receipt
+              </h4>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={resendLastOrder}>
+                <MessageCircle className="w-3 h-3 mr-1" /> Send again
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sent to {pendingReceipt.pharmacyNumber} via {pendingReceipt.via === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}. Tap "Received" once medicines arrive to update stock.
+            </p>
+            {pendingReceipt.items.filter(item => !item.med.id.startsWith("ja-")).map((item) => (
+              <div key={item.med.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex-1 truncate">{item.med.name}</span>
+                <Input
+                  type="number"
+                  min={1}
+                  className="w-20 h-8 text-center text-sm"
+                  value={pendingReceivedQtys[item.med.id] ?? item.med.total_quantity}
+                  onChange={(e) => setPendingReceivedQtys(prev => ({ ...prev, [item.med.id]: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingReceipt(null)}>
+                Dismiss
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1"
+                disabled={markingPendingReceived}
+                onClick={markPendingReceived}
+              >
+                {markingPendingReceived ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                ✓ Received
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Guardian-placed Orders */}
       {guardianOrders.length > 0 && (
         <div className="space-y-2">
