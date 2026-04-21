@@ -1,91 +1,46 @@
+## Plan — Admin bypasses all feature gating
 
+Give admin accounts unrestricted access to every plan-gated feature (Premium, Premium Plus, guardian limits, AI tools, PDF export, etc.) without changing their actual subscription record.
 
-## Plan — Admin Sidebar + Waitlist Auto-Notify on Launch
+### Approach
 
-Two features: a shared admin navigation sidebar replacing the current ad-hoc links, and a "Notify All" button on the waitlist page that sends a launch email to all un-notified waitlist users.
+Treat `role === 'admin'` as an implicit "premium-plus" tier inside the gating layer. No UI changes, no upgrade dialogs for admins, no per-feature edits.
 
-### A. Generic Admin Sidebar
+### Changes
 
-**New component — `src/components/AdminSidebar.tsx`**
+**1. `src/hooks/useSubscription.ts**`
 
-A lightweight sidebar using the existing `SidebarProvider` + `Sidebar` components from `src/components/ui/sidebar.tsx`. Three nav items:
-- Coupons (`/admin/coupons`) — Ticket icon
-- Waitlist (`/admin/waitlist`) — Users icon
-- Logout — LogOut icon (calls `signOut`, navigates to `/admin/login`)
+After loading the subscription, check the user's role via `user_roles` table (or reuse the existing `useAuth` profile if role is already exposed). If the user is an admin, override the returned `plan` to `"premium-plus"` and `status` to `"active"`. Keep the underlying DB row untouched — this is a runtime override only.
 
-Uses `NavLink` from `src/components/NavLink.tsx` for active-route highlighting. Collapsible to icon-only mode. `SidebarTrigger` in a small header bar so it is always accessible.
+**2. `src/lib/featureGating.ts**`
 
-**New layout wrapper — `src/components/AdminLayout.tsx`**
+Add an early-return in `canAccessFeature`: if the caller passes a sentinel plan or we expose a small helper `isAdminPlan`, skip tier comparison. Simpler: since step 1 already forces admins to `"premium-plus"`, `canAccessFeature` works unchanged. Same for `getGuardianLimit` — admins get the premium-plus limit (10) automatically.
 
-Replaces `AppLayout` on admin pages. Structure:
-```text
-SidebarProvider
-  div.min-h-screen.flex.w-full
-    AdminSidebar
-    div.flex-1.flex.flex-col
-      header (SidebarTrigger + page title)
-      main (children)
-```
+**3. Verification points (no code changes needed, but confirm flow)**
 
-No NavTabs, no SOSButton, no check-in hooks, no footer disclaimer — admin pages don't need any of that.
+- `useFeatureGate` → reads `plan` from `useSubscription` → admin sees `premium-plus` → `canAccess` returns true for everything → `UpgradeDialog` never opens.
+- `GuardianTab` guardian-limit check → uses `getGuardianLimit(plan)` → admin gets 10.
+- `Subscription.tsx` page → will show admin as "Premium Plus active" (cosmetic, acceptable; admins rarely visit this page).
 
-**Edit admin pages** (`AdminCoupons.tsx`, `AdminWaitlist.tsx`)
-- Replace `<AppLayout>` with `<AdminLayout>`.
-- Remove the manual `<Link to="/admin/...">` navigation buttons (sidebar handles it).
+### Detection of admin role
 
-**Edit `src/App.tsx`** — no route changes needed; only the layout wrapper inside each page changes.
+Two options for reading the role inside `useSubscription`:
 
-### B. Waitlist Auto-Notify on Launch
+- **Option A (preferred)**: Add a quick `supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle()` query alongside the subscription fetch. Cache it in the hook's state.
+- **Option B**: If `AuthContext.profile.role` already reflects admin status, read it from `useAuth()` directly — zero extra query.
 
-**New action in `admin-waitlist` edge function — `action: "notify_all"`**
+Will use Option B if `profiles.role` carries `'admin'` for admin accounts; otherwise fall back to Option A. Quick check during implementation. 
 
-- Fetches all waitlist rows where `notified_at IS NULL`.
-- For each row, invokes `send-transactional-email` with a new `premium-plus-launch` template, passing `{ name: row.full_name }` as `templateData` and `idempotencyKey: "pp-launch-{row.id}"`.
-- Updates `notified_at = now()` for each successfully queued row.
-- Returns `{ queued: N, failed: N }`.
-- Guard: if zero un-notified rows exist, returns immediately with `{ queued: 0 }`.
+ok with Option B with fall back to option A. 
 
-**New email template — `premium-plus-launch.tsx`**
+### Out of scope
 
-A branded React Email template announcing the Premium Plus Smart Ring is now available. Mirrors the styling of the existing `premium-plus-waitlist-confirmation.tsx`. Content:
-- Heading: "Premium Plus is here, {name}!"
-- Body: The Smart Ring is ready to ship. Early-bird pricing active.
-- CTA button linking to the subscription page.
-- Contact section (same as waitlist confirmation).
-
-Register in `registry.ts` as `'premium-plus-launch'`.
-
-**Frontend — `AdminWaitlist.tsx`**
-
-Add a "Notify All" button in the header (next to Export CSV). Behavior:
-- Shows count of un-notified entries (e.g., "Notify 12 users").
-- On click, opens a confirmation `AlertDialog`: "Send launch email to X waitlist users?"
-- On confirm, calls `invoke({ action: "notify_all" })`.
-- Shows toast with results ("Queued 12 emails").
-- Refreshes the list so `notified_at` timestamps update.
-- Disabled when no un-notified entries exist.
-
-**Important caveat — Email domain not configured**
-
-No email domain is set up for this project yet. The "Notify All" button will work (emails get queued), but they will not actually deliver until the email domain is configured and DNS is verified. The plan includes showing a warning banner on the waitlist page if email sending is not yet active, with a note to set up the email domain.
+- Changing the actual `subscriptions` table for admin users.
+- Hiding the Subscription page from admins.
+- Backend RLS changes (gating is purely client-side feature surfacing; backend already trusts admin role where it matters).
 
 ### Files
 
-**Create**
-- `src/components/AdminSidebar.tsx` — sidebar nav component
-- `src/components/AdminLayout.tsx` — admin layout wrapper (SidebarProvider + AdminSidebar + content area)
-- `supabase/functions/_shared/transactional-email-templates/premium-plus-launch.tsx` — launch notification email
-
 **Edit**
-- `src/pages/AdminCoupons.tsx` — swap `AppLayout` for `AdminLayout`, remove manual nav links
-- `src/pages/AdminWaitlist.tsx` — swap `AppLayout` for `AdminLayout`, remove manual nav links, add "Notify All" button + AlertDialog
-- `supabase/functions/admin-waitlist/index.ts` — add `notify_all` action
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register `premium-plus-launch`
 
-**Deploy**
-- `admin-waitlist` and `send-transactional-email` edge functions after changes
-
-### Email domain setup
-
-After implementation, the email domain needs to be configured for actual delivery. This is a one-time interactive setup step.
-
+- `src/hooks/useSubscription.ts` — admin role check + plan override.
