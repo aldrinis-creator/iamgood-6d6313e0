@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
 import type { SelectedAlternative } from "./MedicationManager";
 import JanAushadhiAlternatives from "./JanAushadhiAlternatives";
+import { normalizeWhatsAppNumber, buildWhatsAppUrl, PREPARING_WHATSAPP_HTML } from "@/lib/whatsapp";
 
 interface Medication {
   id: string;
@@ -275,16 +276,19 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   };
 
   const sendWhatsApp = async () => {
-    const num = pharmacyNumber.replace(/\D/g, "");
-    if (!num || num.length < 10) {
+    const num = normalizeWhatsAppNumber(pharmacyNumber);
+    if (!num || num.length < 11) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
 
     // CRITICAL: open a blank window SYNCHRONOUSLY (within the click event) so
-    // popup blockers don't kill the wa.me fallback after the await below.
+    // popup blockers don't kill the WhatsApp fallback after the await below.
     const popup = window.open("", "_blank");
+    if (popup) {
+      try { popup.document.write(PREPARING_WHATSAPP_HTML); popup.document.close(); } catch {}
+    }
 
     const patientName =
       session?.user?.user_metadata?.full_name ||
@@ -297,7 +301,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
       .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
       .join("\n");
 
-    const waUrl = `https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`;
+    const waUrl = buildWhatsAppUrl(num, buildOrderText());
     const itemsSnapshot = [...orderItems];
 
     const finalize = (via: "msg91" | "browser") => {
@@ -334,21 +338,21 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         },
       });
       if (error || !data?.success) {
-        console.warn("MSG91 failed, falling back to wa.me:", JSON.stringify(error || data));
+        console.warn("[send-pharmacy-order] MSG91 failed, falling back to WhatsApp link:", JSON.stringify({ error, data }));
         if (popup) popup.location.href = waUrl;
         else window.open(waUrl, "_blank");
-        toast.info("Opened WhatsApp as fallback");
+        toast.info("WhatsApp opened — please tap Send");
         finalize("browser");
       } else {
         if (popup) popup.close();
-        toast.success("Order sent to pharmacy via WhatsApp ✓");
+        toast.success("Order sent to pharmacy via MSG91 WhatsApp ✓");
         finalize("msg91");
       }
     } catch (e) {
-      console.warn("send-pharmacy-order error, falling back:", JSON.stringify(e));
+      console.warn("[send-pharmacy-order] invoke error, falling back:", JSON.stringify({ message: (e as Error)?.message, e: String(e) }));
       if (popup) popup.location.href = waUrl;
       else window.open(waUrl, "_blank");
-      toast.info("Opened WhatsApp as fallback");
+      toast.info("WhatsApp opened — please tap Send");
       finalize("browser");
     }
     setSending(false);
@@ -380,10 +384,9 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   const resendLastOrder = () => {
     if (!pendingReceipt) return;
-    const num = pendingReceipt.pharmacyNumber.replace(/\D/g, "");
     const text = `🏥 *Medication Order Resend*\n\n` +
       pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, "_blank");
+    window.open(buildWhatsAppUrl(pendingReceipt.pharmacyNumber, text), "_blank");
   };
 
   const saveAsPdf = () => {
