@@ -17,7 +17,7 @@ import {
   User, Phone, Calendar, Scale, Ruler, Heart, Shield,
   Save, Edit, ShieldCheck, Stethoscope,
   Trash2, Mail, Plus, Loader2, ChevronDown, Activity, Apple, Pill, AlertTriangle,
-  Printer, MessageCircle, Share2, Send,
+  Printer, MessageCircle, Share2,
 } from "lucide-react";
 import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
