@@ -222,8 +222,8 @@ Deno.serve(async (req) => {
 
       if (!matches || matches.length === 0) {
         await logAudit(adminClient, user.id, "2fa_failed", req);
-        return new Response(JSON.stringify({ error: "Invalid or expired code" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ success: false, error: "Invalid or expired code" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
