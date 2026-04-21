@@ -17,3 +17,4 @@ Services page lives at /services (user role) accessed from profile dropdown menu
 - [Urine Check](mem://features/urine-check) — Photo-based urine colour + 10-pad dipstick screening with red-flag escalation. Top-level tile in My Health.
 - [Pill Identifier](mem://features/pill-identifier) — Photo-based pill ID with prescription cross-check, banned-drug detection, guardian alerts on mismatch
 - [Tongue Analysis](mem://features/tongue-analysis) — Photo-based tongue screening with coating/colour/surface analysis and guardian alerts on red flags
+- [MMJ Safety Net](mem://features/mmj-safety-net) — Map My Journey safety: low-battery guardian alert, auto-SOS escalation on unanswered route deviation, public live-tracking share link.
