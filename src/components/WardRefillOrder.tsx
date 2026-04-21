@@ -466,7 +466,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
       <Card>
         <CardContent className="p-3 space-y-2">
           {meds
-            .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+            .filter((m) => !pendingOrders.some((o) => o.items.some((p) => p.med_id === m.id)))
             .map((med) => {
             const inOrder = orderItems.some((o) => o.med.id === med.id);
             if (inOrder) return null;
