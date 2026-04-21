@@ -1,71 +1,45 @@
 
 
-## Plan — Persistent "Pending Receipt" with "Medications Received" Footer
+## Plan — Fix the "function never reached" issue
 
-### Current behavior
-After sending an order via WhatsApp, a "Pending Receipt" card appears in `RefillOrder.tsx` and `WardRefillOrder.tsx` — but it's stored in component state only, so it disappears on page refresh, navigation away, or app reload.
+### Diagnosis
 
-### Goal
-The pending order card must persist across sessions, devices, and tabs until the User or Guardian explicitly confirms stock receipt. The footer button label changes to **"Medications Received"** for clarity.
+Your screenshot proves the MSG91 template `e1e205a8_3b76_4c20_bde4_9f124a35c8c4` works perfectly when called directly. But in our app:
 
----
+- **Zero edge function logs** exist for `send-pharmacy-order` — across all attempts.
+- **Zero edge HTTP request logs** exist either.
+- This means the request is being **rejected by Supabase before it reaches the function code**, or the function was never successfully deployed.
 
-### What I'll build
+The smoking gun: in `supabase/config.toml` the function is set to **`verify_jwt = true`**, while every other MSG91 function (`msg91-send`, `send-otp`, `send-sos-alert`, `notify-guardian-medication`) is set to `verify_jwt = false`. With JWT verification on, any request from an unauthenticated context (or a stale token, or a token sent with the wrong header) is rejected with `401` at the Supabase edge gateway — **before** the function executes, so nothing is logged. That matches the symptom exactly.
 
-**1. New table `medication_orders`** (already partially referenced via `confirmOrder` insert, but not used for UI persistence)
+### What I'll change
 
-```text
-id              uuid pk
-user_id         uuid (ward owner of medications)
-ordered_by      uuid (user OR guardian who placed order)
-items           jsonb  [{ med_id, name, dosage, qty }]
-pharmacy_phone  text
-send_method     text   'msg91' | 'browser'
-status          text   'pending_receipt' | 'received' | 'dismissed'
-sent_at         timestamptz default now()
-received_at     timestamptz nullable
-```
+**1. `supabase/config.toml`** — flip `send-pharmacy-order` to `verify_jwt = false`, matching every other outbound MSG91 function.
 
-**RLS policies:**
-- User can `SELECT/UPDATE` rows where `user_id = auth.uid()`.
-- Guardian can `SELECT/INSERT/UPDATE` rows where `user_id` is one of their accepted wards (via existing `guardians` table).
-- `INSERT` requires `ordered_by = auth.uid()`.
+**2. Force a redeploy of `send-pharmacy-order`** so logs start flowing and we can confirm MSG91 is actually being called.
 
-**2. Update both refill components**
+**3. Add one safety log line** at the very top of the function (before any other code) so we can prove invocation even if a later parse step fails.
 
-- On successful WhatsApp send (MSG91 or fallback), `INSERT` a row with `status = 'pending_receipt'` and `pharmacy_phone`, `send_method`, `items` snapshot.
-- On mount, `SELECT` open orders (`status = 'pending_receipt'`) for the current ward and render them as the pending-receipt card(s).
-- Subscribe via Supabase Realtime so a guardian sees orders the user placed (and vice versa) without refreshing.
-- Filter selectable Low Stock + Order Medications lists to exclude meds present in any open pending order (cross-session aware).
+**4. Test the function directly** via curl after deploy to verify MSG91 returns success with the same payload our app sends, confirming nothing else is wrong.
 
-**3. Pending Receipt card UI changes**
+**5. Re-test from the app** — the MSG91 success branch should now fire instead of always falling through to the `wa.me` fallback. Toast will show **"Order sent to pharmacy via MSG91 WhatsApp ✓"**, and the popup will close automatically (no second WhatsApp tab).
 
-- Persistent across reloads, navigation, tabs, and User ↔ Guardian.
-- Footer button relabeled from `✓ Received` to **"Medications Received"** (full-width, primary color).
-- Secondary actions retained: **Send again**, **Dismiss** (sets `status = 'dismissed'`, removes card without updating stock — for cancelled/duplicate orders).
-- On **"Medications Received"** tap: update stock (`remaining_quantity`) per item using current edited qty, then set order `status = 'received'`, `received_at = now()`.
+### Files modified
 
-**4. Cleanup**
-Remove the now-redundant in-memory `pendingReceipt` and `lastSendInfo` state in favor of the DB-backed list. The brief 6s success banner stays (transient toast-style confirmation), but the persistent card is now DB-driven.
+- `supabase/config.toml` — single line change
+- `supabase/functions/send-pharmacy-order/index.ts` — add one early log line
 
----
+### Why this isn't a template / payload issue
 
-### Files
+Your screenshot confirms the template renders correctly with the exact variable names we're sending (`patient_name`, `doctor_name`, `hospital_name`, `order_date`, `items_list`). No template change is needed.
 
-**New migration:** `medication_orders` table + RLS policies (a basic table already exists per the `confirmOrder` insert; migration will add missing columns `pharmacy_phone`, `send_method`, `received_at`, normalize `status` enum, and add RLS if missing — I'll inspect the current schema first and only add what's missing).
+### Why this isn't a phone-format issue
 
-**Modified:**
-- `src/components/medications/RefillOrder.tsx` — User app
-- `src/components/WardRefillOrder.tsx` — Guardian app
+MSG91 accepts the `91XXXXXXXXXX` format we already normalize to. The screenshot proves it.
 
-No edge function changes needed.
+### What to expect after the fix
 
----
-
-### Edge cases handled
-
-- **Multiple open orders:** rendered as a stacked list, each with its own Receive/Dismiss controls.
-- **Guardian places order, user marks received** (or vice versa): Realtime keeps both views in sync.
-- **Partial receipt:** user can edit qty per item before tapping "Medications Received" (existing behavior preserved).
-- **Cancelled order:** **Dismiss** clears the card without touching stock.
+- Edge function logs will start appearing for every send.
+- App will route through MSG91 (no manual WhatsApp tap needed by the User/Guardian).
+- The `wa.me` fallback stays as a safety net in case MSG91 ever rejects a future payload.
 
