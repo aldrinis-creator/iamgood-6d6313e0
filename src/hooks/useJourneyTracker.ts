@@ -218,6 +218,86 @@ export function useJourneyTracker() {
     };
   }, [activeJourney?.id, activeJourney?.status, settings.journeyCheckInFrequency]);
 
+  // Feature 1: Low-battery guardian alert (one-shot per journey)
+  useEffect(() => {
+    if (!activeJourney || activeJourney.status !== "active") return;
+    if (!("getBattery" in navigator)) return;
+
+    let cancelled = false;
+    let batt: any = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const check = () => {
+      if (cancelled || !batt || batteryAlertSentRef.current) return;
+      const level = Math.round(batt.level * 100);
+      if (level <= 15 && !batt.charging) {
+        batteryAlertSentRef.current = true;
+        notifyGuardians(
+          "🔋 Battery Critical",
+          `User's battery is at ${level}% during journey to ${activeJourney.destination_name}. Last known location attached.`,
+          "battery_critical"
+        );
+        // Save a fresh location update so guardians see the latest pin
+        if (currentPos) {
+          saveLocationUpdate(currentPos.lat, currentPos.lng);
+        }
+      }
+    };
+
+    (navigator as any).getBattery().then((b: any) => {
+      if (cancelled) return;
+      batt = b;
+      check();
+      b.addEventListener("levelchange", check);
+      b.addEventListener("chargingchange", check);
+      // Poll every 60s as a backup (some browsers don't fire events reliably)
+      intervalId = setInterval(check, 60000);
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      if (batt) {
+        try {
+          batt.removeEventListener("levelchange", check);
+          batt.removeEventListener("chargingchange", check);
+        } catch {}
+      }
+    };
+  }, [activeJourney?.id, activeJourney?.status, currentPos]);
+
+  // Feature 2: Deviation -> escalation. When deviation starts, force check-in popup
+  // and start a 5-minute unanswered-response timer. If unanswered, fire pendingAutoSos.
+  useEffect(() => {
+    if (!activeJourney || activeJourney.status !== "active") return;
+
+    if (routeDeviation && !escalationFiredRef.current) {
+      checkInRespondedRef.current = false;
+      setShowCheckIn(true);
+
+      if (deviationEscalationTimer.current) clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = setTimeout(() => {
+        // Only escalate if still off-route and check-in still unanswered
+        if (routeDeviation && !checkInRespondedRef.current && !escalationFiredRef.current) {
+          escalationFiredRef.current = true;
+          setPendingAutoSos(true);
+        }
+      }, 5 * 60 * 1000);
+    }
+
+    if (!routeDeviation) {
+      // Back on route — cancel escalation
+      if (deviationEscalationTimer.current) {
+        clearTimeout(deviationEscalationTimer.current);
+        deviationEscalationTimer.current = undefined;
+      }
+    }
+
+    return () => {
+      // cleanup handled on next run / journey end
+    };
+  }, [routeDeviation, activeJourney?.id, activeJourney?.status]);
+
   const saveLocationUpdate = async (lat: number, lng: number, response?: string) => {
     if (!activeJourney || !session?.user?.id) return;
     const { data } = await supabase.from("journey_updates").insert({
