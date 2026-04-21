@@ -49,16 +49,67 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
 
-  // Pending-receipt + send-confirmation state
-  const [pendingReceipt, setPendingReceipt] = useState<{
-    items: OrderItem[]; sentAt: number; via: "msg91" | "browser"; pharmacyNumber: string;
-  } | null>(null);
-  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, number>>({});
-  const [markingPendingReceived, setMarkingPendingReceived] = useState(false);
+  // Persistent pending orders (DB-backed)
+  interface PendingOrder {
+    id: string;
+    items: { med_id: string; name: string; dosage: string; qty: number; total_quantity?: number }[];
+    pharmacy_phone: string | null;
+    send_method: string | null;
+    created_at: string;
+    ordered_by: string;
+    orderer_name?: string | null;
+  }
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, Record<string, number>>>({});
+  const [markingPendingReceived, setMarkingPendingReceived] = useState<string | null>(null);
+  const [dismissingOrder, setDismissingOrder] = useState<string | null>(null);
   const [lastSendInfo, setLastSendInfo] = useState<{
     via: "msg91" | "browser"; pharmacyNumber: string; itemCount: number;
   } | null>(null);
   const [sending, setSending] = useState(false);
+
+  const loadPendingOrders = useCallback(async () => {
+    const { data } = await supabase
+      .from("medication_orders" as any)
+      .select("*")
+      .eq("user_id", wardUserId)
+      .eq("status", "pending_receipt")
+      .order("created_at", { ascending: false });
+    if (!data) return;
+    const enriched = await Promise.all((data as any[]).map(async (order: any) => {
+      let orderer_name: string | null = null;
+      if (order.ordered_by !== wardUserId) {
+        const { data: profile } = await supabase
+          .from("profiles").select("full_name").eq("id", order.ordered_by).single();
+        orderer_name = profile?.full_name || null;
+      }
+      return { ...order, orderer_name };
+    }));
+    setPendingOrders(enriched as PendingOrder[]);
+    setPendingReceivedQtys((prev) => {
+      const next = { ...prev };
+      for (const o of enriched) {
+        if (!next[o.id]) {
+          next[o.id] = Object.fromEntries(
+            (o.items as any[])
+              .filter((it: any) => it.med_id)
+              .map((it: any) => [it.med_id, it.total_quantity ?? it.qty])
+          );
+        }
+      }
+      return next;
+    });
+  }, [wardUserId]);
+
+  useEffect(() => {
+    loadPendingOrders();
+    const channel = supabase
+      .channel(`med-orders-ward-${wardUserId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "medication_orders", filter: `user_id=eq.${wardUserId}` },
+        () => loadPendingOrders())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadPendingOrders, wardUserId]);
 
   const markReceived = async () => {
     setMarkingReceived(true);
