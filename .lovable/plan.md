@@ -1,48 +1,127 @@
 
 
-## Plan — Fix Pharmacy WhatsApp Send + UX
+## Plan — Fix Pharmacy WhatsApp 404 + MSG91 Send Confirmation
 
-### Three problems found
+### Screenshot diagnosis
 
-1. **MSG91 send not happening, fallback not opening either** — likely caused by the popup-blocker rule: `wa.me` is opened from inside an `await`-resolved callback, so the browser treats it as a non-user-gesture and silently blocks it. Also, **no edge-function logs exist** for `send-pharmacy-order` — meaning either it never deployed, or invoke is failing silently before reaching the function. Both `RefillOrder` and `WardRefillOrder` have the same bug.
-2. **Ordered medication stays visible in selection list** — after a successful WhatsApp send, the order panel still shows the medications as "in order" instead of clearing them out.
-3. **No clear delivery confirmation** — the success toast is brief and doesn't visually distinguish MSG91 success vs `wa.me` fallback vs failure.
+The screenshot shows WhatsApp opened, but landed on `api.whatsapp.com` with **404 — This page doesn't exist**. That means the fallback is no longer fully blocked; it is opening a WhatsApp URL that WhatsApp rejects.
 
-### Fix 1 — Send + fallback reliability
+The most likely cause is phone formatting: the app strips symbols but does **not** convert a 10-digit Indian number into international WhatsApp format. For example:
 
-In **both** `src/components/medications/RefillOrder.tsx` and `src/components/WardRefillOrder.tsx`:
+```text
+9876543210   -> currently sent as 9876543210
+Required     -> 919876543210
+```
 
-- Open the `wa.me` window **synchronously upfront** (`window.open("", "_blank")`) before any `await`, then either navigate it to `wa.me/...` (fallback path) or close it (MSG91 success path). This is the standard fix for popup blockers in async flows.
-- On MSG91 invoke error, log the actual error object (currently only `console.warn` — add full stringification so we can see what's failing).
-- Also defensively normalize the phone in the client (strip `+`, spaces, dashes) before sending — matches what the function expects.
+I also checked backend function logs for `send-pharmacy-order`: there are currently **no logs**, which means the MSG91 function is either not deployed/reached, blocked before execution, or not being invoked from the current app session.
 
-### Fix 2 — Clear ordered meds after successful send
+---
 
-After **either** MSG91 success **or** `wa.me` fallback opens:
-- Call `setOrderItems([])` to empty the cart.
-- Reset `setOrderConfirmed(false)` so the confirmation panel collapses.
-- Keep the medications in `allMeds` (they aren't deleted from the DB) but they'll no longer appear as "in order" — the **Order** button reappears beside each med, and low-stock items still show in the alerts list with a fresh **Order** button.
-- The "Mark as Received" workflow moves to a separate persistent state (`pendingReceipt`) so the user can still update stock after the order panel resets — show a single small "Order sent — pending receipt" card with the items and the "✓ Received — Update Stock" button.
+## What I will build
 
-### Fix 3 — Clear delivery confirmation
+### 1. Fix WhatsApp fallback URL generation
 
-Replace the brief toast with a **dedicated confirmation card** that appears for ~5 seconds after sending, showing:
-- ✓ Green check + heading: **"Order sent to pharmacy"**
-- Sub-line: **"via WhatsApp (MSG91)"** on success, or **"via WhatsApp (browser link)"** on fallback.
-- Pharmacy number it was sent to.
-- Items count.
-- A "Send again" button in case the pharmacy didn't receive it.
+Create a single reliable WhatsApp phone normalizer used by both User and Guardian refill flows:
 
-Toast remains as a backup quick confirmation.
+```text
++91 98765 43210  -> 919876543210
+9876543210       -> 919876543210
+09876543210      -> 919876543210
+00919876543210   -> 919876543210
+```
 
-### Files modified
+Then build the fallback URL with the normalized number:
 
-- `src/components/medications/RefillOrder.tsx` — User app
-- `src/components/WardRefillOrder.tsx` — Guardian app
+```text
+https://api.whatsapp.com/send?phone=919876543210&text=...
+```
 
-No edge-function or DB changes needed. The existing `send-pharmacy-order` function and `MSG91_PHARMACY_TEMPLATE_ID` secret stay as-is. If MSG91 still returns errors after the popup-blocker fix, the next step is to inspect the actual MSG91 response in the logs (now reachable because the function will be hit) and verify the template ID format with MSG91 — but that's a follow-up only if needed.
+This should prevent the 404 page shown in the screenshot.
 
-### Why the popup-blocker is the most likely root cause
+---
 
-`window.open()` called after `await supabase.functions.invoke(...)` runs outside the original click event context. Chrome, Safari, and Firefox all silently block this — no error, no popup, no toast progression. The user sees: button click → nothing happens → no WhatsApp opens → no fallback opens. This matches the symptom exactly.
+### 2. Make the fallback popup more reliable
+
+In both refill components:
+
+- Validate and normalize the pharmacy number before sending.
+- Open the popup synchronously on button tap.
+- Put a small “Preparing WhatsApp…” page in the popup while MSG91 is attempted.
+- If MSG91 fails, navigate that same popup to the corrected WhatsApp URL.
+- If MSG91 succeeds, close the popup.
+
+This keeps the popup-blocker fix while also avoiding invalid WhatsApp URLs.
+
+---
+
+### 3. Deploy and harden the MSG91 pharmacy backend function
+
+Update `send-pharmacy-order` to:
+
+- Parse MSG91 response as text first, then JSON if possible.
+- Log HTTP status and full MSG91 response.
+- Treat MSG91 as successful only when the response indicates success, not just because HTTP status is `200`.
+- Return a clean `{ success: false, error, result }` when MSG91 rejects the template, phone, or payload.
+- Re-deploy the function so calls produce logs.
+
+This will make it clear whether failures are from:
+- missing/incorrect `MSG91_PHARMACY_TEMPLATE_ID`
+- invalid MSG91 template variable mapping
+- phone number rejection
+- auth/session issue
+- function deployment issue
+
+---
+
+### 4. Remove selected medicines from selectable lists immediately
+
+When a User or Guardian taps **Order** from Low Stock Alerts or Order Medications:
+
+- That medicine will move into **Your Order**.
+- It will disappear from the selectable Low Stock list.
+- It will disappear from the selectable Order Medications list.
+- If the user removes it from the cart, it reappears.
+- After sending, it remains in the **Order sent — pending receipt** card until received/dismissed.
+
+This applies to both:
+- `src/components/medications/RefillOrder.tsx`
+- `src/components/WardRefillOrder.tsx`
+
+---
+
+### 5. Improve post-send confirmation wording
+
+Because a browser `wa.me` / WhatsApp composer link cannot technically confirm delivery, the UI should avoid a false “delivered” claim.
+
+The confirmation card will show one of these:
+
+- **Order sent to pharmacy via MSG91 WhatsApp**
+  - When MSG91 accepts the message
+  - Show provider request ID if MSG91 returns one
+
+- **WhatsApp opened — please tap Send**
+  - When fallback opens the WhatsApp composer
+  - This makes it clear the final send is done inside WhatsApp
+
+The persistent pending card will keep:
+
+- pharmacy number
+- send method
+- items ordered
+- **Send again**
+- **Received — Update Stock**
+
+---
+
+## Files to update
+
+- `src/components/medications/RefillOrder.tsx`
+- `src/components/WardRefillOrder.tsx`
+- `supabase/functions/send-pharmacy-order/index.ts`
+
+Optionally add a tiny shared utility file if cleaner:
+
+- `src/lib/whatsapp.ts`
+
+No database changes are required for this fix.
 
