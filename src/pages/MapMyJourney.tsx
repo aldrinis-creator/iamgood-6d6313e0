@@ -726,6 +726,13 @@ const MapMyJourney = () => {
         onRespond={respondCheckIn}
         onDismiss={() => setShowCheckIn(false)}
       />
+
+      <JourneyAutoSosOverlay
+        open={pendingAutoSos}
+        onCancel={cancelAutoSos}
+        onTrigger={handleAutoSosTrigger}
+        destinationName={activeJourney?.destination_name}
+      />
     </AppLayout>
   );
 };
