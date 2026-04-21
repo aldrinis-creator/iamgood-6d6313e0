@@ -682,7 +682,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
               Order medications from partner pharmacies with doorstep delivery.
             </p>
             {allMeds
-              .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+              .filter((m) => !pendingOrders.some((o) => o.items.some((p) => p.med_id === m.id)))
               .map((med) => {
               const inOrder = orderItems.some((o) => o.med.id === med.id);
               if (inOrder) return null;
