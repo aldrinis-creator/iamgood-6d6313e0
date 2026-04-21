@@ -136,14 +136,48 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     return text;
   };
 
-  const sendWhatsApp = () => {
+  const sendWhatsApp = async () => {
     const num = pharmacyNumber.replace(/\s+/g, "").replace(/^\+/, "");
     if (!num || num.length < 10) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`, "_blank");
+
+    const orderDate = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+    const itemsText = orderItems
+      .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
+      .join("\n");
+
+    const fallback = () => {
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`, "_blank");
+    };
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
+        body: {
+          pharmacy_phone: num,
+          patient_name: wardName,
+          doctor_name: "—",
+          hospital_name: "—",
+          order_date: orderDate,
+          items_text: itemsText,
+        },
+      });
+      if (error || !data?.success) {
+        console.warn("MSG91 failed, falling back to wa.me", error || data);
+        toast.info("Opening WhatsApp as fallback...");
+        fallback();
+        return;
+      }
+      toast.success(`Order sent to pharmacy for ${wardName} ✓`);
+    } catch (e) {
+      console.warn("send-pharmacy-order error, falling back", e);
+      toast.info("Opening WhatsApp as fallback...");
+      fallback();
+    }
   };
 
   const saveAsPdf = () => {

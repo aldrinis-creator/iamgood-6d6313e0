@@ -257,15 +257,53 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
     return text;
   };
 
-  const sendWhatsApp = () => {
+  const sendWhatsApp = async () => {
     const num = pharmacyNumber.replace(/\s+/g, "").replace(/^\+/, "");
     if (!num || num.length < 10) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
-    const text = encodeURIComponent(buildOrderText());
-    window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+
+    const patientName =
+      session?.user?.user_metadata?.full_name ||
+      session?.user?.email?.split("@")[0] ||
+      "Patient";
+    const orderDate = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+    const itemsText = orderItems
+      .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
+      .join("\n");
+
+    const fallback = () => {
+      const text = encodeURIComponent(buildOrderText());
+      window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+    };
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
+        body: {
+          pharmacy_phone: num,
+          patient_name: patientName,
+          doctor_name: doctorInfo.doctorName || "—",
+          hospital_name: doctorInfo.hospitalName || "—",
+          order_date: orderDate,
+          items_text: itemsText,
+        },
+      });
+      if (error || !data?.success) {
+        console.warn("MSG91 failed, falling back to wa.me", error || data);
+        toast.info("Opening WhatsApp as fallback...");
+        fallback();
+        return;
+      }
+      toast.success("Order sent to pharmacy via WhatsApp ✓");
+    } catch (e) {
+      console.warn("send-pharmacy-order error, falling back", e);
+      toast.info("Opening WhatsApp as fallback...");
+      fallback();
+    }
   };
 
   const saveAsPdf = () => {
