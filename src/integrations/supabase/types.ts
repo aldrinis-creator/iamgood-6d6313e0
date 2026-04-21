@@ -395,6 +395,51 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_submissions: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          message: string
+          phone: string | null
+          responded_at: string | null
+          source: string
+          status: string
+          subject: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          message: string
+          phone?: string | null
+          responded_at?: string | null
+          source?: string
+          status?: string
+          subject: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          message?: string
+          phone?: string | null
+          responded_at?: string | null
+          source?: string
+          status?: string
+          subject?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       coupons: {
         Row: {
           applicable_plans: string[]
