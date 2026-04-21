@@ -71,6 +71,7 @@ function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
 
 const MapMyJourney = () => {
   const { session } = useAuth();
+  const { triggerSOS } = useApp();
   const {
     activeJourney,
     updates,
@@ -83,6 +84,10 @@ const MapMyJourney = () => {
     routeDeviation,
     routeDeviationDismissed,
     setRouteDeviationDismissed,
+    pendingAutoSos,
+    cancelAutoSos,
+    notifyAutoSosFired,
+    createShareToken,
     startJourney,
     endJourney,
     respondCheckIn,
