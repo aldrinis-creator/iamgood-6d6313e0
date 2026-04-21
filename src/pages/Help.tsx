@@ -39,7 +39,7 @@ const iconMap: Record<string, React.ReactNode> = {
   crown: <Crown className="w-5 h-5 text-warning" />,
 };
 
-type HelpTab = "faq" | "contact" | "settings" | "privacy" | "terms";
+type HelpTab = "faq" | "settings" | "privacy" | "terms";
 
 const Help = () => {
   const [searchParams] = useSearchParams();
@@ -51,14 +51,13 @@ const Help = () => {
 
   useEffect(() => {
     const t = searchParams.get("tab") as HelpTab | null;
-    if (t && ["faq", "contact", "settings", "privacy", "terms"].includes(t)) {
+    if (t && ["faq", "settings", "privacy", "terms"].includes(t)) {
       setActiveTab(t);
     }
   }, [searchParams]);
 
   const tabs: { id: HelpTab; label: string; icon: React.ReactNode }[] = [
     { id: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
-    { id: "contact", label: "Get in Touch", icon: <Mail className="w-4 h-4" /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon className="w-4 h-4" /> },
     { id: "privacy", label: "Privacy", icon: <Shield className="w-4 h-4" /> },
     { id: "terms", label: "Terms", icon: <FileText className="w-4 h-4" /> },
@@ -240,38 +239,6 @@ const Help = () => {
             <p className="text-xs text-center text-muted-foreground pt-2">
               FAQ version: {FAQ_VERSION} · This document is for informational purposes only.
             </p>
-          </div>
-        )}
-
-        {activeTab === "contact" && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-primary" />
-                  Get in Touch
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Have questions, feedback, or need assistance? We'd love to hear from you.
-                </p>
-                <div className="space-y-2">
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-sm font-medium">Email Support</p>
-                    <p className="text-sm text-primary">checkin_support@futurewave.in</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-sm font-medium">WhatsApp Support</p>
-                    <p className="text-sm text-primary">+91 7045868482</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-sm font-medium">Response Time</p>
-                    <p className="text-xs text-muted-foreground">We typically respond within 24 hours on business days.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
