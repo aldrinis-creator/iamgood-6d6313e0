@@ -23,6 +23,8 @@ function normalizePhone(raw: string): string {
 }
 
 Deno.serve(async (req) => {
+  console.log("[send-pharmacy-order] request received", { method: req.method, url: req.url });
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

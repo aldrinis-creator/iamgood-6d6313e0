@@ -44,4 +44,4 @@ project_id = "magnrdegcegxdtgapyez"
   [functions.admin-auth]
     verify_jwt = false
   [functions.send-pharmacy-order]
-    verify_jwt = true
+    verify_jwt = false
