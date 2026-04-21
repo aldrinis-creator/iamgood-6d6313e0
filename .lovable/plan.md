@@ -1,46 +1,80 @@
-## Plan — Admin bypasses all feature gating
 
-Give admin accounts unrestricted access to every plan-gated feature (Premium, Premium Plus, guardian limits, AI tools, PDF export, etc.) without changing their actual subscription record.
+## Plan — Contact Us form in Profile + admin table
 
-### Approach
+Add a Contact Us tab inside the My Profile page, store submissions in a new database table, and surface them in the admin section similar to the Premium Plus waitlist.
 
-Treat `role === 'admin'` as an implicit "premium-plus" tier inside the gating layer. No UI changes, no upgrade dialogs for admins, no per-feature edits.
+### Database
 
-### Changes
+**New table: `contact_submissions`**
 
-**1. `src/hooks/useSubscription.ts**`
+Columns:
+- `id` uuid PK (default `gen_random_uuid()`)
+- `user_id` uuid nullable (set when authenticated user submits)
+- `full_name` text not null
+- `email` text not null
+- `phone` text nullable
+- `subject` text not null
+- `message` text not null
+- `source` text not null default `'app-profile'` (so future website submissions can use `'web-landing-page'`)
+- `status` text not null default `'new'` (values: `new`, `in_progress`, `resolved`)
+- `admin_notes` text nullable
+- `responded_at` timestamptz nullable
+- `created_at` timestamptz not null default `now()`
 
-After loading the subscription, check the user's role via `user_roles` table (or reuse the existing `useAuth` profile if role is already exposed). If the user is an admin, override the returned `plan` to `"premium-plus"` and `status` to `"active"`. Keep the underlying DB row untouched — this is a runtime override only.
+**RLS policies:**
+- Authenticated users can `INSERT` their own submission (`auth.uid() = user_id` OR `user_id IS NULL`).
+- Authenticated users can `SELECT` their own submissions (`auth.uid() = user_id`).
+- Admins can `SELECT`/`UPDATE` all rows via `has_role(auth.uid(), 'admin')`.
+- Service role full access.
 
-**2. `src/lib/featureGating.ts**`
+### Frontend — Profile tab
 
-Add an early-return in `canAccessFeature`: if the caller passes a sentinel plan or we expose a small helper `isAdminPlan`, skip tier comparison. Simpler: since step 1 already forces admins to `"premium-plus"`, `canAccessFeature` works unchanged. Same for `getGuardianLimit` — admins get the premium-plus limit (10) automatically.
+**`src/pages/MyProfile.tsx`**
+- Convert the page to use the existing `Tabs` UI (or add a "Contact Us" section alongside current profile sections — match existing tab pattern used in Settings/Help).
+- Add new tab "Contact Us" with form fields:
+  - Full Name (required, prefilled from profile)
+  - Email (required, prefilled)
+  - Phone (optional, prefilled, uses `PhoneInput`)
+  - Subject (required, dropdown: General Inquiry, Bug Report, Feature Request, Billing, Other)
+  - Message (required, textarea, max 1000 chars)
+- Validate with `zod` (trim + length limits per security guidelines).
+- Submit inserts into `contact_submissions` with `user_id = auth.uid()` and `source = 'app-profile'`.
+- On success: toast confirmation, reset form, optionally trigger `send-transactional-email` using existing `contact-confirmation` template to email the user a receipt.
 
-**3. Verification points (no code changes needed, but confirm flow)**
+### Admin section
 
-- `useFeatureGate` → reads `plan` from `useSubscription` → admin sees `premium-plus` → `canAccess` returns true for everything → `UpgradeDialog` never opens.
-- `GuardianTab` guardian-limit check → uses `getGuardianLimit(plan)` → admin gets 10.
-- `Subscription.tsx` page → will show admin as "Premium Plus active" (cosmetic, acceptable; admins rarely visit this page).
+**New page: `src/pages/AdminContacts.tsx`**
+- Mirrors `AdminWaitlist.tsx` layout (AdminLayout + table).
+- Columns: Email, Name, Phone, Subject, Source, Submitted, Status (badge).
+- Row actions:
+  - Click to expand/show full message in a Dialog.
+  - Status dropdown (new → in_progress → resolved) — updates `status` and `responded_at`.
+  - Optional `admin_notes` textarea inside dialog.
+- Export CSV button.
+- Filter by status (All / New / In Progress / Resolved).
 
-### Detection of admin role
+**New edge function: `supabase/functions/admin-contacts/index.ts`**
+- Mirror of `admin-waitlist`: actions `list`, `export`, `update_status`, `add_note`.
+- Verifies admin via `has_role` RPC.
 
-Two options for reading the role inside `useSubscription`:
-
-- **Option A (preferred)**: Add a quick `supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle()` query alongside the subscription fetch. Cache it in the hook's state.
-- **Option B**: If `AuthContext.profile.role` already reflects admin status, read it from `useAuth()` directly — zero extra query.
-
-Will use Option B if `profiles.role` carries `'admin'` for admin accounts; otherwise fall back to Option A. Quick check during implementation. 
-
-ok with Option B with fall back to option A. 
-
-### Out of scope
-
-- Changing the actual `subscriptions` table for admin users.
-- Hiding the Subscription page from admins.
-- Backend RLS changes (gating is purely client-side feature surfacing; backend already trusts admin role where it matters).
+**Routing & navigation**
+- `src/App.tsx` — register `/admin/contacts` route (wrapped in `AdminRoute` + `AdminLayout`).
+- `src/components/AdminSidebar.tsx` — add "Contact Submissions" link with badge for `new` count.
+- `supabase/config.toml` — add `[functions.admin-contacts]` block.
 
 ### Files
 
-**Edit**
+**Create**
+- `src/pages/AdminContacts.tsx`
+- `supabase/functions/admin-contacts/index.ts`
+- Migration for `contact_submissions` table + RLS
 
-- `src/hooks/useSubscription.ts` — admin role check + plan override.
+**Edit**
+- `src/pages/MyProfile.tsx` — add Contact Us tab + form
+- `src/App.tsx` — register admin route
+- `src/components/AdminSidebar.tsx` — add nav link
+- `supabase/config.toml` — function config block
+
+### Table name to share
+
+**`contact_submissions`** — use this exact name when wiring up the website's contact form so all submissions (app + web) collect into one table. Set `source = 'web-landing-page'` for website entries vs `'app-profile'` for app entries.
