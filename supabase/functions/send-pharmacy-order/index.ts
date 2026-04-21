@@ -4,6 +4,7 @@ const corsHeaders = {
 };
 
 const MSG91_FLOW_URL = "https://control.msg91.com/api/v5/flow";
+const MSG91_REPORT_URL = "https://control.msg91.com/api/v5/report"; // /{request_id}/wa
 
 interface PharmacyOrderRequest {
   pharmacy_phone: string;
@@ -20,6 +21,41 @@ function normalizePhone(raw: string): string {
   if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
   if (digits.length === 10) digits = "91" + digits;
   return digits;
+}
+
+async function pollDeliveryStatus(requestId: string, authKey: string): Promise<{
+  state: string;
+  raw: unknown;
+} | null> {
+  // Try a few endpoint variants — MSG91's report URL pattern has changed over time.
+  const candidates = [
+    `${MSG91_REPORT_URL}/${requestId}/wa`,
+    `${MSG91_REPORT_URL}/${requestId}`,
+    `https://control.msg91.com/api/v5/wa/report/${requestId}`,
+  ];
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url, { headers: { authkey: authKey, accept: "application/json" } });
+      const text = await r.text();
+      let body: any = text;
+      try { body = JSON.parse(text); } catch { /* not json */ }
+      console.log("[send-pharmacy-order] poll", { url, status: r.status, body: text.slice(0, 400) });
+      if (r.ok && typeof body === "object" && body) {
+        // Try to extract a state field from common shapes
+        const data = body.data || body.report || body;
+        const state =
+          data?.status ||
+          data?.delivery_status ||
+          data?.state ||
+          (Array.isArray(data) && data[0]?.status) ||
+          "unknown";
+        return { state: String(state), raw: body };
+      }
+    } catch (e) {
+      console.warn("[send-pharmacy-order] poll error", { url, err: String(e) });
+    }
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -109,7 +145,6 @@ Deno.serve(async (req) => {
       body: rawText.slice(0, 500),
     });
 
-    // MSG91 returns HTTP 200 even for failures — must inspect body.type === "success"
     const r = result as Record<string, unknown> | string;
     const msgType = typeof r === "object" && r !== null ? (r as any).type : null;
     const isSuccess = res.ok && (msgType === "success" || (typeof r === "object" && (r as any).message && !msgType));
@@ -122,10 +157,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    const requestId = typeof r === "object" && r !== null ? (r as any).message : null;
+    const requestId: string | null = typeof r === "object" && r !== null ? String((r as any).message ?? "") : null;
+
+    // Poll MSG91 report API to get the actual WhatsApp delivery state.
+    let deliveryState = "queued";
+    let deliveryRaw: unknown = null;
+    if (requestId) {
+      // Wait briefly so MSG91 has time to record an initial state.
+      await new Promise((r) => setTimeout(r, 2500));
+      const poll = await pollDeliveryStatus(requestId, authKey);
+      if (poll) {
+        deliveryState = poll.state;
+        deliveryRaw = poll.raw;
+      }
+    }
+
+    // Treat known terminal failures as failure so the client can fall back to wa.me.
+    const failedStates = ["failed", "rejected", "undelivered", "expired", "blocked", "invalid"];
+    const ds = String(deliveryState).toLowerCase();
+    const deliveryFailed = failedStates.some((s) => ds.includes(s));
+
+    console.log("[send-pharmacy-order] delivery verdict", {
+      requestId, deliveryState, deliveryFailed,
+    });
 
     return new Response(
-      JSON.stringify({ success: true, request_id: requestId, result }),
+      JSON.stringify({
+        success: !deliveryFailed,
+        delivery_state: deliveryState,
+        delivery_failed: deliveryFailed,
+        request_id: requestId,
+        result,
+        delivery_report: deliveryRaw,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
