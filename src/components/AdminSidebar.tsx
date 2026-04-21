@@ -1,4 +1,4 @@
-import { Ticket, Users, LogOut } from "lucide-react";
+import { Ticket, Users, MessageSquare, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,7 @@ import {
 const items = [
   { title: "Coupons", url: "/admin/coupons", icon: Ticket },
   { title: "Waitlist", url: "/admin/waitlist", icon: Users },
+  { title: "Contact Submissions", url: "/admin/contacts", icon: MessageSquare },
 ];
 
 export function AdminSidebar() {

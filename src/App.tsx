@@ -36,6 +36,7 @@ import MapMyJourney from "./pages/MapMyJourney";
 import Unsubscribe from "./pages/Unsubscribe";
 import AdminCoupons from "./pages/AdminCoupons";
 import AdminWaitlist from "./pages/AdminWaitlist";
+import AdminContacts from "./pages/AdminContacts";
 import AdminVerify from "./pages/AdminVerify";
 import AdminLogin from "./pages/AdminLogin";
 import AdminRoute from "./components/AdminRoute";
@@ -87,6 +88,7 @@ const App = () => (
               <Route path="/admin/verify" element={<ProtectedRoute><AdminVerify /></ProtectedRoute>} />
               <Route path="/admin/coupons" element={<AdminRoute><AdminCoupons /></AdminRoute>} />
               <Route path="/admin/waitlist" element={<AdminRoute><AdminWaitlist /></AdminRoute>} />
+              <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
