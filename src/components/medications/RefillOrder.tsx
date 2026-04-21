@@ -84,15 +84,20 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
 
-  // Pending receipt (persists after send so user can update stock later)
-  const [pendingReceipt, setPendingReceipt] = useState<{
-    items: OrderItem[];
-    sentAt: number;
-    via: "msg91" | "browser";
-    pharmacyNumber: string;
-  } | null>(null);
-  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, number>>({});
-  const [markingPendingReceived, setMarkingPendingReceived] = useState(false);
+  // Persistent pending orders (DB-backed; survives reloads + syncs across devices)
+  interface PendingOrder {
+    id: string;
+    items: { med_id: string; name: string; dosage: string; qty: number; total_quantity?: number }[];
+    pharmacy_phone: string | null;
+    send_method: string | null;
+    created_at: string;
+    ordered_by: string;
+    orderer_name?: string | null;
+  }
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, Record<string, number>>>({});
+  const [markingPendingReceived, setMarkingPendingReceived] = useState<string | null>(null);
+  const [dismissingOrder, setDismissingOrder] = useState<string | null>(null);
   // Last send info (for the dedicated confirmation card, auto-hides after 6s)
   const [lastSendInfo, setLastSendInfo] = useState<{
     via: "msg91" | "browser";
