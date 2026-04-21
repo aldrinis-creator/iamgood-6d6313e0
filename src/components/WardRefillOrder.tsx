@@ -266,27 +266,17 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
           items_text: itemsText,
         },
       });
-      const deliveryState = (data as any)?.delivery_state as string | undefined;
-      const deliveryFailed = (data as any)?.delivery_failed === true;
       console.log("[send-pharmacy-order] ward client verdict:", JSON.stringify({ data, error }));
 
-      if (error || !data?.success || deliveryFailed) {
-        console.warn("[send-pharmacy-order] MSG91 not delivered, opening fallback:", JSON.stringify({ error, deliveryState }));
+      if (error || !data?.success) {
+        console.warn("[send-pharmacy-order] MSG91 failed, opening fallback:", JSON.stringify({ error, data }));
         if (popup) popup.location.href = waUrl;
         else window.open(waUrl, "_blank");
-        toast.warning(
-          deliveryState
-            ? `MSG91 reported "${deliveryState}" — opened WhatsApp so you can send manually`
-            : "MSG91 unavailable — WhatsApp opened, please tap Send"
-        );
+        toast.warning("MSG91 unavailable — WhatsApp opened, please tap Send");
         finalize("browser");
       } else {
         if (popup) popup.close();
-        toast.success(
-          deliveryState && deliveryState !== "queued"
-            ? `Pharmacy WhatsApp: ${deliveryState} ✓`
-            : "Sent to MSG91 — awaiting WhatsApp delivery"
-        );
+        toast.success("Order sent to pharmacy via WhatsApp ✓");
         finalize("msg91");
       }
     } catch (e) {
