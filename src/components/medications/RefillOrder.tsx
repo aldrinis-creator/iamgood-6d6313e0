@@ -617,7 +617,10 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
             </CardContent>
           </Card>
         ) : (
-          meds.map((med) => (
+          meds
+            .filter((m) => !orderItems.some((o) => o.med.id === m.id))
+            .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+            .map((med) => (
             <Card key={med.id} className="border-destructive/30">
               <CardContent className="p-3 flex items-center gap-3">
                 <div className="flex-1">
@@ -652,23 +655,20 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
             <p className="text-sm text-muted-foreground">
               Order medications from partner pharmacies with doorstep delivery.
             </p>
-            {allMeds.map((med) => {
+            {allMeds
+              .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+              .map((med) => {
               const inOrder = orderItems.some((o) => o.med.id === med.id);
+              if (inOrder) return null;
               return (
                 <div key={med.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div>
                     <p className="text-sm">{med.name}</p>
                     <p className="text-xs text-muted-foreground">{med.dosage}</p>
                   </div>
-                  {inOrder ? (
-                    <Button size="sm" variant="outline" onClick={() => removeFromOrder(med.id)}>
-                      <X className="w-3 h-3 mr-1" /> Remove
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => addToOrder(med)}>
-                      <ShoppingCart className="w-3 h-3 mr-1" /> Order
-                    </Button>
-                  )}
+                  <Button size="sm" variant="outline" onClick={() => addToOrder(med)}>
+                    <ShoppingCart className="w-3 h-3 mr-1" /> Order
+                  </Button>
                 </div>
               );
             })}
