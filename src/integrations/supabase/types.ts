@@ -959,6 +959,41 @@ export type Database = {
         }
         Relationships: []
       }
+      journey_share_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          journey_id: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          journey_id: string
+          token?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          journey_id?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_share_tokens_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "journeys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journey_updates: {
         Row: {
           check_in_response: string | null
@@ -2072,6 +2107,20 @@ export type Database = {
       expire_stale_nominations: { Args: never; Returns: number }
       expire_stale_subscriptions: { Args: never; Returns: number }
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
+      get_public_journey: {
+        Args: { _token: string }
+        Returns: {
+          current_lat: number
+          current_lng: number
+          destination_lat: number
+          destination_lng: number
+          destination_name: string
+          started_at: string
+          status: string
+          transport_mode: string
+          updated_at: string
+        }[]
+      }
       guardian_ward_count: {
         Args: { _guardian_email: string }
         Returns: number

@@ -34,6 +34,7 @@ import EmergencyProfile from "./pages/EmergencyProfile";
 import Install from "./pages/Install";
 import GuardianMessages from "./pages/GuardianMessages";
 import MapMyJourney from "./pages/MapMyJourney";
+import PublicJourneyView from "./pages/PublicJourneyView";
 import Unsubscribe from "./pages/Unsubscribe";
 import AdminCoupons from "./pages/AdminCoupons";
 import AdminWaitlist from "./pages/AdminWaitlist";
@@ -81,6 +82,7 @@ const App = () => (
               <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
               {/* Public routes */}
               <Route path="/e/:token" element={<EmergencyProfile />} />
+              <Route path="/j/:token" element={<PublicJourneyView />} />
               <Route path="/install" element={<Install />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />

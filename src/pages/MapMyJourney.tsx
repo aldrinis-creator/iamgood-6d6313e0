@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2, Users } from "lucide-react";
+import { MapPin, Navigation, Clock, Car, Footprints, Train, Bus, Eye, Star, X, History, Home, Briefcase, Hospital, ShoppingBag, TrainFront, UtensilsCrossed, Loader2, Users, Share2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import JourneyCheckInPopup from "@/components/JourneyCheckInPopup";
 import JourneyAlertOverlay from "@/components/JourneyAlertOverlay";
+import JourneyAutoSosOverlay from "@/components/JourneyAutoSosOverlay";
 import JourneyReportCard from "@/components/JourneyReportCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useJourneyTracker } from "@/hooks/useJourneyTracker";
+import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatISTTime } from "@/lib/istTime";
@@ -69,6 +71,7 @@ function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
 
 const MapMyJourney = () => {
   const { session } = useAuth();
+  const { triggerSOS } = useApp();
   const {
     activeJourney,
     updates,
@@ -81,6 +84,10 @@ const MapMyJourney = () => {
     routeDeviation,
     routeDeviationDismissed,
     setRouteDeviationDismissed,
+    pendingAutoSos,
+    cancelAutoSos,
+    notifyAutoSosFired,
+    createShareToken,
     startJourney,
     endJourney,
     respondCheckIn,
@@ -250,6 +257,24 @@ const MapMyJourney = () => {
     toast.success("Journey ended safely ✅");
   };
 
+  const handleShareLiveLink = async () => {
+    const token = await createShareToken();
+    if (!token) {
+      toast.error("Could not create share link");
+      return;
+    }
+    const url = `${window.location.origin}/j/${token}`;
+    const msg = `I'm sharing my live journey with you. Track me here: ${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    toast.success("Live tracking link opened in WhatsApp");
+  };
+
+  const handleAutoSosTrigger = async () => {
+    await notifyAutoSosFired();
+    triggerSOS();
+    cancelAutoSos();
+  };
+
   // Map bounds
   const mapBounds = (() => {
     if (activeJourney && currentPos) {
@@ -392,6 +417,10 @@ const MapMyJourney = () => {
                       ))}
                   </div>
                 )}
+
+                <Button variant="outline" onClick={handleShareLiveLink} className="w-full h-11 text-sm font-medium gap-2">
+                  <Share2 className="w-4 h-4" /> Share live link via WhatsApp
+                </Button>
 
                 <Button variant="destructive" onClick={handleEndJourney} className="w-full h-12 text-md font-semibold mt-2">
                   End Journey
@@ -696,6 +725,13 @@ const MapMyJourney = () => {
         open={showCheckIn}
         onRespond={respondCheckIn}
         onDismiss={() => setShowCheckIn(false)}
+      />
+
+      <JourneyAutoSosOverlay
+        open={pendingAutoSos}
+        onCancel={cancelAutoSos}
+        onTrigger={handleAutoSosTrigger}
+        destinationName={activeJourney?.destination_name}
       />
     </AppLayout>
   );

@@ -67,6 +67,9 @@ export function useJourneyTracker() {
   const [arrivingSoonDismissed, setArrivingSoonDismissed] = useState(false);
   const [routeDeviationDismissed, setRouteDeviationDismissed] = useState(false);
 
+  // Auto-SOS escalation state
+  const [pendingAutoSos, setPendingAutoSos] = useState(false);
+
   // Deviation tracking for report
   const deviationCountRef = useRef(0);
   const maxDeviationRef = useRef(0);
@@ -77,6 +80,14 @@ export function useJourneyTracker() {
   const autoEndTimer = useRef<ReturnType<typeof setTimeout>>();
   const arrivedAt = useRef<number | null>(null);
   const deviationNotifiedAt = useRef<number>(0);
+
+  // Feature 1: battery alert (one-shot per journey)
+  const batteryAlertSentRef = useRef(false);
+
+  // Feature 2: deviation -> auto-SOS escalation
+  const deviationEscalationTimer = useRef<ReturnType<typeof setTimeout>>();
+  const escalationFiredRef = useRef(false);
+  const checkInRespondedRef = useRef(false);
 
   // Fetch active journey on mount
   useEffect(() => {
@@ -207,6 +218,86 @@ export function useJourneyTracker() {
     };
   }, [activeJourney?.id, activeJourney?.status, settings.journeyCheckInFrequency]);
 
+  // Feature 1: Low-battery guardian alert (one-shot per journey)
+  useEffect(() => {
+    if (!activeJourney || activeJourney.status !== "active") return;
+    if (!("getBattery" in navigator)) return;
+
+    let cancelled = false;
+    let batt: any = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const check = () => {
+      if (cancelled || !batt || batteryAlertSentRef.current) return;
+      const level = Math.round(batt.level * 100);
+      if (level <= 15 && !batt.charging) {
+        batteryAlertSentRef.current = true;
+        notifyGuardians(
+          "🔋 Battery Critical",
+          `User's battery is at ${level}% during journey to ${activeJourney.destination_name}. Last known location attached.`,
+          "battery_critical"
+        );
+        // Save a fresh location update so guardians see the latest pin
+        if (currentPos) {
+          saveLocationUpdate(currentPos.lat, currentPos.lng);
+        }
+      }
+    };
+
+    (navigator as any).getBattery().then((b: any) => {
+      if (cancelled) return;
+      batt = b;
+      check();
+      b.addEventListener("levelchange", check);
+      b.addEventListener("chargingchange", check);
+      // Poll every 60s as a backup (some browsers don't fire events reliably)
+      intervalId = setInterval(check, 60000);
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      if (batt) {
+        try {
+          batt.removeEventListener("levelchange", check);
+          batt.removeEventListener("chargingchange", check);
+        } catch {}
+      }
+    };
+  }, [activeJourney?.id, activeJourney?.status, currentPos]);
+
+  // Feature 2: Deviation -> escalation. When deviation starts, force check-in popup
+  // and start a 5-minute unanswered-response timer. If unanswered, fire pendingAutoSos.
+  useEffect(() => {
+    if (!activeJourney || activeJourney.status !== "active") return;
+
+    if (routeDeviation && !escalationFiredRef.current) {
+      checkInRespondedRef.current = false;
+      setShowCheckIn(true);
+
+      if (deviationEscalationTimer.current) clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = setTimeout(() => {
+        // Only escalate if still off-route and check-in still unanswered
+        if (routeDeviation && !checkInRespondedRef.current && !escalationFiredRef.current) {
+          escalationFiredRef.current = true;
+          setPendingAutoSos(true);
+        }
+      }, 5 * 60 * 1000);
+    }
+
+    if (!routeDeviation) {
+      // Back on route — cancel escalation
+      if (deviationEscalationTimer.current) {
+        clearTimeout(deviationEscalationTimer.current);
+        deviationEscalationTimer.current = undefined;
+      }
+    }
+
+    return () => {
+      // cleanup handled on next run / journey end
+    };
+  }, [routeDeviation, activeJourney?.id, activeJourney?.status]);
+
   const saveLocationUpdate = async (lat: number, lng: number, response?: string) => {
     if (!activeJourney || !session?.user?.id) return;
     const { data } = await supabase.from("journey_updates").insert({
@@ -306,11 +397,19 @@ export function useJourneyTracker() {
     setArrivingSoonDismissed(false);
     setRouteDeviation(false);
     setRouteDeviationDismissed(false);
+    setPendingAutoSos(false);
     deviationCountRef.current = 0;
     maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     lastSaveTime.current = 0;
+    batteryAlertSentRef.current = false;
+    escalationFiredRef.current = false;
+    checkInRespondedRef.current = false;
+    if (deviationEscalationTimer.current) {
+      clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = undefined;
+    }
 
     await notifyGuardians(
       "🗺️ Journey Started",
@@ -356,22 +455,64 @@ export function useJourneyTracker() {
     setArrivingSoonDismissed(false);
     setRouteDeviation(false);
     setRouteDeviationDismissed(false);
+    setPendingAutoSos(false);
     setExpectedRoute([]);
     deviationCountRef.current = 0;
     maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
+    batteryAlertSentRef.current = false;
+    escalationFiredRef.current = false;
+    checkInRespondedRef.current = false;
     if (autoEndTimer.current) clearTimeout(autoEndTimer.current);
     if (checkInTimer.current) clearInterval(checkInTimer.current);
+    if (deviationEscalationTimer.current) clearTimeout(deviationEscalationTimer.current);
   };
 
   const respondCheckIn = async (response: string) => {
     setShowCheckIn(false);
+    checkInRespondedRef.current = true;
+    // Cancel any pending deviation escalation
+    if (deviationEscalationTimer.current) {
+      clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = undefined;
+    }
     if (currentPos) {
       await saveLocationUpdate(currentPos.lat, currentPos.lng, response);
       await notifyGuardians("💬 Journey Check-in", `User responded: "${response}"`);
     }
   };
+
+  const cancelAutoSos = useCallback(() => {
+    setPendingAutoSos(false);
+    // Note: escalationFiredRef stays true so we don't re-escalate this journey
+  }, []);
+
+  const notifyAutoSosFired = useCallback(async () => {
+    if (!activeJourney) return;
+    await notifyGuardians(
+      "🚨 Auto-SOS Triggered",
+      `Auto-SOS triggered for user en route to ${activeJourney.destination_name}: route deviation + no check-in response.`,
+      "auto_sos"
+    );
+  }, [activeJourney, notifyGuardians]);
+
+  const createShareToken = useCallback(async (): Promise<string | null> => {
+    if (!activeJourney || !session?.user?.id) return null;
+    const { data, error } = await supabase
+      .from("journey_share_tokens")
+      .insert({
+        journey_id: activeJourney.id,
+        user_id: session.user.id,
+      })
+      .select("token")
+      .single();
+    if (error || !data) {
+      console.error("Failed to create share token", error);
+      return null;
+    }
+    return data.token;
+  }, [activeJourney, session?.user?.id]);
 
   return {
     activeJourney,
@@ -385,6 +526,10 @@ export function useJourneyTracker() {
     routeDeviation,
     routeDeviationDismissed,
     setRouteDeviationDismissed,
+    pendingAutoSos,
+    cancelAutoSos,
+    notifyAutoSosFired,
+    createShareToken,
     startJourney,
     endJourney,
     respondCheckIn,
