@@ -268,8 +268,9 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!row) {
-        return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        // Return 200 so client SDK doesn't treat as network error; client checks success flag.
+        return new Response(JSON.stringify({ success: false, error: "Invalid or expired token" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
