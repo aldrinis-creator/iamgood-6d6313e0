@@ -48,6 +48,17 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
 
+  // Pending-receipt + send-confirmation state
+  const [pendingReceipt, setPendingReceipt] = useState<{
+    items: OrderItem[]; sentAt: number; via: "msg91" | "browser"; pharmacyNumber: string;
+  } | null>(null);
+  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, number>>({});
+  const [markingPendingReceived, setMarkingPendingReceived] = useState(false);
+  const [lastSendInfo, setLastSendInfo] = useState<{
+    via: "msg91" | "browser"; pharmacyNumber: string; itemCount: number;
+  } | null>(null);
+  const [sending, setSending] = useState(false);
+
   const markReceived = async () => {
     setMarkingReceived(true);
     try {
