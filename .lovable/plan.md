@@ -1,91 +1,48 @@
-## Plan — MMJ Safety Net (3 features)
+## Plan — Send Pharmacy Order via MSG91 (User + Guardian)
 
-Three additions to Map My Journey, all hooked into the existing `useJourneyTracker` lifecycle so they only run during an active journey.
+Replace the `wa.me/...` deep link in **both** the User app (`RefillOrder.tsx`) and the Guardian app (`WardRefillOrder.tsx`) with an MSG91-powered server send, so the order is delivered to the pharmacy automatically without opening WhatsApp.
 
----
+### How it will work
 
-### Feature 1: Low-Battery Guardian Alert (during journey)
+1. User/Guardian taps **"Send to Pharmacy via WhatsApp"**.
+2. Frontend calls a new Edge Function `send-pharmacy-order` with `{ pharmacy_phone, order_text, patient_name, doctor_name, hospital_name, items_summary }`.
+3. The Edge Function calls MSG91 Flow API with a pre-approved WhatsApp template (variables: patient name, doctor, hospital, items, date) and sends to the pharmacy number.
+4. Frontend shows "Order sent to pharmacy" toast on success. If MSG91 returns an error, fall back to opening `wa.me/...` so the user is never blocked.
 
-**Trigger:** Active journey + battery ≤ 15% + not charging → fire **once per journey** to Guardians.
+### Why a template is required
 
-**Implementation:**
+MSG91 / WhatsApp Business does **not** allow free-form outbound messages to numbers that haven't messaged you first. The pharmacy is a cold recipient, so this **must** go through a pre-approved WhatsApp template. You'll need to:
 
-- In `useJourneyTracker.ts`, add a battery monitor effect that activates only when `activeJourney.status === "active"`.
-- Uses `navigator.getBattery()` (already proven in `BatteryWarning.tsx`).
-- On threshold cross, call `notifyGuardians("🔋 Battery Critical", "User's battery is at X% during journey to {destination}. Last known location attached.", "battery_critical")` and save a location update so Guardians see the latest pin.
-- Ref flag `batteryAlertSentRef` prevents repeat fires; resets in `startJourney`/`endJourney`.
-- No alert if user is charging (recovery in progress).
+- Create a template in the MSG91 dashboard named e.g. `pharmacy_order` with these variables:
+  - `{{1}}` patient name
+  - `{{2}}` doctor name
+  - `{{3}}` hospital/clinic
+  - `{{4}}` date
+  - `{{5}}` items list (multi-line)
+- Submit it for WhatsApp approval (usually 1–24h).
+- Once approved, paste the template ID — I'll store it as a new secret `MSG91_PHARMACY_TEMPLATE_ID`.
 
----
+If you'd rather ship faster, we can use **SMS** via MSG91 instead of WhatsApp (no template approval needed for transactional SMS in many flows), but the message will arrive as plain SMS, not WhatsApp.
 
-### Feature 2: Auto-SOS Escalation on Unanswered Deviation
+### Files
 
-**Trigger:** Route deviation active **AND** the journey check-in popup has been displayed for 5 minutes unanswered → start a **60-second pre-SOS countdown overlay** (cancellable). If not cancelled, fire the existing `triggerSOS()` from `AppContext`.
+**New**
 
-**Implementation:**
+- `supabase/functions/send-pharmacy-order/index.ts` — validates input, calls MSG91 Flow API, returns `{ success, result }`.
+- `supabase/config.toml` — add `[functions.send-pharmacy-order] verify_jwt = true` block (this should be authenticated since it's user-triggered).
+- New secret: `MSG91_PHARMACY_TEMPLATE_ID`.
 
-- In `useJourneyTracker.ts`: when `routeDeviation` becomes `true`, force `setShowCheckIn(true)` (the existing check-in popup) and start a 5-minute timer `deviationEscalationTimer`.
-- If the user responds to the check-in OR `routeDeviation` clears OR journey ends → cancel timer.
-- On timer expiry, set new state `pendingAutoSos = true`.
-- New component `JourneyAutoSosOverlay.tsx` (mounted in `MapMyJourney.tsx`): full-screen 60-sec countdown matching the visual language of `FallDetectionOverlay`. "Cancel — I'm safe" button stops it; expiry calls `triggerSOS()` from `useApp()` and notifies Guardians with context: "Auto-SOS triggered: route deviation + no check-in response."
-- The existing SOS pipeline (email/WhatsApp/push) handles delivery — no new backend.
+**Modified**
 
-**Safety guards:**
+- `src/components/medications/RefillOrder.tsx` — `sendWhatsApp()` becomes async: calls `supabase.functions.invoke("send-pharmacy-order", ...)`, falls back to `wa.me` on failure.
+- `src/components/WardRefillOrder.tsx` — same change, includes ward name in payload.
 
-- Only escalates if `routeDeviation` is still active when timer fires (user back on route cancels).
-- Audible chime + vibration during the 60-sec countdown so a conscious user definitely notices.
-- One escalation per journey (ref flag).
+### What I need from you before building
 
----
+1. **Channel**: WhatsApp template (preferred, requires approval) or plain SMS (faster, no approval)?
+2. If WhatsApp: confirm you'll create the `pharmacy_order` template in MSG91 and provide the template ID, or want me to draft the exact template text for you to paste in.
+3. Keep the `wa.me` **fallback** if MSG91 fails? (Recommended yes — pharmacies must always receive the order.)
 
-### Feature 3: Public Shareable Live-Tracking Link
-
-**Trigger:** User taps a new "Share live link via WhatsApp" button on the active journey panel in `MapMyJourney.tsx`.
-
-**Database (new migration):**
-
-- Table `journey_share_tokens`: `id, journey_id, user_id, token (unique, random 32-char), created_at, expires_at`. RLS: only owner can insert/select their own tokens.
-- RPC `get_public_journey(_token text)` → SECURITY DEFINER, returns `{ destination_name, transport_mode, started_at, status, current_lat, current_lng, updated_at }` only when token matches an active journey. **No user identity, phone, health data, origin, or full breadcrumb trail exposed.** Returns null once `journeys.status != 'active'`.
-
-**Frontend:**
-
-- New public route `/j/:token` → component `PublicJourneyView.tsx`. Polls the RPC every 15 seconds, shows a Leaflet map with the moving dot, destination pin, ETA-style header ("User on the way to {destination}"), and a "Journey ended" state when status flips. No login, no header, no bottom nav (uses minimal layout).
-- "Share live link via WhatsApp" button in `MapMyJourney.tsx` active-journey panel: creates a token, builds `https://iamgood.lovable.app/j/{token}`, opens `wa.me/?text={encoded message + link}`.
-- Token is auto-invalidated when journey ends (RPC checks `journeys.status='active'` → returns null → public page shows "Journey has ended").
-
-**Privacy:**
-
-- Token is a one-shot per-journey secret — link only works while that journey is active.
-- Public page intentionally shows zero PII: no name, no phone, no avatar, no health data.
-- Optional: add a "Stop sharing" button that deletes the token immediately.
-
----
-
-### Files touched
-
-**Modified:**
-
-- `src/hooks/useJourneyTracker.ts` — battery monitor, deviation-escalation timer, `pendingAutoSos` state, share-token helpers.
-- `src/pages/MapMyJourney.tsx` — mount `JourneyAutoSosOverlay`, add "Share live link" button.
-
-**New:**
-
-- `src/components/JourneyAutoSosOverlay.tsx` — 60-sec countdown UI.
-- `src/pages/PublicJourneyView.tsx` — public live-tracking page.
-- Route entry in `src/App.tsx` for `/j/:token` (outside `AppLayout`, no auth).
-- Migration: `journey_share_tokens` table + RLS + `get_public_journey` RPC.
-- Memory file: `mem://features/mmj-safety-net`.
-
-### What's deliberately NOT included
-
-- **Signal-loss alert:** browser GPS `error` callbacks fire constantly on weak signal and would create alert spam. Battery is the better proxy for "phone died." Skip unless you specifically want it.
-- **Persistent share links** (reusable across journeys): privacy risk. Per-journey only.
-- **Showing the breadcrumb trail on the public page:** location history is more sensitive than current pin. Current dot only.
-
-### Confirm before I proceed
-
-1. Auto-SOS on unanswered deviation — keep the **60-second cancel countdown** before SOS fires? (Strongly recommend yes.)
-2. Public share link — OK to expose `{destination_name, current_lat/lng, transport_mode}` and nothing else?
-3. Build all three together, or sequence them (1 → 2 → 3)?  
-Build all three together
-  &nbsp;
+1. WhatsApp channel
+2. you may draft the template
+3. keep the [wa.me](http://wa.me) fallback
