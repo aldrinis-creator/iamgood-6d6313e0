@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PhoneInput from "@/components/PhoneInput";
+import { cn } from "@/lib/utils";
 
 const SUBJECTS = [
   "General Inquiry",
@@ -28,6 +29,8 @@ const contactSchema = z.object({
   message: z.string().trim().min(1, "Message is required").max(1000, "Message must be under 1000 characters"),
 });
 
+type FieldName = "full_name" | "email" | "phone" | "subject" | "message";
+
 const ContactUsForm = () => {
   const { session, profile } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -39,6 +42,7 @@ const ContactUsForm = () => {
   const [subject, setSubject] = useState("General Inquiry");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (profile?.full_name) setFullName(profile.full_name);
@@ -46,27 +50,40 @@ const ContactUsForm = () => {
     if (profile?.phone) setPhone(profile.phone);
   }, [profile, userEmail]);
 
+  const validation = contactSchema.safeParse({
+    full_name: fullName,
+    email,
+    phone,
+    subject,
+    message,
+  });
+  const errors: Partial<Record<FieldName, string>> = validation.success
+    ? {}
+    : validation.error.issues.reduce((acc, issue) => {
+        const key = issue.path[0] as FieldName;
+        if (!acc[key]) acc[key] = issue.message;
+        return acc;
+      }, {} as Partial<Record<FieldName, string>>);
+  const isFormValid = validation.success;
+
+  const handleBlur = (field: FieldName) => setTouched((p) => ({ ...p, [field]: true }));
+  const showError = (field: FieldName) => touched[field] && errors[field];
+
   const handleSubmit = async () => {
-    const parsed = contactSchema.safeParse({
-      full_name: fullName,
-      email,
-      phone,
-      subject,
-      message,
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
+    if (!validation.success) {
+      setTouched({ full_name: true, email: true, phone: true, subject: true, message: true });
+      toast.error(validation.error.issues[0].message);
       return;
     }
 
     setSubmitting(true);
     const { error } = await supabase.from("contact_submissions").insert({
       user_id: userId,
-      full_name: parsed.data.full_name,
-      email: parsed.data.email,
-      phone: parsed.data.phone || null,
-      subject: parsed.data.subject,
-      message: parsed.data.message,
+      full_name: validation.data.full_name,
+      email: validation.data.email,
+      phone: validation.data.phone || null,
+      subject: validation.data.subject,
+      message: validation.data.message,
       source: "app-profile",
     });
     setSubmitting(false);
@@ -80,6 +97,7 @@ const ContactUsForm = () => {
     toast.success("Message sent! We'll get back to you soon.");
     setMessage("");
     setSubject("General Inquiry");
+    setTouched({});
   };
 
   return (
@@ -98,10 +116,14 @@ const ContactUsForm = () => {
           <Input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            onBlur={() => handleBlur("full_name")}
             placeholder="Your name"
             maxLength={100}
-            className="text-base"
+            className={cn("text-base", showError("full_name") && "border-destructive")}
           />
+          {showError("full_name") && (
+            <p className="text-xs text-destructive mt-1">{errors.full_name}</p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Email *</Label>
@@ -109,36 +131,58 @@ const ContactUsForm = () => {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => handleBlur("email")}
             placeholder="you@example.com"
             maxLength={255}
-            className="text-base"
+            className={cn("text-base", showError("email") && "border-destructive")}
           />
+          {showError("email") && (
+            <p className="text-xs text-destructive mt-1">{errors.email}</p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Phone (optional)</Label>
           <PhoneInput value={phone} onChange={setPhone} />
+          {showError("phone") && (
+            <p className="text-xs text-destructive mt-1">{errors.phone}</p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Subject *</Label>
-          <Select value={subject} onValueChange={setSubject}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={subject}
+            onValueChange={(v) => {
+              setSubject(v);
+              handleBlur("subject");
+            }}
+          >
+            <SelectTrigger className={cn(showError("subject") && "border-destructive")}>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
+          {showError("subject") && (
+            <p className="text-xs text-destructive mt-1">{errors.subject}</p>
+          )}
         </div>
         <div>
           <Label className="text-xs">Message * <span className="text-muted-foreground">({message.length}/1000)</span></Label>
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onBlur={() => handleBlur("message")}
             placeholder="How can we help?"
             rows={5}
             maxLength={1000}
-            className="text-base"
+            className={cn("text-base", showError("message") && "border-destructive")}
           />
+          {showError("message") && (
+            <p className="text-xs text-destructive mt-1">{errors.message}</p>
+          )}
         </div>
-        <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+        <Button onClick={handleSubmit} disabled={submitting || !isFormValid} className="w-full">
           {submitting ? (
             <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Sending…</>
           ) : (
