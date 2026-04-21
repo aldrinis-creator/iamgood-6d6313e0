@@ -375,15 +375,27 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
           items_text: itemsText,
         },
       });
-      if (error || !data?.success) {
-        console.warn("[send-pharmacy-order] MSG91 failed, falling back to WhatsApp link:", JSON.stringify({ error, data }));
+      const deliveryState = (data as any)?.delivery_state as string | undefined;
+      const deliveryFailed = (data as any)?.delivery_failed === true;
+      console.log("[send-pharmacy-order] client verdict:", JSON.stringify({ data, error }));
+
+      if (error || !data?.success || deliveryFailed) {
+        console.warn("[send-pharmacy-order] MSG91 not delivered, opening fallback:", JSON.stringify({ error, deliveryState }));
         if (popup) popup.location.href = waUrl;
         else window.open(waUrl, "_blank");
-        toast.info("WhatsApp opened — please tap Send");
+        toast.warning(
+          deliveryState
+            ? `MSG91 reported "${deliveryState}" — opened WhatsApp so you can send manually`
+            : "MSG91 unavailable — WhatsApp opened, please tap Send"
+        );
         finalize("browser");
       } else {
         if (popup) popup.close();
-        toast.success("Order sent to pharmacy via MSG91 WhatsApp ✓");
+        toast.success(
+          deliveryState && deliveryState !== "queued"
+            ? `Pharmacy WhatsApp: ${deliveryState} ✓`
+            : "Sent to MSG91 — awaiting WhatsApp delivery"
+        );
         finalize("msg91");
       }
     } catch (e) {
@@ -844,7 +856,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
                     className="text-base"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Include country code (e.g., +91 for India).
+                    Include country code (e.g., +91 for India). First-time pharmacies may need to reply to your WhatsApp Business message once before automated messages are accepted.
                   </p>
                   <Button
                     variant="outline"

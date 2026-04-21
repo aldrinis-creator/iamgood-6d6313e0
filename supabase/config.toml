@@ -45,3 +45,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.send-pharmacy-order]
     verify_jwt = false
+  [functions.msg91-template-info]
+    verify_jwt = false
