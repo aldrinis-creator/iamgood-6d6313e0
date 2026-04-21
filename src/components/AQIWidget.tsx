@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import { supabase } from "@/integrations/supabase/client";
 
-const API_KEY = "AIzaSyCQuBmmLMKvQwqD4ydUL8DA8sZ7sIQtLX8";
+// Public browser key, restricted in Google Cloud (HTTP referrers + Air Quality API only).
+const API_KEY = "AIzaSyAhR4Tw_kXEQyzxbD2O3kXlr5YzJDq_Psc";
 const MAX_SEARCHES_PER_DAY = 5;
 
 interface Pollutant {

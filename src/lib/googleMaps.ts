@@ -2,11 +2,15 @@
 
 let loadPromise: Promise<void> | null = null;
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyBRtFaGdJzYpSjC8_0h6FdeJ0W8OqLjeFc";
+// NOTE: This is a public browser key. Security is enforced via Google Cloud
+// HTTP referrer restrictions + API restrictions (Maps JS, Places, Street View,
+// Geocoding, Air Quality only). Safe to ship in the bundle per Google's
+// recommended pattern: https://developers.google.com/maps/api-security-best-practices
+const GOOGLE_MAPS_API_KEY = "AIzaSyCTaUAI6Q-yrka45TYnP4kYI5gWDjGMjaQ";
 
 export function loadGoogleMapsAPI(): Promise<void> {
   if (!GOOGLE_MAPS_API_KEY) {
-    return Promise.reject(new Error("VITE_GOOGLE_MAPS_API_KEY not configured"));
+    return Promise.reject(new Error("Google Maps API key not configured"));
   }
 
   if (loadPromise) return loadPromise;
