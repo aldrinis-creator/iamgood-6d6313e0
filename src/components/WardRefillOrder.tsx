@@ -441,7 +441,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
       ) : (
         lowStockMeds
           .filter((m) => !orderItems.some((o) => o.med.id === m.id))
-          .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+          .filter((m) => !pendingOrders.some((o) => o.items.some((p) => p.med_id === m.id)))
           .map((med) => (
           <Card key={med.id} className="border-destructive/30">
             <CardContent className="p-3 flex items-center gap-3">
