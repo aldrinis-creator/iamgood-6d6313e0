@@ -84,15 +84,20 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
 
-  // Pending receipt (persists after send so user can update stock later)
-  const [pendingReceipt, setPendingReceipt] = useState<{
-    items: OrderItem[];
-    sentAt: number;
-    via: "msg91" | "browser";
-    pharmacyNumber: string;
-  } | null>(null);
-  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, number>>({});
-  const [markingPendingReceived, setMarkingPendingReceived] = useState(false);
+  // Persistent pending orders (DB-backed; survives reloads + syncs across devices)
+  interface PendingOrder {
+    id: string;
+    items: { med_id: string; name: string; dosage: string; qty: number; total_quantity?: number }[];
+    pharmacy_phone: string | null;
+    send_method: string | null;
+    created_at: string;
+    ordered_by: string;
+    orderer_name?: string | null;
+  }
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, Record<string, number>>>({});
+  const [markingPendingReceived, setMarkingPendingReceived] = useState<string | null>(null);
+  const [dismissingOrder, setDismissingOrder] = useState<string | null>(null);
   // Last send info (for the dedicated confirmation card, auto-hides after 6s)
   const [lastSendInfo, setLastSendInfo] = useState<{
     via: "msg91" | "browser";
@@ -101,34 +106,52 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
   } | null>(null);
   const [sending, setSending] = useState(false);
 
-  // Fetch guardian-placed orders
-  useEffect(() => {
+  // Load all pending-receipt orders for this user (self + guardian-placed) + realtime
+  const loadPendingOrders = useCallback(async () => {
     if (!session?.user?.id) return;
-    const fetchOrders = async () => {
-      const { data } = await supabase
-        .from("medication_orders" as any)
-        .select("*")
-        .eq("user_id", session.user.id)
-        .eq("status", "ordered")
-        .order("created_at", { ascending: false });
-      if (data) {
-        // Fetch orderer names
-        const enriched = await Promise.all((data as any[]).map(async (order: any) => {
-          if (order.ordered_by !== session.user.id) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name")
-              .eq("id", order.ordered_by)
-              .single();
-            return { ...order, orderer_name: profile?.full_name || "Guardian" };
-          }
-          return { ...order, orderer_name: null };
-        }));
-        setGuardianOrders(enriched.filter((o: any) => o.ordered_by !== session.user.id));
+    const { data } = await supabase
+      .from("medication_orders" as any)
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("status", "pending_receipt")
+      .order("created_at", { ascending: false });
+    if (!data) return;
+    const enriched = await Promise.all((data as any[]).map(async (order: any) => {
+      let orderer_name: string | null = null;
+      if (order.ordered_by !== session.user.id) {
+        const { data: profile } = await supabase
+          .from("profiles").select("full_name").eq("id", order.ordered_by).single();
+        orderer_name = profile?.full_name || "Guardian";
       }
-    };
-    fetchOrders();
+      return { ...order, orderer_name };
+    }));
+    setPendingOrders(enriched as PendingOrder[]);
+    setPendingReceivedQtys((prev) => {
+      const next = { ...prev };
+      for (const o of enriched) {
+        if (!next[o.id]) {
+          next[o.id] = Object.fromEntries(
+            (o.items as any[])
+              .filter((it: any) => it.med_id && !String(it.med_id).startsWith("ja-"))
+              .map((it: any) => [it.med_id, it.total_quantity ?? it.qty])
+          );
+        }
+      }
+      return next;
+    });
+    setGuardianOrders([]);
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    loadPendingOrders();
+    if (!session?.user?.id) return;
+    const channel = supabase
+      .channel(`med-orders-${session.user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "medication_orders", filter: `user_id=eq.${session.user.id}` },
+        () => loadPendingOrders())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadPendingOrders, session?.user?.id]);
 
   const markReceived = async () => {
     setMarkingReceived(true);
@@ -304,20 +327,35 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
     const waUrl = buildWhatsAppUrl(num, buildOrderText());
     const itemsSnapshot = [...orderItems];
 
+    // Persist the order to DB so the pending-receipt card survives reloads / cross-device
+    const persistOrder = async (via: "msg91" | "browser") => {
+      if (!session?.user?.id) return;
+      try {
+        const items = itemsSnapshot.map((it) => ({
+          med_id: it.med.id,
+          name: it.med.name,
+          dosage: it.med.dosage,
+          qty: it.qty,
+          total_quantity: it.med.total_quantity,
+        }));
+        await supabase.from("medication_orders" as any).insert({
+          user_id: session.user.id,
+          ordered_by: session.user.id,
+          items,
+          status: "pending_receipt",
+          pharmacy_phone: pharmacyNumber,
+          send_method: via,
+          doctor_name: doctorInfo.doctorName || null,
+          hospital_name: doctorInfo.hospitalName || null,
+        });
+        loadPendingOrders();
+      } catch (err) {
+        console.error("Failed to persist medication order", err);
+      }
+    };
+
     const finalize = (via: "msg91" | "browser") => {
-      setPendingReceipt({
-        items: itemsSnapshot,
-        sentAt: Date.now(),
-        via,
-        pharmacyNumber,
-      });
-      setPendingReceivedQtys(
-        Object.fromEntries(
-          itemsSnapshot
-            .filter((it) => !it.med.id.startsWith("ja-"))
-            .map((it) => [it.med.id, it.med.total_quantity])
-        )
-      );
+      persistOrder(via);
       setLastSendInfo({ via, pharmacyNumber, itemCount: itemsSnapshot.length });
       setOrderItems([]);
       setOrderConfirmed(false);
@@ -358,35 +396,46 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
     setSending(false);
   };
 
-  // Mark pending-receipt items as received (after async send completes)
-  const markPendingReceived = async () => {
-    if (!pendingReceipt) return;
-    setMarkingPendingReceived(true);
+  // Mark a specific persisted order as received -> update stock + status
+  const markPendingReceived = async (order: PendingOrder) => {
+    setMarkingPendingReceived(order.id);
     try {
-      for (const item of pendingReceipt.items) {
-        if (item.med.id.startsWith("ja-")) continue;
-        const qty = pendingReceivedQtys[item.med.id] ?? item.med.total_quantity;
-        await supabase
-          .from("medications")
-          .update({ remaining_quantity: qty })
-          .eq("id", item.med.id);
+      const qtys = pendingReceivedQtys[order.id] || {};
+      for (const item of order.items) {
+        if (!item.med_id || String(item.med_id).startsWith("ja-")) continue;
+        const qty = qtys[item.med_id] ?? item.total_quantity ?? item.qty;
+        await supabase.from("medications").update({ remaining_quantity: qty }).eq("id", item.med_id);
       }
-      toast.success("Stock updated successfully!");
-      setPendingReceipt(null);
-      setPendingReceivedQtys({});
+      await supabase.from("medication_orders" as any)
+        .update({ status: "received", received_at: new Date().toISOString() })
+        .eq("id", order.id);
+      toast.success("Stock updated — order marked received");
       load();
+      loadPendingOrders();
       onRefillDone?.();
     } catch {
       toast.error("Failed to update stock");
     }
-    setMarkingPendingReceived(false);
+    setMarkingPendingReceived(null);
   };
 
-  const resendLastOrder = () => {
-    if (!pendingReceipt) return;
+  const dismissPendingOrder = async (order: PendingOrder) => {
+    setDismissingOrder(order.id);
+    try {
+      await supabase.from("medication_orders" as any)
+        .update({ status: "dismissed" }).eq("id", order.id);
+      loadPendingOrders();
+    } catch {
+      toast.error("Failed to dismiss");
+    }
+    setDismissingOrder(null);
+  };
+
+  const resendOrder = (order: PendingOrder) => {
+    if (!order.pharmacy_phone) { toast.error("No pharmacy number on this order"); return; }
     const text = `🏥 *Medication Order Resend*\n\n` +
-      pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
-    window.open(buildWhatsAppUrl(pendingReceipt.pharmacyNumber, text), "_blank");
+      order.items.map((it, i) => `${i + 1}. ${it.name} — ${it.dosage} (Qty: ${it.qty})`).join("\n");
+    window.open(buildWhatsAppUrl(order.pharmacy_phone, text), "_blank");
   };
 
   const saveAsPdf = () => {
@@ -471,94 +520,71 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         </Card>
       )}
 
-      {/* Pending receipt — persists until user marks as received */}
-      {pendingReceipt && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Package className="w-4 h-4 text-primary" />
-                Order sent — pending receipt
-              </h4>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={resendLastOrder}>
-                <MessageCircle className="w-3 h-3 mr-1" /> Send again
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Sent to {pendingReceipt.pharmacyNumber} via {pendingReceipt.via === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}. Tap "Received" once medicines arrive to update stock.
-            </p>
-            {pendingReceipt.items.filter(item => !item.med.id.startsWith("ja-")).map((item) => (
-              <div key={item.med.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex-1 truncate">{item.med.name}</span>
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-20 h-8 text-center text-sm"
-                  value={pendingReceivedQtys[item.med.id] ?? item.med.total_quantity}
-                  onChange={(e) => setPendingReceivedQtys(prev => ({ ...prev, [item.med.id]: parseInt(e.target.value) || 0 }))}
-                />
+      {/* Persistent pending orders (DB-backed; survives reloads + cross-device) */}
+      {pendingOrders.map((order) => {
+        const filteredItems = order.items.filter((it) => it.med_id && !String(it.med_id).startsWith("ja-"));
+        const qtys = pendingReceivedQtys[order.id] || {};
+        return (
+          <Card key={order.id} className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  {order.orderer_name ? <UserCheck className="w-4 h-4 text-primary" /> : <Package className="w-4 h-4 text-primary" />}
+                  {order.orderer_name ? `Guardian Order from ${order.orderer_name}` : "Order sent — pending receipt"}
+                </h4>
+                {order.pharmacy_phone && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => resendOrder(order)}>
+                    <MessageCircle className="w-3 h-3 mr-1" /> Send again
+                  </Button>
+                )}
               </div>
-            ))}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingReceipt(null)}>
-                Dismiss
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1"
-                disabled={markingPendingReceived}
-                onClick={markPendingReceived}
-              >
-                {markingPendingReceived ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-                ✓ Received
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Guardian-placed Orders */}
-      {guardianOrders.length > 0 && (
-        <div className="space-y-2">
-          {guardianOrders.map((order: any) => (
-            <Card key={order.id} className="border-primary/30 bg-primary/5">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-primary" />
-                  <h3 className="text-sm font-semibold text-primary">
-                    Guardian Order from {order.orderer_name}
-                  </h3>
-                </div>
+              {order.pharmacy_phone && (
                 <p className="text-xs text-muted-foreground">
-                  Your guardian ordered these medications for you.
+                  Sent to {order.pharmacy_phone} via {order.send_method === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}.
                 </p>
-                <div className="space-y-1">
-                  {(order.items as any[]).map((item: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-border last:border-0">
-                      <span>{item.name} — {item.dosage}</span>
-                      <Badge variant="secondary" className="text-[10px]">Qty: {item.qty}</Badge>
-                    </div>
-                  ))}
+              )}
+              {filteredItems.map((item) => (
+                <div key={item.med_id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex-1 truncate">{item.name} <span className="text-muted-foreground">— {item.dosage}</span></span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-20 h-8 text-center text-sm"
+                    value={qtys[item.med_id] ?? item.total_quantity ?? item.qty}
+                    onChange={(e) => setPendingReceivedQtys(prev => ({
+                      ...prev,
+                      [order.id]: { ...(prev[order.id] || {}), [item.med_id]: parseInt(e.target.value) || 0 }
+                    }))}
+                  />
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Ordered on {new Date(order.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                </p>
+              ))}
+              <p className="text-[10px] text-muted-foreground">
+                Ordered on {new Date(order.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+              </p>
+              <div className="flex gap-2">
                 <Button
-                  className="w-full"
+                  variant="outline"
                   size="sm"
-                  disabled={markingOrderReceived === order.id}
-                  onClick={() => markGuardianOrderReceived(order)}
+                  className="flex-1"
+                  disabled={dismissingOrder === order.id}
+                  onClick={() => dismissPendingOrder(order)}
                 >
-                  {markingOrderReceived === order.id
-                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    : <CheckCircle className="w-4 h-4 mr-2" />}
-                  ✓ Received — Update Stock
+                  Dismiss
                 </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  disabled={markingPendingReceived === order.id}
+                  onClick={() => markPendingReceived(order)}
+                >
+                  {markingPendingReceived === order.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Medications Received
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
       {/* Banned Warnings */}
       {Object.keys(bannedMap).length > 0 && (
         <Card className="border-destructive/30 bg-destructive/5">
@@ -619,7 +645,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
         ) : (
           meds
             .filter((m) => !orderItems.some((o) => o.med.id === m.id))
-            .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+            .filter((m) => !pendingOrders.some((o) => o.items.some((p) => p.med_id === m.id)))
             .map((med) => (
             <Card key={med.id} className="border-destructive/30">
               <CardContent className="p-3 flex items-center gap-3">
@@ -656,7 +682,7 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
               Order medications from partner pharmacies with doorstep delivery.
             </p>
             {allMeds
-              .filter((m) => !pendingReceipt?.items.some((p) => p.med.id === m.id))
+              .filter((m) => !pendingOrders.some((o) => o.items.some((p) => p.med_id === m.id)))
               .map((med) => {
               const inOrder = orderItems.some((o) => o.med.id === med.id);
               if (inOrder) return null;
