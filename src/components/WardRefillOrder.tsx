@@ -48,6 +48,17 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
   const [markingReceived, setMarkingReceived] = useState(false);
 
+  // Pending-receipt + send-confirmation state
+  const [pendingReceipt, setPendingReceipt] = useState<{
+    items: OrderItem[]; sentAt: number; via: "msg91" | "browser"; pharmacyNumber: string;
+  } | null>(null);
+  const [pendingReceivedQtys, setPendingReceivedQtys] = useState<Record<string, number>>({});
+  const [markingPendingReceived, setMarkingPendingReceived] = useState(false);
+  const [lastSendInfo, setLastSendInfo] = useState<{
+    via: "msg91" | "browser"; pharmacyNumber: string; itemCount: number;
+  } | null>(null);
+  const [sending, setSending] = useState(false);
+
   const markReceived = async () => {
     setMarkingReceived(true);
     try {
@@ -137,12 +148,15 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   };
 
   const sendWhatsApp = async () => {
-    const num = pharmacyNumber.replace(/\s+/g, "").replace(/^\+/, "");
+    const num = pharmacyNumber.replace(/\D/g, "");
     if (!num || num.length < 10) {
       toast.error("Enter a valid WhatsApp number with country code");
       return;
     }
     localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber);
+
+    // Open blank window synchronously so popup blockers don't kill the fallback.
+    const popup = window.open("", "_blank");
 
     const orderDate = new Date().toLocaleDateString("en-IN", {
       day: "2-digit", month: "short", year: "numeric",
@@ -150,11 +164,21 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     const itemsText = orderItems
       .map((item, i) => `${i + 1}. ${item.med.name} - ${item.med.dosage} (Qty: ${item.qty})`)
       .join("\n");
+    const waUrl = `https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`;
+    const itemsSnapshot = [...orderItems];
 
-    const fallback = () => {
-      window.open(`https://wa.me/${num}?text=${encodeURIComponent(buildOrderText())}`, "_blank");
+    const finalize = (via: "msg91" | "browser") => {
+      setPendingReceipt({ items: itemsSnapshot, sentAt: Date.now(), via, pharmacyNumber });
+      setPendingReceivedQtys(
+        Object.fromEntries(itemsSnapshot.map((it) => [it.med.id, it.med.total_quantity]))
+      );
+      setLastSendInfo({ via, pharmacyNumber, itemCount: itemsSnapshot.length });
+      setOrderItems([]);
+      setOrderConfirmed(false);
+      setTimeout(() => setLastSendInfo(null), 6000);
     };
 
+    setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
         body: {
@@ -167,17 +191,53 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
         },
       });
       if (error || !data?.success) {
-        console.warn("MSG91 failed, falling back to wa.me", error || data);
-        toast.info("Opening WhatsApp as fallback...");
-        fallback();
-        return;
+        console.warn("MSG91 failed, falling back to wa.me:", JSON.stringify(error || data));
+        if (popup) popup.location.href = waUrl;
+        else window.open(waUrl, "_blank");
+        toast.info("Opened WhatsApp as fallback");
+        finalize("browser");
+      } else {
+        if (popup) popup.close();
+        toast.success(`Order sent to pharmacy for ${wardName} ✓`);
+        finalize("msg91");
       }
-      toast.success(`Order sent to pharmacy for ${wardName} ✓`);
     } catch (e) {
-      console.warn("send-pharmacy-order error, falling back", e);
-      toast.info("Opening WhatsApp as fallback...");
-      fallback();
+      console.warn("send-pharmacy-order error, falling back:", JSON.stringify(e));
+      if (popup) popup.location.href = waUrl;
+      else window.open(waUrl, "_blank");
+      toast.info("Opened WhatsApp as fallback");
+      finalize("browser");
     }
+    setSending(false);
+  };
+
+  const markPendingReceived = async () => {
+    if (!pendingReceipt) return;
+    setMarkingPendingReceived(true);
+    try {
+      for (const item of pendingReceipt.items) {
+        const qty = pendingReceivedQtys[item.med.id] ?? item.med.total_quantity;
+        await supabase
+          .from("medications")
+          .update({ remaining_quantity: qty })
+          .eq("id", item.med.id);
+      }
+      toast.success("Stock updated successfully!");
+      setPendingReceipt(null);
+      setPendingReceivedQtys({});
+      load();
+    } catch {
+      toast.error("Failed to update stock");
+    }
+    setMarkingPendingReceived(false);
+  };
+
+  const resendLastOrder = () => {
+    if (!pendingReceipt) return;
+    const num = pendingReceipt.pharmacyNumber.replace(/\D/g, "");
+    const text = `🏥 *Medication Order Resend for ${wardName}*\n\n` +
+      pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const saveAsPdf = () => {
@@ -205,10 +265,72 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   };
 
   if (loading) return <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>;
-  if (meds.length === 0) return null;
+  if (meds.length === 0 && !pendingReceipt && !lastSendInfo) return null;
 
   return (
     <div className="space-y-3">
+      {/* Send confirmation banner */}
+      {lastSendInfo && (
+        <Card className="border-success/40 bg-success/5">
+          <CardContent className="p-3">
+            <div className="flex items-start gap-2">
+              <CheckCircle className="w-5 h-5 text-success shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-success">Order sent to pharmacy</h4>
+                <p className="text-xs text-muted-foreground">
+                  via WhatsApp ({lastSendInfo.via === "msg91" ? "MSG91" : "browser link"}) · {lastSendInfo.itemCount} item{lastSendInfo.itemCount === 1 ? "" : "s"} · To: {lastSendInfo.pharmacyNumber}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setLastSendInfo(null)}>
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending receipt card */}
+      {pendingReceipt && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Order sent — pending receipt
+              </h4>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={resendLastOrder}>
+                <MessageCircle className="w-3 h-3 mr-1" /> Send again
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sent to {pendingReceipt.pharmacyNumber} via {pendingReceipt.via === "msg91" ? "MSG91 WhatsApp" : "WhatsApp link"}.
+            </p>
+            {pendingReceipt.items.map((item) => (
+              <div key={item.med.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex-1 truncate">{item.med.name}</span>
+                <Input
+                  type="number"
+                  min={1}
+                  className="w-20 h-8 text-center text-sm"
+                  value={pendingReceivedQtys[item.med.id] ?? item.med.total_quantity}
+                  onChange={(e) => setPendingReceivedQtys(prev => ({ ...prev, [item.med.id]: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingReceipt(null)}>
+                Dismiss
+              </Button>
+              <Button size="sm" className="flex-1" disabled={markingPendingReceived} onClick={markPendingReceived}>
+                {markingPendingReceived ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                ✓ Received
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {meds.length > 0 && <>
       {/* Low Stock Alerts */}
       <h4 className="text-sm font-semibold flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-destructive" />
@@ -324,8 +446,9 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
                   <Badge variant="secondary" className="text-[10px] ml-auto">Saved</Badge>
                 </div>
               )}
-              <Button className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-white" onClick={sendWhatsApp}>
-                <MessageCircle className="w-4 h-4 mr-2" /> Send to Pharmacy via WhatsApp
+              <Button className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-white" onClick={sendWhatsApp} disabled={sending}>
+                {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}
+                {sending ? "Sending..." : "Send to Pharmacy via WhatsApp"}
               </Button>
             </CardContent>
           </Card>
@@ -379,6 +502,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
           </Card>
         </div>
       )}
+      </>}
     </div>
   );
 };
