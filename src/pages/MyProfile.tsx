@@ -23,8 +23,6 @@ import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
 import PastMedicalHistory from "@/components/PastMedicalHistory";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ContactUsForm from "@/components/ContactUsForm";
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
@@ -76,24 +74,9 @@ const MyProfile = () => {
           <h1 className="text-xl font-bold text-foreground">My Profile</h1>
           <p className="text-sm text-muted-foreground">Protected with military-grade encryption</p>
         </div>
-        <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="profile" className="gap-1.5">
-              <User className="w-4 h-4" /> Profile
-            </TabsTrigger>
-            <TabsTrigger value="contact" className="gap-1.5">
-              <Send className="w-4 h-4" /> Contact Us
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="profile" className="mt-0">
-            <VaultGate title="My Profile">
-              <ProfileContent />
-            </VaultGate>
-          </TabsContent>
-          <TabsContent value="contact" className="mt-0">
-            <ContactUsForm />
-          </TabsContent>
-        </Tabs>
+        <VaultGate title="My Profile">
+          <ProfileContent />
+        </VaultGate>
       </div>
     </AppLayout>
   );

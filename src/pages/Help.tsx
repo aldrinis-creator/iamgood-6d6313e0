@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search, Crown } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { faqSections, FAQ_VERSION } from "@/data/faqData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,14 +42,23 @@ const iconMap: Record<string, React.ReactNode> = {
 type HelpTab = "faq" | "contact" | "settings" | "privacy" | "terms";
 
 const Help = () => {
-  const [activeTab, setActiveTab] = useState<HelpTab>("faq");
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get("tab") as HelpTab) || "faq";
+  const [activeTab, setActiveTab] = useState<HelpTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
+  useEffect(() => {
+    const t = searchParams.get("tab") as HelpTab | null;
+    if (t && ["faq", "contact", "settings", "privacy", "terms"].includes(t)) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
   const tabs: { id: HelpTab; label: string; icon: React.ReactNode }[] = [
     { id: "faq", label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
-    { id: "contact", label: "Contact Us", icon: <Mail className="w-4 h-4" /> },
+    { id: "contact", label: "Get in Touch", icon: <Mail className="w-4 h-4" /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon className="w-4 h-4" /> },
     { id: "privacy", label: "Privacy", icon: <Shield className="w-4 h-4" /> },
     { id: "terms", label: "Terms", icon: <FileText className="w-4 h-4" /> },
@@ -240,7 +249,7 @@ const Help = () => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Mail className="w-5 h-5 text-primary" />
-                  Contact Us
+                  Get in Touch
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
