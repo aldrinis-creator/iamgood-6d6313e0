@@ -1,8 +1,10 @@
 
 
-## Plan — Draft WhatsApp Template for MSG91 Approval
+## Plan — Draft WhatsApp Template for Appointment Sharing
 
-You'll copy the content below into MSG91 dashboard → WhatsApp Templates → Create New, submit for approval, then paste the approved template ID back to me.
+The edge function (`share-appointment-whatsapp`), frontend dialog (`ShareAppointmentDialog.tsx`), and secret slot (`MSG91_APPT_SHARE_TEMPLATE_ID`) **already exist and are wired up** — including a `wa.me` fallback if MSG91 fails. The only missing piece is the approved WhatsApp template in MSG91.
+
+Below is the template to submit. The variable names match exactly what the existing edge function already sends, so once you paste the approved Template ID into the secret, the flow works in both User and Guardian apps with no code changes.
 
 ---
 
@@ -10,10 +12,10 @@ You'll copy the content below into MSG91 dashboard → WhatsApp Templates → Cr
 
 | Field | Value |
 |---|---|
-| **Template Name** | `pharmacy_order` |
-| **Category** | `UTILITY` (transactional — faster approval than MARKETING) |
+| **Template Name** | `appointment_share` |
+| **Category** | `UTILITY` (transactional — fastest approval) |
 | **Language** | `English` (`en`) |
-| **Header** | None (text-only template — fastest approval) |
+| **Header** | None |
 | **Footer** | `Sent via Check-iN` |
 | **Buttons** | None |
 
@@ -22,62 +24,68 @@ You'll copy the content below into MSG91 dashboard → WhatsApp Templates → Cr
 ### Template Body (paste exactly)
 
 ```
-Hello, new medication order received via Check-iN.
+Hello {{1}}, an appointment has been shared with you via Check-iN.
 
-*Patient:* {{1}}
-*Doctor:* {{2}}
-*Clinic/Hospital:* {{3}}
-*Order Date:* {{4}}
+*Appointment:* {{2}}
+*Date:* {{3}}
+*Time:* {{4}}
+*Doctor:* {{5}}
+*Location:* {{6}}
 
-*Items:*
-{{5}}
-
-Please confirm availability and delivery time. Reply to this message to coordinate.
+Please save this to your calendar. Reply if you need any clarification.
 ```
 
-### Sample Values (MSG91 requires these for approval)
+### Sample Values (required for MSG91 approval)
 
-| Variable | Sample |
-|---|---|
-| `{{1}}` Patient name | `Ramesh Kumar` |
-| `{{2}}` Doctor name | `Dr. A. Sharma` |
-| `{{3}}` Clinic / Hospital | `Apollo Clinic, Indiranagar` |
-| `{{4}}` Order date | `21 Apr 2026` |
-| `{{5}}` Items list | `1. Metformin 500mg — Qty: 30\n2. Atorvastatin 10mg — Qty: 30\n3. Telmisartan 40mg — Qty: 30` |
+| Var | MSG91 field name | Sample |
+|---|---|---|
+| `{{1}}` | `member_name` | `Priya Sharma` |
+| `{{2}}` | `appointment_title` | `Cardiology Follow-up` |
+| `{{3}}` | `date` | `25 Apr 2026` |
+| `{{4}}` | `time` | `10:30` |
+| `{{5}}` | `doctor_name` | `Dr. R. Mehta` |
+| `{{6}}` | `location` | `Apollo Hospital, Bangalore` |
 
 ---
 
 ### Why these choices
 
-- **UTILITY category**: Order placement is transactional, not promotional — Meta approves these in 1–24h vs days for MARKETING.
-- **No header/buttons**: Each interactive element adds approval risk and rejection reasons. Plain body = highest approval rate.
-- **Asterisks for bold**: WhatsApp renders `*text*` as **bold** — keeps the message scannable for busy pharmacists.
-- **Single items variable `{{5}}`**: Avoids needing a fixed item count. We'll join all order lines with `\n` server-side before sending.
-- **Footer "Sent via Check-iN"**: Brand attribution + signals legitimate business sender.
+- **UTILITY category**: appointment notifications are transactional → 1–24h approval, vs days for MARKETING.
+- **Opens with `{{1}}` greeting that includes static text "Hello"**: WhatsApp rejects templates that start with a bare variable, so the leading "Hello " keeps it compliant while still personalising.
+- **Variable names match the existing edge function payload exactly** (`member_name`, `appointment_title`, `date`, `time`, `doctor_name`, `location`) — no code changes needed after approval.
+- **Bold via asterisks**: scannable by busy recipients.
+- **No buttons/header/URLs**: highest approval rate, no extra review.
 
 ---
 
-### Your steps
+### Your steps in MSG91
 
-1. Log in to **MSG91 dashboard → WhatsApp → Templates → Add New**.
-2. Paste the body, name (`pharmacy_order`), category (UTILITY), language (English).
-3. Fill the 5 sample values from the table above.
-4. Submit for approval.
-5. Once approved (status = "Approved"), copy the **Template ID** (looks like a long alphanumeric string) and share it with me.
+1. **MSG91 dashboard → WhatsApp → Templates → Add New**.
+2. Name `appointment_share`, category **UTILITY**, language **English**.
+3. Paste the body above; fill the 6 sample values from the table.
+4. **Important**: in the variable mapping step, name the variables exactly: `member_name`, `appointment_title`, `date`, `time`, `doctor_name`, `location` — these must match the keys the edge function already sends.
+5. Submit for approval.
+6. Once approved, copy the **Template ID** and paste it as the value of the existing secret `MSG91_APPT_SHARE_TEMPLATE_ID` (already provisioned).
 
-### After you share the template ID
+---
 
-I'll proceed with the build:
-1. Request the `MSG91_PHARMACY_TEMPLATE_ID` secret and ask you to paste the ID.
-2. Create `supabase/functions/send-pharmacy-order/index.ts` that calls MSG91 Flow API with the 5 variables.
-3. Update `RefillOrder.tsx` (User) and `WardRefillOrder.tsx` (Guardian) to invoke the function, with `wa.me` fallback on failure.
-4. Register the function in `supabase/config.toml` with `verify_jwt = true`.
+### After you update the secret
+
+Nothing for me to build — the flow is already complete:
+
+1. User taps **"Share with Member/s"** in Appointments → selects guardians → taps **Share via WhatsApp**.
+2. Frontend invokes `share-appointment-whatsapp` edge function.
+3. Edge function calls MSG91 Flow API with the approved template.
+4. On success → marks `appointments.share_status = 'shared'` and shows success toast.
+5. On failure → automatic fallback opens `wa.me/<phone>?text=...` for each recipient (already implemented).
+
+This works identically in the User app and Guardian app since both use the same `ShareAppointmentDialog` component.
 
 ### Common rejection reasons to avoid
 
-- Don't add promotional language ("Best prices!", "Discount") — that flips it to MARKETING and gets rejected as UTILITY.
-- Don't use `{{1}}` at the very start of the body — Meta rejects templates that open with a variable.
-- Don't include URLs in the body unless absolutely needed — increases scrutiny.
+- Don't add promotional language ("Best appointment service!") — flips it to MARKETING.
+- Don't start the body with a bare `{{1}}` — already handled with the "Hello " prefix.
+- Don't include URLs in the body — increases scrutiny and rejection risk.
 
 The template above already follows all three rules.
 
