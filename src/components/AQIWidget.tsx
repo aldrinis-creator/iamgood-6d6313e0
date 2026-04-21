@@ -56,6 +56,7 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchesLeft, setSearchesLeft] = useState(MAX_SEARCHES_PER_DAY);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
 
   // Initialize rate limiting (user only)
   useEffect(() => {
