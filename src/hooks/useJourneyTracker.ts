@@ -397,11 +397,19 @@ export function useJourneyTracker() {
     setArrivingSoonDismissed(false);
     setRouteDeviation(false);
     setRouteDeviationDismissed(false);
+    setPendingAutoSos(false);
     deviationCountRef.current = 0;
     maxDeviationRef.current = 0;
     deviationNotifiedAt.current = 0;
     arrivedAt.current = null;
     lastSaveTime.current = 0;
+    batteryAlertSentRef.current = false;
+    escalationFiredRef.current = false;
+    checkInRespondedRef.current = false;
+    if (deviationEscalationTimer.current) {
+      clearTimeout(deviationEscalationTimer.current);
+      deviationEscalationTimer.current = undefined;
+    }
 
     await notifyGuardians(
       "🗺️ Journey Started",
