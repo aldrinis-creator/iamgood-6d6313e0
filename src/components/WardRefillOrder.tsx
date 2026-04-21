@@ -222,11 +222,32 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     const waUrl = buildWhatsAppUrl(num, buildOrderText());
     const itemsSnapshot = [...orderItems];
 
+    const persistOrder = async (via: "msg91" | "browser") => {
+      if (!session?.user?.id) return;
+      try {
+        const items = itemsSnapshot.map((it) => ({
+          med_id: it.med.id,
+          name: it.med.name,
+          dosage: it.med.dosage,
+          qty: it.qty,
+          total_quantity: it.med.total_quantity,
+        }));
+        await supabase.from("medication_orders" as any).insert({
+          user_id: wardUserId,
+          ordered_by: session.user.id,
+          items,
+          status: "pending_receipt",
+          pharmacy_phone: pharmacyNumber,
+          send_method: via,
+        });
+        loadPendingOrders();
+      } catch (err) {
+        console.error("Failed to persist medication order", err);
+      }
+    };
+
     const finalize = (via: "msg91" | "browser") => {
-      setPendingReceipt({ items: itemsSnapshot, sentAt: Date.now(), via, pharmacyNumber });
-      setPendingReceivedQtys(
-        Object.fromEntries(itemsSnapshot.map((it) => [it.med.id, it.med.total_quantity]))
-      );
+      persistOrder(via);
       setLastSendInfo({ via, pharmacyNumber, itemCount: itemsSnapshot.length });
       setOrderItems([]);
       setOrderConfirmed(false);
@@ -266,32 +287,42 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     setSending(false);
   };
 
-  const markPendingReceived = async () => {
-    if (!pendingReceipt) return;
-    setMarkingPendingReceived(true);
+  const markPendingReceived = async (order: PendingOrder) => {
+    setMarkingPendingReceived(order.id);
     try {
-      for (const item of pendingReceipt.items) {
-        const qty = pendingReceivedQtys[item.med.id] ?? item.med.total_quantity;
-        await supabase
-          .from("medications")
-          .update({ remaining_quantity: qty })
-          .eq("id", item.med.id);
+      const qtys = pendingReceivedQtys[order.id] || {};
+      for (const item of order.items) {
+        if (!item.med_id) continue;
+        const qty = qtys[item.med_id] ?? item.total_quantity ?? item.qty;
+        await supabase.from("medications").update({ remaining_quantity: qty }).eq("id", item.med_id);
       }
-      toast.success("Stock updated successfully!");
-      setPendingReceipt(null);
-      setPendingReceivedQtys({});
+      await supabase.from("medication_orders" as any)
+        .update({ status: "received", received_at: new Date().toISOString() })
+        .eq("id", order.id);
+      toast.success("Stock updated — order marked received");
       load();
+      loadPendingOrders();
     } catch {
       toast.error("Failed to update stock");
     }
-    setMarkingPendingReceived(false);
+    setMarkingPendingReceived(null);
   };
 
-  const resendLastOrder = () => {
-    if (!pendingReceipt) return;
+  const dismissPendingOrder = async (order: PendingOrder) => {
+    setDismissingOrder(order.id);
+    try {
+      await supabase.from("medication_orders" as any)
+        .update({ status: "dismissed" }).eq("id", order.id);
+      loadPendingOrders();
+    } catch { toast.error("Failed to dismiss"); }
+    setDismissingOrder(null);
+  };
+
+  const resendOrder = (order: PendingOrder) => {
+    if (!order.pharmacy_phone) { toast.error("No pharmacy number on this order"); return; }
     const text = `🏥 *Medication Order Resend for ${wardName}*\n\n` +
-      pendingReceipt.items.map((it, i) => `${i + 1}. ${it.med.name} — ${it.med.dosage} (Qty: ${it.qty})`).join("\n");
-    window.open(buildWhatsAppUrl(pendingReceipt.pharmacyNumber, text), "_blank");
+      order.items.map((it, i) => `${i + 1}. ${it.name} — ${it.dosage} (Qty: ${it.qty})`).join("\n");
+    window.open(buildWhatsAppUrl(order.pharmacy_phone, text), "_blank");
   };
 
   const saveAsPdf = () => {
