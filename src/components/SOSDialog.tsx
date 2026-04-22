@@ -60,7 +60,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [medicationDetails, setMedicationDetails] = useState<MedicationDetail[]>([]);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(10);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [userName, setUserName] = useState("");
