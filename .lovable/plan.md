@@ -1,89 +1,204 @@
+## Plan — MSG91 WhatsApp for "Share Appointment with Member/s"
 
+### Diagnosis
 
-## Plan — Switch to MSG91 WhatsApp Outbound API (correct endpoint)
-
-### Root cause (now confirmed)
-
-The curl you shared reveals the real problem. We've been calling the **MSG91 Flow API** (`/api/v5/flow`) with named variables like `patient_name`, `items_list`. That endpoint is for SMS flows — not WhatsApp templates. MSG91 returns `type: "success"` because the Flow request is accepted, but no WhatsApp ever goes out because there's no WhatsApp channel wired to that endpoint.
-
-The correct endpoint for WhatsApp templates is:
-```text
-POST https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/
-```
-with `integrated_number` (your WhatsApp Business number `917045868482`), template `name = medication_order_notification`, namespace `e1e205a8_3b76_4c20_bde4_9f124a35c8c4`, and **positional** body params `body_1` through `body_5`.
-
-This explains everything: success response + no delivery + no error in MSG91 dashboard.
+`share-appointment-whatsapp` still calls the **MSG91 Flow API** (`/api/v5/flow`) — the same endpoint that silently failed for pharmacy orders. We already proved that the **WhatsApp Outbound Bulk API** is the correct one. We'll mirror the pharmacy pattern for appointments and define a new approved template.
 
 ---
 
-### What I'll change
+### 1. New WhatsApp Template (you create in MSG91 dashboard)
 
-**1. Rewrite `supabase/functions/send-pharmacy-order/index.ts`** to call the WhatsApp outbound endpoint exactly as in your curl:
+**Template name:** `appointment_share_notification`
+**Category:** Utility
+**Language:** `en_US`
+**Sender (integrated number):** `917045868482` (same as pharmacy)
 
-- URL: `https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/`
+**Body (5 positional variables):**
+
+```text
+Hi {{1}}, an appointment has been shared with you:
+
+📅 *{{2}}*
+🗓️ Date: {{3}}
+⏰ Time: {{4}}
+👨‍⚕️ Doctor: {{5}}
+
+Sent via Check-iN.
+```
+
+Variable mapping:
+
+- `{{1}}` = recipient name (member/guardian)
+- `{{2}}` = appointment title
+- `{{3}}` = date (e.g. `25 Apr 2026`)
+- `{{4}}` = time (`HH:MM`)
+- `{{5}}` = doctor name + (location appended in same line if present)
+
+> Location is folded into `{{5}}` to keep the variable count at 5 (matching what MSG91 reliably approves quickly). Once you submit and approve, copy the **namespace** shown in the dashboard.
+
+---
+
+### 2. New / updated secrets (you add after template approval)
+
+- `MSG91_APPT_SHARE_TEMPLATE_NAME` = `appointment_share_notification`
+- `MSG91_APPT_SHARE_TEMPLATE_ID` = **already exists** — reuse this slot to store the **namespace** from the new approved template (replace its current value)
+- *(reuse)* `MSG91_AUTH_KEY`, `MSG91_INTEGRATED_NUMBER`
+
+I'll request these via `add_secret` after you confirm the template is approved.
+
+---
+
+### 3. Edge function rewrite — `supabase/functions/share-appointment-whatsapp/index.ts`
+
+Mirror the working pharmacy function:
+
+- Endpoint: `https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/`
 - Headers: `Content-Type: application/json`, `authkey: <MSG91_AUTH_KEY>`
-- Payload shape:
+- Phone normalization (`91XXXXXXXXXX`)
+- Single bulk call with `to_and_components[]` carrying ALL recipients (one entry per member, each with their own `body_1` = member name)
+- Payload per recipient:
   ```text
-  integrated_number: "917045868482"
-  content_type: "template"
-  payload:
-    messaging_product: "whatsapp"
-    type: "template"
-    template:
-      name: "medication_order_notification"
-      language: { code: "en_US", policy: "deterministic" }
-      namespace: "e1e205a8_3b76_4c20_bde4_9f124a35c8c4"
-      to_and_components: [{
-        to: ["<normalized pharmacy phone, e.g. 919819576467>"],
-        components: {
-          body_1: { type: "text", value: <patient_name> },
-          body_2: { type: "text", value: <doctor_name> },
-          body_3: { type: "text", value: <hospital_name> },
-          body_4: { type: "text", value: <order_date> },
-          body_5: { type: "text", value: <items_text, truncated to 900 chars> }
-        }
-      }]
+  to: ["<normalized phone>"]
+  components:
+    body_1: <member_name>
+    body_2: <appointment.title>
+    body_3: <formatted date>
+    body_4: <HH:MM>
+    body_5: <doctor_name + ", " + location if present>
   ```
-- Keep phone normalization (`91XXXXXXXXXX`).
-- Keep early invocation log + full request/response logs for visibility.
-- Treat HTTP 2xx + `type === "success"` (or presence of a request id) as accepted; return `success: true` with the MSG91 request id.
-- On non-2xx or explicit error in body, return `success: false` with the MSG91 error message so the client falls back to `wa.me`.
+- Treat `type: "success"` or presence of request id as accepted → return `{ success: true, request_id }`
+- On failure, return `{ success: false, error }` so client falls back to `wa.me`
+- On success, update `appointments.share_status = 'shared'` (already in place)
+- `verify_jwt = false` in `supabase/config.toml` (matches all MSG91 outbound functions)
+- Early invocation log + full request/response logs
 
-**2. Make the integrated number configurable**
-Read `MSG91_INTEGRATED_NUMBER` from secrets, defaulting to `917045868482` (your number from the curl). If you ever change the WABA sender, you only flip a secret.
+---
 
-**3. Remove the obsolete delivery-poll against the SMS report URL**
-The previous code polled `/api/v5/report/{id}/wa` — that endpoint isn't valid for the WhatsApp outbound API and was the source of the noisy "rejected" / "queued" toasts. Rely on the synchronous response from the outbound API plus a much shorter optional check against the WhatsApp report endpoint (`/api/v5/whatsapp/report/...`) only if it returns useful data; otherwise treat the synchronous accept as success.
+### 4. Client update — `src/components/appointments/ShareAppointmentDialog.tsx`
 
-**4. Client toast cleanup**
-In `RefillOrder.tsx` and `WardRefillOrder.tsx`:
-- On `success: true` → "Order sent to pharmacy via WhatsApp ✓" (close popup).
-- On `success: false` → keep the existing automatic `wa.me` fallback (popup navigates to manual WhatsApp composer).
-- Remove references to `delivery_state` / `delivery_failed` — no longer reported.
+Tighten the existing handler:
 
-**5. Add a one-time secret check at deploy**
-If `MSG91_AUTH_KEY` is missing, return a clear 200-with-error so the client falls back. (Already in place — keeping it.)
+- On `success: true` → toast `"Appointment shared via WhatsApp ✓"`, close dialog, invalidate `["appointments"]`
+- On `success: false` or thrown error → automatically open the existing `wa.me` fallback per recipient (current behavior), toast `"MSG91 unavailable — opening WhatsApp manually"`
+- Remove the unused `ExternalLink` import
+
+No DB schema changes. No changes to `Appointments.tsx` (it already wires the dialog).
 
 ---
 
 ### Files modified
 
-- `supabase/functions/send-pharmacy-order/index.ts` — full rewrite to the WhatsApp outbound API
-- `src/components/medications/RefillOrder.tsx` — simplify success/failure handling
-- `src/components/WardRefillOrder.tsx` — simplify success/failure handling
+- `supabase/functions/share-appointment-whatsapp/index.ts` — full rewrite to WhatsApp Outbound API
+- `supabase/config.toml` — set `verify_jwt = false` for `share-appointment-whatsapp`
+- `src/components/appointments/ShareAppointmentDialog.tsx` — simpler success/fallback handling
 
-### Files added
+### What you'll see
 
-- *(none — the existing `msg91-template-info` diagnostic stays as-is for future debugging)*
+- Selected members receive the templated WhatsApp message on their number
+- Edge function logs show full request/response for every share
+- If MSG91 rejects (template paused, opted-out recipient, etc.), the dialog opens `wa.me` tabs so the appointment still gets shared manually
+- Appointment row marked **Shared** in the Appointments list
 
-### What you'll see after the fix
+### One thing for you to do (no code)
 
-- Pharmacy actually receives the WhatsApp template message on `+91 9819576467` (or whichever number the order was placed for).
-- Edge function logs show the full WhatsApp outbound request + MSG91 response, so any future failure is diagnosable in one look.
-- App toast: **"Order sent to pharmacy via WhatsApp ✓"** with the persistent "Pending Receipt" card showing **"Medications Received"**.
-- If MSG91 ever rejects (e.g., template paused, sender suspended), the popup auto-navigates to `wa.me` so the order still gets to the pharmacy manually.
+Create and submit `appointment_share_notification` in the MSG91 dashboard under integrated number `917045868482`, then share back the **namespace** so I can store it in `MSG91_APPT_SHARE_TEMPLATE_ID`.
 
-### One thing for you to confirm in the MSG91 dashboard (no code needed)
+curl --location --request POST
 
-The template `medication_order_notification` (namespace `e1e205a8_3b76_4c20_bde4_9f124a35c8c4`) must be in **Approved** status under your `917045868482` integrated number, with exactly **5 body variables**. Your curl implies it already is — so no action needed unless delivery still fails after this fix.
+  '[https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/](https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/)'
 
+  --header 'Content-Type: application/json'
+
+  --header 'authkey: <authkey>'
+
+  --data-raw '{
+
+    "integrated_number": "917045868482",
+
+    "content_type": "template",
+
+    "payload": {
+
+        "messaging_product": "whatsapp",
+
+        "type": "template",
+
+        "template": {
+
+            "name": "appointment_share_notification",
+
+            "language": {
+
+                "code": "en",
+
+                "policy": "deterministic"
+
+            },
+
+            "namespace": null,
+
+            "to_and_components": [
+
+                {
+
+                    "to": [
+
+                        "<list_of_phone_numbers>"
+
+                    ],
+
+                    "components": {
+
+                        "body_1": {
+
+                            "type": "text",
+
+                            "value": "value1"
+
+                        },
+
+                        "body_2": {
+
+                            "type": "text",
+
+                            "value": "value1"
+
+                        },
+
+                        "body_3": {
+
+                            "type": "text",
+
+                            "value": "value1"
+
+                        },
+
+                        "body_4": {
+
+                            "type": "text",
+
+                            "value": "value1"
+
+                        },
+
+                        "body_5": {
+
+                            "type": "text",
+
+                            "value": "value1"
+
+                        }
+
+                    }
+
+                }
+
+            ]
+
+        }
+
+    }
+
+}'
+
+&nbsp;
