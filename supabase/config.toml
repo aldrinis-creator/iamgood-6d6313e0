@@ -47,3 +47,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.msg91-template-info]
     verify_jwt = false
+  [functions.share-appointment-whatsapp]
+    verify_jwt = false

@@ -5,51 +5,149 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MSG91_FLOW_URL = "https://control.msg91.com/api/v5/flow";
+const MSG91_WA_URL =
+  "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
+
+const DEFAULT_INTEGRATED_NUMBER = "917045868482";
+const DEFAULT_TEMPLATE_NAME = "appointment_share_notification";
+const DEFAULT_LANG = "en";
+
+interface Recipient {
+  phone: string;
+  name: string;
+}
+
+interface Appointment {
+  id: string;
+  title?: string;
+  start_date?: string;
+  start_time?: string;
+  location?: string | null;
+  doctor_name?: string | null;
+}
+
+function normalizePhone(raw: string): string {
+  let digits = (raw || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 10) digits = "91" + digits;
+  return digits;
+}
+
+function formatDate(d?: string): string {
+  if (!d) return "";
+  try {
+    const dt = new Date(d + "T00:00:00");
+    return dt.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return d;
+  }
+}
 
 Deno.serve(async (req) => {
+  console.log("[share-appointment-whatsapp] request received", { method: req.method });
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    const templateId = Deno.env.get("MSG91_APPT_SHARE_TEMPLATE_ID");
+    const integratedNumber =
+      Deno.env.get("MSG91_INTEGRATED_NUMBER") || DEFAULT_INTEGRATED_NUMBER;
+    const templateName =
+      Deno.env.get("MSG91_APPT_SHARE_TEMPLATE_NAME") || DEFAULT_TEMPLATE_NAME;
+    const namespaceRaw = Deno.env.get("MSG91_APPT_SHARE_TEMPLATE_ID") || "";
+    // Treat empty / "null" as no namespace (per the curl, namespace is null for this template)
+    const namespace =
+      !namespaceRaw || namespaceRaw.toLowerCase() === "null" ? null : namespaceRaw;
+    const langCode = Deno.env.get("MSG91_APPT_SHARE_LANG") || DEFAULT_LANG;
 
-    if (!authKey || !templateId) {
-      console.error("MSG91_AUTH_KEY or MSG91_APPT_SHARE_TEMPLATE_ID not configured");
+    console.log("[share-appointment-whatsapp] config", {
+      hasAuth: !!authKey,
+      integratedNumber,
+      templateName,
+      namespace,
+      langCode,
+    });
+
+    if (!authKey) {
+      console.error("[share-appointment-whatsapp] MSG91_AUTH_KEY missing");
       return new Response(
         JSON.stringify({ success: false, error: "MSG91 not configured" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { appointment, recipients } = await req.json();
+    const { appointment, recipients } = (await req.json()) as {
+      appointment: Appointment;
+      recipients: Recipient[];
+    };
 
-    if (!appointment || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    if (!appointment || !Array.isArray(recipients) || recipients.length === 0) {
       return new Response(
-        JSON.stringify({ error: "appointment and recipients[] are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "appointment and recipients[] are required" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const msg91Recipients = recipients.map((r: { phone: string; name: string }) => ({
-      mobiles: r.phone.replace(/[^0-9]/g, ""),
-      appointment_title: appointment.title || "Appointment",
-      date: appointment.start_date || "",
-      time: (appointment.start_time || "").slice(0, 5),
-      location: appointment.location || "Not specified",
-      doctor_name: appointment.doctor_name || "Not specified",
-      member_name: r.name,
-    }));
+    const title = appointment.title || "Appointment";
+    const dateStr = formatDate(appointment.start_date);
+    const timeStr = (appointment.start_time || "").slice(0, 5);
+    const doctor = appointment.doctor_name || "Not specified";
+    const location = appointment.location ? `, ${appointment.location}` : "";
+    const body5 = `${doctor}${location}`.slice(0, 200);
+
+    const to_and_components = recipients
+      .map((r) => {
+        const mobile = normalizePhone(r.phone);
+        if (mobile.length < 11) return null;
+        return {
+          to: [mobile],
+          components: {
+            body_1: { type: "text", value: (r.name || "there").slice(0, 60) },
+            body_2: { type: "text", value: title.slice(0, 100) },
+            body_3: { type: "text", value: dateStr },
+            body_4: { type: "text", value: timeStr },
+            body_5: { type: "text", value: body5 },
+          },
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (to_and_components.length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: "No valid recipient phone numbers" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const payload = {
-      template_id: templateId,
-      short_url: "0",
-      recipients: msg91Recipients,
+      integrated_number: integratedNumber,
+      content_type: "template",
+      payload: {
+        messaging_product: "whatsapp",
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: langCode, policy: "deterministic" },
+          namespace,
+          to_and_components,
+        },
+      },
     };
 
-    const res = await fetch(MSG91_FLOW_URL, {
+    console.log("[share-appointment-whatsapp] calling MSG91 WA", {
+      templateName,
+      namespace,
+      recipientCount: to_and_components.length,
+    });
+
+    const res = await fetch(MSG91_WA_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -58,30 +156,62 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const result = await res.json();
-    console.log("MSG91 WhatsApp share response:", JSON.stringify(result));
+    const rawText = await res.text();
+    let result: unknown = rawText;
+    try { result = JSON.parse(rawText); } catch { /* not JSON */ }
 
-    // Update share_status via service role
-    if (res.ok) {
+    console.log("[share-appointment-whatsapp] MSG91 WA response", {
+      status: res.status,
+      body: rawText.slice(0, 600),
+    });
+
+    const obj = (typeof result === "object" && result !== null) ? (result as Record<string, unknown>) : null;
+    const msgType = obj?.type as string | undefined;
+    const requestId = obj?.request_id ?? obj?.message ?? null;
+    const errorMsg = (obj?.message && msgType === "error")
+      ? String(obj.message)
+      : (obj?.error ? String(obj.error) : null);
+
+    const isSuccess = res.ok && (msgType === "success" || (!!requestId && msgType !== "error"));
+
+    if (!isSuccess) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMsg || `HTTP ${res.status}`,
+          http_status: res.status,
+          result,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Mark appointment as shared
+    try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const supabase = createClient(supabaseUrl, serviceKey);
-
       await supabase
         .from("appointments")
         .update({ share_status: "shared" })
         .eq("id", appointment.id);
+    } catch (e) {
+      console.error("[share-appointment-whatsapp] failed to update share_status", e);
     }
 
     return new Response(
-      JSON.stringify({ success: res.ok, result }),
+      JSON.stringify({
+        success: true,
+        request_id: requestId,
+        result,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("Share appointment error:", err);
+    console.error("[share-appointment-whatsapp] uncaught error:", err);
     return new Response(
       JSON.stringify({ success: false, error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
