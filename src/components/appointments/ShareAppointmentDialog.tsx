@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Send, Users, ExternalLink } from "lucide-react";
+import { Send, Users } from "lucide-react";
 
 interface ShareAppointmentDialogProps {
   open: boolean;
@@ -69,23 +69,17 @@ const ShareAppointmentDialog = ({ open, onOpenChange, appointment }: ShareAppoin
 
       if (error) throw error;
 
-      // If MSG91 worked, update share_status
       if (data?.success) {
-        await supabase
-          .from("appointments")
-          .update({ share_status: "shared" })
-          .eq("id", appointment.id);
-
         queryClient.invalidateQueries({ queryKey: ["appointments"] });
-        toast.success(`Appointment shared with ${recipients.length} member(s)`);
+        toast.success("Appointment shared via WhatsApp ✓");
         setSelected([]);
         onOpenChange(false);
       } else {
-        // Fallback: open wa.me links
+        toast.message("MSG91 unavailable — opening WhatsApp manually");
         openWhatsAppFallback(recipients);
       }
     } catch {
-      // Fallback: open wa.me links
+      toast.message("MSG91 unavailable — opening WhatsApp manually");
       openWhatsAppFallback(recipients);
     } finally {
       setSending(false);
@@ -103,14 +97,12 @@ const ShareAppointmentDialog = ({ open, onOpenChange, appointment }: ShareAppoin
       window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
     });
 
-    // Still mark as shared
     supabase
       .from("appointments")
       .update({ share_status: "shared" })
       .eq("id", appointment.id)
       .then(() => queryClient.invalidateQueries({ queryKey: ["appointments"] }));
 
-    toast.success("Opening WhatsApp to share appointment");
     setSelected([]);
     onOpenChange(false);
   };
