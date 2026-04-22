@@ -226,31 +226,122 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- MSG91 WhatsApp alerts to guardians ---
+    // --- MSG91 WhatsApp Outbound Bulk API to guardians ---
     let msg91Sent = 0;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-    const MSG91_SOS_TEMPLATE = "69cff9f7759afeb3920ace04";
+    const integratedNumber = Deno.env.get("MSG91_INTEGRATED_NUMBER") || "917045868482";
+    const templateName = Deno.env.get("MSG91_SOS_TEMPLATE_NAME") || "sos_alert_notification";
+    const namespaceRaw = Deno.env.get("MSG91_SOS_TEMPLATE_ID") || "";
+    const namespace = !namespaceRaw || namespaceRaw.toLowerCase() === "null" ? null : namespaceRaw;
+    const langCode = Deno.env.get("MSG91_SOS_LANG") || "en_US";
 
     if (msg91AuthKey && guardianRows?.length) {
-      const guardianPhones = guardianRows.map((g: any) => g.guardian_phone).filter(Boolean);
-      const recipients = guardianPhones.map((phone: string) => {
-        const clean = phone.replace(/[^0-9]/g, "");
-        const mobile = clean.startsWith("91") ? clean : `91${clean}`;
-        return { mobiles: mobile, var1: user_name || "User" };
+      // body_2: IST timestamp
+      const istNow = new Date().toLocaleString("en-IN", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+        timeZone: "Asia/Kolkata",
       });
+      const istTimestamp = `${istNow} IST`;
 
-      if (recipients.length > 0) {
+      // body_3: latest SOS location → Google Maps link
+      let locationStr = "Location unavailable";
+      try {
+        const { data: sosRow } = await supabase
+          .from("sos_events")
+          .select("latitude, longitude")
+          .eq("user_id", user_id)
+          .order("triggered_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (sosRow?.latitude != null && sosRow?.longitude != null) {
+          locationStr = `https://maps.google.com/?q=${sosRow.latitude},${sosRow.longitude}`;
+        }
+      } catch (e) {
+        console.error("[send-sos-alert] location fetch error:", e);
+      }
+
+      // body_4: compact health summary from health_profile
+      let healthSummary = "See app for details";
+      try {
+        const { data: hp } = await supabase
+          .from("health_profile")
+          .select("blood_group, chronic_conditions, allergies")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        if (hp) {
+          const parts: string[] = [];
+          if (hp.blood_group) parts.push(`Blood: ${hp.blood_group}`);
+          if (hp.chronic_conditions?.length) parts.push(`Conditions: ${hp.chronic_conditions.join(", ")}`);
+          if (hp.allergies?.length) parts.push(`Allergies: ${hp.allergies.join(", ")}`);
+          if (parts.length) healthSummary = parts.join(" | ").slice(0, 200);
+        }
+      } catch (e) {
+        console.error("[send-sos-alert] health_profile fetch error:", e);
+      }
+
+      // Dedupe phones
+      const seen = new Set<string>();
+      const to_and_components = guardianRows
+        .map((g: any) => {
+          const raw = (g.guardian_phone || "").replace(/\D/g, "");
+          if (!raw) return null;
+          const mobile = raw.startsWith("91") ? raw : `91${raw}`;
+          if (mobile.length < 11 || seen.has(mobile)) return null;
+          seen.add(mobile);
+          return {
+            to: [mobile],
+            components: {
+              body_1: { type: "text", value: (user_name || "A Check-iN user").slice(0, 60) },
+              body_2: { type: "text", value: istTimestamp },
+              body_3: { type: "text", value: locationStr.slice(0, 200) },
+              body_4: { type: "text", value: healthSummary },
+            },
+          };
+        })
+        .filter((x: any) => x !== null);
+
+      if (to_and_components.length > 0) {
+        const payload = {
+          integrated_number: integratedNumber,
+          content_type: "template",
+          payload: {
+            messaging_product: "whatsapp",
+            type: "template",
+            template: {
+              name: templateName,
+              language: { code: langCode, policy: "deterministic" },
+              namespace,
+              to_and_components,
+            },
+          },
+        };
+
+        console.log("[send-sos-alert] calling MSG91 WA", {
+          templateName, namespace, recipientCount: to_and_components.length,
+        });
+
         try {
-          const flowRes = await fetch("https://control.msg91.com/api/v5/flow", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
-            body: JSON.stringify({ template_id: MSG91_SOS_TEMPLATE, recipients }),
+          const res = await fetch(
+            "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
+              body: JSON.stringify(payload),
+            }
+          );
+          const rawText = await res.text();
+          let result: any = rawText;
+          try { result = JSON.parse(rawText); } catch { /* not JSON */ }
+          console.log("[send-sos-alert] MSG91 WA response", {
+            status: res.status, body: rawText.slice(0, 600),
           });
-          const flowResult = await flowRes.json();
-          console.log("MSG91 SOS flow result:", JSON.stringify(flowResult));
-          if (flowRes.ok) msg91Sent = recipients.length;
+          const msgType = result?.type;
+          const requestId = result?.request_id ?? result?.message ?? null;
+          const isSuccess = res.ok && (msgType === "success" || (!!requestId && msgType !== "error"));
+          if (isSuccess) msg91Sent = to_and_components.length;
         } catch (e) {
-          console.error("MSG91 SOS send error:", e);
+          console.error("[send-sos-alert] MSG91 WA send error:", e);
         }
       }
     }
