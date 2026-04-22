@@ -48,12 +48,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeSosId, setActiveSosId] = useState<string | null>(null);
   const [roleOverride, setRoleOverride] = useState<UserRole | null>(null);
   const [pauseMode, setPauseMode] = useState<PauseMode>("active");
+  const invokedSosIdsRef = React.useRef<Set<string>>(new Set());
 
   const isLoggedIn = !!session;
   const userName = profile?.full_name || "User";
   const role: UserRole = roleOverride ?? ((profile?.role === "guardian" ? "guardian" : "user") as UserRole);
 
   const setRole = useCallback((r: UserRole) => setRoleOverride(r), []);
+
+  const invokeSosAlertOnce = useCallback(async (sosId: string) => {
+    if (invokedSosIdsRef.current.has(sosId)) return;
+    invokedSosIdsRef.current.add(sosId);
+    if (!session?.user?.id) return;
+    try {
+      const currentUserName = profile?.full_name || "User";
+      const { data: guardianRows } = await supabase
+        .from("guardians")
+        .select("guardian_email, guardian_phone")
+        .eq("user_id", session.user.id)
+        .eq("status", "accepted");
+
+      const guardian_emails = (guardianRows ?? []).map((g: any) => g.guardian_email).filter(Boolean);
+      const guardian_phones = (guardianRows ?? []).map((g: any) => g.guardian_phone).filter(Boolean);
+
+      await supabase.functions.invoke("send-sos-alert", {
+        body: {
+          user_id: session.user.id,
+          message: `🚨 SOS ALERT from ${currentUserName} — immediate attention needed.`,
+          guardian_emails,
+          guardian_phones,
+          user_name: currentUserName,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to invoke send-sos-alert:", e);
+    }
+  }, [session?.user?.id, profile?.full_name]);
 
   const triggerSOS = useCallback(async () => {
     setEmergencyMode(true);
@@ -87,6 +117,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw error;
       } else if (data) {
         setActiveSosId(data.id);
+        // Fire-and-forget edge function invocation (deduped by sos id)
+        invokeSosAlertOnce(data.id);
       }
     } catch (err) {
       console.error("Failed to create SOS event (may be offline):", err);
@@ -105,7 +137,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast.error("Failed to record SOS event");
       }
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, invokeSosAlertOnce]);
 
   const cancelSOS = useCallback(async () => {
     setEmergencyMode(false);

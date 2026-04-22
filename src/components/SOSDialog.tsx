@@ -60,7 +60,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [medicationDetails, setMedicationDetails] = useState<MedicationDetail[]>([]);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(10);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [userName, setUserName] = useState("");
@@ -131,7 +131,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       fetchData();
       countingRef.current = true;
       hasSentRef.current = false;
-      setTimeLeft(30);
+      setTimeLeft(10);
       setSent(false);
       setSending(false);
     } else {
@@ -249,7 +249,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
   const handleCancel = () => {
     countingRef.current = false;
-    setTimeLeft(30);
+    setTimeLeft(10);
     cancelSOS();
     onClose();
   };
@@ -568,7 +568,15 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
               {sending ? "Sending alerts..." : "Sending SOS to all guardians & doctor"}
             </p>
           </div>
-          <Progress value={((30 - timeLeft) / 30) * 100} className="h-2 [&>div]:bg-sos" />
+          <Progress value={((10 - timeLeft) / 10) * 100} className="h-2 [&>div]:bg-sos" />
+          <Button
+            onClick={() => { countingRef.current = false; sendAlerts(); }}
+            disabled={sending}
+            className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold"
+          >
+            {sending ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <AlertCircle className="w-5 h-5 mr-2" />}
+            Send SOS Now
+          </Button>
           <Button onClick={handleCancel} variant="outline" className="w-full border-sos text-sos hover:bg-sos/10 h-12 text-base font-semibold">
             <X className="w-5 h-5 mr-2" />
             Cancel SOS
