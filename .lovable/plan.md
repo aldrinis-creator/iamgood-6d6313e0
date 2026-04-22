@@ -1,204 +1,103 @@
-## Plan — MSG91 WhatsApp for "Share Appointment with Member/s"
 
-### Diagnosis
 
-`share-appointment-whatsapp` still calls the **MSG91 Flow API** (`/api/v5/flow`) — the same endpoint that silently failed for pharmacy orders. We already proved that the **WhatsApp Outbound Bulk API** is the correct one. We'll mirror the pharmacy pattern for appointments and define a new approved template.
+## Plan — Restructure SOS template to fit MSG91's variable-length rule
+
+### What the error means
+
+MSG91 rejects templates when the **ratio of variables to fixed body text** is too high. Our 5-variable SOS body had only ~30 characters of static text wrapping 5 placeholders — WhatsApp considers this spammy. Two ways to fix it: **fewer variables** OR **more fixed text**. We'll do both: drop to **4 variables** and add more grounding copy.
 
 ---
 
-### 1. New WhatsApp Template (you create in MSG91 dashboard)
+### New template — `sos_alert_notification` (4 vars, longer body)
 
-**Template name:** `appointment_share_notification`
+**Name:** `sos_alert_notification`
 **Category:** Utility
 **Language:** `en_US`
-**Sender (integrated number):** `917045868482` (same as pharmacy)
+**Sender:** `917045868482`
 
-**Body (5 positional variables):**
-
+**Body:**
 ```text
-Hi {{1}}, an appointment has been shared with you:
+🚨 EMERGENCY SOS ALERT from Check-iN
 
-📅 *{{2}}*
-🗓️ Date: {{3}}
-⏰ Time: {{4}}
-👨‍⚕️ Doctor: {{5}}
+{{1}} has triggered an emergency SOS and needs your immediate attention.
 
-Sent via Check-iN.
+Time of alert: {{2}}
+Last known location: {{3}}
+
+Health summary: {{4}}
+
+Please call them immediately or reach their nearest emergency contact. If unreachable, contact local emergency services.
+
+Sent via Check-iN — Personal Emergency Response System.
 ```
 
-Variable mapping:
+**Variable mapping:**
+- `{{1}}` = ward name
+- `{{2}}` = IST timestamp (e.g. `22 Apr 2026, 15:42 IST`)
+- `{{3}}` = Google Maps link OR "Location unavailable"
+- `{{4}}` = compact health summary (blood group + key conditions + allergies, truncated to ~200 chars) OR "See app for details"
 
-- `{{1}}` = recipient name (member/guardian)
-- `{{2}}` = appointment title
-- `{{3}}` = date (e.g. `25 Apr 2026`)
-- `{{4}}` = time (`HH:MM`)
-- `{{5}}` = doctor name + (location appended in same line if present)
-
-> Location is folded into `{{5}}` to keep the variable count at 5 (matching what MSG91 reliably approves quickly). Once you submit and approve, copy the **namespace** shown in the dashboard.
-
----
-
-### 2. New / updated secrets (you add after template approval)
-
-- `MSG91_APPT_SHARE_TEMPLATE_NAME` = `appointment_share_notification`
-- `MSG91_APPT_SHARE_TEMPLATE_ID` = **already exists** — reuse this slot to store the **namespace** from the new approved template (replace its current value)
-- *(reuse)* `MSG91_AUTH_KEY`, `MSG91_INTEGRATED_NUMBER`
-
-I'll request these via `add_secret` after you confirm the template is approved.
+This restructure:
+- Drops from 5 to 4 variables
+- Adds ~250 chars of fixed safety copy (call them, contact emergency services, branded footer)
+- Keeps every critical data point a guardian needs in a real SOS
 
 ---
 
-### 3. Edge function rewrite — `supabase/functions/share-appointment-whatsapp/index.ts`
+### Same fix applied preemptively to the other 3 templates
 
-Mirror the working pharmacy function:
+To avoid the same rejection on resubmission, here are the revised, longer-body versions:
 
-- Endpoint: `https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/`
-- Headers: `Content-Type: application/json`, `authkey: <MSG91_AUTH_KEY>`
-- Phone normalization (`91XXXXXXXXXX`)
-- Single bulk call with `to_and_components[]` carrying ALL recipients (one entry per member, each with their own `body_1` = member name)
-- Payload per recipient:
-  ```text
-  to: ["<normalized phone>"]
-  components:
-    body_1: <member_name>
-    body_2: <appointment.title>
-    body_3: <formatted date>
-    body_4: <HH:MM>
-    body_5: <doctor_name + ", " + location if present>
-  ```
-- Treat `type: "success"` or presence of request id as accepted → return `{ success: true, request_id }`
-- On failure, return `{ success: false, error }` so client falls back to `wa.me`
-- On success, update `appointments.share_status = 'shared'` (already in place)
-- `verify_jwt = false` in `supabase/config.toml` (matches all MSG91 outbound functions)
-- Early invocation log + full request/response logs
+#### `missed_checkin_notification` — 3 vars
+```text
+⏰ Missed Check-iN Alert
+
+{{1}} did not respond to their scheduled {{2}} check-in window today on Check-iN.
+
+This may be nothing, but please reach out to confirm they are safe and well. You can call them at {{3}} or open the Check-iN app to view their status.
+
+Sent via Check-iN — Personal Safety Companion.
+```
+Vars: `{{1}}` ward name · `{{2}}` window label · `{{3}}` ward phone.
+*(Date dropped — "today" is implicit since alert fires within the hour.)*
+
+#### `medication_status_notification` — 3 vars
+```text
+💊 Medication Update from Check-iN
+
+{{1}} has {{2}} their scheduled medication: {{3}}.
+
+You are receiving this because you are listed as their guardian and have opted in to medication notifications. You can review the full medication schedule and history in the Check-iN app.
+
+Sent via Check-iN — Personal Health Companion.
+```
+Vars: `{{1}}` ward name · `{{2}}` "taken" / "taken late" / "missed" · `{{3}}` medication name.
+*(Timestamp dropped — message arrives in real time, so "just now" is implicit.)*
+
+#### `guardian_invite_notification` — 3 vars
+```text
+🛡️ Guardian Invitation from Check-iN
+
+Hi {{1}},
+
+{{2}} has nominated you as their Guardian on Check-iN — a personal safety and health companion app for families.
+
+As their Guardian, you'll receive alerts if they miss a check-in, trigger an SOS, or need help. Accept your nomination here: {{3}}
+
+This invitation expires in 72 hours. Sent via Check-iN.
+```
+Vars: `{{1}}` guardian name · `{{2}}` ward name · `{{3}}` accept link.
+*(Relation dropped — already shown in-app on the accept page.)*
 
 ---
 
-### 4. Client update — `src/components/appointments/ShareAppointmentDialog.tsx`
+### Code impact (after templates are approved)
 
-Tighten the existing handler:
+When you approve each template and share the namespace, I'll wire each edge function exactly like pharmacy/appointments — no schema changes. Variable counts in the rewrite will match the new template (4 for SOS, 3 for the other three).
 
-- On `success: true` → toast `"Appointment shared via WhatsApp ✓"`, close dialog, invalidate `["appointments"]`
-- On `success: false` or thrown error → automatically open the existing `wa.me` fallback per recipient (current behavior), toast `"MSG91 unavailable — opening WhatsApp manually"`
-- Remove the unused `ExternalLink` import
+### What you do next
 
-No DB schema changes. No changes to `Appointments.tsx` (it already wires the dialog).
+1. In MSG91 dashboard, replace the `sos_alert_notification` body with the **4-variable version above** and submit.
+2. Optionally pre-fix the other three templates the same way before submitting them, to avoid hitting the same error.
+3. Reply with the namespace for each template once approved — I'll wire the matching edge function.
 
----
-
-### Files modified
-
-- `supabase/functions/share-appointment-whatsapp/index.ts` — full rewrite to WhatsApp Outbound API
-- `supabase/config.toml` — set `verify_jwt = false` for `share-appointment-whatsapp`
-- `src/components/appointments/ShareAppointmentDialog.tsx` — simpler success/fallback handling
-
-### What you'll see
-
-- Selected members receive the templated WhatsApp message on their number
-- Edge function logs show full request/response for every share
-- If MSG91 rejects (template paused, opted-out recipient, etc.), the dialog opens `wa.me` tabs so the appointment still gets shared manually
-- Appointment row marked **Shared** in the Appointments list
-
-### One thing for you to do (no code)
-
-Create and submit `appointment_share_notification` in the MSG91 dashboard under integrated number `917045868482`, then share back the **namespace** so I can store it in `MSG91_APPT_SHARE_TEMPLATE_ID`.
-
-curl --location --request POST
-
-  '[https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/](https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/)'
-
-  --header 'Content-Type: application/json'
-
-  --header 'authkey: <authkey>'
-
-  --data-raw '{
-
-    "integrated_number": "917045868482",
-
-    "content_type": "template",
-
-    "payload": {
-
-        "messaging_product": "whatsapp",
-
-        "type": "template",
-
-        "template": {
-
-            "name": "appointment_share_notification",
-
-            "language": {
-
-                "code": "en",
-
-                "policy": "deterministic"
-
-            },
-
-            "namespace": null,
-
-            "to_and_components": [
-
-                {
-
-                    "to": [
-
-                        "<list_of_phone_numbers>"
-
-                    ],
-
-                    "components": {
-
-                        "body_1": {
-
-                            "type": "text",
-
-                            "value": "value1"
-
-                        },
-
-                        "body_2": {
-
-                            "type": "text",
-
-                            "value": "value1"
-
-                        },
-
-                        "body_3": {
-
-                            "type": "text",
-
-                            "value": "value1"
-
-                        },
-
-                        "body_4": {
-
-                            "type": "text",
-
-                            "value": "value1"
-
-                        },
-
-                        "body_5": {
-
-                            "type": "text",
-
-                            "value": "value1"
-
-                        }
-
-                    }
-
-                }
-
-            ]
-
-        }
-
-    }
-
-}'
-
-&nbsp;
