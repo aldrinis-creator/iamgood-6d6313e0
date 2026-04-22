@@ -1,103 +1,54 @@
 
 
-## Plan — Restructure SOS template to fit MSG91's variable-length rule
+## Plan — Wire `send-sos-alert` to MSG91 WhatsApp Outbound API
 
-### What the error means
+### Confirmed inputs
+- Template: `sos_alert_notification` (approved, 4 body vars, `en_US`)
+- Namespace: `e1e205a8_3b76_4c20_bde4_9f124a35c8c4`
+- Sender: `917045868482`
+- Secret slot already exists: `MSG91_SOS_TEMPLATE_ID` → I'll ask you to update its value to the namespace above
 
-MSG91 rejects templates when the **ratio of variables to fixed body text** is too high. Our 5-variable SOS body had only ~30 characters of static text wrapping 5 placeholders — WhatsApp considers this spammy. Two ways to fix it: **fewer variables** OR **more fixed text**. We'll do both: drop to **4 variables** and add more grounding copy.
+### What changes
 
----
+**1. Secret update (you do this)**
+- Set `MSG91_SOS_TEMPLATE_ID` = `e1e205a8_3b76_4c20_bde4_9f124a35c8c4`
+- Set `MSG91_INTEGRATED_NUMBER` = `917045868482` (if not already)
 
-### New template — `sos_alert_notification` (4 vars, longer body)
+**2. Edge function rewrite — `supabase/functions/send-sos-alert/index.ts`**
 
-**Name:** `sos_alert_notification`
-**Category:** Utility
-**Language:** `en_US`
-**Sender:** `917045868482`
+Replace the existing MSG91 Flow API block (lines ~213-241) with a WhatsApp Outbound Bulk API call, mirroring the proven pharmacy/appointments pattern:
 
-**Body:**
-```text
-🚨 EMERGENCY SOS ALERT from Check-iN
+- Endpoint: `https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/`
+- Headers: `Content-Type: application/json`, `authkey: <MSG91_AUTH_KEY>`
+- Build `to_and_components[]` — one entry per guardian phone, each with:
+  - `body_1` = ward name (`user_name`)
+  - `body_2` = IST timestamp (formatted via existing pattern)
+  - `body_3` = Google Maps link from `sos_events.lat/lng` (latest active SOS) OR `"Location unavailable"`
+  - `body_4` = compact health summary from `medical_info` table (blood group + key conditions, truncated to ~200 chars) OR `"See app for details"`
+- Treat `type: "success"` or presence of `request_id` → `msg91Sent = recipients.length`
+- On failure, log full response; in-app + email + push paths remain unchanged
+- Phone normalization: strip non-digits, prepend `91` if missing
+- Deduplicate recipients by phone
 
-{{1}} has triggered an emergency SOS and needs your immediate attention.
+**3. Data fetch additions inside the function**
+- Query latest active `sos_events` row for `user_id` to get `lat`/`lng` for `body_3`
+- Query `medical_info` for `user_id` to build `body_4` (blood_group, conditions array, allergies — truncated)
+- Both wrapped in try/catch with safe fallbacks so SOS never blocks on enrichment failures
 
-Time of alert: {{2}}
-Last known location: {{3}}
+**4. No changes to**
+- `supabase/config.toml` (already `verify_jwt = false`)
+- Email queue, push notification, in-app notification logic
+- Any client code (`SOSDialog`, `FallDetectionOverlay`, `AppContext.triggerSOS`) — they already invoke `send-sos-alert`
 
-Health summary: {{4}}
+### Files modified
+- `supabase/functions/send-sos-alert/index.ts` — replace Flow API block with WhatsApp Outbound Bulk API
 
-Please call them immediately or reach their nearest emergency contact. If unreachable, contact local emergency services.
+### What you'll see after deploy
+- Real WhatsApp message arrives on every guardian's phone within seconds of SOS
+- Function logs show full request payload + MSG91 response with `request_id`
+- Existing email + push + in-app + `wa.me` fallback paths unaffected
 
-Sent via Check-iN — Personal Emergency Response System.
-```
-
-**Variable mapping:**
-- `{{1}}` = ward name
-- `{{2}}` = IST timestamp (e.g. `22 Apr 2026, 15:42 IST`)
-- `{{3}}` = Google Maps link OR "Location unavailable"
-- `{{4}}` = compact health summary (blood group + key conditions + allergies, truncated to ~200 chars) OR "See app for details"
-
-This restructure:
-- Drops from 5 to 4 variables
-- Adds ~250 chars of fixed safety copy (call them, contact emergency services, branded footer)
-- Keeps every critical data point a guardian needs in a real SOS
-
----
-
-### Same fix applied preemptively to the other 3 templates
-
-To avoid the same rejection on resubmission, here are the revised, longer-body versions:
-
-#### `missed_checkin_notification` — 3 vars
-```text
-⏰ Missed Check-iN Alert
-
-{{1}} did not respond to their scheduled {{2}} check-in window today on Check-iN.
-
-This may be nothing, but please reach out to confirm they are safe and well. You can call them at {{3}} or open the Check-iN app to view their status.
-
-Sent via Check-iN — Personal Safety Companion.
-```
-Vars: `{{1}}` ward name · `{{2}}` window label · `{{3}}` ward phone.
-*(Date dropped — "today" is implicit since alert fires within the hour.)*
-
-#### `medication_status_notification` — 3 vars
-```text
-💊 Medication Update from Check-iN
-
-{{1}} has {{2}} their scheduled medication: {{3}}.
-
-You are receiving this because you are listed as their guardian and have opted in to medication notifications. You can review the full medication schedule and history in the Check-iN app.
-
-Sent via Check-iN — Personal Health Companion.
-```
-Vars: `{{1}}` ward name · `{{2}}` "taken" / "taken late" / "missed" · `{{3}}` medication name.
-*(Timestamp dropped — message arrives in real time, so "just now" is implicit.)*
-
-#### `guardian_invite_notification` — 3 vars
-```text
-🛡️ Guardian Invitation from Check-iN
-
-Hi {{1}},
-
-{{2}} has nominated you as their Guardian on Check-iN — a personal safety and health companion app for families.
-
-As their Guardian, you'll receive alerts if they miss a check-in, trigger an SOS, or need help. Accept your nomination here: {{3}}
-
-This invitation expires in 72 hours. Sent via Check-iN.
-```
-Vars: `{{1}}` guardian name · `{{2}}` ward name · `{{3}}` accept link.
-*(Relation dropped — already shown in-app on the accept page.)*
-
----
-
-### Code impact (after templates are approved)
-
-When you approve each template and share the namespace, I'll wire each edge function exactly like pharmacy/appointments — no schema changes. Variable counts in the rewrite will match the new template (4 for SOS, 3 for the other three).
-
-### What you do next
-
-1. In MSG91 dashboard, replace the `sos_alert_notification` body with the **4-variable version above** and submit.
-2. Optionally pre-fix the other three templates the same way before submitting them, to avoid hitting the same error.
-3. Reply with the namespace for each template once approved — I'll wire the matching edge function.
+### What you do
+1. Update secret `MSG91_SOS_TEMPLATE_ID` to `e1e205a8_3b76_4c20_bde4_9f124a35c8c4`
+2. Approve this plan — I'll deploy the rewritten function
 
