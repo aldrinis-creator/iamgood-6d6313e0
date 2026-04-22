@@ -218,17 +218,24 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           user_name: userName,
         },
       });
-      // If MSG91 didn't send, fallback to wa.me links
-      if (!sosResult?.msg91Sent) {
+
+      const whatsappOk = (sosResult?.whatsappQueued ?? 0) > 0;
+      const smsOk = (sosResult?.smsQueued ?? 0) > 0;
+
+      if (!whatsappOk && !smsOk) {
+        toast.error("WhatsApp & SMS delivery failed — opening WhatsApp links as backup");
         guardians.forEach((g, i) => {
           setTimeout(() => {
             window.open(getWhatsAppLink(g.guardian_phone), "_blank");
           }, i * 500);
         });
+      } else {
+        const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
+        toast.success(`SOS sent via ${channels} to ${sosResult?.recipientCount ?? guardians.length} guardian(s)`);
       }
     } catch (e) {
       console.error("Failed to send SOS alerts:", e);
-      // Fallback to wa.me links
+      toast.error("SOS backend failed — opening WhatsApp as backup");
       guardians.forEach((g, i) => {
         setTimeout(() => {
           window.open(getWhatsAppLink(g.guardian_phone), "_blank");

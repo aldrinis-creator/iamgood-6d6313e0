@@ -106,7 +106,9 @@ const FallDetectionOverlay = () => {
           user_name: userName,
         },
       });
-      if (!result?.msg91Sent) {
+      const whatsappOk = (result?.whatsappQueued ?? 0) > 0;
+      const smsOk = (result?.smsQueued ?? 0) > 0;
+      if (!whatsappOk && !smsOk) {
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
           const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
