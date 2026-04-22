@@ -1,46 +1,102 @@
 
+## Plan — Fix SOS delivery so WhatsApp targets the right guardian and add real SMS support
 
-## Diagnosis — Why no WhatsApp/SMS arrived
+### What the codebase shows now
+- The SOS backend **is being triggered**. Existing logs show the backend calling MSG91 WhatsApp and receiving accepted responses with `request_id`s.
+- The current SOS backend does **not send SMS at all**. It only does:
+  1. email queue
+  2. in-app notifications
+  3. push notifications
+  4. WhatsApp via MSG91
+- The current SOS backend also has a delivery risk: it re-queries `guardians` by `user_id` **without filtering to `status = "accepted"`** and ignores the caller’s `guardian_phones`. That can send WhatsApp to stale or pending guardian numbers.
 
-I checked Supabase edge logs: **`send-sos-alert` was never invoked** in this session. The MSG91 wiring is correct; the function simply wasn't called.
+### What to build
 
-### Root cause
+#### 1. Make SOS recipient selection reliable
+Update `supabase/functions/send-sos-alert/index.ts` so SOS uses a single clean recipient set:
+- normalize + dedupe phone numbers
+- prefer accepted guardians only
+- if caller passes `guardian_phones`, use them as the primary list or validate against accepted guardians
+- use the same resolved recipient set for:
+  - WhatsApp
+  - push lookup
+  - notification text/logging
 
-In `SOSDialog.tsx` (line 243-248), `sendAlerts()` only fires when the **30-second countdown reaches 0**. If the user:
-- Closed the dialog early
-- Cancelled before 0
-- Or only saw the floating SOS bubble but never opened the dialog
+This removes the current mismatch where the client and backend may target different guardian rows.
 
-…then no edge function call is made → no WhatsApp, no email, no push.
+#### 2. Add actual SMS sending for SOS
+Extend `send-sos-alert` with a true SMS channel using MSG91 Flow API:
+- use a dedicated SOS SMS template secret, e.g. `MSG91_SOS_SMS_TEMPLATE_ID`
+- send SMS to the same normalized guardian recipient list
+- include compact variables such as:
+  - user name
+  - IST timestamp
+  - location link or “Location unavailable”
+  - short health summary
+- return whether SMS was queued successfully, separate from WhatsApp
 
-The countdown was added as a "safety cancel window," but it conflicts with the user's expectation that **pressing SOS = alerts go out immediately**.
+Important: this is new functionality. Right now SMS is not implemented anywhere in the SOS function.
 
-### Secondary gap
+#### 3. Improve backend result reporting
+Have `send-sos-alert` return a structured channel result instead of only `msg91Sent`, for example:
+```text
+{
+  emailQueued: 1,
+  pushSent: 0,
+  whatsappQueued: 1,
+  smsQueued: 1,
+  whatsappRequestId: "...",
+  smsRequestId: "...",
+  recipientCount: 1,
+  errors: { whatsapp: null, sms: null }
+}
+```
+Also add clearer logs for:
+- final normalized phone list
+- accepted guardian count
+- WhatsApp request/result
+- SMS request/result
 
-`AppContext.triggerSOS()` (called by Fall Detection and other auto-triggers) inserts into `sos_events` but **never invokes `send-sos-alert`** itself. Only `SOSDialog` and `FallDetectionOverlay` invoke the edge function. So any code path that calls `triggerSOS()` directly without the dialog will also silently fail to send WhatsApp.
+This makes future debugging much faster.
 
----
+#### 4. Update the client to react to channel failures properly
+Update these callers:
+- `src/components/SOSDialog.tsx`
+- `src/contexts/AppContext.tsx`
+- `src/components/FallDetectionOverlay.tsx`
 
-## Plan — Two fixes
+So they:
+- read the new structured response
+- only use `wa.me` fallback if backend WhatsApp failed
+- show a clear error toast when neither WhatsApp nor SMS was queued
+- stop implying that SMS exists when it does not
 
-### 1. Reduce SOSDialog countdown + add manual "Send Now" button
-- Drop countdown from **30s → 10s** (matches industry standard for emergency apps)
-- Add a prominent **"Send SOS Now"** button inside the dialog that bypasses the countdown and calls `sendAlerts()` immediately
-- Keep the "Cancel" button as-is
+#### 5. Keep current non-SMS channels intact
+Do not change the existing:
+- push flow
+- in-app notification insertion
+- email queueing
 
-### 2. Make `triggerSOS()` self-sufficient
-- After inserting into `sos_events`, `AppContext.triggerSOS()` will also invoke `send-sos-alert` with the current user's name + guardian list
-- Add a guard (`hasInvokedRef`) so the same SOS event isn't double-sent if the dialog also fires
-- This guarantees that **any** SOS path (manual button, fall detection, voice, journey auto-SOS) sends WhatsApp
+Those can stay as parallel channels while SOS SMS is added.
 
-### 3. Verification
-- After deploy, trigger SOS once and check edge logs for `[send-sos-alert] MSG91 WA response` → confirms the call reached MSG91 with `request_id`
+### Files to modify
+- `supabase/functions/send-sos-alert/index.ts`
+- `src/components/SOSDialog.tsx`
+- `src/contexts/AppContext.tsx`
+- `src/components/FallDetectionOverlay.tsx`
 
-### Files modified
-- `src/components/SOSDialog.tsx` — countdown 30→10, add "Send Now" button
-- `src/contexts/AppContext.tsx` — `triggerSOS()` invokes `send-sos-alert` after inserting event, with dedupe guard
+### Required setup before implementation
+To send SOS SMS, the project needs a dedicated MSG91 SOS SMS template and its template ID stored as a runtime secret:
+- `MSG91_SOS_SMS_TEMPLATE_ID`
 
-### What you do
-1. Approve this plan
-2. After deploy, press SOS in the app and wait. WhatsApp should arrive on guardian phones within ~5 seconds.
+### Expected outcome
+After this change:
+- WhatsApp will target the correct accepted guardian numbers consistently
+- SOS will also send a real SMS, not just WhatsApp/push/email
+- the app will clearly indicate whether WhatsApp and SMS were actually queued
+- backend logs will show exactly which channel succeeded or failed
 
+### Technical notes
+- No database schema change is required for this fix
+- The current logs already prove the backend is reaching MSG91 for WhatsApp; the main app-side fix is recipient correctness and adding the missing SMS channel
+- Email is currently failing for a separate sender-domain reason, but that is independent of the WhatsApp/SMS issue
