@@ -435,6 +435,46 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                     </p>
                   </div>
                 )}
+                {/* Per-recipient summary so the user always sees who was contacted */}
+                {guardians.length > 0 && (
+                  <div className="bg-secondary/40 border border-border rounded-lg p-3 text-left">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Recipients ({guardians.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {guardians.map((g, i) => {
+                        const digits = (g.guardian_phone || "").replace(/\D/g, "");
+                        const withCc = digits.startsWith("91") ? digits : `91${digits}`;
+                        const isSender = withCc === "917045868482";
+                        const isInvalid = digits.length < 10;
+                        const skipped = isSender || isInvalid;
+                        const skipReason = isSender
+                          ? "skipped: matches sender number"
+                          : isInvalid
+                            ? "skipped: invalid number"
+                            : null;
+                        return (
+                          <div key={i} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="min-w-0">
+                              <span className="font-medium text-foreground">{g.guardian_name}</span>
+                              <span className="text-muted-foreground"> · {g.guardian_phone}</span>
+                              {g.status === "pending" && (
+                                <span className="ml-1 text-warning">(pending)</span>
+                              )}
+                            </div>
+                            <span className={`shrink-0 ${skipped ? "text-destructive" : isFailed ? "text-destructive" : "text-success"}`}>
+                              {skipped
+                                ? skipReason
+                                : isFailed
+                                  ? "not delivered"
+                                  : "WA + SMS submitted"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
