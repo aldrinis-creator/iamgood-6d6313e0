@@ -1,52 +1,70 @@
 
-## Plan — Two small additions
 
-### 1. Add a Refresh button to the AQI widget
+## Plan — Tell the Guardian to install the app, at the right moments
 
-**File:** `src/components/AQIWidget.tsx`
+Today a nominated Guardian gets the invite (email + WhatsApp/SMS), clicks **Accept & Create Account**, registers, and lands on "Go to Sign In" — at no point are they told the app can be installed on their phone. Below are the three touchpoints I'll add an install nudge to.
 
-Add a small refresh icon button in the AQI popover header (next to the "Updated: …" timestamp on line 308–313) that re-fetches current conditions on demand.
+### 1. Guardian invitation email — `supabase/functions/_shared/transactional-email-templates/guardian-invitation.tsx`
+
+Add a short "Get the app" section just below the existing "What does this mean?" info box, before the Accept button:
+
+```
+📱 Install the Check-iN app
+After accepting, install Check-iN on your phone so you receive
+SOS alerts and check-in updates instantly — even when the app
+is closed.
+   • iPhone: Open the link in Safari → Share → Add to Home Screen
+   • Android: Open the link in Chrome → tap "Install app" when prompted
+```
+
+Style it like the existing `infoBox` (light background, navy left border) so it visually parallels the other info card. No new template props — pure copy.
+
+### 2. WhatsApp / SMS invite (MSG91) — no code change, dashboard-only
+
+The MSG91 invite template body currently doesn't mention installation. Since the SMS/WA template is approved by MSG91 and edited in their dashboard, I'll surface the suggested updated body text in the plan so you can paste it into the MSG91 template:
+
+```
+Hi {{guardian_name}}, {{user_name}}{{relation}} has nominated you
+as their Guardian on Check-iN. Accept: {{accept_link}}
+Reject: {{reject_link}}
+After accepting, install the app from {{accept_link}} → Add to
+Home Screen for instant SOS alerts.
+```
+
+No code change in this repo — just a one-line addition to the existing MSG91 template body, re-submitted for approval.
+
+### 3. Post-registration success screen — `src/pages/Register.tsx`
+
+In the existing `registrationComplete` block (lines 361–462), add a new install card for guardians (and users too, since it benefits both) right above the "Go to Sign In" button:
+
+```
+📱 Install Check-iN on your phone
+Get instant SOS alerts and check-in updates — even when the app is closed.
+[ Install App ]   [ Skip for now ]
+```
 
 Behavior:
-- **User role:** re-runs `fetchDefaultLocation()` for the current geolocation, OR re-fetches the last searched location if `aqiData.locationName` is not "Current Location" (re-geocode via Nominatim using the cached name). Refresh does **not** consume the 5/day search quota — it only refreshes the already-loaded location.
-- **Guardian role:** re-runs `fetchWardLocation()` to pull the ward's latest shared location and AQI.
-- While refreshing: button shows a spinner (`Loader2`), is disabled, and the trigger pill shows the existing loading state.
-- On success: `fetchedAt` updates and a subtle "Updated" toast confirms.
-- On failure: toast error, previous data stays.
+- The **Install App** button uses the existing `usePwaInstall()` hook. If the browser supports `beforeinstallprompt` (Android Chrome, desktop Chrome/Edge), it triggers the native install dialog directly.
+- If install isn't available (iOS Safari, already installed, or unsupported browser), the button instead navigates to the existing `/install` page, which already has iOS "Add to Home Screen" steps and the Android fallback.
+- If `isInstalled === true`, the card is hidden entirely.
+- Skip just continues to Sign In as today.
 
-Icon: `RefreshCw` from lucide-react. Placement: right side of the location/timestamp row inside the popover, ghost button, `h-7 w-7`.
+This reuses `PwaInstallBanner`'s logic (`usePwaInstall`, `installApp()`) — no new hook needed.
 
-### 2. Let the User change their Primary Guardian
+### 4. Bonus: in-app install nudge for first-time guardian sign-in
 
-**Current state:** Today there is no user-facing way to change Primary. `OnboardingWizard` marks the first guardian added as primary, and `GuardianTab.tsx` only shows a "Primary" badge with no toggle. The only existing "Set Primary" UI is `WardEmergencyCard`, which is the **guardian's** view of a ward — not the user's own profile.
-
-**Fix:** Add a "Set as Primary" action to the user's own guardian list.
-
-**File:** `src/components/GuardianTab.tsx` (used inside `MyProfile` / `Settings` guardian list)
-
-For each guardian row that is **not** currently primary AND has `status === "accepted"`:
-- Add a small `Star` (outline) button next to the existing trash icon, tooltip "Set as Primary".
-- Pending/expired/rejected guardians: button hidden (can't be primary until accepted).
-- The current primary shows the existing filled "Primary" badge (no button needed).
-
-Click flow:
-1. Open an `AlertDialog` confirming: *"Make {name} your Primary Guardian? They will be the first contact for SOS alerts and emergency profile sharing."*
-2. On confirm, run a two-step Supabase update inside a single sequence:
-   - `update guardians set is_primary = false where user_id = <current user> and is_primary = true`
-   - `update guardians set is_primary = true where id = <selected guardian id>`
-3. On success: toast "Primary guardian updated", refresh list via existing `fetchGuardians()`.
-4. On failure: toast error, no state change.
-
-**Why no DB migration:** `guardians.is_primary` already exists; RLS already allows the user to update their own guardian rows. No new tables, functions, or policies needed.
+The first time a brand-new guardian signs in (no wards yet, no install dismissed), `GuardianDashboard` already shows their empty state. I'll add the existing `<PwaInstallBanner />` to the top of `GuardianDashboard` (same component used elsewhere) so the install nudge persists until they install or dismiss it. The banner already respects the `pwa-install-dismissed` localStorage flag, so it won't nag.
 
 ### Verification
 
-1. AQI popover shows a refresh icon next to the timestamp; clicking it spins, then updates the timestamp without consuming a search.
-2. In My Profile → Guardians, accepted non-primary guardians show a star button. Clicking it opens a confirm dialog. Confirming flips Primary correctly and only one guardian remains Primary.
-3. Existing Primary badge logic in EmergencyProfile / SOSDialog / WardEmergencyCard reads the same `is_primary` column and reflects the change immediately.
+1. Send a fresh guardian invite — the email shows the new "Install the Check-iN app" section between the "What does this mean?" box and the Accept button.
+2. After updating the MSG91 template body and re-approval, the WhatsApp/SMS message includes the install hint line.
+3. Complete a new guardian registration — the success screen shows the install card. On Android Chrome, clicking Install fires the native prompt; on iOS Safari, it routes to `/install` with the Add-to-Home-Screen steps.
+4. After signing in for the first time, GuardianDashboard shows the install banner at the top until installed or dismissed.
 
 ### What I will NOT change
 
-- No DB migration, no new RLS, no new edge function.
-- AQI 5/day search rate-limit logic stays intact — refresh is free.
-- WardEmergencyCard guardian-side "Set Primary" flow is unchanged.
+- No DB migration, no new edge function, no MSG91 secret rotation.
+- No change to the 24-hour auto-accept rule.
+- The `/install` page itself stays as-is — it's already the right destination.
+
