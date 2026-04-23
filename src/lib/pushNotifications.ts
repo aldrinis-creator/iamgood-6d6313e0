@@ -23,10 +23,11 @@ export const getPushPermission = (): NotificationPermission | "unsupported" => {
 export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration | null> => {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    const reg = await navigator.serviceWorker.register("/sw-push.js");
+    // Use the unified Workbox SW registered in main.tsx — no separate /sw-push.js
+    const reg = await navigator.serviceWorker.ready;
     return reg;
   } catch (err) {
-    console.error("SW registration failed:", err);
+    console.error("SW ready failed:", err);
     return null;
   }
 };
