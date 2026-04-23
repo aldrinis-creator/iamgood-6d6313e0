@@ -678,6 +678,43 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Ambulance type */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Ambulance className="w-4 h-4" /> Ambulance Type <span className="text-destructive">*</span>
+              </h3>
+              <RadioGroup
+                value={ambulanceType}
+                onValueChange={(v) => setAmbulanceType(v as "BLS" | "ALS")}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                <label
+                  htmlFor="amb-bls-book"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "BLS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="BLS" id="amb-bls-book" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">BLS</div>
+                    <div className="text-xs text-muted-foreground">Basic Life Support</div>
+                  </div>
+                </label>
+                <label
+                  htmlFor="amb-als-book"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "ALS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="ALS" id="amb-als-book" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">ALS</div>
+                    <div className="text-xs text-muted-foreground">Advanced Life Support</div>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h3 className="text-sm font-semibold">Pricing</h3>
               <div className="flex justify-between text-sm">

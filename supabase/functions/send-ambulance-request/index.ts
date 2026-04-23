@@ -22,6 +22,7 @@ interface RequestBody {
   pickup: { address: string; lat: number | null; lng: number | null };
   destination: { name: string; lat: number | null; lng: number | null };
   contacts: Contact[];
+  ambulance_type?: "BLS" | "ALS";
   force_channel?: "api" | "whatsapp";
 }
 
@@ -105,6 +106,7 @@ async function sendWhatsAppViaMsg91(body: RequestBody, healthSummary: string, pr
         guardian_phone: guardianPhone,
         health_summary: healthSummary.slice(0, 200),
         profile_link: profileLink,
+        ambulance_type: body.ambulance_type || "BLS",
       },
     ],
   };
