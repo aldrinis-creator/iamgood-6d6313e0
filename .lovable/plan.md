@@ -1,41 +1,33 @@
-## Plan — Hardcode the MSG91 SOS WhatsApp payload to match the working curl exactly
 
-### What's wrong now
+## Plan — Redeploy `send-sos-alert` and pull latest logs
 
-The current `send-sos-alert` edge function reads the WhatsApp template name, namespace, language, and integrated number from environment variables (`MSG91_SOS_TEMPLATE_NAME`, `MSG91_SOS_TEMPLATE_ID`, `MSG91_SOS_LANG`, `MSG91_INTEGRATED_NUMBER`). If any of these are missing, blank, or set to `"null"`, the payload sent to MSG91 silently differs from the curl example you provided — which is why WhatsApp never fires.
+You don't need the Supabase CLI or `cmd /c npx supabase functions deploy …`. Lovable Cloud has a built-in deploy tool that pushes the function directly to your managed backend (`magnrdegcegxdtgapyez`) without any login, link, or terminal.
 
-### What to change
+### Steps
 
-Update `supabase/functions/send-sos-alert/index.ts` so the WhatsApp request is built with the **exact** values from your working curl, with no env-driven overrides:
+1. **Redeploy the edge function** using Lovable's `deploy_edge_functions` tool for `send-sos-alert`. This is the equivalent of the `npx supabase functions deploy …` you were trying to run, but it runs against the correct managed project automatically.
+2. **Trigger an SOS in the app** (you do this from the preview — tap the SOS button with at least one accepted guardian on file).
+3. **Fetch the latest `send-sos-alert` logs** so we can read:
+   - `[send-sos-alert] WA request` — the exact payload sent to MSG91
+   - `[send-sos-alert] WA response` — MSG91's reply (success / error reason)
+   - `[send-sos-alert] SMS request` / `SMS response` — to diagnose why SMS isn't firing either
+4. **Diagnose based on the logs:**
+   - If WA request matches your curl exactly and MSG91 returns success → WhatsApp issue is resolved.
+   - If MSG91 returns an error (e.g. template not approved on your integrated number, namespace mismatch, recipient not opted in) → I'll report the exact error and propose the next fix.
+   - For SMS: confirm `MSG91_SOS_SMS_TEMPLATE_ID` is being read and what Flow API returns; if it's a template/Flow config issue I'll surface it.
 
-- `integrated_number`: `"917045868482"` (hardcoded)
-- `content_type`: `"template"`
-- `messaging_product`: `"whatsapp"`
-- `type`: `"template"`
-- `template.name`: `"sos_alert_notification"` (hardcoded)
-- `template.language.code`: `"en_US"` (hardcoded)
-- `template.language.policy`: `"deterministic"` (hardcoded)
-- `template.namespace`: `"e1e205a8_3b76_4c20_bde4_9f124a35c8c4"` (hardcoded, not nulled)
-- `template.to_and_components`: one entry per recipient with `body_1..body_4` = `userName`, `istTimestamp`, `locationStr`, `healthSummary`
+### What I will NOT change in this step
 
-Only `MSG91_AUTH_KEY` will continue to be read from secrets (it's a credential, not a template config).
+- No code edits to `send-sos-alert/index.ts` — the hardcoded WhatsApp payload from the previous plan is already in place. This step is purely deploy + observe.
+- SMS path stays as-is until logs tell us what's actually failing.
 
-### Logging
+### Files touched
 
-Log the final payload (template name, namespace, recipient count) and the full MSG91 response body so the next test makes the failure mode visible if MSG91 still rejects.
-
-### SMS path
-
-Leave the SMS path (`MSG91_SOS_SMS_TEMPLATE_ID` via Flow API) unchanged — your message is specifically about the WhatsApp trigger.
-
-### Files to modify
-
-- `supabase/functions/send-sos-alert/index.ts` — replace env-driven WhatsApp template config with hardcoded values from the curl example.
+- None (deploy + log read only).
 
 ### Verification
 
-1. Deploy `send-sos-alert`.
-2. Trigger SOS in the app with at least one accepted guardian whose phone is valid.
-3. Check `[send-sos-alert] WA request` and `[send-sos-alert] WA response` logs — payload should match the curl exactly, and MSG91 should return `type: "success"` with a `request_id`.
-4. Confirm WhatsApp message arrives on the guardian's phone.
-5. Check SMS as that too is not triggering  
+- Deploy tool returns success for `send-sos-alert`.
+- Logs show a `WA request` entry with `integrated_number: "917045868482"`, `template.name: "sos_alert_notification"`, and a populated `to_and_components` array.
+- Logs show a `WA response` with either `type: "success"` + `request_id` (good) or a clear MSG91 error message (actionable).
+- Guardian receives WhatsApp message; if not, the log error tells us exactly why.
