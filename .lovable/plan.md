@@ -1,125 +1,74 @@
 
-## Plan — Fix SOS delivery reliability and stop false “sent” confirmations
+## Plan — Fix new-guardian SOS delivery + add MSG91 Guardian Invite template
 
-### What is happening now
+### Issue 1: Newly added guardian did not receive SOS
 
-The current backend call to MSG91 is succeeding at the API level, but that only means MSG91 accepted the request for processing. It does not confirm that the guardian actually received the WhatsApp or SMS.
+The most likely cause is that `send-sos-alert` only resolves recipients from guardians whose `status = 'accepted'`. A guardian you just added in My Profile is created with `status = 'pending'` until they accept the invite (or 24h auto-accept), so they are silently excluded from the SOS recipient list — which is why you got no confirmation.
 
-Two concrete issues are visible from the current SOS logs:
+I will:
 
-1. `send-sos-alert` is marking both WhatsApp and SMS as successful immediately after MSG91 accepts the request.
-2. The resolved recipient phone in the latest SOS attempt is `917045868482`, which is also the hardcoded MSG91 integrated number being used as the sender. That means the system is currently attempting to send the SOS to the same number configured as the WhatsApp sender, which is very likely the wrong guardian destination.
+1. **Confirm the cause** by reading the recently-added guardian row(s) for your user (`status`, `guardian_phone`, `nominated_at`) — read-only check, no changes.
+2. **Update `supabase/functions/send-sos-alert/index.ts`** so SOS recipients include guardians with `status IN ('accepted','pending')`. Pending guardians are still real people the user explicitly nominated, and SOS is life-safety — they should be alerted. Each attempt row in `sos_message_attempts` will record the guardian's status at send-time.
+3. **Surface pending guardians in `SOSDialog.tsx`** with an amber "Pending acceptance — will still be alerted" badge next to their phone, so the user knows who is being contacted and in what state.
+4. **Improve the post-send confirmation** so the success/partial/failed banner lists each recipient with channel outcome (WA accepted / SMS accepted / skipped: self-targeted / skipped: invalid number). This guarantees the user always sees a clear confirmation of what happened, even when zero messages were actually delivered.
+5. **Pull edge logs** after the next test SOS to verify both guardians appear in the recipient list and MSG91 returns `type: success` for each.
 
-### What to build
+### Issue 2: MSG91 Guardian Invite template
 
-#### 1. Harden recipient validation in `send-sos-alert`
-Update `supabase/functions/send-sos-alert/index.ts` so the function:
-- logs both the sender number and final recipient numbers clearly
-- rejects or warns when a recipient phone matches the configured integrated sender number
-- returns a structured warning/error when all recipients are invalid or self-targeting
-- distinguishes between:
-  - request accepted by MSG91
-  - actual delivery confirmed later
-  - invalid recipient configuration
+Today, `send-guardian-invite` reads `MSG91_INVITE_TEMPLATE_ID` from secrets and calls MSG91 Flow API with these variables per recipient:
 
-This prevents “successful” SOS sends that were never actually deliverable.
+- `guardian_name`
+- `user_name`
+- `relation`
+- `accept_link`
+- `reject_link`
 
-#### 2. Stop treating MSG91 acceptance as delivery success
-Refine the function response so the app no longer interprets:
-- `HTTP 200`
-- `type: "success"`
-- `request_id`
+The secret already exists (`MSG91_INVITE_TEMPLATE_ID` is set), but you've asked for the **template content itself** to be created in the MSG91 dashboard. I cannot create templates inside MSG91 for you — that requires logging into your MSG91 account and (for WhatsApp) Meta approval. What I can do is:
 
-as “guardian definitely received the alert”.
+1. **Provide ready-to-paste template copy** (WhatsApp + SMS variants) matching the exact variable names the edge function already sends, so you only need to paste, submit for approval, and copy the resulting Template ID back into the `MSG91_INVITE_TEMPLATE_ID` secret if it changes.
+2. **Document the MSG91 Flow variable mapping** (`guardian_name`, `user_name`, `relation`, `accept_link`, `reject_link`) so the template variables line up 1:1 with what the backend sends — otherwise MSG91 silently drops variables.
+3. **Add a small diagnostic** to `send-guardian-invite` that logs the MSG91 response body (currently it only logs "MSG91 invite sent to: …" without the response), so future invite failures are debuggable the same way SOS attempts now are.
+4. **Optionally** create a `guardian_invite_attempts` audit table mirroring `sos_message_attempts` so invite delivery is also tracked and visible. I'll only build this if you want it — say the word and I'll add it. Default plan: skip it for now to keep scope tight.
 
-Instead, return statuses more like:
-- `whatsappAccepted`
-- `smsAccepted`
-- `whatsappRequestId`
-- `smsRequestId`
-- `deliveryPending: true`
+### Template copy I will hand you (for MSG91 dashboard)
 
-Then update:
-- `src/contexts/AppContext.tsx`
-- `src/components/SOSDialog.tsx`
-- `src/components/FallDetectionOverlay.tsx`
+**WhatsApp template** (category: Utility, language: English):
 
-so the UI says “queued” / “submitted to provider” instead of “sent” unless delivery is actually confirmed.
+> 🛡️ *Guardian Nomination — Check-iN*
+>
+> Hi {{1}},
+>
+> *{{2}}*{{3}} has nominated you as their Guardian on Check-iN, a personal emergency response app. As a Guardian you'll receive SOS alerts, check-in updates, medication adherence and fall detection notifications.
+>
+> ✅ Accept: {{4}}
+> ❌ Reject: {{5}}
+>
+> You have 24 hours to reject. After that the nomination is auto-accepted.
+>
+> — Check-iN
 
-#### 3. Add outbound SOS delivery tracking
-Create a database-backed audit trail for SOS outbound messages, for example an `sos_message_attempts` table, storing:
-- `sos_event_id`
-- `user_id`
-- channel (`whatsapp` / `sms`)
-- recipient phone
-- provider request ID
-- provider status
-- provider response body
-- timestamps
-- optional failure reason
+Variable mapping when registering in MSG91:
+`{{1}}` = `guardian_name`, `{{2}}` = `user_name`, `{{3}}` = `relation`, `{{4}}` = `accept_link`, `{{5}}` = `reject_link`
 
-Add RLS so only the owning user and accepted guardians tied to that SOS can view relevant records, and service-role/backend code can write them.
+**SMS template** (transactional, DLT-registered):
 
-This gives a durable source of truth for each guardian notification attempt.
+> {{user_name}}{{relation}} has nominated you as their Guardian on Check-iN. Accept: {{accept_link}} Reject: {{reject_link}}. Auto-accepts in 24h. - Check-iN
 
-#### 4. Add delivery-status webhook handling for MSG91
-Build a backend function to receive MSG91 delivery callbacks for SOS WhatsApp/SMS and update the delivery table when messages move from:
-- accepted
-- submitted
-- delivered
-- failed
+### Files I will edit
 
-The existing OTP delivery webhook pattern can be reused, but it should write into the SOS delivery tracking table instead of `otp_events`.
+- `supabase/functions/send-sos-alert/index.ts` — include `pending` guardians in recipient resolution; tag attempt rows with guardian status.
+- `supabase/functions/send-guardian-invite/index.ts` — log full MSG91 response body for debuggability.
+- `src/components/SOSDialog.tsx` — show recipient list with status badges and per-channel outcome in the confirmation banner.
 
-This enables actual delivery confirmation instead of guessing from the initial API response.
+### What I will NOT change
 
-#### 5. Surface recipient problems in the app
-Update the SOS UX so users can immediately see when guardian contact data is likely wrong:
-- show the guardian phone numbers that will receive the SOS before send
-- highlight invalid or suspicious numbers
-- warn if a guardian phone matches the MSG91 integrated sender number
-- show a clear fallback message if no valid recipients exist
-
-This prevents silent misconfiguration.
-
-#### 6. Improve fallback behavior
-Keep WhatsApp web fallback only for real provider submission failures, but avoid opening fallback links when:
-- the guardian number is invalid
-- the number matches the sender number
-- there are zero accepted guardians with usable phones
-
-This avoids false backup attempts.
-
-### Files to update
-
-- `supabase/functions/send-sos-alert/index.ts`
-- `src/contexts/AppContext.tsx`
-- `src/components/SOSDialog.tsx`
-- `src/components/FallDetectionOverlay.tsx`
-
-### Backend work required
-
-- Add a migration for an SOS delivery tracking table and RLS policies
-- Add a new backend function/webhook endpoint for MSG91 delivery callbacks
-- Optionally add a lightweight read query path for debugging recent SOS delivery attempts in the app
+- No DB migration. No new tables. No webhook changes.
+- No edits to MSG91 templates from my side — you must paste the copy above into your MSG91 dashboard and submit for WhatsApp approval.
+- No change to the 24h auto-accept logic.
 
 ### Verification
 
-1. Trigger SOS with an accepted guardian.
-2. Confirm the queued recipient phone is the guardian’s real number, not the MSG91 integrated sender number.
-3. Confirm the app says “queued” or “processing” immediately after MSG91 accepts the request.
-4. Confirm the delivery tracking table records:
-   - WhatsApp request ID
-   - SMS request ID
-   - recipient number
-   - accepted timestamp
-5. Send a delivery callback and confirm status updates to delivered or failed.
-6. Verify the UI reflects real delivery outcomes and no longer reports false success.
-
-### Expected outcome
-
-After this change, the SOS system will:
-- stop claiming delivery before it is confirmed
-- expose when the guardian phone configuration is wrong
-- prevent self-targeted sends to the MSG91 sender number
-- provide auditable delivery status for both WhatsApp and SMS
+1. Logs show both your guardians (Don Carlos + the new one) in the recipient list with status flagged.
+2. SOS confirmation banner lists each guardian's name + phone + per-channel result.
+3. MSG91 logs show `type: success` for each accepted recipient.
+4. Once you paste and approve the WhatsApp template in MSG91 and (if needed) update `MSG91_INVITE_TEMPLATE_ID`, sending an invite to a new guardian results in a real WhatsApp message arriving on their phone, and `send-guardian-invite` logs show the MSG91 response body.
