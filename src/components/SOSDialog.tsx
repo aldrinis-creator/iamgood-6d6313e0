@@ -140,6 +140,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       setTimeLeft(10);
       setSent(false);
       setSending(false);
+      setDeliverySummary(null);
     } else {
       countingRef.current = false;
     }
