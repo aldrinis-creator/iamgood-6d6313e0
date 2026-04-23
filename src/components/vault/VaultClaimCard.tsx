@@ -401,6 +401,18 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
           )}
           {claim?.status === "released" ? (
             <p className="text-xs text-muted-foreground">Released on {new Date(claim.user_window_ends_at || claim.created_at).toLocaleDateString("en-IN")}. Check your email for the access link.</p>
+          ) : claim?.status === "rejected" ? (
+            <div className="space-y-2">
+              {claim.reject_reason && (
+                <p className="text-xs text-destructive">{claim.reject_reason}</p>
+              )}
+              <Button variant="outline" size="sm" className="w-full" onClick={() => setClaim(null)}>
+                Acknowledge & dismiss
+              </Button>
+              <p className="text-[10px] text-muted-foreground">
+                A new claim cannot be filed for 30 days after a rejection.
+              </p>
+            </div>
           ) : claimActive ? (
             <p className="text-xs text-muted-foreground">A claim is already in progress. The admin will review after the grace window ends.</p>
           ) : (
