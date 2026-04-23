@@ -63,6 +63,12 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deliverySummary, setDeliverySummary] = useState<{
+    status: "success" | "partial" | "failed";
+    title: string;
+    detail: string;
+    selfTargetedPhones: string[];
+  } | null>(null);
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [userDob, setUserDob] = useState("");
@@ -134,6 +140,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       setTimeLeft(10);
       setSent(false);
       setSending(false);
+      setDeliverySummary(null);
     } else {
       countingRef.current = false;
     }
@@ -208,30 +215,65 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
       if (invokeError) {
         toast.error(`SOS backend failed: ${invokeError} — opening WhatsApp as backup`);
+        setDeliverySummary({
+          status: "failed",
+          title: "SOS could not be sent",
+          detail: `Backend error: ${invokeError}. Opening WhatsApp as a manual backup.`,
+          selfTargetedPhones: [],
+        });
         guardians.forEach((g, i) => {
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
       } else if (delivery) {
         const whatsappOk = (delivery.whatsappAccepted ?? delivery.whatsappQueued) > 0;
         const smsOk = (delivery.smsAccepted ?? delivery.smsQueued) > 0;
+        const selfTargeted = delivery.selfTargetedPhones ?? [];
 
         if (delivery.recipientCount === 0) {
           // Already toasted by AppContext; do NOT open wa.me when guardian
           // numbers are invalid or self-targeted — that would just open the
           // sender's own WhatsApp and look "successful" without delivering.
+          setDeliverySummary({
+            status: "failed",
+            title: "No SOS message was delivered",
+            detail: selfTargeted.length > 0
+              ? `Your guardian's phone (${selfTargeted.join(", ")}) is the same as the WhatsApp sender number. MSG91 cannot deliver a message from the sender to itself. Update the guardian's phone in My Profile to a different mobile number.`
+              : (delivery.errors.recipients || "No accepted guardians with valid phone numbers were found."),
+            selfTargetedPhones: selfTargeted,
+          });
         } else if (!whatsappOk && !smsOk) {
           toast.error(`Provider didn't accept the alert — opening WhatsApp as backup`);
+          setDeliverySummary({
+            status: "failed",
+            title: "Provider did not accept the SOS",
+            detail: `WhatsApp: ${delivery.errors.whatsapp || "rejected"} · SMS: ${delivery.errors.sms || "rejected"}. Opening WhatsApp as a manual backup.`,
+            selfTargetedPhones: selfTargeted,
+          });
           guardians.forEach((g, i) => {
             setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
           });
         } else {
           const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
           toast.success(`SOS queued via ${channels} for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`);
+          setDeliverySummary({
+            status: selfTargeted.length > 0 ? "partial" : "success",
+            title: selfTargeted.length > 0 ? "SOS partially submitted" : "SOS submitted to provider",
+            detail: selfTargeted.length > 0
+              ? `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). ${selfTargeted.length} guardian phone(s) match the sender number and were skipped: ${selfTargeted.join(", ")}.`
+              : `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). Awaiting delivery confirmation from MSG91.`,
+            selfTargetedPhones: selfTargeted,
+          });
         }
       }
     } catch (e: any) {
       console.error("Failed to send SOS alerts:", e);
       toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
+      setDeliverySummary({
+        status: "failed",
+        title: "SOS failed",
+        detail: `${e?.message || e}. Opening WhatsApp as a manual backup.`,
+        selfTargetedPhones: [],
+      });
       guardians.forEach((g, i) => {
         setTimeout(() => {
           window.open(getWhatsAppLink(g.guardian_phone), "_blank");
@@ -356,16 +398,45 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
     return (
       <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
-          {/* Confirmation header */}
-          <div className="text-center space-y-3 py-4">
-            <div className="w-16 h-16 rounded-full bg-sos/10 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-sos" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground">SOS Alerts Submitted</h2>
-            <p className="text-muted-foreground text-sm">
-              Emergency alerts submitted to provider for {guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.
-            </p>
-          </div>
+          {/* Confirmation header — reflects real delivery outcome */}
+          {(() => {
+            const ds = deliverySummary;
+            const status = ds?.status ?? "success";
+            const isFailed = status === "failed";
+            const isPartial = status === "partial";
+            const ringClass = isFailed
+              ? "bg-destructive/10"
+              : isPartial
+                ? "bg-warning/10"
+                : "bg-sos/10";
+            const iconClass = isFailed
+              ? "text-destructive"
+              : isPartial
+                ? "text-warning"
+                : "text-sos";
+            const Icon = isFailed ? AlertCircle : CheckCircle2;
+            const title = ds?.title ?? `SOS Alerts Submitted`;
+            const detail = ds?.detail ?? `Emergency alerts submitted to provider for ${guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.`;
+            return (
+              <div className="text-center space-y-3 py-4">
+                <div className={`w-16 h-16 rounded-full ${ringClass} flex items-center justify-center mx-auto`}>
+                  <Icon className={`w-8 h-8 ${iconClass}`} />
+                </div>
+                <h2 className={`text-xl font-bold ${isFailed ? "text-destructive" : "text-foreground"}`}>{title}</h2>
+                <p className="text-muted-foreground text-sm whitespace-pre-line">{detail}</p>
+                {isFailed && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-left">
+                    <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Action required
+                    </p>
+                    <p className="text-sm text-destructive">
+                      No guardian has been notified. Please call 112 immediately if this is a real emergency, then fix your guardian's phone number in My Profile.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Call buttons */}
           <div className="flex gap-2 mb-4">
