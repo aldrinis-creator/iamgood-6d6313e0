@@ -1,67 +1,62 @@
 
 
-## Plan — Visual Checks Analysis tab in Medical Vault
+## Plan — Restructure Medical Vault tabs + auto-shut Profile/Records on idle + slim Health Tools
 
-Add a fourth tab in **Medical Vault** that holds all results from **Urine Check, Tongue Analysis, and Face Scan** under a single record type so they're easy to find, while keeping every existing record (today saved as `Lab Report`) accessible by migrating them.
+### A. Two new Medical Vault tabs (`src/pages/MedicalVault.tsx`)
 
-### 1. New record_type: `"Visual Check"`
+Grow `TabsList` from `grid-cols-4` to `grid-cols-6` and add two new triggers between **Visual** and **Profile**:
 
-A new shared category used by all three tools. Stored in the existing `medical_records` table — no schema change.
+1. **Doctor Visit Report** (`value="doctor-report"`, `FileText` icon, label "Dr Report"). Renders the existing `<DoctorVisitReport />` component **inline at the top** so users can generate a new report from inside the Vault, followed by a list of all saved doctor reports — `records.filter(r => r.record_type === "Doctor's Diagnosis")` sorted newest-first, using the same View / Save As / Share / Delete card layout as the Records tab. Empty state: "No doctor visit reports yet — tap Generate above."
 
-### 2. `src/components/health-tools/UrineCheck.tsx`
-- Change the `saveToVault` insert from `record_type: "Lab Report"` to `record_type: "Visual Check"`.
-- No other behaviour change.
+2. **Document Analyzer** (`value="doc-analyzer"`, `Search` icon, label "Analyzer"). Renders the existing `<DocumentAnalyzer />` component **inline at the top** for new uploads/analysis, followed by a list of every saved analysis. Filter rule: any record whose `record_type` is one of `["Lab Report", "X-Ray / Scan", "Discharge Summary", "Doctor's Diagnosis", "Insurance Document"]` AND was created via the analyzer — since the existing `DocumentAnalyzer.saveToVault` writes a single `record_type`, we widen the filter to that 5-item set so all parsed medical documents land here. Same card layout as Records tab. Empty state: "No analyzed documents yet — upload a report above."
 
-### 3. `src/components/health-tools/TongueAnalysis.tsx`
-- Change the `saveToVault` insert from `record_type: "Lab Report"` to `record_type: "Visual Check"`.
+Note: `DoctorVisitReport.saveToVault` already inserts as `"Doctor's Diagnosis"` and `DocumentAnalyzer.saveToVault` writes one of the lab/xray/discharge types, so no save-side changes are needed — the new tabs are purely a focused view of existing data.
 
-### 4. `src/components/FaceScan.tsx` — **save to vault by default**
+### B. Trim `RECORD_TYPES` filter chips + upload dropdown (`src/pages/MedicalVault.tsx`)
 
-Today Face Scans only persist to the `face_scans` table; nothing lands in Medical Vault. Add an automatic insert into `medical_records` after a successful scan (live, photo, or video):
-- `record_type: "Visual Check"`
-- `title: "Face Scan — <date>"`
-- `description: JSON.stringify({ heartRate, stressLevel, stressScore, confidence, photo_indicators? }, null, 2)`
-- `record_date: today (IST)`
-- For photo-mode scans, also upload the original image to the `medical-documents` bucket and set `file_url` / `file_name` (mirrors UrineCheck/TongueAnalysis behaviour). Live/video modes save without a file.
-- Wrap in try/catch — a Vault save failure must NOT break the existing `face_scans` insert or the results UI; show a silent console warning only.
-
-### 5. `src/pages/MedicalVault.tsx` — new "Visual Checks" tab
-
-- Change `TabsList` from `grid-cols-3` to `grid-cols-4` and add a new trigger `value="visual"` with an `Eye` icon and label **"Visual"**.
-- Add a `TabsContent value="visual"` block that renders only records where `record_type === "Visual Check"`, sorted newest-first. Reuse the same card layout (View / Save As / Share / Delete) and the existing `handleViewRecord` dialog so JSON descriptions and any attached image render with the existing preview path.
-- Add `"Visual Check"` to the `RECORD_TYPES` constant so it appears in the upload-form dropdown and Records-tab filter chip too. The Records tab continues to show all records (including Visual Checks) — the new tab is a focused view.
-- Empty state: "No visual check results yet. Run a Urine, Tongue, or Face scan from My Health → Health Tools."
-
-### 6. Migration of existing reports
-
-Existing Urine, Tongue (and any prior Face) saves live as `record_type = "Lab Report"`. To move them into the new tab without losing other true Lab Reports (e.g., Vitals device reports, Pill ID), migrate by **title prefix** which uniquely identifies them:
-
-```sql
-UPDATE public.medical_records
-SET record_type = 'Visual Check'
-WHERE record_type = 'Lab Report'
-  AND (
-    title LIKE 'Tongue Check —%'
-    OR title LIKE 'Urine Color Check —%'
-    OR title LIKE 'Urine Dipstick —%'
-    OR title LIKE 'Urine Check —%'
-    OR title LIKE 'Face Scan —%'
-  );
+Replace:
+```ts
+const RECORD_TYPES = [
+  "Doctor's Diagnosis", "Lab Report", "Visual Check", "Discharge Summary",
+  "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Legal Will", "Other",
+];
+```
+with:
+```ts
+const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Other"];
 ```
 
-Run via the migration tool. Vitals device reports (`"Device Report Analysis - …"`) and Pill IDs (`"Pill ID: …"`) are intentionally left as `Lab Report` since they aren't visual screenings.
+This affects only the **Records tab UI** (chip row + manual upload dropdown). The 6 removed labels stay valid in the DB (the check constraint still permits them — see §D), so existing records remain viewable in Records and continue to be filterable by the new tabs above. Auto-saved Doctor Reports / analyzed documents continue inserting their original `record_type` strings; they just no longer appear as user-facing chips.
+
+### C. Auto-shut Records & Profile tabs after 30s idle (`src/pages/MedicalVault.tsx`)
+
+Convert the `<Tabs defaultValue="records">` into a controlled component with `const [activeTab, setActiveTab] = useState("records")`. Add a `useEffect` that, whenever `activeTab === "records" || activeTab === "profile"`, starts a 30-second `setTimeout` and resets it on `pointerdown`, `keydown`, `scroll`, and `touchstart` listeners on the page container. On expiry, call `setActiveTab("records")` only when leaving Profile, **OR** for both: collapse to a neutral landing — chosen behaviour: switch back to a new lightweight default `value="records"` but with `setShowUploadForm(false)`, `setSearchQuery("")`, and clearing the `viewRecord` dialog so any open card/preview closes too. The Doctor Report / Analyzer / Visual / Vault tabs are excluded (long-running AI work shouldn't be interrupted). Show a subtle toast: "Tab auto-closed for privacy" the first time it fires per session.
+
+### D. Database — no migration required
+
+The existing check constraint already permits all 9 historical record types plus `"Visual Check"`. Removing labels from the UI dropdown does not need a constraint change. **Skip migrations.**
+
+### E. Remove Medical Documents from Health Tools (`src/pages/MyHealth.tsx`)
+
+- Remove the `{ icon: Upload, label: "Medical Documents", desc: "Upload and organize medical documents" }` entry from `healthToolsSubItems`.
+- Remove `"Medical Documents": MedicalDocuments` from `subToolComponents`.
+- Remove the `import MedicalDocuments from "@/components/health-tools/MedicalDocuments"` line.
+
+The file `src/components/health-tools/MedicalDocuments.tsx` is left on disk (no other importers) but is now dead code — safe to leave; deletion is optional.
 
 ### What I will NOT change
-- No changes to `face_scans`, `medication_records` schemas or RLS.
-- No changes to PillIdentifier, VitalsMonitor, DocumentAnalyzer, or other tools.
-- No change to MyHealth routing or Health Tools tile order.
-- The Records tab keeps showing everything — Visual tab is additive.
+
+- No change to `DoctorVisitReport.tsx`, `DocumentAnalyzer.tsx`, `UrineCheck.tsx`, `TongueAnalysis.tsx`, or `FaceScan.tsx`.
+- No change to `medical_records` schema, RLS, or storage bucket.
+- No change to the Visual / Vault tabs, the Records list rendering, or the View Record dialog.
+- No change to MyHealth top-level tile grid (only the "Health Tools" hub sub-list loses one row).
 
 ### Verification
-1. Open **Medical Vault** → see four tabs: Records, **Visual**, Profile, Vault.
-2. Run a Urine Check → tap **Save to Vault** → record appears under **Visual** with attached image preview.
-3. Run a Tongue scan → save → appears under **Visual**.
-4. Run a Face Scan (live or photo) → results screen renders as today, AND a new "Face Scan — <date>" card auto-appears under **Visual** (photo mode includes image preview).
-5. Pre-existing Tongue/Urine "Lab Report" records now appear under **Visual** (migration).
-6. Vitals device reports and Pill ID entries remain under Records → "Lab Report" filter, not under Visual.
+
+1. Open **Medical Vault** → see 6 tabs in order: **Records · Visual · Dr Report · Analyzer · Profile · Vault**.
+2. Tap **Dr Report** → DoctorVisitReport UI loads at top; all previously-saved doctor reports list below.
+3. Tap **Analyzer** → DocumentAnalyzer UI loads at top; all previously-saved lab reports / X-rays / discharge summaries / diagnoses / insurance docs list below.
+4. Switch to **Records** → filter chip row shows only **All · Visual Check · Vaccination Record · Other** (the 6 removed labels are gone). Existing records of any type still appear in the unfiltered list.
+5. Stay on **Records** for 30s with no input → toast appears, Records collapses to its default (search cleared, upload form closed, dialog closed). Repeat on **Profile** → same auto-shut. Stay on **Dr Report** / **Analyzer** / **Visual** / **Vault** for 60s → no auto-shut.
+6. Open **My Health → Health Tools** hub → "Medical Documents" tile is gone; the other 5 sub-tools remain.
 
