@@ -126,11 +126,11 @@ const FallDetectionOverlay = () => {
   useEffect(() => {
     if (countdownExpired && !hasSentRef.current) {
       hasSentRef.current = true;
-      triggerSOS();
+      // sendFallAlerts() calls triggerSOS() internally with the rich fall message.
       sendFallAlerts();
       cancelFallAlert();
     }
-  }, [countdownExpired, triggerSOS, sendFallAlerts, cancelFallAlert]);
+  }, [countdownExpired, sendFallAlerts, cancelFallAlert]);
 
   // Start/stop alarm sound when fall is detected/dismissed
   useEffect(() => {
