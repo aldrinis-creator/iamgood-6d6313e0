@@ -54,6 +54,9 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const [email, setEmail] = useState("");
   const [relation, setRelation] = useState("");
 
+  const [primaryCandidate, setPrimaryCandidate] = useState<Guardian | null>(null);
+  const [settingPrimary, setSettingPrimary] = useState(false);
+
   const fetchGuardians = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
