@@ -234,9 +234,20 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {g.is_primary && (
+                    {g.is_primary ? (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">Primary</span>
-                    )}
+                    ) : g.status === "accepted" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setPrimaryCandidate(g)}
+                        title="Set as Primary"
+                        aria-label="Set as Primary"
+                      >
+                        <Star className="w-4 h-4" />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
