@@ -6,6 +6,22 @@ import { toast } from "sonner";
 export type UserRole = "user" | "guardian";
 export type PauseMode = "active" | "sleep" | "checked-out";
 
+export type SOSRecipientChannelStatus = "accepted" | "rejected" | "not_attempted";
+export type SOSRecipientSkipReason = "self_targeted" | "invalid_phone" | "duplicate_phone";
+export interface SOSRecipientReport {
+  guardian_id: string;
+  name: string;
+  phone_raw: string;
+  phone_normalized: string | null;
+  status: "accepted" | "pending";
+  included: boolean;
+  skip_reason: SOSRecipientSkipReason | null;
+  channels: {
+    whatsapp: SOSRecipientChannelStatus;
+    sms: SOSRecipientChannelStatus;
+  };
+}
+
 export interface SOSDeliveryResult {
   recipientCount: number;
   // "Accepted" = provider (MSG91) took the request; delivery is still pending
@@ -21,6 +37,7 @@ export interface SOSDeliveryResult {
   pushSent?: number;
   deliveryPending?: boolean;
   selfTargetedPhones?: string[];
+  recipients?: SOSRecipientReport[];
   errors: {
     invoke: string | null;
     recipients: string | null;
