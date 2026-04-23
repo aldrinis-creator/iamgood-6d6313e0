@@ -274,10 +274,8 @@ Deno.serve(async (req) => {
       console.warn("[send-sos-alert] aborting WA/SMS:", recipientsErr);
       return new Response(
         JSON.stringify({
-          // legacy fields
           sent: 0,
           msg91Sent: 0,
-          // structured
           emailQueued: 0,
           pushSent: 0,
           whatsappAccepted: 0,
@@ -289,6 +287,7 @@ Deno.serve(async (req) => {
           recipientCount: 0,
           deliveryPending: false,
           selfTargetedPhones,
+          recipients: recipientsReport,
           errors: {
             invoke: null,
             recipients: recipientsErr,
