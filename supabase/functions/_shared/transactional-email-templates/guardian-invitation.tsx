@@ -53,6 +53,15 @@ const GuardianInvitationEmail = ({
             <Text style={bulletItem}>🚨 Fall detection alerts</Text>
           </Section>
 
+          <Section style={infoBox}>
+            <Text style={infoTitle}>📱 Install the Check-iN app</Text>
+            <Text style={infoText}>
+              After accepting, install Check-iN on your phone so you receive SOS alerts and check-in updates instantly — even when the app is closed.
+            </Text>
+            <Text style={bulletItem}><strong>iPhone:</strong> Open the link in Safari → Share → Add to Home Screen</Text>
+            <Text style={bulletItem}><strong>Android:</strong> Open the link in Chrome → tap "Install app" when prompted</Text>
+          </Section>
+
           <Section style={warningBox}>
             <Text style={warningTitle}>⏰ 24-Hour Window</Text>
             <Text style={warningText}>
