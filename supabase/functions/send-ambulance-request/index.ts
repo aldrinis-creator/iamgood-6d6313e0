@@ -5,9 +5,54 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MSG91_FLOW_URL = "https://control.msg91.com/api/v5/flow";
+const MSG91_WA_BULK_URL = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
+const MSG91_INTEGRATED_NUMBER = "917045868482";
+const MSG91_NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
 const AMBULANCE_WHATSAPP_NUMBER = "918710810887";
 const HELPLINE = "+917045868482";
+
+function buildBodyComponents(values: string[]): Record<string, { type: string; value: string }> {
+  const components: Record<string, { type: string; value: string }> = {};
+  values.forEach((v, i) => {
+    components[`body_${i + 1}`] = { type: "text", value: String(v ?? "") };
+  });
+  return components;
+}
+
+async function sendMsg91WhatsApp(templateName: string, toPhone: string, bodyValues: string[]): Promise<{ ok: boolean; response?: any }> {
+  const authKey = Deno.env.get("MSG91_AUTH_KEY");
+  if (!authKey) {
+    return { ok: false, response: { error: "MSG91_AUTH_KEY missing" } };
+  }
+  const payload = {
+    integrated_number: MSG91_INTEGRATED_NUMBER,
+    content_type: "template",
+    payload: {
+      messaging_product: "whatsapp",
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "en_GB", policy: "deterministic" },
+        namespace: MSG91_NAMESPACE,
+        to_and_components: [
+          { to: [toPhone], components: buildBodyComponents(bodyValues) },
+        ],
+      },
+    },
+  };
+  try {
+    const res = await fetch(MSG91_WA_BULK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authkey: authKey },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    console.log(`MSG91 ${templateName} -> ${toPhone}:`, JSON.stringify(json));
+    return { ok: res.ok, response: json };
+  } catch (e) {
+    return { ok: false, response: { error: String(e) } };
+  }
+}
 
 interface Contact {
   name: string;
