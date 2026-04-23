@@ -979,6 +979,14 @@ const Settings = () => {
           <PrivacyTab session={session} navigate={navigate} guardians={guardians} />
         )}
       </div>
+      {session?.user?.id && (
+        <VaultNomineeRecoveryDialog
+          open={recoveryDialog.open}
+          onOpenChange={(open) => setRecoveryDialog((s) => ({ ...s, open }))}
+          userId={session.user.id}
+          guardianId={recoveryDialog.guardianId}
+        />
+      )}
     </AppLayout>
   );
 };
