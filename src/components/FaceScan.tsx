@@ -126,7 +126,51 @@ const FaceScan = () => {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const saveResults = async (scanResults: ScanResults, sampleCount: number) => {
+  const saveToMedicalVault = async (
+    scanResults: ScanResults,
+    photoIndicators: PhotoAnalysisResults | null,
+    photoFile: File | null
+  ) => {
+    if (!user) return;
+    try {
+      let fileUrl: string | null = null;
+      let fileName: string | null = null;
+      if (photoFile) {
+        fileName = `face-scan-${Date.now()}.jpg`;
+        const path = `${user.id}/${Date.now()}-${fileName}`;
+        const { error: upErr } = await supabase.storage
+          .from("medical-documents")
+          .upload(path, photoFile, { contentType: photoFile.type });
+        if (!upErr) fileUrl = path;
+      }
+      const payload: Record<string, unknown> = {
+        heartRate: scanResults.heartRate,
+        stressLevel: scanResults.stressLevel,
+        stressScore: scanResults.stressScore,
+        confidence: scanResults.confidence,
+      };
+      if (photoIndicators) payload.photo_indicators = photoIndicators;
+
+      await supabase.from("medical_records").insert({
+        user_id: user.id,
+        title: `Face Scan — ${new Date().toLocaleDateString("en-IN")}`,
+        record_type: "Visual Check",
+        description: JSON.stringify(payload, null, 2),
+        record_date: new Date().toISOString().split("T")[0],
+        file_name: fileName,
+        file_url: fileUrl,
+      });
+    } catch (e) {
+      console.warn("Face scan vault save failed:", e);
+    }
+  };
+
+  const saveResults = async (
+    scanResults: ScanResults,
+    sampleCount: number,
+    photoIndicators: PhotoAnalysisResults | null = null,
+    photoFile: File | null = null,
+  ) => {
     if (!user) return;
     const { error } = await supabase.from("face_scans").insert({
       user_id: user.id,
@@ -141,6 +185,9 @@ const FaceScan = () => {
     } else {
       toast.success("Scan saved to your history");
       queryClient.invalidateQueries({ queryKey: ["face-scans", user.id] });
+
+      // Auto-save to Medical Vault (Visual Check) — silent on failure
+      saveToMedicalVault(scanResults, photoIndicators, photoFile).catch(() => {});
 
       if (scanResults.heartRate) {
         supabase.functions.invoke("notify-vital-anomaly", {
@@ -289,7 +336,7 @@ const FaceScan = () => {
         stressScore: parsed.stress_score || 50,
         confidence: "Fair",
       };
-      await saveResults(scanResult, 0);
+      await saveResults(scanResult, 0, parsed, file);
 
       setResults(scanResult);
       setPhase("results");

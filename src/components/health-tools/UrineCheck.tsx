@@ -178,7 +178,7 @@ const UrineCheck = () => {
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
         title,
-        record_type: "Lab Report",
+        record_type: "Visual Check",
         description,
         file_name: fileName,
         file_url: fileUrl,
