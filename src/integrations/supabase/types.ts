@@ -667,31 +667,37 @@ export type Database = {
       }
       encrypted_documents: {
         Row: {
+          category: string
           created_at: string
           doc_type: string
           encrypted_value: string
           id: string
           iv: string
+          label: string | null
           salt: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          category?: string
           created_at?: string
           doc_type: string
           encrypted_value: string
           id?: string
           iv: string
+          label?: string | null
           salt: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          category?: string
           created_at?: string
           doc_type?: string
           encrypted_value?: string
           id?: string
           iv?: string
+          label?: string | null
           salt?: string
           updated_at?: string
           user_id?: string
@@ -2098,6 +2104,129 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_nominee_claims: {
+        Row: {
+          acknowledged: boolean
+          admin_reviewed_by: string | null
+          created_at: string
+          death_certificate_url: string | null
+          guardian_id: string
+          id: string
+          id_proof_url: string | null
+          proof_uploaded_at: string | null
+          reject_reason: string | null
+          rejected_at: string | null
+          released_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_window_ends_at: string | null
+          user_window_started_at: string | null
+        }
+        Insert: {
+          acknowledged?: boolean
+          admin_reviewed_by?: string | null
+          created_at?: string
+          death_certificate_url?: string | null
+          guardian_id: string
+          id?: string
+          id_proof_url?: string | null
+          proof_uploaded_at?: string | null
+          reject_reason?: string | null
+          rejected_at?: string | null
+          released_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          user_window_ends_at?: string | null
+          user_window_started_at?: string | null
+        }
+        Update: {
+          acknowledged?: boolean
+          admin_reviewed_by?: string | null
+          created_at?: string
+          death_certificate_url?: string | null
+          guardian_id?: string
+          id?: string
+          id_proof_url?: string | null
+          proof_uploaded_at?: string | null
+          reject_reason?: string | null
+          rejected_at?: string | null
+          released_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_window_ends_at?: string | null
+          user_window_started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_nominee_claims_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_nominee_claims_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_ward_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_pin_escrow: {
+        Row: {
+          admin_share_encrypted: string
+          created_at: string
+          guardian_id: string | null
+          guardian_share_encrypted: string
+          id: string
+          pin_hash: string
+          recovery_share_hint: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_share_encrypted: string
+          created_at?: string
+          guardian_id?: string | null
+          guardian_share_encrypted: string
+          id?: string
+          pin_hash: string
+          recovery_share_hint?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_share_encrypted?: string
+          created_at?: string
+          guardian_id?: string | null
+          guardian_share_encrypted?: string
+          id?: string
+          pin_hash?: string
+          recovery_share_hint?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_pin_escrow_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_pin_escrow_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_ward_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vault_pins: {
         Row: {
           created_at: string
@@ -2118,6 +2247,106 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vault_release_tokens: {
+        Row: {
+          claim_id: string
+          created_at: string
+          expires_at: string
+          guardian_id: string
+          id: string
+          otp_attempts: number
+          otp_hash: string | null
+          payload_encrypted: string | null
+          payload_iv: string | null
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          expires_at?: string
+          guardian_id: string
+          id?: string
+          otp_attempts?: number
+          otp_hash?: string | null
+          payload_encrypted?: string | null
+          payload_iv?: string | null
+          token?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          expires_at?: string
+          guardian_id?: string
+          id?: string
+          otp_attempts?: number
+          otp_hash?: string | null
+          payload_encrypted?: string | null
+          payload_iv?: string | null
+          token?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_release_tokens_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "vault_nominee_claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_reminder_meta: {
+        Row: {
+          created_at: string
+          display_label: string
+          doc_id: string
+          id: string
+          kind: string
+          next_reminder_at: string
+          target_date: string | null
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_label: string
+          doc_id: string
+          id?: string
+          kind: string
+          next_reminder_at: string
+          target_date?: string | null
+          tier?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_label?: string
+          doc_id?: string
+          id?: string
+          kind?: string
+          next_reminder_at?: string
+          target_date?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_reminder_meta_doc_id_fkey"
+            columns: ["doc_id"]
+            isOneToOne: false
+            referencedRelation: "encrypted_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wellness_logs: {
         Row: {
