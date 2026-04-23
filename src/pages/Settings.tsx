@@ -463,10 +463,16 @@ const Settings = () => {
     }
   };
 
+  const [recoveryDialog, setRecoveryDialog] = useState<{ open: boolean; guardianId: string }>({ open: false, guardianId: "" });
+
   const toggleVaultNominee = async (id: string, current: boolean) => {
     const { error } = await supabase.from("guardians").update({ is_vault_nominee: !current } as any).eq("id", id);
     if (!error) {
       setGuardians(guardians.map((g) => g.id === id ? { ...g, is_vault_nominee: !current } : g));
+      // When enabling, open the PIN escrow recovery wizard
+      if (!current && session?.user?.id) {
+        setRecoveryDialog({ open: true, guardianId: id });
+      }
     }
   };
 
