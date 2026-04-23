@@ -581,18 +581,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Stamp per-channel outcomes onto the recipients report (included rows only)
+    const waStatus: "accepted" | "rejected" = whatsappError ? "rejected" : (whatsappAccepted > 0 ? "accepted" : "rejected");
+    const smsStatus: "accepted" | "rejected" = smsError ? "rejected" : (smsAccepted > 0 ? "accepted" : "rejected");
+    for (const r of recipientsReport) {
+      if (!r.included) continue;
+      r.channels.whatsapp = msg91AuthKey ? waStatus : "not_attempted";
+      r.channels.sms = (msg91AuthKey && smsTemplateId) ? smsStatus : "not_attempted";
+    }
+
     return new Response(
       JSON.stringify({
-        // legacy fields (kept for older clients)
         sent: emailsQueued,
         msg91Sent: whatsappAccepted,
-        // structured response
         emailQueued: emailsQueued,
         pushSent,
-        // NEW semantics: "accepted" = MSG91 took the request; not delivered yet
         whatsappAccepted,
         smsAccepted,
-        // legacy aliases (the app reads these today)
         whatsappQueued: whatsappAccepted,
         smsQueued: smsAccepted,
         whatsappRequestId,
@@ -601,6 +606,7 @@ Deno.serve(async (req) => {
         deliveryPending: whatsappAccepted > 0 || smsAccepted > 0,
         sender: MSG91_INTEGRATED_NUMBER,
         selfTargetedPhones,
+        recipients: recipientsReport,
         errors: { invoke: null, recipients: null, whatsapp: whatsappError, sms: smsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
