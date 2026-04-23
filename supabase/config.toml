@@ -49,3 +49,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.share-appointment-whatsapp]
     verify_jwt = false
+  [functions.sos-delivery-webhook]
+    verify_jwt = false
