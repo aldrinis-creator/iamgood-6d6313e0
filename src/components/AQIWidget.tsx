@@ -211,6 +211,15 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     }
   };
 
+  useEffect(() => {
+    setLoading(true);
+    if (isGuardian) {
+      fetchWardLocation();
+    } else {
+      fetchDefaultLocation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuardian, wardUserId]);
 
   // 10-minute inactivity revert (user only)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
