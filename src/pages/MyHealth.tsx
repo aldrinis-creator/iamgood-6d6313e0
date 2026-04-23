@@ -13,7 +13,7 @@ import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
 import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
-import MedicalDocuments from "@/components/health-tools/MedicalDocuments";
+
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
 import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
