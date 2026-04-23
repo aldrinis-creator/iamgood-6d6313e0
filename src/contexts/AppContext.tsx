@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { queueSOS } from "@/lib/offlineQueue";
 
 export type UserRole = "user" | "guardian";
 export type PauseMode = "active" | "sleep" | "checked-out";
@@ -241,7 +242,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error("Failed to create SOS event (may be offline):", err);
       try {
-        const { queueSOS } = await import("@/lib/offlineQueue");
         await queueSOS(sosPayload);
         toast.warning("You're offline — SOS queued and will send when reconnected");
         if ("serviceWorker" in navigator && "SyncManager" in window) {
