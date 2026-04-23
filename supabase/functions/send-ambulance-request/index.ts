@@ -179,6 +179,7 @@ async function notifyGuardians(supabase: any, body: RequestBody, ownerUserId: st
             pickup: body.pickup.address || "current location",
             destination: body.destination.name,
             request_id: requestId.slice(0, 8),
+            ambulance_type: body.ambulance_type || "BLS",
           }],
         }),
       });
@@ -221,6 +222,7 @@ Deno.serve(async (req) => {
       source: body.source,
       channel: "pending",
       status: "pending",
+      ambulance_type: body.ambulance_type || "BLS",
       patient_name: body.patient_name,
       pickup_address: body.pickup.address,
       pickup_lat: body.pickup.lat,
