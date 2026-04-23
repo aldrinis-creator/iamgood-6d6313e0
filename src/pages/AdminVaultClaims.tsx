@@ -86,7 +86,7 @@ const AdminVaultClaims = () => {
       const userIds = [...new Set(rows.map((r) => r.user_id))];
       const guardianIds = [...new Set(rows.map((r) => r.guardian_id))];
       const [{ data: ps }, { data: gs }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, phone").in("id", userIds),
+        supabase.from("profiles").select("id, full_name, phone, last_active_at").in("id", userIds),
         supabase.from("guardians").select("id, guardian_name, guardian_phone, guardian_email").in("id", guardianIds),
       ]);
       const pmap: typeof profiles = {};
@@ -95,23 +95,64 @@ const AdminVaultClaims = () => {
       const gmap: typeof guardians = {};
       (gs || []).forEach((g: any) => { gmap[g.id] = { name: g.guardian_name, phone: g.guardian_phone, email: g.guardian_email }; });
       setGuardians(gmap);
+
+      // Activity signals: last check-in, last journey
+      const amap: Record<string, ActivitySignals> = {};
+      await Promise.all(userIds.map(async (uid) => {
+        const [{ data: ci }, { data: jr }] = await Promise.all([
+          supabase.from("check_ins").select("created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          supabase.from("journeys").select("created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        amap[uid] = {
+          last_sign_in_at: (ps || []).find((p: any) => p.id === uid)?.last_active_at || null,
+          last_check_in_at: ci?.created_at || null,
+          last_journey_at: jr?.created_at || null,
+        };
+      }));
+      setActivity(amap);
+
+      // Signed thumbnail URLs for selfie + ID + cert
+      const urlMap: Record<string, string> = {};
+      await Promise.all(rows.flatMap((r) => [
+        r.selfie_url, r.id_proof_url, r.death_certificate_url,
+      ]).filter(Boolean).map(async (path) => {
+        const { data } = await supabase.storage.from("medical-documents").createSignedUrl(path!, 600);
+        if (data?.signedUrl) urlMap[path!] = data.signedUrl;
+      }));
+      setSignedUrls(urlMap);
     }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
   const viewFile = async (path: string) => {
+    const url = signedUrls[path];
+    if (url) { window.open(url, "_blank", "noopener"); return; }
     const { data } = await supabase.storage.from("medical-documents").createSignedUrl(path, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
   };
 
-  const release = async (claim: ClaimRow) => {
-    if (!confirm("Release vault contents to the nominee? They will receive a one-time link valid for 24h.")) return;
-    setBusyId(claim.id);
+  const openRelease = (claimId: string) => {
+    setReleaseId(claimId);
+    setReleaseConfirmed(false);
+    setReleaseTyped("");
+    setReleaseNotes("");
+  };
+
+  const confirmRelease = async () => {
+    if (!releaseId) return;
+    if (!releaseConfirmed || releaseTyped !== "RELEASE" || !releaseNotes.trim()) {
+      toast.error("Complete all confirmations");
+      return;
+    }
+    setBusyId(releaseId);
     try {
-      const { error } = await supabase.functions.invoke("vault-release-claim", { body: { claim_id: claim.id } });
+      const { error } = await supabase.functions.invoke("vault-release-claim", {
+        body: { claim_id: releaseId, release_notes: releaseNotes.trim() },
+      });
       if (error) throw error;
       toast.success("Released — nominee notified");
+      setReleaseId(null);
       await load();
     } catch (err: any) {
       toast.error(err?.message || "Release failed");
