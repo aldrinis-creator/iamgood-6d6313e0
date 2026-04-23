@@ -1,8 +1,6 @@
-// vault-claim-initiated: Hardened verification + multi-channel notifications
-// for a Vault Nominee Claim. Performs file-presence verification, activity
-// cross-checks (auto-rejects if user signed in within last 24h, or if DOB > DOD),
-// notifies user via in-app + email + SMS, cross-notifies all other guardians,
-// logs to admin_audit_log, and advances status to user_window_open.
+// vault-claim-initiated: Hardened verification + multi-channel notifications.
+// Returns structured rejection payloads {ok:false, rejected:true, reason_code, reason_message}
+// at HTTP 200 so the client can branch on the body.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -15,7 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const { claim_id } = await req.json();
-    if (!claim_id) return json({ error: "claim_id required" }, 400);
+    if (!claim_id) return reject("claim_not_found", "claim_id required");
 
     const supa = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -27,20 +25,20 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("id", claim_id)
       .single();
-    if (claimErr || !claim) return json({ error: "claim not found" }, 404);
+    if (claimErr || !claim) return reject("claim_not_found", "Claim record was lost");
 
     const userId = claim.user_id;
 
     // ─── 1. Verify all 3 storage paths exist with non-zero size ───
     const expectedFiles = [
-      { key: "death_certificate_url", path: claim.death_certificate_url },
-      { key: "id_proof_url", path: claim.id_proof_url },
-      { key: "selfie_url", path: claim.selfie_url },
+      { key: "death_certificate", path: claim.death_certificate_url },
+      { key: "id_proof", path: claim.id_proof_url },
+      { key: "selfie", path: claim.selfie_url },
     ];
     for (const f of expectedFiles) {
       if (!f.path) {
         await rejectClaim(supa, claim_id, `Missing required file: ${f.key}`);
-        return json({ error: `missing ${f.key}`, rejected: true }, 200);
+        return reject("missing_file", `Missing required file: ${f.key}`, { file: f.key });
       }
       const folder = f.path.split("/").slice(0, -1).join("/");
       const name = f.path.split("/").pop()!;
@@ -48,7 +46,7 @@ Deno.serve(async (req) => {
       const found = (list || []).find((o: any) => o.name === name);
       if (!found || !((found.metadata?.size ?? 0) > 0)) {
         await rejectClaim(supa, claim_id, `File missing or empty: ${f.key}`);
-        return json({ error: `file missing ${f.key}`, rejected: true }, 200);
+        return reject("file_empty", `File missing or empty: ${f.key}`, { file: f.key });
       }
     }
 
@@ -64,7 +62,7 @@ Deno.serve(async (req) => {
       );
       await notifyAllParties(supa, claim, userId, "Vault Claim Auto-Rejected",
         "A bereavement claim was filed against your account but rejected automatically because you were active in the last 24 hours.");
-      return json({ ok: true, rejected: true, reason: "user_active_24h" });
+      return reject("user_active_24h", "Account was active within the last 24 hours");
     }
 
     // ─── 3. Cross-check: DOB <= DOD ───
@@ -75,7 +73,7 @@ Deno.serve(async (req) => {
       const dod = new Date(claim.date_of_death);
       if (dod < dob) {
         await rejectClaim(supa, claim_id, `Date of death (${claim.date_of_death}) precedes date of birth (${prof.date_of_birth})`);
-        return json({ ok: true, rejected: true, reason: "dod_before_dob" });
+        return reject("dod_before_dob", "Date of death precedes date of birth");
       }
     }
 
@@ -106,9 +104,11 @@ Deno.serve(async (req) => {
     }
 
     // ─── 6. Advance status to user_window_open ───
-    await supa.from("vault_nominee_claims")
+    const { data: updated } = await supa.from("vault_nominee_claims")
       .update({ status: "user_window_open" })
-      .eq("id", claim_id);
+      .eq("id", claim_id)
+      .select("status, user_window_ends_at")
+      .single();
 
     // ─── 7. Admin audit log + admin contact submission ───
     await supa.from("admin_audit_log").insert({
@@ -138,11 +138,19 @@ Deno.serve(async (req) => {
       user_id: userId,
     });
 
-    return json({ ok: true });
+    return json({
+      ok: true,
+      status: updated?.status || "user_window_open",
+      window_ends_at: updated?.user_window_ends_at || null,
+    });
   } catch (e: any) {
-    return json({ error: String(e?.message || e) }, 500);
+    return json({ ok: false, error: String(e?.message || e) }, 500);
   }
 });
+
+function reject(reason_code: string, reason_message: string, extra: Record<string, unknown> = {}) {
+  return json({ ok: false, rejected: true, reason_code, reason_message, ...extra });
+}
 
 async function rejectClaim(supa: any, claimId: string, reason: string) {
   await supa.from("vault_nominee_claims")
@@ -155,7 +163,6 @@ async function rejectClaim(supa: any, claimId: string, reason: string) {
 }
 
 async function notifyAllParties(supa: any, claim: any, userId: string, title: string, message: string) {
-  // In-app
   await supa.rpc("insert_notification_deduped", {
     p_user_id: userId,
     p_title: title,
@@ -164,7 +171,6 @@ async function notifyAllParties(supa: any, claim: any, userId: string, title: st
     p_guardian_id: claim.guardian_id,
   });
 
-  // Email + SMS via existing infra (best effort, swallow errors)
   const { data: prof } = await supa.from("profiles").select("full_name, phone").eq("id", userId).maybeSingle();
   const { data: authUser } = await supa.auth.admin.getUserById(userId);
   const email = authUser?.user?.email;
