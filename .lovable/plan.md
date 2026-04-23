@@ -1,109 +1,80 @@
 
 
-## Plan — Fix mobile blank-screen + desktop stale-version issues
+## Plan — Fix white-screen on published site (`vendor-maps` React TDZ)
 
-### Root causes
+### Root cause (confirmed via live console)
 
-1. **`base: './'` in `vite.config.ts`** produces relative asset URLs (`./assets/...`). On any deep route (`/dashboard`, `/medical-vault`, `/j/<token>`), the browser resolves them against the current path → 404 → blank screen. This hits mobile users hardest because they refresh / open shared deep links more often.
-2. **Two competing service workers** at scope `/`:
-   - VitePWA's auto-generated Workbox `sw.js` (precaches `index.html` + hashed JS).
-   - A manually-registered `/sw-push.js` for push notifications.
-   Whichever registered first stays in control. The cached `index.html` references old hashed chunks that were purged on each new publish → app loads stale shell → references missing JS → silently broken.
-3. **No "kill-switch" / forced-update logic** for users already running an old SW. `autoUpdate` only refreshes when the SW *script* changes; users whose SW is broken never get the new one.
+The published `https://iamgood.lovable.app/` returns HTTP 200 with all assets, but JS crashes at module evaluation:
 
-### A. `vite.config.ts` — three fixes
-
-1. Change `base: './'` → `base: '/'`. All Lovable hosts are served from origin root; relative base breaks SPA deep-linking.
-2. Make the PWA service worker share scope with the push worker by **merging push logic into the Workbox SW** via `injectManifest` strategy, OR (simpler) **disable VitePWA's auto-register and let a single SW (`sw-push.js`) handle both**. We'll pick the simpler path: keep VitePWA only for the manifest + icon precache config, set `injectRegister: false`, and import its registration manually in `main.tsx` *behind a guard*.
-3. Add `cleanupOutdatedCaches: true` and `skipWaiting: true` + `clientsClaim: true` to Workbox so old precaches are wiped on activation.
-
-```ts
-VitePWA({
-  registerType: "autoUpdate",
-  injectRegister: false,                // we register manually with guards
-  workbox: {
-    cleanupOutdatedCaches: true,
-    clientsClaim: true,
-    skipWaiting: true,
-    navigateFallbackDenylist: [/^\/~oauth/, /^\/sw-push\.js/],
-    /* existing globPatterns, runtimeCaching */
-  },
-  /* manifest unchanged */
-})
+```
+TypeError: Cannot read properties of undefined (reading 'createContext')
+  at vendor-maps-BpkyvA2L.js:1:1091
 ```
 
-### B. `src/main.tsx` — single SW registration with iframe/preview guard + kill-switch
+That line is `react-leaflet` calling `React.createContext(...)` at top-level. The current `manualChunks` rule in `vite.config.ts` splits chunks by sub-string match:
 
-Replace the current bare `createRoot(...)` with a guarded registration that:
-- **Unregisters ALL existing service workers** if a new `BUILD_ID` differs from `localStorage.lovable_build_id`. This forces every desktop user stuck on a stale SW to reset on next visit.
-- **Skips registration entirely** when running inside an iframe or on `id-preview--*` / `lovableproject.com` hosts (per Lovable PWA guidance).
-- Registers the **Workbox SW** (`/sw.js`) on production only, then once it's controlling, posts a message to also activate push subscription handling — so we no longer register `/sw-push.js` separately.
-
-Pseudocode at the top of `main.tsx`:
 ```ts
-const BUILD_ID = __APP_VERSION__;          // injected via vite define
-const isIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
-const isPreview = /id-preview--|lovableproject\.com/.test(location.hostname);
-
-(async () => {
-  if ("serviceWorker" in navigator) {
-    const prev = localStorage.getItem("lovable_build_id");
-    if (prev !== BUILD_ID || isIframe || isPreview) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-      localStorage.setItem("lovable_build_id", BUILD_ID);
-    }
-    if (!isIframe && !isPreview && import.meta.env.PROD) {
-      const { registerSW } = await import("virtual:pwa-register");
-      registerSW({ immediate: true, onNeedRefresh() { location.reload(); } });
-    }
-  }
-  createRoot(document.getElementById("root")!).render(<App />);
-})();
+if (id.includes('react-dom') || id.includes('react/') || id.includes('react-router')) return 'vendor-react';
+if (id.includes('leaflet')) return 'vendor-maps';
 ```
 
-Add `define: { __APP_VERSION__: JSON.stringify(Date.now().toString()) }` in `vite.config.ts` so each build gets a unique ID.
+Problems:
+1. The `react` core package files live at paths like `node_modules/react/index.js` and `node_modules/react/cjs/react.production.min.js`. `id.includes('react/')` *does* match those, but it **also matches** `react-leaflet/`, `react-hook-form/`, `react-day-picker/`, `react-markdown/`, `react-resizable-panels/`, etc., dumping unrelated packages into `vendor-react` and making React-dependent packages evaluate before `React` is ready when they're in *other* chunks (`vendor-maps`, `vendor-forms`, `vendor-misc`).
+2. `react-leaflet` falls into `vendor-maps` via the leaflet rule and tries to read `React.createContext` before `vendor-react` has finished initialising — Rollup can't guarantee evaluation order across chunks for circular-ish vendor graphs, hence the TDZ crash.
 
-### C. `src/lib/pushNotifications.ts` — stop registering a second SW
+### A. Rewrite `manualChunks` so React + every `react-*` peer ship in ONE chunk
 
-Change `registerServiceWorker()` to use the *already-registered* Workbox SW instead of `/sw-push.js`:
+Use precise package-name matching against the path segment after `node_modules/`. All React ecosystem packages (anything whose package name is `react`, `react-dom`, `scheduler`, or starts with `react-`) go into `vendor-react`. Leaflet (the non-React core) stays in `vendor-maps`. Same for `recharts` (it imports React → must be in `vendor-react` OR allow recharts to live with React; simpler: keep it in `vendor-charts` but it will work as long as React loads first — which it now will, because `vendor-react` is referenced by `index-*.js` first).
+
 ```ts
-export const registerServiceWorker = async () => {
-  if (!("serviceWorker" in navigator)) return null;
-  return await navigator.serviceWorker.ready;   // returns the Workbox SW
-};
+manualChunks(id) {
+  if (!id.includes('node_modules')) return;
+  // Extract the package name after the LAST node_modules/
+  const after = id.split('node_modules/').pop()!;
+  const pkg = after.startsWith('@')
+    ? after.split('/').slice(0, 2).join('/')   // scoped: @scope/name
+    : after.split('/')[0];                     // plain: name
+
+  // React and every React-dependent peer in ONE chunk → guarantees
+  // React is initialised before any consumer evaluates.
+  if (
+    pkg === 'react' ||
+    pkg === 'react-dom' ||
+    pkg === 'react/jsx-runtime' ||
+    pkg === 'scheduler' ||
+    pkg.startsWith('react-')          // react-router, react-leaflet, react-hook-form, react-day-picker, react-markdown, react-resizable-panels, react-dom, etc.
+  ) return 'vendor-react';
+
+  if (pkg.startsWith('@radix-ui') || pkg === 'lucide-react' || pkg === 'cmdk') return 'vendor-ui';
+  if (pkg.startsWith('@supabase')) return 'vendor-supabase';
+  if (pkg.startsWith('@tanstack')) return 'vendor-query';
+  if (pkg === 'recharts' || pkg.startsWith('d3-')) return 'vendor-charts';
+  if (pkg === 'pdfjs-dist' || pkg === 'jspdf' || pkg === 'html2canvas') return 'vendor-pdf';
+  if (pkg === 'leaflet') return 'vendor-maps';   // pure leaflet only; react-leaflet now lives in vendor-react
+  if (pkg === 'date-fns' || pkg === 'zod') return 'vendor-forms';
+  return 'vendor-misc';
+}
 ```
-Then **port the push event listeners from `public/sw-push.js` into a small `src/sw-push-handlers.ts`** that VitePWA's `injectManifest` mode can include, OR keep the simpler approach: add the `push` and `notificationclick` handlers directly via Workbox's `additionalManifestEntries` workaround — concretely, switch VitePWA's `strategies` to `"injectManifest"` and provide a custom `src/sw.ts` that does:
-```ts
-import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
-import { clientsClaim } from "workbox-core";
-self.skipWaiting(); clientsClaim(); cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
-self.addEventListener("push", /* existing logic from sw-push.js */);
-self.addEventListener("notificationclick", /* existing logic */);
-```
-Delete `public/sw-push.js` once handlers are migrated. Result: one SW, one scope, no race.
 
-### D. `index.html` — add explicit no-cache for the HTML shell
+Note: `lucide-react` matches `pkg.startsWith('react-')`? No — its name is `lucide-react`, doesn't start with `react-`, so it correctly stays in `vendor-ui`. ✅
 
-Add `<meta http-equiv="Cache-Control" content="no-cache" />` so even if the CDN edge caches `index.html` aggressively, browsers re-validate. (Belt-and-suspenders against future stale shells.)
+### B. Build & verify locally
 
-### E. Verification
+1. Run `npx vite build` — confirm no warnings about cross-chunk circular deps and that `dist/assets/vendor-react-*.js` now contains both `react` and `react-leaflet` (grep output, or check chunk sizes — `vendor-react` will grow ~80 KB).
+2. Confirm bundle still under publish limit (each chunk < 1 MB; total precache < 5 MB). With React ecosystem consolidated, `vendor-react` should be ~350-450 KB — well below the cap.
+3. `npx vite preview` and load `/` — no `createContext` error in console.
 
-1. `npx vite build` succeeds; `dist/index.html` references `/assets/...` (absolute, not `./assets/...`).
-2. Open the published URL on desktop where the broken old SW lives → on first load the kill-switch unregisters the old SW + clears caches → second load shows the new build.
-3. Open `/dashboard` directly on mobile (cold) → loads (no asset 404s).
-4. Open `/j/<token>` shared link on mobile → loads.
-5. DevTools → Application → Service Workers shows exactly **one** SW (`sw.js`), scope `/`. Push subscription still works (uses the same SW via `serviceWorker.ready`).
-6. Publish a new build → existing users get the update on next page load (no "ghost old version") because `BUILD_ID` changed → unregister + re-register cycle.
-7. Inside the Lovable editor preview iframe, no SW is registered (per existing PWA guidance), so live edits show instantly.
+### C. Publish & smoke-test
+
+1. Click Publish → Update.
+2. Visit `https://iamgood.lovable.app/` in a fresh incognito window → React app mounts, no white screen.
+3. Open `/journey` (uses react-leaflet) → map renders.
+4. Open `/dashboard` → existing kill-switch in `src/main.tsx` will unregister stale SWs and reload once, then the app works on the next load for users who had the broken build cached.
 
 ### What I will NOT change
 
-- No DB / edge function / RLS changes.
-- No feature, route, or UI changes.
-- No new npm packages (workbox-* is already pulled in transitively by `vite-plugin-pwa`).
-- Push notification behavior preserved — same handlers, just hosted in the unified SW.
+- No DB / RLS / edge function / feature changes.
+- No new dependencies.
+- Service worker, kill-switch, base path, lazy routes — all untouched (already correct).
+- Only `vite.config.ts` `build.rollupOptions.output.manualChunks` is modified.
 
