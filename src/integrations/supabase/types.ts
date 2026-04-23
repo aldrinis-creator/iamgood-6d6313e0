@@ -254,6 +254,75 @@ export type Database = {
         }
         Relationships: []
       }
+      ambulance_requests: {
+        Row: {
+          channel: string
+          contacts: Json
+          created_at: string
+          destination_lat: number | null
+          destination_lng: number | null
+          destination_name: string | null
+          error_message: string | null
+          health_summary: string | null
+          id: string
+          patient_name: string | null
+          payload: Json
+          pickup_address: string | null
+          pickup_lat: number | null
+          pickup_lng: number | null
+          response: Json | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string
+          ward_user_id: string | null
+        }
+        Insert: {
+          channel?: string
+          contacts?: Json
+          created_at?: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          destination_name?: string | null
+          error_message?: string | null
+          health_summary?: string | null
+          id?: string
+          patient_name?: string | null
+          payload?: Json
+          pickup_address?: string | null
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          response?: Json | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          ward_user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          contacts?: Json
+          created_at?: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          destination_name?: string | null
+          error_message?: string | null
+          health_summary?: string | null
+          id?: string
+          patient_name?: string | null
+          payload?: Json
+          pickup_address?: string | null
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          response?: Json | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          ward_user_id?: string | null
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           alarm_enabled: boolean
