@@ -22,6 +22,7 @@ interface RequestBody {
   pickup: { address: string; lat: number | null; lng: number | null };
   destination: { name: string; lat: number | null; lng: number | null };
   contacts: Contact[];
+  ambulance_type?: "BLS" | "ALS";
   force_channel?: "api" | "whatsapp";
 }
 
@@ -105,6 +106,7 @@ async function sendWhatsAppViaMsg91(body: RequestBody, healthSummary: string, pr
         guardian_phone: guardianPhone,
         health_summary: healthSummary.slice(0, 200),
         profile_link: profileLink,
+        ambulance_type: body.ambulance_type || "BLS",
       },
     ],
   };
@@ -177,6 +179,7 @@ async function notifyGuardians(supabase: any, body: RequestBody, ownerUserId: st
             pickup: body.pickup.address || "current location",
             destination: body.destination.name,
             request_id: requestId.slice(0, 8),
+            ambulance_type: body.ambulance_type || "BLS",
           }],
         }),
       });
@@ -219,6 +222,7 @@ Deno.serve(async (req) => {
       source: body.source,
       channel: "pending",
       status: "pending",
+      ambulance_type: body.ambulance_type || "BLS",
       patient_name: body.patient_name,
       pickup_address: body.pickup.address,
       pickup_lat: body.pickup.lat,

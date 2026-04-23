@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Ambulance, AlertTriangle, CreditCard, Navigation, Phone,
   MessageCircle, MapPin, Info, Pencil, Check, Loader2, Hospital, X, User as UserIcon,
@@ -60,6 +61,7 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
   // Patient + contacts
   const [patientName, setPatientName] = useState("");
   const [emergencyType, setEmergencyType] = useState("");
+  const [ambulanceType, setAmbulanceType] = useState<"BLS" | "ALS">("BLS");
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [primaryGuardianMissing, setPrimaryGuardianMissing] = useState(false);
 
@@ -303,6 +305,7 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
           },
           contacts,
           emergency_type: emergencyType || undefined,
+          ambulance_type: ambulanceType,
           force_channel: forceWhatsApp ? "whatsapp" : undefined,
         },
       });
@@ -462,6 +465,47 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
                   <AlertTriangle className="w-3 h-3" /> {locationError}
                 </p>
               )}
+            </div>
+
+            {/* Ambulance type */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Ambulance className="w-4 h-4" /> Ambulance Type <span className="text-destructive">*</span>
+              </h3>
+              <RadioGroup
+                value={ambulanceType}
+                onValueChange={(v) => setAmbulanceType(v as "BLS" | "ALS")}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                <label
+                  htmlFor="amb-bls"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "BLS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="BLS" id="amb-bls" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">BLS</div>
+                    <div className="text-xs text-muted-foreground">Basic Life Support — oxygen, first aid, stretcher</div>
+                  </div>
+                </label>
+                <label
+                  htmlFor="amb-als"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "ALS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="ALS" id="amb-als" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">ALS</div>
+                    <div className="text-xs text-muted-foreground">Advanced Life Support — ICU-equipped, paramedic, defib</div>
+                  </div>
+                </label>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground flex items-start gap-1">
+                <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                Choose ALS for cardiac, stroke, severe trauma, or unconscious patients.
+              </p>
             </div>
 
             {/* Destination hospital */}
@@ -634,6 +678,43 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Ambulance type */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Ambulance className="w-4 h-4" /> Ambulance Type <span className="text-destructive">*</span>
+              </h3>
+              <RadioGroup
+                value={ambulanceType}
+                onValueChange={(v) => setAmbulanceType(v as "BLS" | "ALS")}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                <label
+                  htmlFor="amb-bls-book"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "BLS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="BLS" id="amb-bls-book" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">BLS</div>
+                    <div className="text-xs text-muted-foreground">Basic Life Support</div>
+                  </div>
+                </label>
+                <label
+                  htmlFor="amb-als-book"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "ALS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="ALS" id="amb-als-book" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">ALS</div>
+                    <div className="text-xs text-muted-foreground">Advanced Life Support</div>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h3 className="text-sm font-semibold">Pricing</h3>
               <div className="flex justify-between text-sm">
