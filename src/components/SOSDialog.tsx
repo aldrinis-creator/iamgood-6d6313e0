@@ -194,59 +194,42 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     setSending(true);
     vibrate([200, 100, 200, 100, 400]);
 
-    await triggerSOS();
-
     const message = buildSOSMessage();
 
-    // WhatsApp is now handled server-side via MSG91 in the edge function
-    // Fallback: open wa.me links if MSG91 fails (handled in edge function response)
-    const guardianPhones = guardians.map((g) => g.guardian_phone).filter(Boolean);
-
-    const guardianEmails = guardians
-      .map((g) => g.guardian_email)
-      .filter(Boolean) as string[];
-
     try {
-      const { data: sosResult, error: sosError } = await supabase.functions.invoke("send-sos-alert", {
-        body: {
-          user_id: session?.user?.id,
-          message,
-          guardian_emails: guardianEmails,
-          guardian_phones: guardianPhones,
-          doctor_email: null,
-          doctor_name: medical.familyDoctorName,
-          user_name: userName,
-        },
+      const result = await triggerSOS({
+        message,
+        doctorName: medical.familyDoctorName,
+        userName,
       });
 
-      if (sosError) {
-        console.error("[SOSDialog] send-sos-alert invoke error:", sosError);
-        toast.error(`SOS backend failed: ${sosError.message || "invoke error"} — opening WhatsApp as backup`);
+      const delivery = result.delivery;
+      const invokeError = result.invokeError;
+
+      if (invokeError) {
+        toast.error(`SOS backend failed: ${invokeError} — opening WhatsApp as backup`);
         guardians.forEach((g, i) => {
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
-      } else {
-        console.log("[SOSDialog] send-sos-alert response:", sosResult);
-        const recipientCount = (sosResult as any)?.recipientCount ?? 0;
-        const whatsappOk = ((sosResult as any)?.whatsappQueued ?? 0) > 0;
-        const smsOk = ((sosResult as any)?.smsQueued ?? 0) > 0;
-        const errs = (sosResult as any)?.errors || {};
+      } else if (delivery) {
+        const whatsappOk = delivery.whatsappQueued > 0;
+        const smsOk = delivery.smsQueued > 0;
 
-        if (recipientCount === 0) {
-          toast.error(errs.recipients || "No accepted guardians with valid phone numbers");
+        if (delivery.recipientCount === 0) {
+          // Already toasted by AppContext; no fallback possible without numbers
         } else if (!whatsappOk && !smsOk) {
-          toast.error(`Delivery failed. WA: ${errs.whatsapp || "n/a"} | SMS: ${errs.sms || "n/a"} — opening WhatsApp as backup`);
+          toast.error(`Delivery failed via backend — opening WhatsApp as backup`);
           guardians.forEach((g, i) => {
             setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
           });
         } else {
           const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
-          toast.success(`SOS sent via ${channels} to ${recipientCount} guardian(s)`);
+          toast.success(`SOS sent via ${channels} to ${delivery.recipientCount} guardian(s)`);
         }
       }
     } catch (e: any) {
       console.error("Failed to send SOS alerts:", e);
-      toast.error(`SOS backend failed: ${e?.message || e} — opening WhatsApp as backup`);
+      toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
       guardians.forEach((g, i) => {
         setTimeout(() => {
           window.open(getWhatsAppLink(g.guardian_phone), "_blank");
@@ -256,7 +239,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     setSending(false);
     setSent(true);
-  }, [guardians, triggerSOS, buildSOSMessage, getWhatsAppLink, session?.user?.id, medical.familyDoctorName, userName]);
+  }, [guardians, triggerSOS, buildSOSMessage, getWhatsAppLink, medical.familyDoctorName, userName]);
 
   useEffect(() => {
     if (timeLeft === 0 && countingRef.current && !hasSentRef.current) {
