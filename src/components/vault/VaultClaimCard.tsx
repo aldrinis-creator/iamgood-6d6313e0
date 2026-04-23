@@ -316,15 +316,42 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
         .eq("id", claimId);
       if (upErr) throw upErr;
 
-      await supabase.functions.invoke("vault-claim-initiated", { body: { claim_id: claimId } });
+      const { data: result, error: invokeErr } = await supabase.functions.invoke(
+        "vault-claim-initiated",
+        { body: { claim_id: claimId } },
+      );
+      if (invokeErr) throw new Error("Server verification failed — please try again");
+
+      if (result?.rejected) {
+        const reasonMap: Record<string, string> = {
+          missing_file: "A required document is missing. Please re-upload all three files.",
+          file_empty: "One of the uploaded files is empty or corrupted. Re-upload and try again.",
+          user_active_24h: "Auto-rejected: the account was active in the last 24 hours.",
+          dod_before_dob: "Date of death cannot be before the user's date of birth.",
+          claim_not_found: "Claim record was lost. Please try again.",
+        };
+        toast.error(reasonMap[result.reason_code] || result.reason_message || "Claim auto-rejected.");
+        const { data: refreshed } = await supabase
+          .from("vault_nominee_claims" as any)
+          .select("id, status, user_window_ends_at, created_at, reject_reason")
+          .eq("id", claimId).maybeSingle();
+        setClaim((refreshed as unknown as ExistingClaim) || null);
+        setOpen(false);
+        resetWizard();
+        return;
+      }
 
       toast.success("Claim filed. The user has 7 days to cancel before admin review.");
       setOpen(false);
       resetWizard();
-      setClaim({
+      const { data: refreshed } = await supabase
+        .from("vault_nominee_claims" as any)
+        .select("id, status, user_window_ends_at, created_at, reject_reason")
+        .eq("id", claimId).maybeSingle();
+      setClaim((refreshed as unknown as ExistingClaim) || {
         id: claimId,
-        status: "user_window_open",
-        user_window_ends_at: new Date(Date.now() + 7 * 86400_000).toISOString(),
+        status: result?.status || "user_window_open",
+        user_window_ends_at: result?.window_ends_at || new Date(Date.now() + 7 * 86400_000).toISOString(),
         created_at: new Date().toISOString(),
       });
     } catch (err: any) {
