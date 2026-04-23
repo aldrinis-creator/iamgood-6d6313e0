@@ -619,6 +619,8 @@ const GuardianDashboard = () => {
 
   const handleRefreshLocation = async () => {
     if (!wardUserId) return;
+    // Hard guard: never load location if consent is off (unless active SOS).
+    if (!locationConsent && !activeSOS) return;
     // First try user_settings (latest saved location)
     const { data: settingsData } = await supabase
       .from("user_settings" as any)
