@@ -455,7 +455,7 @@ Deno.serve(async (req) => {
         whatsappRequestId,
         smsRequestId,
         recipientCount: finalPhones.length,
-        errors: { whatsapp: whatsappError, sms: smsError },
+        errors: { invoke: null, recipients: null, whatsapp: whatsappError, sms: smsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
