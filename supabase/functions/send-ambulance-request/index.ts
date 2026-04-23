@@ -5,9 +5,54 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MSG91_FLOW_URL = "https://control.msg91.com/api/v5/flow";
+const MSG91_WA_BULK_URL = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
+const MSG91_INTEGRATED_NUMBER = "917045868482";
+const MSG91_NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
 const AMBULANCE_WHATSAPP_NUMBER = "918710810887";
 const HELPLINE = "+917045868482";
+
+function buildBodyComponents(values: string[]): Record<string, { type: string; value: string }> {
+  const components: Record<string, { type: string; value: string }> = {};
+  values.forEach((v, i) => {
+    components[`body_${i + 1}`] = { type: "text", value: String(v ?? "") };
+  });
+  return components;
+}
+
+async function sendMsg91WhatsApp(templateName: string, toPhone: string, bodyValues: string[]): Promise<{ ok: boolean; response?: any }> {
+  const authKey = Deno.env.get("MSG91_AUTH_KEY");
+  if (!authKey) {
+    return { ok: false, response: { error: "MSG91_AUTH_KEY missing" } };
+  }
+  const payload = {
+    integrated_number: MSG91_INTEGRATED_NUMBER,
+    content_type: "template",
+    payload: {
+      messaging_product: "whatsapp",
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "en_GB", policy: "deterministic" },
+        namespace: MSG91_NAMESPACE,
+        to_and_components: [
+          { to: [toPhone], components: buildBodyComponents(bodyValues) },
+        ],
+      },
+    },
+  };
+  try {
+    const res = await fetch(MSG91_WA_BULK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authkey: authKey },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    console.log(`MSG91 ${templateName} -> ${toPhone}:`, JSON.stringify(json));
+    return { ok: res.ok, response: json };
+  } catch (e) {
+    return { ok: false, response: { error: String(e) } };
+  }
+}
 
 interface Contact {
   name: string;
@@ -84,45 +129,20 @@ async function tryAmbulanceApi(payload: any): Promise<{ ok: boolean; reason?: st
 }
 
 async function sendWhatsAppViaMsg91(body: RequestBody, healthSummary: string, profileLink: string): Promise<{ ok: boolean; response?: any }> {
-  const authKey = Deno.env.get("MSG91_AUTH_KEY");
-  const templateId = Deno.env.get("MSG91_AMBULANCE_TEMPLATE_ID");
-  if (!authKey || !templateId) {
-    return { ok: false, response: { error: "MSG91 not configured" } };
-  }
-
   const userPhone = body.contacts.find(c => c.role === "patient")?.phone || "";
   const guardianPhone = body.contacts.find(c => c.role === "guardian")?.phone || "—";
+  const pickupAddress = body.pickup.address || `${body.pickup.lat},${body.pickup.lng}`;
 
-  const payload = {
-    template_id: templateId,
-    short_url: "0",
-    recipients: [
-      {
-        mobiles: AMBULANCE_WHATSAPP_NUMBER,
-        patient_name: body.patient_name,
-        pickup_address: body.pickup.address || `${body.pickup.lat},${body.pickup.lng}`,
-        destination: body.destination.name,
-        user_phone: userPhone,
-        guardian_phone: guardianPhone,
-        health_summary: healthSummary.slice(0, 200),
-        profile_link: profileLink,
-        ambulance_type: body.ambulance_type || "BLS",
-      },
-    ],
-  };
-
-  try {
-    const res = await fetch(MSG91_FLOW_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", authkey: authKey },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json().catch(() => ({}));
-    console.log("MSG91 ambulance response:", JSON.stringify(json));
-    return { ok: res.ok, response: json };
-  } catch (e) {
-    return { ok: false, response: { error: String(e) } };
-  }
+  return sendMsg91WhatsApp("ambulance_dispatch_request", AMBULANCE_WHATSAPP_NUMBER, [
+    body.patient_name,                         // body_1
+    pickupAddress,                             // body_2
+    body.destination.name,                     // body_3
+    userPhone,                                 // body_4
+    guardianPhone,                             // body_5
+    healthSummary.slice(0, 200),               // body_6
+    profileLink,                               // body_7
+    body.ambulance_type || "BLS",              // body_8
+  ]);
 }
 
 async function notifyGuardians(supabase: any, body: RequestBody, ownerUserId: string, requestId: string) {
@@ -161,28 +181,16 @@ async function notifyGuardians(supabase: any, body: RequestBody, ownerUserId: st
     await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
   }
 
-  // MSG91 WhatsApp to primary guardian
+  // MSG91 WhatsApp to primary guardian via Bulk API
   const primary = (guardiansRes.data || []).find((g: any) => g.is_primary) || (guardiansRes.data || [])[0];
-  const guardianTemplateId = Deno.env.get("MSG91_AMBULANCE_GUARDIAN_NOTIFY_TEMPLATE_ID");
-  const authKey = Deno.env.get("MSG91_AUTH_KEY");
-  if (primary?.guardian_phone && guardianTemplateId && authKey) {
+  if (primary?.guardian_phone) {
     try {
-      await fetch(MSG91_FLOW_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", authkey: authKey },
-        body: JSON.stringify({
-          template_id: guardianTemplateId,
-          short_url: "0",
-          recipients: [{
-            mobiles: normalizePhone(primary.guardian_phone),
-            ward_name: wardName,
-            pickup: body.pickup.address || "current location",
-            destination: body.destination.name,
-            request_id: requestId.slice(0, 8),
-            ambulance_type: body.ambulance_type || "BLS",
-          }],
-        }),
-      });
+      await sendMsg91WhatsApp("ambulance_guardian_notify", normalizePhone(primary.guardian_phone), [
+        wardName,                                  // body_1
+        body.pickup.address || "current location", // body_2
+        body.destination.name,                     // body_3
+        requestId.slice(0, 8),                     // body_4
+      ]);
     } catch (e) {
       console.warn("Guardian MSG91 notify failed:", e);
     }
