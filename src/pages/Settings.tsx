@@ -25,6 +25,7 @@ import { formatDistanceToNow } from "date-fns";
 import { formatISTDateTime } from "@/lib/istTime";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import VaultNomineeRecoveryDialog from "@/components/vault/VaultNomineeRecoveryDialog";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
@@ -462,10 +463,16 @@ const Settings = () => {
     }
   };
 
+  const [recoveryDialog, setRecoveryDialog] = useState<{ open: boolean; guardianId: string }>({ open: false, guardianId: "" });
+
   const toggleVaultNominee = async (id: string, current: boolean) => {
     const { error } = await supabase.from("guardians").update({ is_vault_nominee: !current } as any).eq("id", id);
     if (!error) {
       setGuardians(guardians.map((g) => g.id === id ? { ...g, is_vault_nominee: !current } : g));
+      // When enabling, open the PIN escrow recovery wizard
+      if (!current && session?.user?.id) {
+        setRecoveryDialog({ open: true, guardianId: id });
+      }
     }
   };
 
@@ -972,6 +979,14 @@ const Settings = () => {
           <PrivacyTab session={session} navigate={navigate} guardians={guardians} />
         )}
       </div>
+      {session?.user?.id && (
+        <VaultNomineeRecoveryDialog
+          open={recoveryDialog.open}
+          onOpenChange={(open) => setRecoveryDialog((s) => ({ ...s, open }))}
+          userId={session.user.id}
+          guardianId={recoveryDialog.guardianId}
+        />
+      )}
     </AppLayout>
   );
 };

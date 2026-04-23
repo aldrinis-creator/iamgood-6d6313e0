@@ -1070,34 +1070,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                   </Button>
                 </div>
               ) : (
-                <>
-                  {DOC_TYPES.map(({ key, label }) => {
-                    const doc = encDocs.find((d) => d.doc_type === key);
-                    const value = decryptedValues[key];
-                    return doc ? (
-                      <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                        <div>
-                          <p className="text-xs text-muted-foreground">{label}</p>
-                          <p className="text-sm font-mono font-medium">{value || "••••••"}</p>
-                        </div>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive"
-                          onClick={() => handleDeleteDoc(doc.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ) : null;
-                  })}
-
-                  {encDocs.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      No encrypted documents yet.
-                    </p>
-                  )}
-
-                  <Button variant="outline" className="w-full" onClick={() => setAddDocDialog(true)}>
-                    <Plus className="w-4 h-4 mr-2" /> Add Encrypted Document
-                  </Button>
-                </>
+                <VaultCategorisedSection userId={userId!} pin={pinForVault} />
               )}
             </CardContent>
           </Card>

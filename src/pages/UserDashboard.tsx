@@ -1,5 +1,6 @@
 import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
+import VaultClaimCancelBanner from "@/components/vault/VaultClaimCancelBanner";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 import useRefillDue from "@/hooks/useRefillDue";
 import { useNavigate } from "react-router-dom";
@@ -198,6 +199,7 @@ const UserDashboard = () => {
   return (
     <AppLayout>
       <div className="p-4 space-y-4">
+        <VaultClaimCancelBanner />
         <EmailPromptBanner userEmail={session?.user?.email} />
         {/* Mode Selector */}
         <Card className="bg-primary/5">
