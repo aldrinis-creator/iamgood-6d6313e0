@@ -13,24 +13,26 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import UserDashboard from "./pages/UserDashboard";
-import GuardianDashboard from "./pages/GuardianDashboard";
-import GuardianAlerts from "./pages/GuardianAlerts";
-import GuardianReports from "./pages/GuardianReports";
-import GuardianServices from "./pages/GuardianServices";
-import MyHealth from "./pages/MyHealth";
-import Services from "./pages/Services";
-import MedicalVault from "./pages/MedicalVault";
-import Settings from "./pages/Settings";
-import Subscription from "./pages/Subscription";
-import Appointments from "./pages/Appointments";
-import Messages from "./pages/Messages";
-import MyProfile from "./pages/MyProfile";
-import ContactUs from "./pages/ContactUs";
-import EmergencyProfile from "./pages/EmergencyProfile";
-import GuardianMessages from "./pages/GuardianMessages";
-import MapMyJourney from "./pages/MapMyJourney";
 import AdminRoute from "./components/AdminRoute";
+
+// Lazy-loaded chart-heavy & authenticated routes (isolates recharts bundle from initial load)
+const UserDashboard = lazy(() => import("./pages/UserDashboard"));
+const GuardianDashboard = lazy(() => import("./pages/GuardianDashboard"));
+const GuardianAlerts = lazy(() => import("./pages/GuardianAlerts"));
+const GuardianReports = lazy(() => import("./pages/GuardianReports"));
+const GuardianServices = lazy(() => import("./pages/GuardianServices"));
+const MyHealth = lazy(() => import("./pages/MyHealth"));
+const Services = lazy(() => import("./pages/Services"));
+const MedicalVault = lazy(() => import("./pages/MedicalVault"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Subscription = lazy(() => import("./pages/Subscription"));
+const Appointments = lazy(() => import("./pages/Appointments"));
+const Messages = lazy(() => import("./pages/Messages"));
+const MyProfile = lazy(() => import("./pages/MyProfile"));
+const ContactUs = lazy(() => import("./pages/ContactUs"));
+const EmergencyProfile = lazy(() => import("./pages/EmergencyProfile"));
+const GuardianMessages = lazy(() => import("./pages/GuardianMessages"));
+const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
 
 // Lazy-loaded heavy / rarely-used routes
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
