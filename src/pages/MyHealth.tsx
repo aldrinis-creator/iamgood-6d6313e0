@@ -38,7 +38,6 @@ const healthTools = [
 
 const healthToolsSubItems = [
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
-  { icon: Upload, label: "Medical Documents", desc: "Upload and organize medical documents" },
   { icon: Search, label: "Document Analyzer", desc: "AI-powered document analysis" },
   { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
