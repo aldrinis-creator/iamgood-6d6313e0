@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { UtensilsCrossed, Camera, Dumbbell, Thermometer, Loader2, ArrowLeft, X, Upload, Flame, CheckCircle, AlertTriangle, Lightbulb, Star, Info, Save, BarChart3, Plus, Edit2, ShieldAlert } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -298,6 +298,20 @@ const NutritionAdvisor = () => {
   const [saved, setSaved] = useState(false);
   const [mealType, setMealType] = useState<string>("other");
   const mealFileRef = useRef<HTMLInputElement>(null);
+  const autoLaunchedRef = useRef(false);
+
+  // Auto-open camera on first mount: jump straight into Analyze This Meal → camera capture
+  useEffect(() => {
+    if (autoLaunchedRef.current) return;
+    autoLaunchedRef.current = true;
+    setActiveAction("analyze_meal");
+    setShowMealUpload(true);
+    // Defer click to next tick so the hidden input is mounted
+    const t = setTimeout(() => {
+      mealFileRef.current?.click();
+    }, 50);
+    return () => clearTimeout(t);
+  }, []);
 
   // Manual meal entry state
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -597,7 +611,7 @@ const NutritionAdvisor = () => {
             <Upload className="w-8 h-8 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Tap to take photo or upload image</span>
             <span className="text-xs text-muted-foreground">JPG, PNG — max 4MB</span>
-            <input ref={mealFileRef} type="file" accept="image/*" onChange={handleMealImageSelect} className="hidden" />
+            <input ref={mealFileRef} type="file" accept="image/*" capture="environment" onChange={handleMealImageSelect} className="hidden" />
           </label>
         )}
 
