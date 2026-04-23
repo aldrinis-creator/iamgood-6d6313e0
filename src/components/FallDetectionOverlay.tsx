@@ -91,29 +91,18 @@ const FallDetectionOverlay = () => {
     }
     msg += "\n\n⚠️ A fall was detected. Please respond immediately!";
 
-    const guardianEmails = guardians.map((g) => g.guardian_email).filter(Boolean) as string[];
-    const guardianPhones = guardians.map((g) => g.guardian_phone).filter(Boolean) as string[];
-
     try {
-      const { data: result, error } = await supabase.functions.invoke("send-sos-alert", {
-        body: {
-          user_id: uid,
-          message: msg,
-          guardian_emails: guardianEmails,
-          guardian_phones: guardianPhones,
-          doctor_email: null,
-          doctor_name: hp?.family_doctor_name || null,
-          user_name: userName,
-        },
+      const result = await triggerSOS({
+        message: msg,
+        doctorName: hp?.family_doctor_name || null,
+        userName,
       });
-      if (error) {
-        console.error("[FallDetection] send-sos-alert invoke error:", error);
-      } else {
-        console.log("[FallDetection] send-sos-alert response:", result);
-      }
-      const whatsappOk = ((result as any)?.whatsappQueued ?? 0) > 0;
-      const smsOk = ((result as any)?.smsQueued ?? 0) > 0;
-      if (error || (!whatsappOk && !smsOk)) {
+      const delivery = result.delivery;
+      const whatsappOk = (delivery?.whatsappQueued ?? 0) > 0;
+      const smsOk = (delivery?.smsQueued ?? 0) > 0;
+
+      // Manual wa.me fallback only if backend delivery truly failed
+      if (result.invokeError || (delivery && delivery.recipientCount > 0 && !whatsappOk && !smsOk)) {
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
           const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
@@ -132,7 +121,7 @@ const FallDetectionOverlay = () => {
         }, i * 500);
       });
     }
-  }, [session?.user?.id, fallConfidence]);
+  }, [session?.user?.id, fallConfidence, triggerSOS]);
 
   useEffect(() => {
     if (countdownExpired && !hasSentRef.current) {
