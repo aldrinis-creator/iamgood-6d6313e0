@@ -1,90 +1,87 @@
 
 
-## Plan — Add "Ambulance Type" (BLS / ALS) to ambulance request flow
+## Plan — Switch ambulance edge function to MSG91 WhatsApp Bulk API (approved templates)
 
-Add a required **Ambulance Type** selector to the booking UI and propagate it through the edge function, MSG91 templates, and the audit table.
+The two MSG91 templates are now approved and use the **WhatsApp Bulk API** with positional `body_N` slots, not the Flow API's named keys. The edge function must be rewritten to call the new endpoint with the correct payload, otherwise sends will fail.
 
-### 1. Database — `ambulance_requests` table
+### 1. Endpoint and payload changes — `supabase/functions/send-ambulance-request/index.ts`
 
-Add one column via migration:
-
-- `ambulance_type text not null default 'BLS'` with a CHECK constraint allowing only `'BLS'` or `'ALS'`.
-
-Existing rows backfill to `'BLS'` automatically via the default.
-
-### 2. UI — `src/components/AmbulanceBooking.tsx`
-
-Add a new required field directly **above the Destination Hospital** field, identical for User and Guardian modes:
+Replace both MSG91 calls. Constants update:
 
 ```
-🚑 Ambulance Type *
-( ) BLS — Basic Life Support (oxygen, first aid, stretcher)
-(•) ALS — Advanced Life Support (ICU-equipped, paramedic, defib)
+MSG91_WA_BULK_URL  = "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/"
+MSG91_INTEGRATED_NUMBER = "917045868482"
+MSG91_NAMESPACE    = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4"
 ```
 
-- Two radio buttons rendered as large tap-friendly cards (≥56px tall, 18px font).
-- Default selection: **BLS** (most common, lower cost).
-- Short helper text under each option explaining when to choose it.
-- A small inline hint: *"Choose ALS for cardiac, stroke, severe trauma, or unconscious patients."*
-- Selected value stored in form state and added to the payload sent to `send-ambulance-request` as `ambulance_type`.
-- Both Emergency tab and Book & Pay tab include the selector (the Book & Pay pricing card will later differentiate BLS vs ALS pricing — for this change we simply capture the selection).
+Replace `sendWhatsAppViaMsg91()` (dispatch) with a Bulk API call that sends to **+918710810887** using template `ambulance_dispatch_request`, with positional bodies in this exact order matching the approved template:
 
-### 3. Edge function — `supabase/functions/send-ambulance-request/index.ts`
+| Slot | Value |
+|---|---|
+| `body_1` | `patient_name` |
+| `body_2` | `pickup_address` (or `lat,lng` fallback) |
+| `body_3` | `destination` |
+| `body_4` | `user_phone` |
+| `body_5` | `guardian_phone` (or `—`) |
+| `body_6` | `health_summary` (≤200 chars) |
+| `body_7` | `profile_link` |
+| `body_8` | `ambulance_type` (`BLS`/`ALS`) |
 
-- Extend `RequestBody` with `ambulance_type: 'BLS' | 'ALS'` (default `'BLS'` if missing).
-- Persist it on the new `ambulance_type` column in the `ambulance_requests` insert.
-- Include it in the partner API JSON payload.
-- Pass it as a new MSG91 variable on **both** templates so the dispatch center and the guardian both see it.
+Replace the guardian-notify fetch in `notifyGuardians()` with a Bulk API call to the primary guardian's phone using template `ambulance_guardian_notify`:
 
-### 4. MSG91 templates — you update in dashboard
+| Slot | Value |
+|---|---|
+| `body_1` | `ward_name` |
+| `body_2` | `pickup` |
+| `body_3` | `destination` |
+| `body_4` | `request_id` (first 8 chars) |
 
-Both templates gain one trailing numbered slot. **No code mapping change needed** — the edge function will start sending `ambulance_type` as a new key; you map it to the new slot number in MSG91.
+Note: `ambulance_type` is **not** in the approved guardian template (only 4 slots), so the guardian message will not show the type — that matches what MSG91 approved. Confirming with you that this is intentional.
 
-**Template `ambulance_dispatch_request`** — append `Type: {{8}}`:
+Both calls use this exact request shape:
 
+```json
+{
+  "integrated_number": "917045868482",
+  "content_type": "template",
+  "payload": {
+    "messaging_product": "whatsapp",
+    "type": "template",
+    "template": {
+      "name": "<template_name>",
+      "language": { "code": "en_GB", "policy": "deterministic" },
+      "namespace": "e1e205a8_3b76_4c20_bde4_9f124a35c8c4",
+      "to_and_components": [{
+        "to": ["<phone>"],
+        "components": {
+          "body_1": { "type": "text", "value": "<v1>" },
+          "body_2": { "type": "text", "value": "<v2>" },
+          "...": "..."
+        }
+      }]
+    }
+  }
+}
 ```
-🚑 Ambulance Request — Check-iN
 
-Type: {{8}}
-Patient: {{1}}
-Pickup: {{2}}
-Destination: {{3}}
-Patient phone: {{4}}
-Guardian phone: {{5}}
-Health: {{6}}
-Profile: {{7}}
-```
+Headers: `Content-Type: application/json` + `authkey: <MSG91_AUTH_KEY>`.
 
-| Slot | Variable | Value |
-|---|---|---|
-| `{{8}}` | `ambulance_type` | `BLS` or `ALS` |
+### 2. Secrets — already configured
 
-**Template `ambulance_guardian_notify`** — append `Type: {{5}}`:
+- `MSG91_AUTH_KEY` ✅ exists
+- `MSG91_AMBULANCE_TEMPLATE_ID` and `MSG91_AMBULANCE_GUARDIAN_NOTIFY_TEMPLATE_ID` are **no longer needed** — the Bulk API uses the **template name** (`ambulance_dispatch_request`, `ambulance_guardian_notify`), not template IDs. These secrets become dead and can be removed later (no action needed now).
 
-```
-🚑 Ambulance booked for {{1}}
+### 3. What I will NOT change
 
-Type: {{5}}
-Pickup: {{2}}
-Destination: {{3}}
-Request ID: {{4}}
+- No DB schema change.
+- No UI change in `AmbulanceBooking.tsx`.
+- No change to the in-app + push guardian notifications, only the WhatsApp leg.
+- No change to other MSG91 flows (OTP, SOS, etc.) — they continue to use the Flow API as before.
 
-Open Check-iN to track status.
-```
+### Verification after deploy
 
-| Slot | Variable | Value |
-|---|---|---|
-| `{{5}}` | `ambulance_type` | `BLS` or `ALS` |
-
-Resubmit both templates for MSG91 approval. Once approved, no further code change is needed — the edge function will already be sending the field.
-
-### 5. Memory update
-
-Append to `mem://features/ambulance-booking`: *"Ambulance Type (BLS / ALS) is a required field on every request, default BLS, sent to partner API, persisted on `ambulance_requests.ambulance_type`, and shown on both MSG91 templates."*
-
-### What I will NOT change
-
-- No price logic change — pricing tier (BLS vs ALS rate) stays as a future enhancement to the Book & Pay tab.
-- No change to guardian notification channels (push / in-app / WhatsApp) beyond adding the type label.
-- No change to SOS, MMJ, or any other flow.
+1. Trigger a test ambulance request from the User app.
+2. `+918710810887` should receive the dispatch WhatsApp with all 8 fields.
+3. Primary guardian's number should receive the 4-field notify WhatsApp.
+4. `supabase.edge_function_logs("send-ambulance-request")` will show the Bulk API response JSON for both calls.
 
