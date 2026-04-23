@@ -398,16 +398,45 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
     return (
       <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
-          {/* Confirmation header */}
-          <div className="text-center space-y-3 py-4">
-            <div className="w-16 h-16 rounded-full bg-sos/10 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-sos" />
-            </div>
-            <h2 className="text-xl font-bold text-foreground">SOS Alerts Submitted</h2>
-            <p className="text-muted-foreground text-sm">
-              Emergency alerts submitted to provider for {guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.
-            </p>
-          </div>
+          {/* Confirmation header — reflects real delivery outcome */}
+          {(() => {
+            const ds = deliverySummary;
+            const status = ds?.status ?? "success";
+            const isFailed = status === "failed";
+            const isPartial = status === "partial";
+            const ringClass = isFailed
+              ? "bg-destructive/10"
+              : isPartial
+                ? "bg-warning/10"
+                : "bg-sos/10";
+            const iconClass = isFailed
+              ? "text-destructive"
+              : isPartial
+                ? "text-warning"
+                : "text-sos";
+            const Icon = isFailed ? AlertCircle : CheckCircle2;
+            const title = ds?.title ?? `SOS Alerts Submitted`;
+            const detail = ds?.detail ?? `Emergency alerts submitted to provider for ${guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.`;
+            return (
+              <div className="text-center space-y-3 py-4">
+                <div className={`w-16 h-16 rounded-full ${ringClass} flex items-center justify-center mx-auto`}>
+                  <Icon className={`w-8 h-8 ${iconClass}`} />
+                </div>
+                <h2 className={`text-xl font-bold ${isFailed ? "text-destructive" : "text-foreground"}`}>{title}</h2>
+                <p className="text-muted-foreground text-sm whitespace-pre-line">{detail}</p>
+                {isFailed && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-left">
+                    <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Action required
+                    </p>
+                    <p className="text-sm text-destructive">
+                      No guardian has been notified. Please call 112 immediately if this is a real emergency, then fix your guardian's phone number in My Profile.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Call buttons */}
           <div className="flex gap-2 mb-4">
