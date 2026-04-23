@@ -63,6 +63,12 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deliverySummary, setDeliverySummary] = useState<{
+    status: "success" | "partial" | "failed";
+    title: string;
+    detail: string;
+    selfTargetedPhones: string[];
+  } | null>(null);
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [userDob, setUserDob] = useState("");
