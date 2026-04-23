@@ -700,6 +700,9 @@ const GuardianDashboard = () => {
           );
         })()}
 
+        {/* Vault Nominee Claim (only if eligible) */}
+        {wardUserId && <VaultClaimCard wardUserId={wardUserId} wardName={wardName} />}
+
         {/* User Status */}
         <Card>
           <CardContent className="p-4">
