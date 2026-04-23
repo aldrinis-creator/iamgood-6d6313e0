@@ -438,46 +438,127 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                     </p>
                   </div>
                 )}
-                {/* Per-recipient summary so the user always sees who was contacted */}
-                {guardians.length > 0 && (
-                  <div className="bg-secondary/40 border border-border rounded-lg p-3 text-left">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Recipients ({guardians.length})
-                    </p>
-                    <div className="space-y-1.5">
-                      {guardians.map((g, i) => {
-                        const digits = (g.guardian_phone || "").replace(/\D/g, "");
-                        const withCc = digits.startsWith("91") ? digits : `91${digits}`;
-                        const isSender = withCc === "917045868482";
-                        const isInvalid = digits.length < 10;
-                        const skipped = isSender || isInvalid;
-                        const skipReason = isSender
-                          ? "skipped: matches sender number"
-                          : isInvalid
-                            ? "skipped: invalid number"
-                            : null;
-                        return (
-                          <div key={i} className="flex items-start justify-between gap-2 text-xs">
-                            <div className="min-w-0">
-                              <span className="font-medium text-foreground">{g.guardian_name}</span>
-                              <span className="text-muted-foreground"> · {g.guardian_phone}</span>
-                              {g.status === "pending" && (
-                                <span className="ml-1 text-warning">(pending)</span>
-                              )}
+                {/* Per-recipient summary — backend is source of truth */}
+                {(() => {
+                  const backendRecipients = ds?.recipients;
+                  if (backendRecipients && backendRecipients.length > 0) {
+                    const skipReasonLabel = (r: typeof backendRecipients[number]) => {
+                      switch (r.skip_reason) {
+                        case "self_targeted": return "phone matches the WhatsApp sender number — MSG91 cannot deliver from sender to itself. Update in My Profile.";
+                        case "invalid_phone": return "phone number is invalid.";
+                        case "duplicate_phone": return "duplicate of another guardian — deduped.";
+                        default: return "skipped";
+                      }
+                    };
+                    const channelLabel = (s: "accepted" | "rejected" | "not_attempted") =>
+                      s === "accepted" ? "submitted" : s === "rejected" ? "rejected" : "—";
+                    const included = backendRecipients.filter(r => r.included);
+                    const skipped = backendRecipients.filter(r => !r.included);
+                    return (
+                      <div className="bg-secondary/40 border border-border rounded-lg p-3 text-left space-y-3">
+                        {included.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                              Recipients ({included.length})
+                            </p>
+                            <div className="space-y-2">
+                              {included.map((r) => (
+                                <div key={r.guardian_id} className="text-xs space-y-0.5">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <CheckCircle2 className="w-3 h-3 text-success inline mr-1" />
+                                      <span className="font-medium text-foreground">{r.name}</span>
+                                      <span className="text-muted-foreground"> · {r.phone_raw}</span>
+                                      <Badge
+                                        variant="outline"
+                                        className={`ml-1.5 text-[10px] px-1.5 py-0 ${r.status === "pending" ? "border-warning text-warning" : "border-success text-success"}`}
+                                      >
+                                        {r.status}
+                                      </Badge>
+                                    </div>
+                                    <span className="shrink-0 text-muted-foreground">
+                                      WA {channelLabel(r.channels.whatsapp)} · SMS {channelLabel(r.channels.sms)}
+                                    </span>
+                                  </div>
+                                  {r.status === "pending" && (
+                                    <p className="text-[11px] text-warning pl-4">
+                                      Pending acceptance — alerted anyway.
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            <span className={`shrink-0 ${skipped ? "text-destructive" : isFailed ? "text-destructive" : "text-success"}`}>
-                              {skipped
-                                ? skipReason
-                                : isFailed
-                                  ? "not delivered"
-                                  : "WA + SMS submitted"}
-                            </span>
                           </div>
-                        );
-                      })}
+                        )}
+                        {skipped.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2 flex items-center gap-1">
+                              <X className="w-3 h-3" /> Skipped ({skipped.length})
+                            </p>
+                            <div className="space-y-2">
+                              {skipped.map((r) => (
+                                <div key={r.guardian_id} className="text-xs">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <span className="font-medium text-foreground">{r.name}</span>
+                                      <span className="text-muted-foreground"> · {r.phone_raw}</span>
+                                      <Badge
+                                        variant="outline"
+                                        className={`ml-1.5 text-[10px] px-1.5 py-0 ${r.status === "pending" ? "border-warning text-warning" : "border-muted-foreground text-muted-foreground"}`}
+                                      >
+                                        {r.status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <p className="text-[11px] text-destructive mt-0.5">
+                                    Reason: {skipReasonLabel(r)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  // Fallback: backend didn't return recipients (deploy lag) — keep legacy local inference
+                  if (guardians.length === 0) return null;
+                  return (
+                    <div className="bg-secondary/40 border border-border rounded-lg p-3 text-left">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Recipients ({guardians.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {guardians.map((g, i) => {
+                          const digits = (g.guardian_phone || "").replace(/\D/g, "");
+                          const withCc = digits.startsWith("91") ? digits : `91${digits}`;
+                          const isSender = withCc === "917045868482";
+                          const isInvalid = digits.length < 10;
+                          const skipped = isSender || isInvalid;
+                          const skipReason = isSender
+                            ? "skipped: matches sender number"
+                            : isInvalid
+                              ? "skipped: invalid number"
+                              : null;
+                          return (
+                            <div key={i} className="flex items-start justify-between gap-2 text-xs">
+                              <div className="min-w-0">
+                                <span className="font-medium text-foreground">{g.guardian_name}</span>
+                                <span className="text-muted-foreground"> · {g.guardian_phone}</span>
+                                {g.status === "pending" && (
+                                  <span className="ml-1 text-warning">(pending)</span>
+                                )}
+                              </div>
+                              <span className={`shrink-0 ${skipped ? "text-destructive" : isFailed ? "text-destructive" : "text-success"}`}>
+                                {skipped ? skipReason : isFailed ? "not delivered" : "WA + SMS submitted"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })()}
