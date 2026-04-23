@@ -69,6 +69,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     title: string;
     detail: string;
     selfTargetedPhones: string[];
+    recipients?: import("@/contexts/AppContext").SOSRecipientReport[];
   } | null>(null);
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
