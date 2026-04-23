@@ -42,6 +42,8 @@ import AdminContacts from "./pages/AdminContacts";
 import AdminVerify from "./pages/AdminVerify";
 import AdminLogin from "./pages/AdminLogin";
 import AdminRoute from "./components/AdminRoute";
+import AdminVaultClaims from "./pages/AdminVaultClaims";
+import VaultClaim from "./pages/VaultClaim";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +95,8 @@ const App = () => (
               <Route path="/admin/coupons" element={<AdminRoute><AdminCoupons /></AdminRoute>} />
               <Route path="/admin/waitlist" element={<AdminRoute><AdminWaitlist /></AdminRoute>} />
               <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
+              <Route path="/admin/vault-claims" element={<AdminRoute><AdminVaultClaims /></AdminRoute>} />
+              <Route path="/vault-claim/:token" element={<VaultClaim />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

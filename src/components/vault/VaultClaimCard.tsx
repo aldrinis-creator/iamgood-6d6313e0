@@ -76,7 +76,7 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        setClaim((c as ExistingClaim) || null);
+        setClaim((c as unknown as ExistingClaim) || null);
       }
     })();
   }, [session?.user?.id, wardUserId]);
