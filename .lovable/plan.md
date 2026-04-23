@@ -1,27 +1,44 @@
 
 
-## Plan — Open camera directly when entering Nutrition
+## Plan — Full-screen camera-only mode for Nutrition
 
-When the user taps **My Health → Wellness Hub → Nutrition**, skip both the four-action picker and the upload/manual-entry screen, and trigger the device **camera capture** immediately.
+When the user enters **My Health → Wellness Hub → Nutrition**, render a dedicated full-screen camera capture view that blocks all other actions (no manual entry, no upload, no action picker) until they either successfully capture a photo or explicitly cancel.
 
 ### Change — `src/components/NutritionAdvisor.tsx`
 
-- On mount, auto-select the `analyze_meal` action and programmatically click a hidden `<input type="file" accept="image/*" capture="environment">` so the native camera opens straight away.
-- After the user takes the photo, the existing analyze flow runs (preview → "Analyze" → AI result). If the user cancels the camera, they land on the existing Analyze screen with the upload / manual-entry options still available, so no path is lost.
-- The auto-launch fires only once per mount (guarded by a ref) so it doesn't re-trigger after the user cancels or returns from the result view.
-- The in-form back arrow continues to return to the four-action picker, keeping Meal Plan / Post-Workout / Feeling Unwell reachable in one extra tap.
+**1. New `cameraOnly` gate state**
+- Add `const [cameraOnly, setCameraOnly] = useState(true)` so the component mounts in camera-only mode.
+- Keep the existing `autoLaunchedRef` guard so the native camera fires exactly once on mount.
+
+**2. New full-screen camera UI (rendered first, before all other branches)**
+
+While `cameraOnly === true` and no preview exists yet, render a fixed full-screen overlay containing:
+- App header strip with title **"Capture Meal"** and a single **Cancel** button (top-right).
+- Centered guidance: camera icon + "Opening camera…" / "Take a clear photo of your meal".
+- A primary **Open Camera** button (re-trigger) — needed because the auto-launch can be dismissed by the OS or fail silently; this is the only visible action besides Cancel.
+- A small **Retry** affordance shown only after a failed/empty capture (toast + button), since this mode hides the existing Camera/Upload buttons that previously served as the implicit retry.
+- No tabs, no manual entry, no upload, no action picker, no back-to-hub link inside this overlay.
+
+**3. Capture outcomes**
+- **Success** (`handleFile` receives a valid image): set `cameraOnly = false`, show the existing preview + **Analyze** screen so the user can confirm and run AI. From here the normal flow continues unchanged.
+- **Cancel** (user taps the overlay's Cancel): set `cameraOnly = false` and clear `activeAction`, returning to the four-action picker (Meal Plan / Analyze / Post-Workout / Feeling Unwell). This is the only escape hatch.
+- **Failed/empty capture** (file input fires with no file, or `toast.error` path for invalid type / >10MB): keep `cameraOnly = true`, surface a Retry button that re-clicks the hidden `<input capture="environment">`.
+
+**4. Outer navigation**
+- The outer `MyHealth.tsx` "← Nutrition" back chevron continues to work — it unmounts `NutritionAdvisor` and returns to the Wellness Hub. No change there.
 
 ### What I will NOT change
 
-- No change to `MyHealth.tsx` routing or the Wellness Hub tile list.
+- No change to `MyHealth.tsx`, routing, hub tiles, or feature gating.
 - No change to the nutrition AI edge function, persona logic, or `meal_logs` insert.
-- No change to `CalorieTracker` or the "Nutrition Metrics" entry point.
-- No new tile, route, or deep-link parameter.
+- No change to `CalorieTracker` / Nutrition Metrics — still reachable from inside the post-capture analyze view, not from the camera-only overlay.
+- No new route, deep-link param, or DB column.
 
 ### Verification
 
-1. Tap **My Health → Wellness Hub → Nutrition** on a mobile device → native camera opens immediately.
-2. Take a photo → returns to the Analyze screen with preview ready → tap **Analyze** to run AI.
-3. Cancel the camera → lands on the Analyze screen with upload / manual-entry still available.
-4. Tap the in-form back arrow → returns to the four-action picker.
+1. Tap **My Health → Wellness Hub → Nutrition** on mobile → full-screen "Capture Meal" overlay appears and the native camera opens immediately. No tabs, manual entry, upload, or other actions are visible.
+2. Take a photo → overlay dismisses, preview shows with **Analyze** button. Normal AI flow proceeds.
+3. Cancel the OS camera dialog → still on the overlay; tap **Open Camera** to retry, or **Cancel** to exit to the four-action picker.
+4. Pick an oversized/non-image file (edge case via file picker on desktop) → toast error, overlay stays, Retry button visible.
+5. Tap the outer "← Nutrition" chevron → returns to Wellness Hub as before.
 
