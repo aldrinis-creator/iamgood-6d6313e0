@@ -131,7 +131,7 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
       if (isEligible) {
         const [{ data: c }, { data: p }] = await Promise.all([
           supabase.from("vault_nominee_claims" as any)
-            .select("id, status, user_window_ends_at, created_at")
+            .select("id, status, user_window_ends_at, created_at, reject_reason")
             .eq("user_id", wardUserId)
             .eq("guardian_id", row!.id)
             .order("created_at", { ascending: false })
