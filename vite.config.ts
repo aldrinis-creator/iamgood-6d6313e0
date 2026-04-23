@@ -83,7 +83,8 @@ export default defineConfig(({ mode }) => ({
           if (pkg.startsWith('@radix-ui') || pkg === 'lucide-react' || pkg === 'cmdk') return 'vendor-ui';
           if (pkg.startsWith('@supabase')) return 'vendor-supabase';
           if (pkg.startsWith('@tanstack')) return 'vendor-query';
-          if (pkg === 'recharts' || pkg.startsWith('d3-')) return 'vendor-charts';
+          // Note: do NOT manualChunk recharts/d3 — let Rollup co-locate them with their dynamic-import callers.
+          // Manual chunking caused a circular-init crash ("Cannot access 'A' before initialization") on first load.
           if (pkg === 'pdfjs-dist' || pkg === 'jspdf' || pkg === 'html2canvas') return 'vendor-pdf';
           if (pkg === 'leaflet') return 'vendor-maps';
           if (pkg === 'date-fns' || pkg === 'zod') return 'vendor-forms';
