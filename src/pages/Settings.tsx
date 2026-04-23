@@ -738,7 +738,7 @@ const Settings = () => {
                   <Switch checked={settings.fallDetection} onCheckedChange={async (v) => {
                     updateSetting("fallDetection", v);
                     if (v) {
-                       await requestMotionPermission();
+                      await requestMotionPermission();
                     }
                   }} />
                 </div>
