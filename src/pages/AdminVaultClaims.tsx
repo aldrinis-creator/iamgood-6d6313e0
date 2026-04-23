@@ -223,27 +223,64 @@ const AdminVaultClaims = () => {
                       <p className="text-muted-foreground">Window ends</p>
                       <p>{c.user_window_ends_at ? new Date(c.user_window_ends_at).toLocaleString("en-IN") : "—"}</p>
                     </div>
+                    <div>
+                      <p className="text-muted-foreground">Date of death</p>
+                      <p>{c.date_of_death || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Certificate #</p>
+                      <p className="truncate">{c.certificate_number || "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">Issuing authority</p>
+                      <p>{c.issuing_authority || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Nominee ID</p>
+                      <p>{c.id_type || "—"} •••• {c.id_number_last4 || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Typed name</p>
+                      <p>{c.nominee_typed_name || "—"}</p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+
+                  <div className="rounded border bg-muted/30 p-2 text-xs space-y-1">
+                    <p className="font-medium flex items-center gap-1"><Activity className="w-3 h-3" /> User activity signals</p>
+                    <p>Last sign-in: <strong>{activity[c.user_id]?.last_sign_in_at ? new Date(activity[c.user_id].last_sign_in_at!).toLocaleString("en-IN") : "—"}</strong></p>
+                    <p>Last check-in: <strong>{activity[c.user_id]?.last_check_in_at ? new Date(activity[c.user_id].last_check_in_at!).toLocaleString("en-IN") : "—"}</strong></p>
+                    <p>Last journey: <strong>{activity[c.user_id]?.last_journey_at ? new Date(activity[c.user_id].last_journey_at!).toLocaleString("en-IN") : "—"}</strong></p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {c.selfie_url && signedUrls[c.selfie_url] && (
+                      <button onClick={() => viewFile(c.selfie_url!)} className="rounded border overflow-hidden aspect-square hover:opacity-80">
+                        <img src={signedUrls[c.selfie_url]} alt="Selfie" className="w-full h-full object-cover" />
+                        <p className="text-[10px] text-center bg-muted py-0.5">Selfie</p>
+                      </button>
+                    )}
+                    {c.id_proof_url && signedUrls[c.id_proof_url] && (
+                      <button onClick={() => viewFile(c.id_proof_url!)} className="rounded border overflow-hidden aspect-square hover:opacity-80">
+                        <img src={signedUrls[c.id_proof_url]} alt="ID" className="w-full h-full object-cover" />
+                        <p className="text-[10px] text-center bg-muted py-0.5">ID Proof</p>
+                      </button>
+                    )}
                     {c.death_certificate_url && (
-                      <Button size="sm" variant="outline" onClick={() => viewFile(c.death_certificate_url!)}>
-                        <FileText className="w-3 h-3 mr-1" /> Death Cert <ExternalLink className="w-3 h-3 ml-1" />
-                      </Button>
-                    )}
-                    {c.id_proof_url && (
-                      <Button size="sm" variant="outline" onClick={() => viewFile(c.id_proof_url!)}>
-                        <FileText className="w-3 h-3 mr-1" /> Nominee ID <ExternalLink className="w-3 h-3 ml-1" />
-                      </Button>
+                      <button onClick={() => viewFile(c.death_certificate_url!)} className="rounded border overflow-hidden aspect-square hover:opacity-80 flex flex-col items-center justify-center bg-muted">
+                        <FileText className="w-6 h-6 text-muted-foreground" />
+                        <p className="text-[10px] mt-1">Death Cert</p>
+                        <ExternalLink className="w-3 h-3 mt-1" />
+                      </button>
                     )}
                   </div>
+
                   {c.reject_reason && (
                     <p className="text-xs text-destructive">Reject reason: {c.reject_reason}</p>
                   )}
                   {canAct && (
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="default" onClick={() => release(c)} disabled={!windowEnded || busyId === c.id}>
-                        {busyId === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
-                        Release
+                      <Button size="sm" variant="default" onClick={() => openRelease(c.id)} disabled={!windowEnded || busyId === c.id}>
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> Release
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => setRejectId(c.id)} disabled={busyId === c.id}>
                         <XCircle className="w-3 h-3 mr-1" /> Reject
@@ -268,6 +305,44 @@ const AdminVaultClaims = () => {
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setRejectId(null); setRejectReason(""); }}>Cancel</Button>
             <Button variant="destructive" onClick={reject} disabled={!rejectReason.trim()}>Reject Claim</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!releaseId} onOpenChange={(o) => { if (!o) setReleaseId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Release Vault to Nominee</DialogTitle>
+            <DialogDescription>
+              This issues a 24-hour one-time portal link to the nominee. This action is logged and irreversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2">
+              <Checkbox id="legible" checked={releaseConfirmed} onCheckedChange={(v) => setReleaseConfirmed(!!v)} />
+              <Label htmlFor="legible" className="text-xs leading-relaxed">
+                Documents are legible and consistent (death certificate, nominee ID, selfie).
+              </Label>
+            </div>
+            <div>
+              <Label htmlFor="confirm" className="text-xs">Type <strong>RELEASE</strong> to confirm</Label>
+              <Input id="confirm" value={releaseTyped} onChange={(e) => setReleaseTyped(e.target.value)} placeholder="RELEASE" />
+            </div>
+            <div>
+              <Label htmlFor="notes" className="text-xs">Release notes (audit trail)</Label>
+              <Textarea id="notes" value={releaseNotes} onChange={(e) => setReleaseNotes(e.target.value)} placeholder="e.g. Verified certificate against state registry, ID matches nominee on record." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReleaseId(null)}>Cancel</Button>
+            <Button
+              variant="default"
+              onClick={confirmRelease}
+              disabled={!releaseConfirmed || releaseTyped !== "RELEASE" || !releaseNotes.trim() || busyId === releaseId}
+            >
+              {busyId === releaseId ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+              Confirm Release
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
