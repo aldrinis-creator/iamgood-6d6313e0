@@ -342,13 +342,30 @@ const NutritionAdvisor = () => {
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
-    if (file.size > MAX_IMAGE_SIZE) { toast.error("Image must be under 4MB"); return; }
+    if (!file) {
+      // User cancelled the OS picker / camera — keep camera-only mode, allow retry
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      if (mealFileRef.current) mealFileRef.current.value = "";
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("Image must be under 4MB");
+      if (mealFileRef.current) mealFileRef.current.value = "";
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
     setMealImagePreview(URL.createObjectURL(file));
     const reader = new FileReader();
     reader.onload = () => setMealImageBase64(reader.result as string);
     reader.readAsDataURL(file);
+    // Successful capture: dismiss the full-screen camera overlay
+    setCameraOnly(false);
+    setCaptureFailed(false);
   };
 
   const clearMealImage = () => {
