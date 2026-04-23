@@ -467,6 +467,47 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
               )}
             </div>
 
+            {/* Ambulance type */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Ambulance className="w-4 h-4" /> Ambulance Type <span className="text-destructive">*</span>
+              </h3>
+              <RadioGroup
+                value={ambulanceType}
+                onValueChange={(v) => setAmbulanceType(v as "BLS" | "ALS")}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                <label
+                  htmlFor="amb-bls"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "BLS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="BLS" id="amb-bls" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">BLS</div>
+                    <div className="text-xs text-muted-foreground">Basic Life Support — oxygen, first aid, stretcher</div>
+                  </div>
+                </label>
+                <label
+                  htmlFor="amb-als"
+                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors min-h-[56px] ${
+                    ambulanceType === "ALS" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <RadioGroupItem value="ALS" id="amb-als" className="mt-1" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold">ALS</div>
+                    <div className="text-xs text-muted-foreground">Advanced Life Support — ICU-equipped, paramedic, defib</div>
+                  </div>
+                </label>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground flex items-start gap-1">
+                <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                Choose ALS for cardiac, stroke, severe trauma, or unconscious patients.
+              </p>
+            </div>
+
             {/* Destination hospital */}
             <div className="space-y-2 relative">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
