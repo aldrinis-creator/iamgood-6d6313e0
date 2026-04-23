@@ -35,6 +35,7 @@ interface ExistingClaim {
   status: string;
   user_window_ends_at: string | null;
   created_at: string;
+  reject_reason?: string | null;
 }
 
 interface GuardianRow {
