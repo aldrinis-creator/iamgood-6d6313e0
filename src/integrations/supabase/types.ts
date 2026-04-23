@@ -256,6 +256,7 @@ export type Database = {
       }
       ambulance_requests: {
         Row: {
+          ambulance_type: string
           channel: string
           contacts: Json
           created_at: string
@@ -278,6 +279,7 @@ export type Database = {
           ward_user_id: string | null
         }
         Insert: {
+          ambulance_type?: string
           channel?: string
           contacts?: Json
           created_at?: string
@@ -300,6 +302,7 @@ export type Database = {
           ward_user_id?: string | null
         }
         Update: {
+          ambulance_type?: string
           channel?: string
           contacts?: Json
           created_at?: string
