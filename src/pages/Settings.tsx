@@ -25,6 +25,7 @@ import { formatDistanceToNow } from "date-fns";
 import { formatISTDateTime } from "@/lib/istTime";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import VaultNomineeRecoveryDialog from "@/components/vault/VaultNomineeRecoveryDialog";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
