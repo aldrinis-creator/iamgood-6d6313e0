@@ -190,16 +190,54 @@ Deno.serve(async (req) => {
     const selfTargetedPhones: string[] = [];
     // phone -> { status, name } so we can stamp delivery attempts with status
     const phoneMeta = new Map<string, { status: string; name: string }>();
+
+    // Per-guardian decision log surfaced to the UI. Built during recipient
+    // resolution; channel outcomes are stamped after WA + SMS calls return.
+    type RecipientReport = {
+      guardian_id: string;
+      name: string;
+      phone_raw: string;
+      phone_normalized: string | null;
+      status: "accepted" | "pending";
+      included: boolean;
+      skip_reason: null | "self_targeted" | "invalid_phone" | "duplicate_phone";
+      channels: {
+        whatsapp: "accepted" | "rejected" | "not_attempted";
+        sms: "accepted" | "rejected" | "not_attempted";
+      };
+    };
+    const recipientsReport: RecipientReport[] = [];
+
     for (const g of acceptedRows) {
       const n = normalizePhone(g.guardian_phone);
-      if (!n) continue;
+      const status = (g.status === "accepted" ? "accepted" : "pending") as "accepted" | "pending";
+      const base = {
+        guardian_id: g.id,
+        name: g.guardian_name,
+        phone_raw: g.guardian_phone,
+        phone_normalized: n,
+        status,
+        channels: {
+          whatsapp: "not_attempted" as const,
+          sms: "not_attempted" as const,
+        },
+      };
+      if (!n) {
+        recipientsReport.push({ ...base, included: false, skip_reason: "invalid_phone" });
+        continue;
+      }
       if (n === MSG91_INTEGRATED_NUMBER) {
-        // Cannot send a WhatsApp from sender to itself — flag and skip
         selfTargetedPhones.push(n);
+        recipientsReport.push({ ...base, included: false, skip_reason: "self_targeted" });
+        continue;
+      }
+      if (acceptedPhonesSet.has(n)) {
+        recipientsReport.push({ ...base, included: false, skip_reason: "duplicate_phone" });
         continue;
       }
       acceptedPhonesSet.add(n);
       phoneMeta.set(n, { status: g.status, name: g.guardian_name });
+      recipientsReport.push({ ...base, included: true, skip_reason: null });
     }
 
     // Optional: validate caller-provided phones against accepted set; fall back to accepted set
@@ -236,10 +274,8 @@ Deno.serve(async (req) => {
       console.warn("[send-sos-alert] aborting WA/SMS:", recipientsErr);
       return new Response(
         JSON.stringify({
-          // legacy fields
           sent: 0,
           msg91Sent: 0,
-          // structured
           emailQueued: 0,
           pushSent: 0,
           whatsappAccepted: 0,
@@ -251,6 +287,7 @@ Deno.serve(async (req) => {
           recipientCount: 0,
           deliveryPending: false,
           selfTargetedPhones,
+          recipients: recipientsReport,
           errors: {
             invoke: null,
             recipients: recipientsErr,
@@ -544,18 +581,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Stamp per-channel outcomes onto the recipients report (included rows only)
+    const waStatus: "accepted" | "rejected" = whatsappError ? "rejected" : (whatsappAccepted > 0 ? "accepted" : "rejected");
+    const smsStatus: "accepted" | "rejected" = smsError ? "rejected" : (smsAccepted > 0 ? "accepted" : "rejected");
+    for (const r of recipientsReport) {
+      if (!r.included) continue;
+      r.channels.whatsapp = msg91AuthKey ? waStatus : "not_attempted";
+      r.channels.sms = (msg91AuthKey && smsTemplateId) ? smsStatus : "not_attempted";
+    }
+
     return new Response(
       JSON.stringify({
-        // legacy fields (kept for older clients)
         sent: emailsQueued,
         msg91Sent: whatsappAccepted,
-        // structured response
         emailQueued: emailsQueued,
         pushSent,
-        // NEW semantics: "accepted" = MSG91 took the request; not delivered yet
         whatsappAccepted,
         smsAccepted,
-        // legacy aliases (the app reads these today)
         whatsappQueued: whatsappAccepted,
         smsQueued: smsAccepted,
         whatsappRequestId,
@@ -564,6 +606,7 @@ Deno.serve(async (req) => {
         deliveryPending: whatsappAccepted > 0 || smsAccepted > 0,
         sender: MSG91_INTEGRATED_NUMBER,
         selfTargetedPhones,
+        recipients: recipientsReport,
         errors: { invoke: null, recipients: null, whatsapp: whatsappError, sms: smsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
