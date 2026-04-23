@@ -184,15 +184,33 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     );
   };
 
-  useEffect(() => {
-    setLoading(true);
-    if (isGuardian) {
-      fetchWardLocation();
-    } else {
-      fetchDefaultLocation();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (isGuardian) {
+        await fetchWardLocation();
+      } else if (aqiData?.locationName && aqiData.locationName !== "Current Location") {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(aqiData.locationName)}&limit=1`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          await fetchEnvironmentData(parseFloat(data[0].lat), parseFloat(data[0].lon), aqiData.locationName);
+        } else {
+          fetchDefaultLocation();
+        }
+      } else {
+        fetchDefaultLocation();
+      }
+      toast.success("Updated");
+    } catch {
+      toast.error("Failed to refresh");
+    } finally {
+      setRefreshing(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGuardian, wardUserId]);
+  };
+
 
   // 10-minute inactivity revert (user only)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
