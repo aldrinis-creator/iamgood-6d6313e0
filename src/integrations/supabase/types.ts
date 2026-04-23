@@ -2108,15 +2108,24 @@ export type Database = {
         Row: {
           acknowledged: boolean
           admin_reviewed_by: string | null
+          certificate_number: string | null
           created_at: string
+          date_of_death: string | null
           death_certificate_url: string | null
+          file_hashes: Json | null
           guardian_id: string
           id: string
+          id_number_last4: string | null
           id_proof_url: string | null
+          id_type: string | null
+          issuing_authority: string | null
+          nominee_typed_name: string | null
           proof_uploaded_at: string | null
+          reauth_at: string | null
           reject_reason: string | null
           rejected_at: string | null
           released_at: string | null
+          selfie_url: string | null
           status: string
           updated_at: string
           user_id: string
@@ -2126,15 +2135,24 @@ export type Database = {
         Insert: {
           acknowledged?: boolean
           admin_reviewed_by?: string | null
+          certificate_number?: string | null
           created_at?: string
+          date_of_death?: string | null
           death_certificate_url?: string | null
+          file_hashes?: Json | null
           guardian_id: string
           id?: string
+          id_number_last4?: string | null
           id_proof_url?: string | null
+          id_type?: string | null
+          issuing_authority?: string | null
+          nominee_typed_name?: string | null
           proof_uploaded_at?: string | null
+          reauth_at?: string | null
           reject_reason?: string | null
           rejected_at?: string | null
           released_at?: string | null
+          selfie_url?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -2144,15 +2162,24 @@ export type Database = {
         Update: {
           acknowledged?: boolean
           admin_reviewed_by?: string | null
+          certificate_number?: string | null
           created_at?: string
+          date_of_death?: string | null
           death_certificate_url?: string | null
+          file_hashes?: Json | null
           guardian_id?: string
           id?: string
+          id_number_last4?: string | null
           id_proof_url?: string | null
+          id_type?: string | null
+          issuing_authority?: string | null
+          nominee_typed_name?: string | null
           proof_uploaded_at?: string | null
+          reauth_at?: string | null
           reject_reason?: string | null
           rejected_at?: string | null
           released_at?: string | null
+          selfie_url?: string | null
           status?: string
           updated_at?: string
           user_id?: string
