@@ -215,30 +215,65 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
       if (invokeError) {
         toast.error(`SOS backend failed: ${invokeError} — opening WhatsApp as backup`);
+        setDeliverySummary({
+          status: "failed",
+          title: "SOS could not be sent",
+          detail: `Backend error: ${invokeError}. Opening WhatsApp as a manual backup.`,
+          selfTargetedPhones: [],
+        });
         guardians.forEach((g, i) => {
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
       } else if (delivery) {
         const whatsappOk = (delivery.whatsappAccepted ?? delivery.whatsappQueued) > 0;
         const smsOk = (delivery.smsAccepted ?? delivery.smsQueued) > 0;
+        const selfTargeted = delivery.selfTargetedPhones ?? [];
 
         if (delivery.recipientCount === 0) {
           // Already toasted by AppContext; do NOT open wa.me when guardian
           // numbers are invalid or self-targeted — that would just open the
           // sender's own WhatsApp and look "successful" without delivering.
+          setDeliverySummary({
+            status: "failed",
+            title: "No SOS message was delivered",
+            detail: selfTargeted.length > 0
+              ? `Your guardian's phone (${selfTargeted.join(", ")}) is the same as the WhatsApp sender number. MSG91 cannot deliver a message from the sender to itself. Update the guardian's phone in My Profile to a different mobile number.`
+              : (delivery.errors.recipients || "No accepted guardians with valid phone numbers were found."),
+            selfTargetedPhones: selfTargeted,
+          });
         } else if (!whatsappOk && !smsOk) {
           toast.error(`Provider didn't accept the alert — opening WhatsApp as backup`);
+          setDeliverySummary({
+            status: "failed",
+            title: "Provider did not accept the SOS",
+            detail: `WhatsApp: ${delivery.errors.whatsapp || "rejected"} · SMS: ${delivery.errors.sms || "rejected"}. Opening WhatsApp as a manual backup.`,
+            selfTargetedPhones: selfTargeted,
+          });
           guardians.forEach((g, i) => {
             setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
           });
         } else {
           const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
           toast.success(`SOS queued via ${channels} for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`);
+          setDeliverySummary({
+            status: selfTargeted.length > 0 ? "partial" : "success",
+            title: selfTargeted.length > 0 ? "SOS partially submitted" : "SOS submitted to provider",
+            detail: selfTargeted.length > 0
+              ? `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). ${selfTargeted.length} guardian phone(s) match the sender number and were skipped: ${selfTargeted.join(", ")}.`
+              : `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). Awaiting delivery confirmation from MSG91.`,
+            selfTargetedPhones: selfTargeted,
+          });
         }
       }
     } catch (e: any) {
       console.error("Failed to send SOS alerts:", e);
       toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
+      setDeliverySummary({
+        status: "failed",
+        title: "SOS failed",
+        detail: `${e?.message || e}. Opening WhatsApp as a manual backup.`,
+        selfTargetedPhones: [],
+      });
       guardians.forEach((g, i) => {
         setTimeout(() => {
           window.open(getWhatsAppLink(g.guardian_phone), "_blank");
