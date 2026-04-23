@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Ambulance, AlertTriangle, CreditCard, Navigation, Phone,
   MessageCircle, MapPin, Info, Pencil, Check, Loader2, Hospital, X, User as UserIcon,
@@ -60,6 +61,7 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
   // Patient + contacts
   const [patientName, setPatientName] = useState("");
   const [emergencyType, setEmergencyType] = useState("");
+  const [ambulanceType, setAmbulanceType] = useState<"BLS" | "ALS">("BLS");
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [primaryGuardianMissing, setPrimaryGuardianMissing] = useState(false);
 
@@ -303,6 +305,7 @@ const AmbulanceBooking = ({ wardUserId, wardName, wardLocation, wardPhone }: Amb
           },
           contacts,
           emergency_type: emergencyType || undefined,
+          ambulance_type: ambulanceType,
           force_channel: forceWhatsApp ? "whatsapp" : undefined,
         },
       });
