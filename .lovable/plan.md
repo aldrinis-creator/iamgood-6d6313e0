@@ -1,70 +1,50 @@
 
 
-## Plan — Tell the Guardian to install the app, at the right moments
+## Plan — Convert MSG91 invite template to numbered variables
 
-Today a nominated Guardian gets the invite (email + WhatsApp/SMS), clicks **Accept & Create Account**, registers, and lands on "Go to Sign In" — at no point are they told the app can be installed on their phone. Below are the three touchpoints I'll add an install nudge to.
+MSG91 only accepts numbered variable placeholders (`{{1}}`, `{{2}}`, …). The named keys (`guardian_name`, `user_name`, etc.) we send in the API request must be mapped to those numbered slots inside MSG91's template configuration — they are not used as inline placeholders in the message body.
 
-### 1. Guardian invitation email — `supabase/functions/_shared/transactional-email-templates/guardian-invitation.tsx`
-
-Add a short "Get the app" section just below the existing "What does this mean?" info box, before the Accept button:
+### What to paste into the MSG91 template body
 
 ```
-📱 Install the Check-iN app
-After accepting, install Check-iN on your phone so you receive
-SOS alerts and check-in updates instantly — even when the app
-is closed.
-   • iPhone: Open the link in Safari → Share → Add to Home Screen
-   • Android: Open the link in Chrome → tap "Install app" when prompted
+🛡 *Guardian Nomination — Check-iN*
+
+Hi {{1}}, {{2}}{{3}} has nominated you as their Guardian on Check-iN. Accept: {{4}} Reject: {{5}} After accepting, install the app from {{4}} → Add to Home Screen for instant SOS alerts.
 ```
 
-Style it like the existing `infoBox` (light background, navy left border) so it visually parallels the other info card. No new template props — pure copy.
+Note: `{{4}}` (the accept link) appears twice — that is allowed; MSG91 simply substitutes the same value in both spots.
 
-### 2. WhatsApp / SMS invite (MSG91) — no code change, dashboard-only
+### Variable mapping to set inside the MSG91 template config
 
-The MSG91 invite template body currently doesn't mention installation. Since the SMS/WA template is approved by MSG91 and edited in their dashboard, I'll surface the suggested updated body text in the plan so you can paste it into the MSG91 template:
+When MSG91 asks you to define what each numbered variable represents, map them as:
 
-```
-Hi {{guardian_name}}, {{user_name}}{{relation}} has nominated you
-as their Guardian on Check-iN. Accept: {{accept_link}}
-Reject: {{reject_link}}
-After accepting, install the app from {{accept_link}} → Add to
-Home Screen for instant SOS alerts.
-```
+| Slot | Variable name in MSG91 config | Value the API sends |
+|---|---|---|
+| `{{1}}` | `guardian_name` | Guardian's first name (e.g. `Jane`) |
+| `{{2}}` | `user_name` | Nominating user's name (e.g. `John`) |
+| `{{3}}` | `relation` | ` (Son)` / ` (Spouse)` / `""` |
+| `{{4}}` | `accept_link` | `https://iamgood.lovable.app/register?nomination=accept&token=…` |
+| `{{5}}` | `reject_link` | `https://iamgood.lovable.app/register?nomination=reject&token=…` |
 
-No code change in this repo — just a one-line addition to the existing MSG91 template body, re-submitted for approval.
+The keys on the right are exactly what `send-guardian-invite/index.ts` already sends in the MSG91 Flow API payload, so **no code change is required** — only the MSG91 dashboard template body and variable mapping need updating, then re-submit for approval.
 
-### 3. Post-registration success screen — `src/pages/Register.tsx`
-
-In the existing `registrationComplete` block (lines 361–462), add a new install card for guardians (and users too, since it benefits both) right above the "Go to Sign In" button:
+### Concrete preview after substitution
 
 ```
-📱 Install Check-iN on your phone
-Get instant SOS alerts and check-in updates — even when the app is closed.
-[ Install App ]   [ Skip for now ]
+🛡 *Guardian Nomination — Check-iN*
+
+Hi Jane, John (Son) has nominated you as their Guardian on Check-iN. Accept: https://iamgood.lovable.app/register?nomination=accept&token=abc123 Reject: https://iamgood.lovable.app/register?nomination=reject&token=abc123 After accepting, install the app from https://iamgood.lovable.app/register?nomination=accept&token=abc123 → Add to Home Screen for instant SOS alerts.
 ```
-
-Behavior:
-- The **Install App** button uses the existing `usePwaInstall()` hook. If the browser supports `beforeinstallprompt` (Android Chrome, desktop Chrome/Edge), it triggers the native install dialog directly.
-- If install isn't available (iOS Safari, already installed, or unsupported browser), the button instead navigates to the existing `/install` page, which already has iOS "Add to Home Screen" steps and the Android fallback.
-- If `isInstalled === true`, the card is hidden entirely.
-- Skip just continues to Sign In as today.
-
-This reuses `PwaInstallBanner`'s logic (`usePwaInstall`, `installApp()`) — no new hook needed.
-
-### 4. Bonus: in-app install nudge for first-time guardian sign-in
-
-The first time a brand-new guardian signs in (no wards yet, no install dismissed), `GuardianDashboard` already shows their empty state. I'll add the existing `<PwaInstallBanner />` to the top of `GuardianDashboard` (same component used elsewhere) so the install nudge persists until they install or dismiss it. The banner already respects the `pwa-install-dismissed` localStorage flag, so it won't nag.
 
 ### Verification
 
-1. Send a fresh guardian invite — the email shows the new "Install the Check-iN app" section between the "What does this mean?" box and the Accept button.
-2. After updating the MSG91 template body and re-approval, the WhatsApp/SMS message includes the install hint line.
-3. Complete a new guardian registration — the success screen shows the install card. On Android Chrome, clicking Install fires the native prompt; on iOS Safari, it routes to `/install` with the Add-to-Home-Screen steps.
-4. After signing in for the first time, GuardianDashboard shows the install banner at the top until installed or dismissed.
+1. Paste the numbered template body into MSG91 and configure the 5 variable mappings as in the table above.
+2. Submit for approval.
+3. Once approved, send a fresh test invite from the app — the WhatsApp/SMS should render with the guardian's name, your name, relation, accept and reject links, and the install hint.
 
 ### What I will NOT change
 
-- No DB migration, no new edge function, no MSG91 secret rotation.
-- No change to the 24-hour auto-accept rule.
-- The `/install` page itself stays as-is — it's already the right destination.
+- No code change in this repo — `send-guardian-invite` already sends the correct field keys.
+- No DB migration, no new edge function.
+- No changes to the email template (already updated previously).
 
