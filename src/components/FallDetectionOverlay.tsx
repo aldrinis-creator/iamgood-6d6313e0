@@ -98,14 +98,18 @@ const FallDetectionOverlay = () => {
         userName,
       });
       const delivery = result.delivery;
-      const whatsappOk = (delivery?.whatsappQueued ?? 0) > 0;
-      const smsOk = (delivery?.smsQueued ?? 0) > 0;
+      const whatsappOk = (delivery?.whatsappAccepted ?? delivery?.whatsappQueued ?? 0) > 0;
+      const smsOk = (delivery?.smsAccepted ?? delivery?.smsQueued ?? 0) > 0;
 
-      // Manual wa.me fallback only if backend delivery truly failed
-      if (result.invokeError || (delivery && delivery.recipientCount > 0 && !whatsappOk && !smsOk)) {
+      // Manual wa.me fallback only if backend invocation truly failed AND we
+      // had valid recipients. Skip when recipientCount=0 (invalid/self-target).
+      const hasRecipients = (delivery?.recipientCount ?? 0) > 0;
+      if (result.invokeError || (hasRecipients && !whatsappOk && !smsOk)) {
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
+          if (cleanPhone.length < 10) return;
           const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+          if (phoneWithCode === "917045868482") return; // skip self-targeted
           setTimeout(() => {
             window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
           }, i * 500);
@@ -115,7 +119,9 @@ const FallDetectionOverlay = () => {
       console.error("Failed to send fall detection alerts:", e);
       guardians.forEach((g, i) => {
         const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
+        if (cleanPhone.length < 10) return;
         const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
+        if (phoneWithCode === "917045868482") return;
         setTimeout(() => {
           window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
         }, i * 500);

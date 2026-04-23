@@ -9,6 +9,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// MSG91 integrated WhatsApp sender. Recipients matching this number cannot
+// receive a message from themselves and will be rejected silently by MSG91.
+const MSG91_INTEGRATED_NUMBER = "917045868482";
+
 // --- Web Push utilities ---
 
 const VAPID_PUBLIC_KEY = "BJq2e6gs1zTIdmNLo6v4DWL4trzwEedK_ghxuB9wb63nlh_y1ShYf2RS_IKdDdPu59tQJ3pLk5XHed6pGZ141lw";
@@ -153,6 +157,21 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Resolve the latest active SOS event for this user — used to attach delivery attempts.
+    let activeSosId: string | null = null;
+    try {
+      const { data: sosRow } = await supabase
+        .from("sos_events")
+        .select("id")
+        .eq("user_id", user_id)
+        .order("triggered_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      activeSosId = sosRow?.id ?? null;
+    } catch (e) {
+      console.error("[send-sos-alert] sos_events fetch error:", e);
+    }
+
     // --- Resolve recipients: accepted guardians only ---
     const { data: acceptedGuardians, error: guardiansErr } = await supabase
       .from("guardians")
@@ -166,9 +185,16 @@ Deno.serve(async (req) => {
 
     const acceptedRows = acceptedGuardians ?? [];
     const acceptedPhonesSet = new Set<string>();
+    const selfTargetedPhones: string[] = [];
     for (const g of acceptedRows) {
       const n = normalizePhone(g.guardian_phone);
-      if (n) acceptedPhonesSet.add(n);
+      if (!n) continue;
+      if (n === MSG91_INTEGRATED_NUMBER) {
+        // Cannot send a WhatsApp from sender to itself — flag and skip
+        selfTargetedPhones.push(n);
+        continue;
+      }
+      acceptedPhonesSet.add(n);
     }
 
     // Optional: validate caller-provided phones against accepted set; fall back to accepted set
@@ -181,31 +207,48 @@ Deno.serve(async (req) => {
     );
 
     console.log("[send-sos-alert] recipients", {
+      sender: MSG91_INTEGRATED_NUMBER,
       acceptedCount: acceptedPhonesSet.size,
       callerCount: callerPhones.length,
       finalCount: finalPhones.length,
       finalPhones,
+      selfTargetedPhones,
     });
 
-    // Early exit: no recipients at all → return structured failure reason
+    // Early exit: no usable recipients → return structured failure reason
     if (finalPhones.length === 0) {
-      console.warn("[send-sos-alert] No recipients with valid phone numbers — aborting WA/SMS");
+      let recipientsErr: string;
+      if (selfTargetedPhones.length > 0) {
+        recipientsErr =
+          `Guardian phone matches the WhatsApp sender number (${MSG91_INTEGRATED_NUMBER}). ` +
+          `MSG91 cannot deliver a message from the sender to itself. ` +
+          `Update the guardian's phone in Settings to a different number.`;
+      } else if (acceptedPhonesSet.size === 0 && acceptedRows.length === 0) {
+        recipientsErr = "No accepted guardians for this user";
+      } else {
+        recipientsErr = "Accepted guardians have no valid phone numbers";
+      }
+      console.warn("[send-sos-alert] aborting WA/SMS:", recipientsErr);
       return new Response(
         JSON.stringify({
+          // legacy fields
           sent: 0,
           msg91Sent: 0,
+          // structured
           emailQueued: 0,
           pushSent: 0,
+          whatsappAccepted: 0,
+          smsAccepted: 0,
           whatsappQueued: 0,
           smsQueued: 0,
           whatsappRequestId: null,
           smsRequestId: null,
           recipientCount: 0,
+          deliveryPending: false,
+          selfTargetedPhones,
           errors: {
             invoke: null,
-            recipients: acceptedPhonesSet.size === 0
-              ? "No accepted guardians for this user"
-              : "Accepted guardians have no valid phone numbers",
+            recipients: recipientsErr,
             whatsapp: null,
             sms: null,
           },
@@ -333,12 +376,12 @@ Deno.serve(async (req) => {
 
     const userNameSafe = (user_name || "A Check-iN user").slice(0, 60);
 
-    // --- WhatsApp via MSG91 (hardcoded to match working curl exactly) ---
-    let whatsappQueued = 0;
+    // --- WhatsApp via MSG91 ---
+    let whatsappAccepted = 0;
     let whatsappRequestId: string | null = null;
     let whatsappError: string | null = null;
+    let whatsappRawResponse: any = null;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-    const integratedNumber = "917045868482";
     const waTemplateName = "sos_alert_notification";
     const namespace = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
     const langCode = "en_US";
@@ -355,7 +398,7 @@ Deno.serve(async (req) => {
       }));
 
       const payload = {
-        integrated_number: integratedNumber,
+        integrated_number: MSG91_INTEGRATED_NUMBER,
         content_type: "template",
         payload: {
           messaging_product: "whatsapp",
@@ -370,7 +413,11 @@ Deno.serve(async (req) => {
       };
 
       console.log("[send-sos-alert] WA request", {
-        templateName: waTemplateName, namespace, recipients: finalPhones.length,
+        sender: MSG91_INTEGRATED_NUMBER,
+        templateName: waTemplateName,
+        namespace,
+        recipients: finalPhones.length,
+        recipientPhones: finalPhones,
       });
       try {
         const res = await fetch(
@@ -383,12 +430,12 @@ Deno.serve(async (req) => {
         );
         const rawText = await res.text();
         let result: any = rawText;
-        try { result = JSON.parse(rawText); } catch { /* ignore */ }
+        try { result = JSON.parse(rawText); whatsappRawResponse = result; } catch { /* ignore */ }
         console.log("[send-sos-alert] WA response", { status: res.status, body: rawText.slice(0, 600) });
-        const msgType = result?.type;
+        const msgType = result?.type ?? result?.status;
         whatsappRequestId = result?.request_id ?? null;
-        const isSuccess = res.ok && (msgType === "success" || (!!whatsappRequestId && msgType !== "error"));
-        if (isSuccess) whatsappQueued = finalPhones.length;
+        const isAccepted = res.ok && (msgType === "success" || (!!whatsappRequestId && msgType !== "error"));
+        if (isAccepted) whatsappAccepted = finalPhones.length;
         else whatsappError = `status=${res.status} ${rawText.slice(0, 200)}`;
       } catch (e) {
         console.error("[send-sos-alert] WA send error:", e);
@@ -399,13 +446,13 @@ Deno.serve(async (req) => {
     }
 
     // --- SMS via MSG91 Flow API ---
-    let smsQueued = 0;
+    let smsAccepted = 0;
     let smsRequestId: string | null = null;
     let smsError: string | null = null;
+    let smsRawResponse: any = null;
     const smsTemplateId = Deno.env.get("MSG91_SOS_SMS_TEMPLATE_ID");
 
     if (msg91AuthKey && smsTemplateId && finalPhones.length) {
-      // Flow API expects recipients: [{ mobiles: "<msisdn>", VAR1: ..., VAR2: ... }]
       const recipients = finalPhones.map((mobile) => ({
         mobiles: mobile,
         name: userNameSafe,
@@ -421,7 +468,9 @@ Deno.serve(async (req) => {
       };
 
       console.log("[send-sos-alert] SMS request", {
-        templateId: smsTemplateId, recipients: finalPhones.length,
+        templateId: smsTemplateId,
+        recipients: finalPhones.length,
+        recipientPhones: finalPhones,
       });
       try {
         const res = await fetch("https://control.msg91.com/api/v5/flow", {
@@ -431,11 +480,11 @@ Deno.serve(async (req) => {
         });
         const rawText = await res.text();
         let result: any = rawText;
-        try { result = JSON.parse(rawText); } catch { /* ignore */ }
+        try { result = JSON.parse(rawText); smsRawResponse = result; } catch { /* ignore */ }
         console.log("[send-sos-alert] SMS response", { status: res.status, body: rawText.slice(0, 600) });
         smsRequestId = result?.request_id ?? result?.message ?? null;
-        const isSuccess = res.ok && (result?.type === "success" || !!smsRequestId);
-        if (isSuccess) smsQueued = finalPhones.length;
+        const isAccepted = res.ok && (result?.type === "success" || !!smsRequestId);
+        if (isAccepted) smsAccepted = finalPhones.length;
         else smsError = `status=${res.status} ${rawText.slice(0, 200)}`;
       } catch (e) {
         console.error("[send-sos-alert] SMS send error:", e);
@@ -447,19 +496,67 @@ Deno.serve(async (req) => {
       smsError = "MSG91_AUTH_KEY not configured";
     }
 
+    // --- Persist per-recipient delivery attempts ---
+    if (activeSosId) {
+      const attemptRows: any[] = [];
+      for (const phone of finalPhones) {
+        if (whatsappAccepted > 0 || whatsappError) {
+          attemptRows.push({
+            sos_event_id: activeSosId,
+            user_id,
+            channel: "whatsapp",
+            recipient_phone: phone,
+            provider: "msg91",
+            request_id: whatsappRequestId,
+            provider_status: whatsappError ? "rejected" : "accepted",
+            delivery_status: whatsappError ? "failed" : "pending",
+            failure_reason: whatsappError,
+            failed_at: whatsappError ? new Date().toISOString() : null,
+            raw_response: whatsappRawResponse,
+          });
+        }
+        if (smsAccepted > 0 || smsError) {
+          attemptRows.push({
+            sos_event_id: activeSosId,
+            user_id,
+            channel: "sms",
+            recipient_phone: phone,
+            provider: "msg91",
+            request_id: smsRequestId,
+            provider_status: smsError ? "rejected" : "accepted",
+            delivery_status: smsError ? "failed" : "pending",
+            failure_reason: smsError,
+            failed_at: smsError ? new Date().toISOString() : null,
+            raw_response: smsRawResponse,
+          });
+        }
+      }
+      if (attemptRows.length) {
+        const { error: insertErr } = await supabase.from("sos_message_attempts").insert(attemptRows);
+        if (insertErr) console.error("[send-sos-alert] attempt insert error:", insertErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         // legacy fields (kept for older clients)
         sent: emailsQueued,
-        msg91Sent: whatsappQueued,
+        msg91Sent: whatsappAccepted,
         // structured response
         emailQueued: emailsQueued,
         pushSent,
-        whatsappQueued,
-        smsQueued,
+        // NEW semantics: "accepted" = MSG91 took the request; not delivered yet
+        whatsappAccepted,
+        smsAccepted,
+        // legacy aliases (the app reads these today)
+        whatsappQueued: whatsappAccepted,
+        smsQueued: smsAccepted,
         whatsappRequestId,
         smsRequestId,
         recipientCount: finalPhones.length,
+        deliveryPending: whatsappAccepted > 0 || smsAccepted > 0,
+        sender: MSG91_INTEGRATED_NUMBER,
+        selfTargetedPhones,
         errors: { invoke: null, recipients: null, whatsapp: whatsappError, sms: smsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

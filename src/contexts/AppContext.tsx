@@ -8,10 +8,19 @@ export type PauseMode = "active" | "sleep" | "checked-out";
 
 export interface SOSDeliveryResult {
   recipientCount: number;
+  // "Accepted" = provider (MSG91) took the request; delivery is still pending
+  // until the delivery-status webhook updates `sos_message_attempts`.
+  whatsappAccepted: number;
+  smsAccepted: number;
+  // Legacy aliases (same values as above) — kept so older UI keeps working.
   whatsappQueued: number;
   smsQueued: number;
+  whatsappRequestId?: string | null;
+  smsRequestId?: string | null;
   emailQueued?: number;
   pushSent?: number;
+  deliveryPending?: boolean;
+  selfTargetedPhones?: string[];
   errors: {
     invoke: string | null;
     recipients: string | null;
@@ -138,12 +147,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       console.log("[triggerSOS] send-sos-alert response:", data);
       const d = data as any;
+      const waAccepted = d?.whatsappAccepted ?? d?.whatsappQueued ?? 0;
+      const smsAccepted = d?.smsAccepted ?? d?.smsQueued ?? 0;
       const delivery: SOSDeliveryResult = {
         recipientCount: d?.recipientCount ?? 0,
-        whatsappQueued: d?.whatsappQueued ?? 0,
-        smsQueued: d?.smsQueued ?? 0,
+        whatsappAccepted: waAccepted,
+        smsAccepted: smsAccepted,
+        whatsappQueued: waAccepted,
+        smsQueued: smsAccepted,
+        whatsappRequestId: d?.whatsappRequestId ?? null,
+        smsRequestId: d?.smsRequestId ?? null,
         emailQueued: d?.emailQueued ?? 0,
         pushSent: d?.pushSent ?? 0,
+        deliveryPending: !!d?.deliveryPending,
+        selfTargetedPhones: Array.isArray(d?.selfTargetedPhones) ? d.selfTargetedPhones : [],
         errors: {
           invoke: null,
           recipients: d?.errors?.recipients ?? null,
@@ -154,8 +171,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (delivery.recipientCount === 0) {
         toast.error(delivery.errors.recipients || "No accepted guardians with valid phone numbers");
-      } else if (delivery.whatsappQueued === 0 && delivery.smsQueued === 0) {
-        toast.error(`SOS delivery failed. WhatsApp: ${delivery.errors.whatsapp || "n/a"} | SMS: ${delivery.errors.sms || "n/a"}`);
+      } else if (waAccepted === 0 && smsAccepted === 0) {
+        toast.error(`SOS not accepted by provider. WhatsApp: ${delivery.errors.whatsapp || "n/a"} | SMS: ${delivery.errors.sms || "n/a"}`);
       }
 
       return { delivery, invokeError: null };
