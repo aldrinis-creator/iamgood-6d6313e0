@@ -1808,6 +1808,71 @@ export type Database = {
         }
         Relationships: []
       }
+      sos_message_attempts: {
+        Row: {
+          accepted_at: string
+          channel: string
+          created_at: string
+          delivered_at: string | null
+          delivery_status: string | null
+          failed_at: string | null
+          failure_reason: string | null
+          id: string
+          provider: string
+          provider_status: string | null
+          raw_response: Json | null
+          recipient_phone: string
+          request_id: string | null
+          sos_event_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          channel: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          provider?: string
+          provider_status?: string | null
+          raw_response?: Json | null
+          recipient_phone: string
+          request_id?: string | null
+          sos_event_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          channel?: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          provider?: string
+          provider_status?: string | null
+          raw_response?: Json | null
+          recipient_phone?: string
+          request_id?: string | null
+          sos_event_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sos_message_attempts_sos_event_id_fkey"
+            columns: ["sos_event_id"]
+            isOneToOne: false
+            referencedRelation: "sos_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           amount_paise: number
