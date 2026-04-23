@@ -102,12 +102,29 @@ export function useJourneyTracker() {
         .limit(1)
         .maybeSingle();
       if (data) {
-        setActiveJourney(data as JourneyData);
         const { data: upd } = await supabase
           .from("journey_updates")
           .select("*")
           .eq("journey_id", data.id)
           .order("created_at", { ascending: true });
+
+        // Self-cleanup: if last GPS update is >15 min old (or never), this is
+        // a ghost journey from a previous closed-tab session. Auto-end it
+        // silently so the Guardian dashboard stops showing "Live".
+        const STALE_MS = 15 * 60 * 1000;
+        const lastUpdateAt = upd && upd.length > 0
+          ? new Date(upd[upd.length - 1].created_at).getTime()
+          : new Date((data as JourneyData).started_at).getTime();
+        if (Date.now() - lastUpdateAt > STALE_MS) {
+          await supabase
+            .from("journeys")
+            .update({ status: "auto_completed", ended_at: new Date().toISOString() })
+            .eq("id", (data as JourneyData).id)
+            .eq("status", "active");
+          return;
+        }
+
+        setActiveJourney(data as JourneyData);
         if (upd) setUpdates(upd as JourneyUpdate[]);
       }
     };

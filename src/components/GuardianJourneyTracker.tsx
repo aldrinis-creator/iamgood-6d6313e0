@@ -260,6 +260,33 @@ const GuardianJourneyTracker = ({ wardUserId, wardName }: Props) => {
 
   if (!journey) return null;
 
+  // ===== Staleness guard =====
+  // If no GPS update for >15 minutes, treat journey as abandoned.
+  // Best-effort patch the row so it stops showing for everyone.
+  const STALE_MS = 15 * 60 * 1000;
+  const lastUpdateAt = updates.length > 0
+    ? new Date(updates[updates.length - 1].created_at).getTime()
+    : new Date(journey.started_at).getTime();
+  const ageMs = Date.now() - lastUpdateAt;
+  // Also abandon if started_at + estimated_duration + 60min has passed with no fresh updates
+  const overdueByEta =
+    journey.estimated_duration_min !== null &&
+    Date.now() >
+      new Date(journey.started_at).getTime() +
+        (journey.estimated_duration_min + 60) * 60 * 1000 &&
+    ageMs > STALE_MS;
+
+  if (ageMs > STALE_MS || overdueByEta) {
+    // Fire-and-forget: mark it ended so other guardians' UIs clear too.
+    supabase
+      .from("journeys")
+      .update({ status: "auto_completed", ended_at: new Date().toISOString() })
+      .eq("id", journey.id)
+      .eq("status", "active")
+      .then(() => {});
+    return null;
+  }
+
   const routePoints: [number, number][] = updates.filter((u) => u.lat && u.lng).map((u) => [u.lat!, u.lng!]);
   const elapsed = Math.round((Date.now() - new Date(journey.started_at).getTime()) / 60000);
 
