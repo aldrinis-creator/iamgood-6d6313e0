@@ -178,6 +178,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pushSent: d?.pushSent ?? 0,
         deliveryPending: !!d?.deliveryPending,
         selfTargetedPhones: Array.isArray(d?.selfTargetedPhones) ? d.selfTargetedPhones : [],
+        recipients: Array.isArray(d?.recipients) ? d.recipients : undefined,
         errors: {
           invoke: null,
           recipients: d?.errors?.recipients ?? null,
