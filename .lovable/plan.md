@@ -1,76 +1,82 @@
 
-## Plan — Fix SOS so backend delivery actually fires and expose why WhatsApp/SMS are failing
+## Plan — Fix SOS so guardian UI still updates, but WhatsApp/SMS also fire reliably
 
-### What the current code and data show
-- SOS button presses are reaching the database: recent `sos_events` rows are being created successfully.
-- The delivery backend is not showing recent `send-sos-alert` execution logs for those SOS tests.
-- Client code has two weak points:
-  1. `triggerSOS()` inserts the SOS row, then calls `invokeSosAlertOnce(data.id)` without awaiting the result or checking for invoke errors.
-  2. `SOSDialog` and `FallDetectionOverlay` call `supabase.functions.invoke("send-sos-alert")` but only read `data`; they do not inspect `error`, so backend failures can be swallowed.
-- Recipient selection is inconsistent:
-  - client fetches all guardians
-  - backend only sends to `status = "accepted"`
-  This can produce a real SOS event with `recipientCount = 0`, which looks like “messaging did not fire”.
+### What the evidence shows
+- The guardian app receiving the SOS banner and emergency card confirms the `sos_events` record is being created and guardian-side SOS display is working.
+- The messaging path is the failing part.
+- The current code still has **multiple SOS delivery entry points**:
+  - `AppContext.triggerSOS()` inserts the SOS event and invokes `send-sos-alert`
+  - `SOSDialog.sendAlerts()` then invokes `send-sos-alert` again
+  - `FallDetectionOverlay` also invokes `send-sos-alert` separately
+- The current backend log snapshot for `send-sos-alert` shows only shutdown events, unlike healthy functions that show boot/listen logs. That points to an unhealthy or unverified function path, not just a guardian UI issue.
 
 ### What to build
 
-#### 1. Make SOS delivery invocation reliable
-Update `src/contexts/AppContext.tsx` so `triggerSOS()`:
-- awaits the backend invoke
-- captures both `{ data, error }`
-- logs and toasts real invoke failures
-- returns the created `sosId` plus delivery result to callers
+#### 1. Centralize SOS delivery into one reliable path
+Refactor SOS so only `AppContext.triggerSOS()` is responsible for:
+- inserting the `sos_events` row
+- resolving accepted guardians
+- invoking `send-sos-alert`
+- returning a structured result to callers
 
-Also keep deduplication, but move it to a deterministic keyed flow so the same SOS event is not inserted or delivered twice.
+Update `SOSDialog` and `FallDetectionOverlay` to:
+- call `triggerSOS()` only
+- stop invoking `send-sos-alert` directly
+- use the returned delivery result for toasts and fallback behavior
 
-#### 2. Stop silent client-side failures
-Update:
-- `src/components/SOSDialog.tsx`
-- `src/components/FallDetectionOverlay.tsx`
+This removes duplicate or racing sends and makes one place responsible for delivery.
 
-So they:
-- read both `data` and `error` from `supabase.functions.invoke`
-- surface backend failures clearly
-- show exact channel status from `errors.whatsapp` / `errors.sms`
-- only open manual `wa.me` fallback when backend delivery truly failed
+#### 2. Make the client expose the real failure reason
+Strengthen `src/contexts/AppContext.tsx` so `triggerSOS()`:
+- returns `{ sosId, deliveryResult, error }`
+- distinguishes:
+  - event created but function invoke failed
+  - no accepted guardians
+  - provider rejected WhatsApp
+  - provider rejected SMS
+- shows exact channel errors in the UI instead of a generic “sent” state
 
-#### 3. Align recipients with accepted guardians only
-Update the client guardian queries to use only accepted guardians for SOS delivery input:
-- filter guardians with `status = "accepted"`
-- show a clear message if there are zero accepted guardians
-- keep the backend as final source of truth, but stop passing stale/pending numbers from the UI
+Update `SOSDialog.tsx` and `FallDetectionOverlay.tsx` to:
+- show success only when `whatsappQueued > 0` or `smsQueued > 0`
+- open manual `wa.me` fallback only when backend delivery really failed
+- stop making the UI appear complete when only the guardian realtime/dashboard updated
 
-This removes the current mismatch between what the UI thinks is a recipient and what the backend actually sends to.
+#### 3. Harden the `send-sos-alert` edge function boot path
+Refactor `supabase/functions/send-sos-alert/index.ts` to match the project’s healthier function patterns:
+- switch the Supabase import to a stable `npm:@supabase/supabase-js@2` import
+- use the SDK CORS helper or the full expected header set consistently on all responses
+- add request validation up front
+- log at function start before any external/network work
+- log the resolved accepted guardians, final normalized phones, and exact WA/SMS payload attempts
 
-#### 4. Add delivery diagnostics inside the backend
-Update `supabase/functions/send-sos-alert/index.ts` to improve observability:
-- log when the function starts, with `user_id` and resolved recipient count
-- log the final normalized recipient list count
-- log whether WhatsApp request was attempted
-- log whether SMS request was attempted
-- return a structured failure reason when recipient count is zero
+Because current logs do not show normal boot/request output for this function, this step is aimed at making the function deploy and execute observably.
 
-Example response shape:
-```text
-{
-  recipientCount: 0,
-  whatsappQueued: 0,
-  smsQueued: 0,
-  errors: {
-    invoke: null,
-    recipients: "No accepted guardians with valid phone numbers",
-    whatsapp: null,
-    sms: null
-  }
-}
-```
+#### 4. Keep recipient resolution strict and consistent
+Use one shared recipient-resolution rule in the backend:
+- accepted guardians only
+- normalized phone numbers only
+- deduplicated final list
+- explicit structured error when the final recipient list is empty
 
-#### 5. Verify the deployed path end-to-end
-After implementation:
-- trigger SOS from the app
-- confirm `send-sos-alert` appears in backend logs
-- confirm the response shows either queued channels or an explicit reason
-- if the function executes but MSG91 still rejects delivery, use the logged request/response bodies to correct template payload details
+The client should no longer assemble its own delivery list independently from the backend.
+
+#### 5. Verify the backend in isolation before trusting the app flow
+After implementation, verify in this order:
+1. invoke `send-sos-alert` directly with a known affected user and accepted guardian phone
+2. confirm the function now shows normal boot/request logs
+3. confirm logs include:
+   - function start
+   - recipient resolution
+   - WhatsApp request/response
+   - SMS request/response
+4. trigger SOS from the app and confirm the same function logs appear for the real user flow
+
+This isolates whether the failure is:
+- client never calling the function
+- function not booting correctly
+- MSG91 rejecting WhatsApp
+- MSG91 rejecting SMS
+- no valid accepted recipient numbers
 
 ### Files to modify
 - `src/contexts/AppContext.tsx`
@@ -80,16 +86,12 @@ After implementation:
 
 ### Expected outcome
 After this change:
-- every SOS press that creates an event will also produce a traceable backend delivery attempt
-- the app will no longer fail silently when function invocation breaks
-- only accepted guardians will be treated as valid SOS recipients
-- if WhatsApp or SMS still fail, the app and backend logs will show exactly whether the issue is:
-  - no accepted guardians
-  - invoke failure
-  - MSG91 rejection
-  - missing/invalid payload values
+- guardian SOS UI will still update as it does now
+- WhatsApp and SMS delivery will run from a single reliable backend path
+- the app will clearly state whether delivery failed at invoke-time, recipient-resolution time, or provider-response time
+- backend logs will finally show a traceable execution for every real SOS test
 
-### Technical details
+### Technical notes
 - No database schema change is required.
-- The most important fix is to stop fire-and-forget invocation in `triggerSOS()` and stop ignoring the `error` field from `supabase.functions.invoke(...)`.
-- Current evidence suggests the SOS UI path can create `sos_events` successfully while still not producing a confirmed backend delivery attempt.
+- The most important architecture fix is removing duplicate `send-sos-alert` invocations from UI components and making `triggerSOS()` the single source of truth.
+- The strongest current signal is that the SOS event path works, while the messaging edge function path is either not being reached consistently or is not booting/executing cleanly in its deployed form.
