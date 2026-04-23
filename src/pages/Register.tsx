@@ -448,6 +448,28 @@ const Register = () => {
             )}
           </div>
 
+          {!isInstalled && (
+            <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-left space-y-3">
+              <div className="flex items-start gap-3">
+                <Smartphone className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Install Check-iN on your phone</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Get instant SOS alerts and check-in updates — even when the app is closed.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleInstallClick}
+              >
+                <Download className="w-4 h-4" /> Install App
+              </Button>
+            </div>
+          )}
+
           <Separator />
 
           <Button
