@@ -66,17 +66,28 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('react/') || id.includes('react-router')) return 'vendor-react';
-            if (id.includes('@radix-ui') || id.includes('lucide-react') || id.includes('cmdk')) return 'vendor-ui';
-            if (id.includes('@supabase')) return 'vendor-supabase';
-            if (id.includes('@tanstack')) return 'vendor-query';
-            if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
-            if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
-            if (id.includes('leaflet')) return 'vendor-maps';
-            if (id.includes('date-fns') || id.includes('zod') || id.includes('react-hook-form')) return 'vendor-forms';
-            return 'vendor-misc';
-          }
+          if (!id.includes('node_modules')) return;
+          const after = id.split('node_modules/').pop()!;
+          const pkg = after.startsWith('@')
+            ? after.split('/').slice(0, 2).join('/')
+            : after.split('/')[0];
+
+          // React + every react-* peer in one chunk to guarantee init order
+          if (
+            pkg === 'react' ||
+            pkg === 'react-dom' ||
+            pkg === 'scheduler' ||
+            pkg.startsWith('react-')
+          ) return 'vendor-react';
+
+          if (pkg.startsWith('@radix-ui') || pkg === 'lucide-react' || pkg === 'cmdk') return 'vendor-ui';
+          if (pkg.startsWith('@supabase')) return 'vendor-supabase';
+          if (pkg.startsWith('@tanstack')) return 'vendor-query';
+          if (pkg === 'recharts' || pkg.startsWith('d3-')) return 'vendor-charts';
+          if (pkg === 'pdfjs-dist' || pkg === 'jspdf' || pkg === 'html2canvas') return 'vendor-pdf';
+          if (pkg === 'leaflet') return 'vendor-maps';
+          if (pkg === 'date-fns' || pkg === 'zod') return 'vendor-forms';
+          return 'vendor-misc';
         },
       },
     },
