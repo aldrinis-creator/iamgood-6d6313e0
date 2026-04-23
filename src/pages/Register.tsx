@@ -73,6 +73,15 @@ const TOTAL_STEPS_GUARDIAN = 3;
 const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { canInstall, installApp, isInstalled } = usePwaInstall();
+
+  const handleInstallClick = async () => {
+    if (canInstall) {
+      await installApp();
+    } else {
+      navigate("/install");
+    }
+  };
   const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<number>(1);
