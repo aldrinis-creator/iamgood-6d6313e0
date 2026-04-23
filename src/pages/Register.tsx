@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown, AlertCircle } from "lucide-react";
+import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown, AlertCircle, Smartphone, Download } from "lucide-react";
+import usePwaInstall from "@/hooks/usePwaInstall";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -72,6 +73,15 @@ const TOTAL_STEPS_GUARDIAN = 3;
 const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { canInstall, installApp, isInstalled } = usePwaInstall();
+
+  const handleInstallClick = async () => {
+    if (canInstall) {
+      await installApp();
+    } else {
+      navigate("/install");
+    }
+  };
   const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<number>(1);
@@ -437,6 +447,28 @@ const Register = () => {
               </div>
             )}
           </div>
+
+          {!isInstalled && (
+            <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-left space-y-3">
+              <div className="flex items-start gap-3">
+                <Smartphone className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-foreground text-sm">Install Check-iN on your phone</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Get instant SOS alerts and check-in updates — even when the app is closed.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleInstallClick}
+              >
+                <Download className="w-4 h-4" /> Install App
+              </Button>
+            </div>
+          )}
 
           <Separator />
 
