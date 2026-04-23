@@ -172,20 +172,24 @@ Deno.serve(async (req) => {
       console.error("[send-sos-alert] sos_events fetch error:", e);
     }
 
-    // --- Resolve recipients: accepted guardians only ---
-    const { data: acceptedGuardians, error: guardiansErr } = await supabase
+    // --- Resolve recipients: accepted OR pending guardians ---
+    // SOS is life-safety. A guardian the user explicitly nominated should be
+    // alerted even if they have not yet clicked the invite link (24h auto-accept).
+    const { data: allGuardians, error: guardiansErr } = await supabase
       .from("guardians")
-      .select("id, guardian_phone, guardian_email")
+      .select("id, guardian_phone, guardian_email, guardian_name, status")
       .eq("user_id", user_id)
-      .eq("status", "accepted");
+      .in("status", ["accepted", "pending"]);
 
     if (guardiansErr) {
       console.error("[send-sos-alert] guardians query error:", guardiansErr);
     }
 
-    const acceptedRows = acceptedGuardians ?? [];
+    const acceptedRows = allGuardians ?? [];
     const acceptedPhonesSet = new Set<string>();
     const selfTargetedPhones: string[] = [];
+    // phone -> { status, name } so we can stamp delivery attempts with status
+    const phoneMeta = new Map<string, { status: string; name: string }>();
     for (const g of acceptedRows) {
       const n = normalizePhone(g.guardian_phone);
       if (!n) continue;
@@ -195,6 +199,7 @@ Deno.serve(async (req) => {
         continue;
       }
       acceptedPhonesSet.add(n);
+      phoneMeta.set(n, { status: g.status, name: g.guardian_name });
     }
 
     // Optional: validate caller-provided phones against accepted set; fall back to accepted set
@@ -500,6 +505,8 @@ Deno.serve(async (req) => {
     if (activeSosId) {
       const attemptRows: any[] = [];
       for (const phone of finalPhones) {
+        const meta = phoneMeta.get(phone);
+        const guardianStatusNote = meta?.status ? `guardian_status=${meta.status}` : null;
         if (whatsappAccepted > 0 || whatsappError) {
           attemptRows.push({
             sos_event_id: activeSosId,
@@ -510,7 +517,7 @@ Deno.serve(async (req) => {
             request_id: whatsappRequestId,
             provider_status: whatsappError ? "rejected" : "accepted",
             delivery_status: whatsappError ? "failed" : "pending",
-            failure_reason: whatsappError,
+            failure_reason: whatsappError ? `${whatsappError} | ${guardianStatusNote}` : guardianStatusNote,
             failed_at: whatsappError ? new Date().toISOString() : null,
             raw_response: whatsappRawResponse,
           });
@@ -525,7 +532,7 @@ Deno.serve(async (req) => {
             request_id: smsRequestId,
             provider_status: smsError ? "rejected" : "accepted",
             delivery_status: smsError ? "failed" : "pending",
-            failure_reason: smsError,
+            failure_reason: smsError ? `${smsError} | ${guardianStatusNote}` : guardianStatusNote,
             failed_at: smsError ? new Date().toISOString() : null,
             raw_response: smsRawResponse,
           });
