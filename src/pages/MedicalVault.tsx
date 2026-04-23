@@ -335,7 +335,31 @@ const MedicalVaultContent = () => {
       });
   }, [userId]);
 
-  // ===================== EMERGENCY PDF =====================
+  // Auto-shut Records & Profile after 30s idle for privacy
+  useEffect(() => {
+    if (activeTab !== "records" && activeTab !== "profile") return;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setActiveTab("records");
+        setShowUploadForm(false);
+        setSearchQuery("");
+        setViewRecord(null);
+        if (!idleToastShownRef.current) {
+          toast("Tab auto-closed for privacy");
+          idleToastShownRef.current = true;
+        }
+      }, 30000);
+    };
+    const events: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [activeTab]);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const buildShareText = () => {
