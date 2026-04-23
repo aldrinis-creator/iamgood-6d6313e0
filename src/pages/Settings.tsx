@@ -26,6 +26,8 @@ import { formatISTDateTime } from "@/lib/istTime";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import VaultNomineeRecoveryDialog from "@/components/vault/VaultNomineeRecoveryDialog";
+import { getGuardianLimit } from "@/lib/featureGating";
+import { requestMotionPermission } from "@/hooks/useFallDetection";
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
@@ -377,10 +379,7 @@ const Settings = () => {
       toast.error("Name and phone are required");
       return;
     }
-    // Dynamic guardian limit based on plan
-    const { getGuardianLimit } = await import("@/lib/featureGating");
-    const { useSubscription } = await import("@/hooks/useSubscription");
-    // We can't use hooks here, so check the subscription table directly
+    // Dynamic guardian limit based on plan — check subscription table directly
     const { data: subData } = await supabase
       .from("subscriptions")
       .select("plan_type, status")
@@ -739,8 +738,7 @@ const Settings = () => {
                   <Switch checked={settings.fallDetection} onCheckedChange={async (v) => {
                     updateSetting("fallDetection", v);
                     if (v) {
-                      const { requestMotionPermission } = await import("@/hooks/useFallDetection");
-                      await requestMotionPermission();
+                       await requestMotionPermission();
                     }
                   }} />
                 </div>
