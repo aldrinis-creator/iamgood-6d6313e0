@@ -50,7 +50,7 @@ const FallDetectionOverlay = () => {
     const [profileRes, hpRes, gRes, npRes] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", uid).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid).eq("status", "accepted"),
       supabase.from("nutrition_personas").select("blood_group, allergies, medical_conditions").eq("user_id", uid).maybeSingle(),
     ]);
 
@@ -95,7 +95,7 @@ const FallDetectionOverlay = () => {
     const guardianPhones = guardians.map((g) => g.guardian_phone).filter(Boolean) as string[];
 
     try {
-      const { data: result } = await supabase.functions.invoke("send-sos-alert", {
+      const { data: result, error } = await supabase.functions.invoke("send-sos-alert", {
         body: {
           user_id: uid,
           message: msg,
@@ -106,9 +106,14 @@ const FallDetectionOverlay = () => {
           user_name: userName,
         },
       });
-      const whatsappOk = (result?.whatsappQueued ?? 0) > 0;
-      const smsOk = (result?.smsQueued ?? 0) > 0;
-      if (!whatsappOk && !smsOk) {
+      if (error) {
+        console.error("[FallDetection] send-sos-alert invoke error:", error);
+      } else {
+        console.log("[FallDetection] send-sos-alert response:", result);
+      }
+      const whatsappOk = ((result as any)?.whatsappQueued ?? 0) > 0;
+      const smsOk = ((result as any)?.smsQueued ?? 0) > 0;
+      if (error || (!whatsappOk && !smsOk)) {
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
           const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;

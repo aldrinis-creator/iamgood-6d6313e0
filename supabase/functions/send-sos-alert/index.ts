@@ -129,6 +129,13 @@ Deno.serve(async (req) => {
       user_name,
     } = await req.json();
 
+    console.log("[send-sos-alert] START", {
+      user_id,
+      hasMessage: !!message,
+      callerEmails: Array.isArray(guardian_emails) ? guardian_emails.length : 0,
+      callerPhones: Array.isArray(guardian_phones) ? guardian_phones.length : 0,
+    });
+
     if (!user_id || !message) {
       return new Response(JSON.stringify({ error: "user_id and message required" }), {
         status: 400,
@@ -141,11 +148,15 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // --- Resolve recipients: accepted guardians only ---
-    const { data: acceptedGuardians } = await supabase
+    const { data: acceptedGuardians, error: guardiansErr } = await supabase
       .from("guardians")
       .select("id, guardian_phone, guardian_email")
       .eq("user_id", user_id)
       .eq("status", "accepted");
+
+    if (guardiansErr) {
+      console.error("[send-sos-alert] guardians query error:", guardiansErr);
+    }
 
     const acceptedRows = acceptedGuardians ?? [];
     const acceptedPhonesSet = new Set<string>();
@@ -169,6 +180,33 @@ Deno.serve(async (req) => {
       finalCount: finalPhones.length,
       finalPhones,
     });
+
+    // Early exit: no recipients at all → return structured failure reason
+    if (finalPhones.length === 0) {
+      console.warn("[send-sos-alert] No recipients with valid phone numbers — aborting WA/SMS");
+      return new Response(
+        JSON.stringify({
+          sent: 0,
+          msg91Sent: 0,
+          emailQueued: 0,
+          pushSent: 0,
+          whatsappQueued: 0,
+          smsQueued: 0,
+          whatsappRequestId: null,
+          smsRequestId: null,
+          recipientCount: 0,
+          errors: {
+            invoke: null,
+            recipients: acceptedPhonesSet.size === 0
+              ? "No accepted guardians for this user"
+              : "Accepted guardians have no valid phone numbers",
+            whatsapp: null,
+            sms: null,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // --- Send emails via transactional queue ---
     const allEmails = [...(guardian_emails || [])];
@@ -417,7 +455,7 @@ Deno.serve(async (req) => {
         whatsappRequestId,
         smsRequestId,
         recipientCount: finalPhones.length,
-        errors: { whatsapp: whatsappError, sms: smsError },
+        errors: { invoke: null, recipients: null, whatsapp: whatsappError, sms: smsError },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
