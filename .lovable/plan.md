@@ -1,79 +1,52 @@
 
-## Plan — Show which pending guardians were included or skipped, and why
+## Plan — Two small additions
 
-Today the SOS confirmation already lists every guardian and tags them `(pending)`, but the included/skipped reason is inferred client-side from the phone number. That breaks down for cases the client can't see (e.g. a backend-side dedupe, an invalid normalization, or a guardian row whose status changed between the dialog opening and the SOS firing). I'll make the backend the source of truth and surface its decision per recipient in the UI.
+### 1. Add a Refresh button to the AQI widget
 
-### Backend — `supabase/functions/send-sos-alert/index.ts`
+**File:** `src/components/AQIWidget.tsx`
 
-Add an explicit `recipients` array to the response so the UI shows exactly what the function decided for each guardian:
+Add a small refresh icon button in the AQI popover header (next to the "Updated: …" timestamp on line 308–313) that re-fetches current conditions on demand.
 
-```ts
-recipients: [
-  {
-    guardian_id: string,
-    name: string,
-    phone_raw: string,         // as stored in guardians table
-    phone_normalized: string,  // E.164 form, or null if invalid
-    status: "accepted" | "pending",
-    included: boolean,
-    skip_reason: null
-      | "self_targeted"        // matches MSG91 sender 917045868482
-      | "invalid_phone"        // failed normalization
-      | "duplicate_phone",     // same number as another guardian, deduped
-    channels: {
-      whatsapp: "accepted" | "rejected" | "not_attempted",
-      sms:      "accepted" | "rejected" | "not_attempted",
-    },
-  },
-]
-```
+Behavior:
+- **User role:** re-runs `fetchDefaultLocation()` for the current geolocation, OR re-fetches the last searched location if `aqiData.locationName` is not "Current Location" (re-geocode via Nominatim using the cached name). Refresh does **not** consume the 5/day search quota — it only refreshes the already-loaded location.
+- **Guardian role:** re-runs `fetchWardLocation()` to pull the ward's latest shared location and AQI.
+- While refreshing: button shows a spinner (`Loader2`), is disabled, and the trigger pill shows the existing loading state.
+- On success: `fetchedAt` updates and a subtle "Updated" toast confirms.
+- On failure: toast error, previous data stays.
 
-Build this list during the recipient-resolution pass (where `phoneMeta` is already built). Tag each row with `status` from the guardians table (so pending vs accepted is preserved), and stamp the per-channel outcome from the existing `whatsappAccepted` / `smsAccepted` / `whatsappError` / `smsError` results once the WA + SMS calls return.
+Icon: `RefreshCw` from lucide-react. Placement: right side of the location/timestamp row inside the popover, ghost button, `h-7 w-7`.
 
-No DB schema changes. The existing `sos_message_attempts` insert is unchanged.
+### 2. Let the User change their Primary Guardian
 
-### Frontend — `src/components/SOSDialog.tsx`
+**Current state:** Today there is no user-facing way to change Primary. `OnboardingWizard` marks the first guardian added as primary, and `GuardianTab.tsx` only shows a "Primary" badge with no toggle. The only existing "Set Primary" UI is `WardEmergencyCard`, which is the **guardian's** view of a ward — not the user's own profile.
 
-Replace the current ad-hoc per-guardian row with a structured "Recipients" section in the confirmation banner, driven by the backend `recipients` array (with a graceful fallback to the existing local-inference behavior if the backend doesn't return it yet, e.g. during deploy lag).
+**Fix:** Add a "Set as Primary" action to the user's own guardian list.
 
-Layout (rendered inside the existing delivery summary card):
+**File:** `src/components/GuardianTab.tsx` (used inside `MyProfile` / `Settings` guardian list)
 
-```text
-Recipients (2)
+For each guardian row that is **not** currently primary AND has `status === "accepted"`:
+- Add a small `Star` (outline) button next to the existing trash icon, tooltip "Set as Primary".
+- Pending/expired/rejected guardians: button hidden (can't be primary until accepted).
+- The current primary shows the existing filled "Primary" badge (no button needed).
 
-✓ Don Carlos · +91 98xxxxxx12   [accepted]    WA submitted · SMS submitted
-✓ Aisha M.   · +91 99xxxxxx34   [pending]     WA submitted · SMS submitted
-                                              Pending acceptance — alerted anyway
+Click flow:
+1. Open an `AlertDialog` confirming: *"Make {name} your Primary Guardian? They will be the first contact for SOS alerts and emergency profile sharing."*
+2. On confirm, run a two-step Supabase update inside a single sequence:
+   - `update guardians set is_primary = false where user_id = <current user> and is_primary = true`
+   - `update guardians set is_primary = true where id = <selected guardian id>`
+3. On success: toast "Primary guardian updated", refresh list via existing `fetchGuardians()`.
+4. On failure: toast error, no state change.
 
-✗ Skipped (1)
-  Test Guardian · +91 70 4586 8482  [pending]
-  Reason: phone matches the WhatsApp sender number — MSG91 cannot
-          deliver from sender to itself. Update in My Profile.
-```
+**Why no DB migration:** `guardians.is_primary` already exists; RLS already allows the user to update their own guardian rows. No new tables, functions, or policies needed.
 
-Rules:
-- Included guardians get a green check, an `accepted` or `pending` badge (amber for pending), and a per-channel status line.
-- Pending-included guardians get a one-line note: *"Pending acceptance — alerted anyway."*
-- Skipped guardians are grouped under a red "Skipped" header with a plain-English reason mapped from `skip_reason` (`self_targeted` → "matches sender number", `invalid_phone` → "phone number is invalid", `duplicate_phone` → "duplicate of another guardian — deduped").
-- Top-of-card summary updates accordingly: `Submitted via WhatsApp + SMS for N guardian(s) · M skipped`.
+### Verification
 
-### Type updates
-
-- Extend `SOSDeliveryResult` in `src/contexts/AppContext.tsx` with the new `recipients` array (optional, so older backends don't break the build).
-- Pass it through unchanged from `triggerSOS` to the dialog.
-
-### Verification (after deploy)
-
-1. Trigger SOS with a mix of accepted + pending guardians, including one whose phone matches `917045868482` and one with a malformed number.
-2. Edge logs show the new `recipients` array in the response.
-3. The SOS confirmation card renders:
-   - Included accepted + pending guardians with per-channel "submitted" tags.
-   - A "Skipped" group listing the self-targeted and invalid-phone guardians with the right reason.
-4. Refreshing the dialog while a pending guardian's status flips to accepted in another tab still shows the correct per-recipient state on the next SOS.
+1. AQI popover shows a refresh icon next to the timestamp; clicking it spins, then updates the timestamp without consuming a search.
+2. In My Profile → Guardians, accepted non-primary guardians show a star button. Clicking it opens a confirm dialog. Confirming flips Primary correctly and only one guardian remains Primary.
+3. Existing Primary badge logic in EmergencyProfile / SOSDialog / WardEmergencyCard reads the same `is_primary` column and reflects the change immediately.
 
 ### What I will NOT change
 
-- No DB migration.
-- No change to MSG91 templates or secrets.
-- No change to the existing 24h auto-accept rule for pending guardians.
-- Resolved/closed SOS history view is unchanged in this pass.
+- No DB migration, no new RLS, no new edge function.
+- AQI 5/day search rate-limit logic stays intact — refresh is free.
+- WardEmergencyCard guardian-side "Set Primary" flow is unchanged.
