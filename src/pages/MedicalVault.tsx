@@ -745,6 +745,118 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
           })()}
         </TabsContent>
 
+        {/* ========== DOCTOR VISIT REPORT TAB ========== */}
+        <TabsContent value="doctor-report" className="space-y-3 mt-4">
+          <DoctorVisitReport />
+          {(() => {
+            const drRecords = records
+              .filter((r) => r.record_type === "Doctor's Diagnosis")
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            if (drRecords.length === 0) {
+              return (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      No doctor visit reports yet — tap Generate above.
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            }
+            return drRecords.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <FileText className="w-8 h-8 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{r.title}</p>
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <Badge variant="secondary" className="text-[10px]">{r.record_type}</Badge>
+                      {r.record_date && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(r.record_date).toLocaleDateString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleViewRecord(r)} title="View">
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    {r.file_url && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDownload(r)} title="Save As">
+                        <Save className="w-3 h-3" />
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(r)} title="Share">
+                      <Share2 className="w-3 h-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(r)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ));
+          })()}
+        </TabsContent>
+
+        {/* ========== DOCUMENT ANALYZER TAB ========== */}
+        <TabsContent value="doc-analyzer" className="space-y-3 mt-4">
+          <DocumentAnalyzer />
+          {(() => {
+            const analyzerRecords = records
+              .filter((r) => ANALYZER_TYPES.includes(r.record_type))
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            if (analyzerRecords.length === 0) {
+              return (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <Search className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      No analyzed documents yet — upload a report above.
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            }
+            return analyzerRecords.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <File className="w-8 h-8 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{r.title}</p>
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <Badge variant="secondary" className="text-[10px]">{r.record_type}</Badge>
+                      {r.record_date && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(r.record_date).toLocaleDateString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleViewRecord(r)} title="View">
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    {r.file_url && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDownload(r)} title="Save As">
+                        <Save className="w-3 h-3" />
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(r)} title="Share">
+                      <Share2 className="w-3 h-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(r)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ));
+          })()}
+        </TabsContent>
+
         <TabsContent value="profile" className="space-y-4 mt-4">
           {profileLoading ? (
             <div className="flex justify-center py-8">
