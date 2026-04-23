@@ -1,44 +1,67 @@
 
 
-## Plan — Full-screen camera-only mode for Nutrition
+## Plan — Visual Checks Analysis tab in Medical Vault
 
-When the user enters **My Health → Wellness Hub → Nutrition**, render a dedicated full-screen camera capture view that blocks all other actions (no manual entry, no upload, no action picker) until they either successfully capture a photo or explicitly cancel.
+Add a fourth tab in **Medical Vault** that holds all results from **Urine Check, Tongue Analysis, and Face Scan** under a single record type so they're easy to find, while keeping every existing record (today saved as `Lab Report`) accessible by migrating them.
 
-### Change — `src/components/NutritionAdvisor.tsx`
+### 1. New record_type: `"Visual Check"`
 
-**1. New `cameraOnly` gate state**
-- Add `const [cameraOnly, setCameraOnly] = useState(true)` so the component mounts in camera-only mode.
-- Keep the existing `autoLaunchedRef` guard so the native camera fires exactly once on mount.
+A new shared category used by all three tools. Stored in the existing `medical_records` table — no schema change.
 
-**2. New full-screen camera UI (rendered first, before all other branches)**
+### 2. `src/components/health-tools/UrineCheck.tsx`
+- Change the `saveToVault` insert from `record_type: "Lab Report"` to `record_type: "Visual Check"`.
+- No other behaviour change.
 
-While `cameraOnly === true` and no preview exists yet, render a fixed full-screen overlay containing:
-- App header strip with title **"Capture Meal"** and a single **Cancel** button (top-right).
-- Centered guidance: camera icon + "Opening camera…" / "Take a clear photo of your meal".
-- A primary **Open Camera** button (re-trigger) — needed because the auto-launch can be dismissed by the OS or fail silently; this is the only visible action besides Cancel.
-- A small **Retry** affordance shown only after a failed/empty capture (toast + button), since this mode hides the existing Camera/Upload buttons that previously served as the implicit retry.
-- No tabs, no manual entry, no upload, no action picker, no back-to-hub link inside this overlay.
+### 3. `src/components/health-tools/TongueAnalysis.tsx`
+- Change the `saveToVault` insert from `record_type: "Lab Report"` to `record_type: "Visual Check"`.
 
-**3. Capture outcomes**
-- **Success** (`handleFile` receives a valid image): set `cameraOnly = false`, show the existing preview + **Analyze** screen so the user can confirm and run AI. From here the normal flow continues unchanged.
-- **Cancel** (user taps the overlay's Cancel): set `cameraOnly = false` and clear `activeAction`, returning to the four-action picker (Meal Plan / Analyze / Post-Workout / Feeling Unwell). This is the only escape hatch.
-- **Failed/empty capture** (file input fires with no file, or `toast.error` path for invalid type / >10MB): keep `cameraOnly = true`, surface a Retry button that re-clicks the hidden `<input capture="environment">`.
+### 4. `src/components/FaceScan.tsx` — **save to vault by default**
 
-**4. Outer navigation**
-- The outer `MyHealth.tsx` "← Nutrition" back chevron continues to work — it unmounts `NutritionAdvisor` and returns to the Wellness Hub. No change there.
+Today Face Scans only persist to the `face_scans` table; nothing lands in Medical Vault. Add an automatic insert into `medical_records` after a successful scan (live, photo, or video):
+- `record_type: "Visual Check"`
+- `title: "Face Scan — <date>"`
+- `description: JSON.stringify({ heartRate, stressLevel, stressScore, confidence, photo_indicators? }, null, 2)`
+- `record_date: today (IST)`
+- For photo-mode scans, also upload the original image to the `medical-documents` bucket and set `file_url` / `file_name` (mirrors UrineCheck/TongueAnalysis behaviour). Live/video modes save without a file.
+- Wrap in try/catch — a Vault save failure must NOT break the existing `face_scans` insert or the results UI; show a silent console warning only.
+
+### 5. `src/pages/MedicalVault.tsx` — new "Visual Checks" tab
+
+- Change `TabsList` from `grid-cols-3` to `grid-cols-4` and add a new trigger `value="visual"` with an `Eye` icon and label **"Visual"**.
+- Add a `TabsContent value="visual"` block that renders only records where `record_type === "Visual Check"`, sorted newest-first. Reuse the same card layout (View / Save As / Share / Delete) and the existing `handleViewRecord` dialog so JSON descriptions and any attached image render with the existing preview path.
+- Add `"Visual Check"` to the `RECORD_TYPES` constant so it appears in the upload-form dropdown and Records-tab filter chip too. The Records tab continues to show all records (including Visual Checks) — the new tab is a focused view.
+- Empty state: "No visual check results yet. Run a Urine, Tongue, or Face scan from My Health → Health Tools."
+
+### 6. Migration of existing reports
+
+Existing Urine, Tongue (and any prior Face) saves live as `record_type = "Lab Report"`. To move them into the new tab without losing other true Lab Reports (e.g., Vitals device reports, Pill ID), migrate by **title prefix** which uniquely identifies them:
+
+```sql
+UPDATE public.medical_records
+SET record_type = 'Visual Check'
+WHERE record_type = 'Lab Report'
+  AND (
+    title LIKE 'Tongue Check —%'
+    OR title LIKE 'Urine Color Check —%'
+    OR title LIKE 'Urine Dipstick —%'
+    OR title LIKE 'Urine Check —%'
+    OR title LIKE 'Face Scan —%'
+  );
+```
+
+Run via the migration tool. Vitals device reports (`"Device Report Analysis - …"`) and Pill IDs (`"Pill ID: …"`) are intentionally left as `Lab Report` since they aren't visual screenings.
 
 ### What I will NOT change
-
-- No change to `MyHealth.tsx`, routing, hub tiles, or feature gating.
-- No change to the nutrition AI edge function, persona logic, or `meal_logs` insert.
-- No change to `CalorieTracker` / Nutrition Metrics — still reachable from inside the post-capture analyze view, not from the camera-only overlay.
-- No new route, deep-link param, or DB column.
+- No changes to `face_scans`, `medication_records` schemas or RLS.
+- No changes to PillIdentifier, VitalsMonitor, DocumentAnalyzer, or other tools.
+- No change to MyHealth routing or Health Tools tile order.
+- The Records tab keeps showing everything — Visual tab is additive.
 
 ### Verification
-
-1. Tap **My Health → Wellness Hub → Nutrition** on mobile → full-screen "Capture Meal" overlay appears and the native camera opens immediately. No tabs, manual entry, upload, or other actions are visible.
-2. Take a photo → overlay dismisses, preview shows with **Analyze** button. Normal AI flow proceeds.
-3. Cancel the OS camera dialog → still on the overlay; tap **Open Camera** to retry, or **Cancel** to exit to the four-action picker.
-4. Pick an oversized/non-image file (edge case via file picker on desktop) → toast error, overlay stays, Retry button visible.
-5. Tap the outer "← Nutrition" chevron → returns to Wellness Hub as before.
+1. Open **Medical Vault** → see four tabs: Records, **Visual**, Profile, Vault.
+2. Run a Urine Check → tap **Save to Vault** → record appears under **Visual** with attached image preview.
+3. Run a Tongue scan → save → appears under **Visual**.
+4. Run a Face Scan (live or photo) → results screen renders as today, AND a new "Face Scan — <date>" card auto-appears under **Visual** (photo mode includes image preview).
+5. Pre-existing Tongue/Urine "Lab Report" records now appear under **Visual** (migration).
+6. Vitals device reports and Pill ID entries remain under Records → "Lab Report" filter, not under Visual.
 
