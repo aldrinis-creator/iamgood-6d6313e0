@@ -1,66 +1,109 @@
 
 
-## Plan — Fix "build failed with exit status 1: limit error" on Publish
+## Plan — Fix mobile blank-screen + desktop stale-version issues
 
-The publish error is a **bundle/precache size guard** failing on the publish pipeline. Local `vite build` succeeds, but the main JS chunk is **3.18 MB** (one single file), which trips the publisher's per-file limit even though our PWA precache cap is set to 5 MB.
+### Root causes
 
-The fix is to code-split the giant main chunk into smaller, route-based chunks. No feature changes, no DB changes.
+1. **`base: './'` in `vite.config.ts`** produces relative asset URLs (`./assets/...`). On any deep route (`/dashboard`, `/medical-vault`, `/j/<token>`), the browser resolves them against the current path → 404 → blank screen. This hits mobile users hardest because they refresh / open shared deep links more often.
+2. **Two competing service workers** at scope `/`:
+   - VitePWA's auto-generated Workbox `sw.js` (precaches `index.html` + hashed JS).
+   - A manually-registered `/sw-push.js` for push notifications.
+   Whichever registered first stays in control. The cached `index.html` references old hashed chunks that were purged on each new publish → app loads stale shell → references missing JS → silently broken.
+3. **No "kill-switch" / forced-update logic** for users already running an old SW. `autoUpdate` only refreshes when the SW *script* changes; users whose SW is broken never get the new one.
 
-### A. Add `manualChunks` to `vite.config.ts`
+### A. `vite.config.ts` — three fixes
 
-Inside the existing `defineConfig`, add a `build.rollupOptions.output.manualChunks` function that groups vendor and feature code into separate files. Target: no chunk over ~800 KB.
+1. Change `base: './'` → `base: '/'`. All Lovable hosts are served from origin root; relative base breaks SPA deep-linking.
+2. Make the PWA service worker share scope with the push worker by **merging push logic into the Workbox SW** via `injectManifest` strategy, OR (simpler) **disable VitePWA's auto-register and let a single SW (`sw-push.js`) handle both**. We'll pick the simpler path: keep VitePWA only for the manifest + icon precache config, set `injectRegister: false`, and import its registration manually in `main.tsx` *behind a guard*.
+3. Add `cleanupOutdatedCaches: true` and `skipWaiting: true` + `clientsClaim: true` to Workbox so old precaches are wiped on activation.
 
 ```ts
-build: {
-  chunkSizeWarningLimit: 1000,
-  rollupOptions: {
-    output: {
-      manualChunks(id) {
-        if (id.includes('node_modules')) {
-          if (id.includes('react-dom') || id.includes('react/') || id.includes('react-router')) return 'vendor-react';
-          if (id.includes('@radix-ui') || id.includes('lucide-react') || id.includes('cmdk')) return 'vendor-ui';
-          if (id.includes('@supabase')) return 'vendor-supabase';
-          if (id.includes('@tanstack')) return 'vendor-query';
-          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
-          if (id.includes('pdfjs-dist') || id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
-          if (id.includes('leaflet')) return 'vendor-maps';
-          if (id.includes('date-fns') || id.includes('zod') || id.includes('react-hook-form')) return 'vendor-forms';
-          return 'vendor-misc';
-        }
-      },
-    },
+VitePWA({
+  registerType: "autoUpdate",
+  injectRegister: false,                // we register manually with guards
+  workbox: {
+    cleanupOutdatedCaches: true,
+    clientsClaim: true,
+    skipWaiting: true,
+    navigateFallbackDenylist: [/^\/~oauth/, /^\/sw-push\.js/],
+    /* existing globPatterns, runtimeCaching */
   },
-},
+  /* manifest unchanged */
+})
 ```
 
-### B. Fix the broken dynamic-import warnings
+### B. `src/main.tsx` — single SW registration with iframe/preview guard + kill-switch
 
-The build log shows 4 modules dynamically imported in one place but statically imported in another, which **prevents code-splitting**. Standardise to static imports (since they're loaded by app shell anyway):
+Replace the current bare `createRoot(...)` with a guarded registration that:
+- **Unregisters ALL existing service workers** if a new `BUILD_ID` differs from `localStorage.lovable_build_id`. This forces every desktop user stuck on a stale SW to reset on next visit.
+- **Skips registration entirely** when running inside an iframe or on `id-preview--*` / `lovableproject.com` hosts (per Lovable PWA guidance).
+- Registers the **Workbox SW** (`/sw.js`) on production only, then once it's controlling, posts a message to also activate push subscription handling — so we no longer register `/sw-push.js` separately.
 
-- `src/pages/Settings.tsx` → change dynamic `import("@/hooks/useFallDetection")`, `import("@/hooks/useSubscription")`, `import("@/lib/featureGating")` to top-level static imports.
-- `src/contexts/AppContext.tsx` → change dynamic `import("@/lib/offlineQueue")` to a static import.
+Pseudocode at the top of `main.tsx`:
+```ts
+const BUILD_ID = __APP_VERSION__;          // injected via vite define
+const isIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const isPreview = /id-preview--|lovableproject\.com/.test(location.hostname);
 
-This silences the warnings and lets Rollup put each vendor/feature in the correct chunk we defined above.
+(async () => {
+  if ("serviceWorker" in navigator) {
+    const prev = localStorage.getItem("lovable_build_id");
+    if (prev !== BUILD_ID || isIframe || isPreview) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+      localStorage.setItem("lovable_build_id", BUILD_ID);
+    }
+    if (!isIframe && !isPreview && import.meta.env.PROD) {
+      const { registerSW } = await import("virtual:pwa-register");
+      registerSW({ immediate: true, onNeedRefresh() { location.reload(); } });
+    }
+  }
+  createRoot(document.getElementById("root")!).render(<App />);
+})();
+```
 
-### C. Lazy-load heavy admin & legal pages via `React.lazy`
+Add `define: { __APP_VERSION__: JSON.stringify(Date.now().toString()) }` in `vite.config.ts` so each build gets a unique ID.
 
-In `src/App.tsx`, wrap the admin and rarely-used routes with `React.lazy()` + `<Suspense>` so they ship as separate chunks instead of bloating the main one:
+### C. `src/lib/pushNotifications.ts` — stop registering a second SW
 
-- `AdminLogin`, `AdminVerify`, `AdminContacts`, `AdminCoupons`, `AdminWaitlist`, `AdminVaultClaims`
-- `VaultClaim`, `PublicJourneyView`, `Unsubscribe`, `PrivacyPolicy`, `TermsOfService`, `Help`, `Install`, `ResetPassword`
+Change `registerServiceWorker()` to use the *already-registered* Workbox SW instead of `/sw-push.js`:
+```ts
+export const registerServiceWorker = async () => {
+  if (!("serviceWorker" in navigator)) return null;
+  return await navigator.serviceWorker.ready;   // returns the Workbox SW
+};
+```
+Then **port the push event listeners from `public/sw-push.js` into a small `src/sw-push-handlers.ts`** that VitePWA's `injectManifest` mode can include, OR keep the simpler approach: add the `push` and `notificationclick` handlers directly via Workbox's `additionalManifestEntries` workaround — concretely, switch VitePWA's `strategies` to `"injectManifest"` and provide a custom `src/sw.ts` that does:
+```ts
+import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
+import { clientsClaim } from "workbox-core";
+self.skipWaiting(); clientsClaim(); cleanupOutdatedCaches();
+precacheAndRoute(self.__WB_MANIFEST);
+self.addEventListener("push", /* existing logic from sw-push.js */);
+self.addEventListener("notificationclick", /* existing logic */);
+```
+Delete `public/sw-push.js` once handlers are migrated. Result: one SW, one scope, no race.
 
-Keep `UserDashboard`, `GuardianDashboard`, `Login`, `Register`, `Index` eager (hot path).
+### D. `index.html` — add explicit no-cache for the HTML shell
 
-### D. Verification
+Add `<meta http-equiv="Cache-Control" content="no-cache" />` so even if the CDN edge caches `index.html` aggressively, browsers re-validate. (Belt-and-suspenders against future stale shells.)
 
-1. Run `npx vite build` locally → confirm the main chunk drops from 3.18 MB to under 1 MB and total precache stays under 5 MB.
-2. Confirm no new warnings about "dynamic import will not move module into another chunk".
-3. Click **Publish → Update** in the editor → success, no "limit error".
-4. Smoke-test the live site: `/`, `/login`, `/register`, `/dashboard`, `/medical-vault`, `/admin/vault-claims`, `/vault-claim/<token>` all load (chunks fetched on demand are fine).
+### E. Verification
+
+1. `npx vite build` succeeds; `dist/index.html` references `/assets/...` (absolute, not `./assets/...`).
+2. Open the published URL on desktop where the broken old SW lives → on first load the kill-switch unregisters the old SW + clears caches → second load shows the new build.
+3. Open `/dashboard` directly on mobile (cold) → loads (no asset 404s).
+4. Open `/j/<token>` shared link on mobile → loads.
+5. DevTools → Application → Service Workers shows exactly **one** SW (`sw.js`), scope `/`. Push subscription still works (uses the same SW via `serviceWorker.ready`).
+6. Publish a new build → existing users get the update on next page load (no "ghost old version") because `BUILD_ID` changed → unregister + re-register cycle.
+7. Inside the Lovable editor preview iframe, no SW is registered (per existing PWA guidance), so live edits show instantly.
 
 ### What I will NOT change
 
-- No feature, UI, DB, or edge-function changes.
-- PWA precache cap stays at 5 MB; we just stop producing one giant chunk.
-- No package additions or removals.
+- No DB / edge function / RLS changes.
+- No feature, route, or UI changes.
+- No new npm packages (workbox-* is already pulled in transitively by `vite-plugin-pwa`).
+- Push notification behavior preserved — same handlers, just hosted in the unified SW.
 
