@@ -212,19 +212,21 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
       } else if (delivery) {
-        const whatsappOk = delivery.whatsappQueued > 0;
-        const smsOk = delivery.smsQueued > 0;
+        const whatsappOk = (delivery.whatsappAccepted ?? delivery.whatsappQueued) > 0;
+        const smsOk = (delivery.smsAccepted ?? delivery.smsQueued) > 0;
 
         if (delivery.recipientCount === 0) {
-          // Already toasted by AppContext; no fallback possible without numbers
+          // Already toasted by AppContext; do NOT open wa.me when guardian
+          // numbers are invalid or self-targeted — that would just open the
+          // sender's own WhatsApp and look "successful" without delivering.
         } else if (!whatsappOk && !smsOk) {
-          toast.error(`Delivery failed via backend — opening WhatsApp as backup`);
+          toast.error(`Provider didn't accept the alert — opening WhatsApp as backup`);
           guardians.forEach((g, i) => {
             setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
           });
         } else {
           const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
-          toast.success(`SOS sent via ${channels} to ${delivery.recipientCount} guardian(s)`);
+          toast.success(`SOS queued via ${channels} for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`);
         }
       }
     } catch (e: any) {
@@ -359,9 +361,9 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
             <div className="w-16 h-16 rounded-full bg-sos/10 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8 text-sos" />
             </div>
-            <h2 className="text-xl font-bold text-foreground">SOS Alerts Sent!</h2>
+            <h2 className="text-xl font-bold text-foreground">SOS Alerts Submitted</h2>
             <p className="text-muted-foreground text-sm">
-              Emergency alerts sent to {guardians.length} guardian(s) via Email & WhatsApp with your profile, health data & location.
+              Emergency alerts submitted to provider for {guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.
             </p>
           </div>
 
