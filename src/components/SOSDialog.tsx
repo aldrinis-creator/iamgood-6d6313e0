@@ -38,6 +38,7 @@ interface Guardian {
   guardian_email: string | null;
   relation: string | null;
   is_primary: boolean;
+  status?: string;
 }
 
 interface MedHistoryEntry {
@@ -85,7 +86,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes, npRes, historyRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary, status").eq("user_id", uid).eq("status", "accepted").order("is_primary", { ascending: false }),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary, status").eq("user_id", uid).in("status", ["accepted", "pending"]).order("is_primary", { ascending: false }),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("profiles").select("full_name, phone, date_of_birth, gender").eq("id", uid).maybeSingle(),
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
@@ -699,11 +700,21 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 className={`flex items-center justify-between rounded-lg p-3 ${
                   hasIssue
                     ? "bg-destructive/10 border border-destructive/30"
-                    : "bg-secondary/50"
+                    : g.status === "pending"
+                      ? "bg-warning/10 border border-warning/30"
+                      : "bg-secondary/50"
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                  <p className="text-sm font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                    {g.guardian_name}
+                    {g.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                    {g.status === "pending" && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning text-warning">
+                        Pending acceptance — will still be alerted
+                      </Badge>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
                   {g.guardian_email && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
