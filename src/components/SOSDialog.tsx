@@ -616,25 +616,51 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
               Alert Recipients ({guardians.length})
             </h3>
           </div>
-          {guardians.map((g, i) => (
-            <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
-                <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
-                {g.guardian_email && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Mail className="w-3 h-3" />{g.guardian_email}
-                  </p>
-                )}
+          {guardians.map((g, i) => {
+            const digits = (g.guardian_phone || "").replace(/\D/g, "");
+            const withCc = digits.startsWith("91") ? digits : `91${digits}`;
+            const isSender = withCc === "917045868482";
+            const isInvalid = digits.length < 10;
+            const hasIssue = isSender || isInvalid;
+            return (
+              <div
+                key={i}
+                className={`flex items-center justify-between rounded-lg p-3 ${
+                  hasIssue
+                    ? "bg-destructive/10 border border-destructive/30"
+                    : "bg-secondary/50"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                  <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
+                  {g.guardian_email && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="w-3 h-3" />{g.guardian_email}
+                    </p>
+                  )}
+                  {isSender && (
+                    <p className="text-[11px] font-medium text-destructive mt-1 flex items-start gap-1">
+                      <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                      This number matches the WhatsApp sender — MSG91 cannot deliver. Update in My Profile.
+                    </p>
+                  )}
+                  {isInvalid && !isSender && (
+                    <p className="text-[11px] font-medium text-destructive mt-1 flex items-start gap-1">
+                      <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                      Phone number looks invalid.
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MessageCircle className="w-3 h-3 text-success" />
+                    <Mail className="w-3 h-3 text-primary" />
+                  </span>
+                </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <MessageCircle className="w-3 h-3 text-success" />
-                  <Mail className="w-3 h-3 text-primary" />
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {guardians.length === 0 && (
             <p className="text-xs text-destructive font-medium">⚠️ No guardians configured. Add guardians in My Profile.</p>
           )}
