@@ -300,6 +300,10 @@ const NutritionAdvisor = () => {
   const mealFileRef = useRef<HTMLInputElement>(null);
   const autoLaunchedRef = useRef(false);
 
+  // Full-screen camera-only mode: blocks all other actions until photo is captured or user cancels
+  const [cameraOnly, setCameraOnly] = useState(true);
+  const [captureFailed, setCaptureFailed] = useState(false);
+
   // Auto-open camera on first mount: jump straight into Analyze This Meal → camera capture
   useEffect(() => {
     if (autoLaunchedRef.current) return;
@@ -312,6 +316,18 @@ const NutritionAdvisor = () => {
     }, 50);
     return () => clearTimeout(t);
   }, []);
+
+  const openCameraInput = () => {
+    setCaptureFailed(false);
+    mealFileRef.current?.click();
+  };
+
+  const exitCameraOnly = () => {
+    setCameraOnly(false);
+    setCaptureFailed(false);
+    setActiveAction(null);
+    setShowMealUpload(false);
+  };
 
   // Manual meal entry state
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -326,13 +342,30 @@ const NutritionAdvisor = () => {
 
   const handleMealImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
-    if (file.size > MAX_IMAGE_SIZE) { toast.error("Image must be under 4MB"); return; }
+    if (!file) {
+      // User cancelled the OS picker / camera — keep camera-only mode, allow retry
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      if (mealFileRef.current) mealFileRef.current.value = "";
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("Image must be under 4MB");
+      if (mealFileRef.current) mealFileRef.current.value = "";
+      if (cameraOnly) setCaptureFailed(true);
+      return;
+    }
     setMealImagePreview(URL.createObjectURL(file));
     const reader = new FileReader();
     reader.onload = () => setMealImageBase64(reader.result as string);
     reader.readAsDataURL(file);
+    // Successful capture: dismiss the full-screen camera overlay
+    setCameraOnly(false);
+    setCaptureFailed(false);
   };
 
   const clearMealImage = () => {
@@ -574,6 +607,55 @@ const NutritionAdvisor = () => {
       setSaving(false);
     }
   };
+
+  // Full-screen camera-only mode: blocks everything until photo captured or user cancels
+  if (cameraOnly && !mealImagePreview) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        <input
+          ref={mealFileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleMealImageSelect}
+          className="hidden"
+        />
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+          <div className="flex items-center gap-2">
+            <Camera className="w-5 h-5 text-success" />
+            <h2 className="text-base font-semibold">Capture Meal</h2>
+          </div>
+          <Button variant="ghost" size="sm" onClick={exitCameraOnly}>
+            Cancel
+          </Button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6 text-center">
+          <div className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center">
+            <Camera className="w-12 h-12 text-success" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">
+              {captureFailed ? "No photo captured" : "Opening camera…"}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              {captureFailed
+                ? "Tap below to try again, or cancel to choose another option."
+                : "Take a clear photo of your meal for AI-powered nutrition analysis."}
+            </p>
+          </div>
+          <div className="w-full max-w-xs space-y-2">
+            <Button className="w-full gap-2" size="lg" onClick={openCameraInput}>
+              <Camera className="w-5 h-5" />
+              {captureFailed ? "Retry" : "Open Camera"}
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={exitCameraOnly}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showTracker) {
     return (
