@@ -23,9 +23,23 @@ interface ClaimRow {
   status: string;
   death_certificate_url: string | null;
   id_proof_url: string | null;
+  selfie_url: string | null;
   user_window_ends_at: string | null;
   created_at: string;
   reject_reason: string | null;
+  issuing_authority: string | null;
+  certificate_number: string | null;
+  date_of_death: string | null;
+  id_type: string | null;
+  id_number_last4: string | null;
+  nominee_typed_name: string | null;
+  reauth_at: string | null;
+}
+
+interface ActivitySignals {
+  last_sign_in_at: string | null;
+  last_check_in_at: string | null;
+  last_journey_at: string | null;
 }
 
 const STATUS_TONES: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -41,9 +55,15 @@ const AdminVaultClaims = () => {
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, { name: string; phone: string | null }>>({});
   const [guardians, setGuardians] = useState<Record<string, { name: string; phone: string; email: string | null }>>({});
+  const [activity, setActivity] = useState<Record<string, ActivitySignals>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [releaseId, setReleaseId] = useState<string | null>(null);
+  const [releaseConfirmed, setReleaseConfirmed] = useState(false);
+  const [releaseTyped, setReleaseTyped] = useState("");
+  const [releaseNotes, setReleaseNotes] = useState("");
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
