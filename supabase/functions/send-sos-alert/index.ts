@@ -1,9 +1,12 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+console.log("[send-sos-alert] module loaded");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // --- Web Push utilities ---
@@ -114,11 +117,14 @@ function normalizePhone(raw: string | null | undefined): string | null {
 // --- Main handler ---
 
 Deno.serve(async (req) => {
+  console.log("[send-sos-alert] request received", { method: req.method, url: req.url });
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const body = await req.json().catch(() => ({}));
     const {
       user_id,
       message,
@@ -127,7 +133,7 @@ Deno.serve(async (req) => {
       doctor_email,
       doctor_name,
       user_name,
-    } = await req.json();
+    } = body as any;
 
     console.log("[send-sos-alert] START", {
       user_id,
