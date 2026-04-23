@@ -129,44 +129,71 @@ async function tryAmbulanceApi(payload: any): Promise<{ ok: boolean; reason?: st
 }
 
 async function sendWhatsAppViaMsg91(body: RequestBody, healthSummary: string, profileLink: string): Promise<{ ok: boolean; response?: any }> {
-  const authKey = Deno.env.get("MSG91_AUTH_KEY");
-  const templateId = Deno.env.get("MSG91_AMBULANCE_TEMPLATE_ID");
-  if (!authKey || !templateId) {
-    return { ok: false, response: { error: "MSG91 not configured" } };
-  }
-
   const userPhone = body.contacts.find(c => c.role === "patient")?.phone || "";
   const guardianPhone = body.contacts.find(c => c.role === "guardian")?.phone || "—";
+  const pickupAddress = body.pickup.address || `${body.pickup.lat},${body.pickup.lng}`;
 
-  const payload = {
-    template_id: templateId,
-    short_url: "0",
-    recipients: [
-      {
-        mobiles: AMBULANCE_WHATSAPP_NUMBER,
-        patient_name: body.patient_name,
-        pickup_address: body.pickup.address || `${body.pickup.lat},${body.pickup.lng}`,
-        destination: body.destination.name,
-        user_phone: userPhone,
-        guardian_phone: guardianPhone,
-        health_summary: healthSummary.slice(0, 200),
-        profile_link: profileLink,
-        ambulance_type: body.ambulance_type || "BLS",
-      },
-    ],
-  };
+  return sendMsg91WhatsApp("ambulance_dispatch_request", AMBULANCE_WHATSAPP_NUMBER, [
+    body.patient_name,                         // body_1
+    pickupAddress,                             // body_2
+    body.destination.name,                     // body_3
+    userPhone,                                 // body_4
+    guardianPhone,                             // body_5
+    healthSummary.slice(0, 200),               // body_6
+    profileLink,                               // body_7
+    body.ambulance_type || "BLS",              // body_8
+  ]);
+}
 
-  try {
-    const res = await fetch(MSG91_FLOW_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", authkey: authKey },
-      body: JSON.stringify(payload),
+async function notifyGuardians(supabase: any, body: RequestBody, ownerUserId: string, requestId: string) {
+  // Find guardians of the OWNER (the patient). If guardian-initiated, also notify the user.
+  const [guardiansRes, ownerProfileRes] = await Promise.all([
+    supabase.from("guardians").select("guardian_user_id, guardian_phone, guardian_name, is_primary").eq("user_id", ownerUserId).eq("status", "accepted"),
+    supabase.from("profiles").select("full_name").eq("id", ownerUserId).maybeSingle(),
+  ]);
+
+  const wardName = ownerProfileRes.data?.full_name || body.patient_name || "your ward";
+  const notifications: any[] = [];
+
+  // In-app: notify all accepted guardians
+  for (const g of guardiansRes.data || []) {
+    if (g.guardian_user_id) {
+      notifications.push({
+        user_id: g.guardian_user_id,
+        title: `🚑 Ambulance dispatched for ${wardName}`,
+        message: `Pickup: ${body.pickup.address || "current location"} → ${body.destination.name}`,
+        type: "ambulance_dispatched",
+      });
+    }
+  }
+
+  // If guardian-initiated, notify the ward (patient) too
+  if (body.source === "guardian") {
+    notifications.push({
+      user_id: ownerUserId,
+      title: "🚑 Ambulance booked for you",
+      message: `Your guardian booked an ambulance. Pickup: ${body.pickup.address || "your location"} → ${body.destination.name}`,
+      type: "ambulance_dispatched",
     });
-    const json = await res.json().catch(() => ({}));
-    console.log("MSG91 ambulance response:", JSON.stringify(json));
-    return { ok: res.ok, response: json };
-  } catch (e) {
-    return { ok: false, response: { error: String(e) } };
+  }
+
+  if (notifications.length > 0) {
+    await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
+  }
+
+  // MSG91 WhatsApp to primary guardian via Bulk API
+  const primary = (guardiansRes.data || []).find((g: any) => g.is_primary) || (guardiansRes.data || [])[0];
+  if (primary?.guardian_phone) {
+    try {
+      await sendMsg91WhatsApp("ambulance_guardian_notify", normalizePhone(primary.guardian_phone), [
+        wardName,                                  // body_1
+        body.pickup.address || "current location", // body_2
+        body.destination.name,                     // body_3
+        requestId.slice(0, 8),                     // body_4
+      ]);
+    } catch (e) {
+      console.warn("Guardian MSG91 notify failed:", e);
+    }
   }
 }
 
