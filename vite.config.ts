@@ -63,34 +63,6 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-          const after = id.split('node_modules/').pop()!;
-          const pkg = after.startsWith('@')
-            ? after.split('/').slice(0, 2).join('/')
-            : after.split('/')[0];
-
-          // React + every react-* peer in one chunk to guarantee init order
-          if (
-            pkg === 'react' ||
-            pkg === 'react-dom' ||
-            pkg === 'scheduler' ||
-            pkg.startsWith('react-')
-          ) return 'vendor-react';
-
-          if (pkg.startsWith('@radix-ui') || pkg === 'lucide-react' || pkg === 'cmdk') return 'vendor-ui';
-          if (pkg.startsWith('@supabase')) return 'vendor-supabase';
-          if (pkg.startsWith('@tanstack')) return 'vendor-query';
-          // Note: do NOT manualChunk recharts/d3 — let Rollup co-locate them with their dynamic-import callers.
-          // Manual chunking caused a circular-init crash ("Cannot access 'A' before initialization") on first load.
-          if (pkg === 'pdfjs-dist' || pkg === 'jspdf' || pkg === 'html2canvas') return 'vendor-pdf';
-          if (pkg === 'leaflet') return 'vendor-maps';
-          if (pkg === 'date-fns' || pkg === 'zod') return 'vendor-forms';
-          return 'vendor-misc';
-        },
-      },
-    },
+    rollupOptions: {},
   },
 }));
