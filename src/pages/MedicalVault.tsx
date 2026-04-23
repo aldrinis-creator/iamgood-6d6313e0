@@ -110,6 +110,7 @@ const FREQUENCIES: Record<string, string> = {
 const MedicalVaultContent = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  useVaultReminderScheduler();
 
   // --- View Record Dialog ---
   const [viewRecord, setViewRecord] = useState<MedicalRecord | null>(null);
