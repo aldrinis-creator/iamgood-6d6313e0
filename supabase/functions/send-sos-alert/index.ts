@@ -333,16 +333,15 @@ Deno.serve(async (req) => {
 
     const userNameSafe = (user_name || "A Check-iN user").slice(0, 60);
 
-    // --- WhatsApp via MSG91 ---
+    // --- WhatsApp via MSG91 (hardcoded to match working curl exactly) ---
     let whatsappQueued = 0;
     let whatsappRequestId: string | null = null;
     let whatsappError: string | null = null;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-    const integratedNumber = Deno.env.get("MSG91_INTEGRATED_NUMBER") || "917045868482";
-    const waTemplateName = Deno.env.get("MSG91_SOS_TEMPLATE_NAME") || "sos_alert_notification";
-    const namespaceRaw = Deno.env.get("MSG91_SOS_TEMPLATE_ID") || "";
-    const namespace = !namespaceRaw || namespaceRaw.toLowerCase() === "null" ? null : namespaceRaw;
-    const langCode = Deno.env.get("MSG91_SOS_LANG") || "en_US";
+    const integratedNumber = "917045868482";
+    const waTemplateName = "sos_alert_notification";
+    const namespace = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
+    const langCode = "en_US";
 
     if (msg91AuthKey && finalPhones.length) {
       const to_and_components = finalPhones.map((mobile) => ({
