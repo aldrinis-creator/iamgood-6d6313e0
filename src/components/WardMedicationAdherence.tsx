@@ -4,6 +4,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getISTDateString, getISTHour } from "@/lib/istTime";
 
 interface Props {
   wardUserId: string;
@@ -46,26 +47,49 @@ const WardMedicationAdherence = ({ wardUserId, wardName }: Props) => {
           .gte("scheduled_at", start.toISOString()),
       ]);
 
-      const totalDailyDoses = (meds || []).reduce(
-        (sum, m: any) => sum + ((m.schedule_times as string[])?.length || 0),
-        0
+      // Today's scheduled doses so far (only count slots whose time has passed)
+      const currentISTHour = getISTHour();
+      const allScheduleTimes: string[] = (meds || []).flatMap(
+        (m: any) => (m.schedule_times as string[]) || []
       );
+      const dosesScheduledByNowToday = allScheduleTimes.filter((t) => {
+        const h = parseInt((t || "00:00").split(":")[0], 10);
+        return !Number.isNaN(h) && h <= currentISTHour;
+      }).length;
+
+      const todayISTKey = getISTDateString(now);
 
       const days: DayData[] = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().slice(0, 10);
-        const dayLabel = d.toLocaleDateString("en-IN", { weekday: "short" });
+        const istKey = getISTDateString(d);
+        // Short weekday label in IST
+        const dayLabel = d.toLocaleDateString("en-IN", {
+          weekday: "short",
+          timeZone: "Asia/Kolkata",
+        });
 
         const dayLogs = (logs || []).filter(
-          (l: any) => l.scheduled_at?.slice(0, 10) === dateStr
+          (l: any) => getISTDateString(new Date(l.scheduled_at)) === istKey
         );
-        const taken = dayLogs.filter((l: any) => l.status === "taken").length;
+        const taken = dayLogs.filter(
+          (l: any) => l.status === "taken" || l.status === "taken_late"
+        ).length;
         const missed = dayLogs.filter(
           (l: any) => l.status === "missed" || l.status === "skipped"
         ).length;
-        const total = Math.max(totalDailyDoses, taken + missed);
+
+        // Past days: total = whatever was logged (avoids retroactively
+        // inflating history with newly added meds).
+        // Today: total = max(scheduled-by-now, logged) so progress stays
+        // accurate during the day.
+        let total: number;
+        if (istKey === todayISTKey) {
+          total = Math.max(dosesScheduledByNowToday, taken + missed);
+        } else {
+          total = taken + missed;
+        }
         const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
 
         days.push({ day: dayLabel, taken, missed, total, pct });
