@@ -20,7 +20,34 @@ export default function useLocationSync() {
 
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!userId || !settings.shareLocation) return;
+    if (!userId) return;
+
+    // If sharing is OFF, wipe any previously stored lastLocation so the
+    // Guardian app can't keep displaying a stale dot, then stop.
+    if (!settings.shareLocation) {
+      (async () => {
+        const { data } = await supabase
+          .from("user_settings" as any)
+          .select("settings")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const current = (data as any)?.settings || {};
+        if (current?.lastLocation || current?.lastLocationAt) {
+          const { lastLocation, lastLocationAt, ...rest } = current;
+          await supabase
+            .from("user_settings" as any)
+            .upsert(
+              {
+                user_id: userId,
+                settings: rest,
+                updated_at: new Date().toISOString(),
+              } as any,
+              { onConflict: "user_id" }
+            );
+        }
+      })();
+      return;
+    }
 
     const checkSafeZones = async (latitude: number, longitude: number) => {
       try {
