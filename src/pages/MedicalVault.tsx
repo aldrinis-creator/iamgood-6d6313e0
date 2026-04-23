@@ -1070,7 +1070,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                   </Button>
                 </div>
               ) : (
-                <VaultCategorisedSection pin={pinForVault} />
+                <VaultCategorisedSection userId={userId!} pin={pinForVault} />
               )}
             </CardContent>
           </Card>
