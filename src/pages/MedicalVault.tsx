@@ -129,6 +129,8 @@ const MedicalVaultContent = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [activeTab, setActiveTab] = useState("records");
+  const idleToastShownRef = useRef(false);
 
   // --- Profile Tab (fully read-only) ---
   const [profileView, setProfileView] = useState<ProfileViewData | null>(null);
