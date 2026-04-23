@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
         const clean = guardian_phone.replace(/[^0-9]/g, "");
         const mobile = clean.startsWith("91") ? clean : `91${clean}`;
         try {
-          await fetch("https://control.msg91.com/api/v5/flow", {
+          const inviteRes = await fetch("https://control.msg91.com/api/v5/flow", {
             method: "POST",
             headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
             body: JSON.stringify({
@@ -93,9 +93,19 @@ Deno.serve(async (req) => {
               }],
             }),
           });
-          console.log("MSG91 invite sent to:", mobile);
+          const inviteBody = await inviteRes.text();
+          console.log("[send-guardian-invite] MSG91 response", {
+            mobile,
+            status: inviteRes.status,
+            ok: inviteRes.ok,
+            templateId: msg91InviteTemplate,
+            body: inviteBody.slice(0, 600),
+          });
+          if (!inviteRes.ok) {
+            console.error("[send-guardian-invite] MSG91 returned non-OK status", inviteRes.status, inviteBody);
+          }
         } catch (e) {
-          console.error("MSG91 invite error:", e);
+          console.error("[send-guardian-invite] MSG91 invite error:", e);
         }
       } else {
         // Fallback: log WhatsApp link

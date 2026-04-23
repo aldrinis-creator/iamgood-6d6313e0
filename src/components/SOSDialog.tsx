@@ -38,6 +38,7 @@ interface Guardian {
   guardian_email: string | null;
   relation: string | null;
   is_primary: boolean;
+  status?: string;
 }
 
 interface MedHistoryEntry {
@@ -85,7 +86,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
     const [hpRes, gRes, apRes, profileRes, activityRes, wellnessRes, medsRes, tokenRes, npRes, historyRes] = await Promise.all([
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
-      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary, status").eq("user_id", uid).eq("status", "accepted").order("is_primary", { ascending: false }),
+      supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation, is_primary, status").eq("user_id", uid).in("status", ["accepted", "pending"]).order("is_primary", { ascending: false }),
       supabase.from("appointments").select("doctor_name").eq("user_id", uid).order("start_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("profiles").select("full_name, phone, date_of_birth, gender").eq("id", uid).maybeSingle(),
       supabase.from("activity_logs").select("heart_rate, spo2, steps, exercise_minutes").eq("user_id", uid).order("log_date", { ascending: false }).limit(1).maybeSingle(),
@@ -434,6 +435,46 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                     </p>
                   </div>
                 )}
+                {/* Per-recipient summary so the user always sees who was contacted */}
+                {guardians.length > 0 && (
+                  <div className="bg-secondary/40 border border-border rounded-lg p-3 text-left">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Recipients ({guardians.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {guardians.map((g, i) => {
+                        const digits = (g.guardian_phone || "").replace(/\D/g, "");
+                        const withCc = digits.startsWith("91") ? digits : `91${digits}`;
+                        const isSender = withCc === "917045868482";
+                        const isInvalid = digits.length < 10;
+                        const skipped = isSender || isInvalid;
+                        const skipReason = isSender
+                          ? "skipped: matches sender number"
+                          : isInvalid
+                            ? "skipped: invalid number"
+                            : null;
+                        return (
+                          <div key={i} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="min-w-0">
+                              <span className="font-medium text-foreground">{g.guardian_name}</span>
+                              <span className="text-muted-foreground"> · {g.guardian_phone}</span>
+                              {g.status === "pending" && (
+                                <span className="ml-1 text-warning">(pending)</span>
+                              )}
+                            </div>
+                            <span className={`shrink-0 ${skipped ? "text-destructive" : isFailed ? "text-destructive" : "text-success"}`}>
+                              {skipped
+                                ? skipReason
+                                : isFailed
+                                  ? "not delivered"
+                                  : "WA + SMS submitted"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -699,11 +740,21 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 className={`flex items-center justify-between rounded-lg p-3 ${
                   hasIssue
                     ? "bg-destructive/10 border border-destructive/30"
-                    : "bg-secondary/50"
+                    : g.status === "pending"
+                      ? "bg-warning/10 border border-warning/30"
+                      : "bg-secondary/50"
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{g.guardian_name}</p>
+                  <p className="text-sm font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                    {g.guardian_name}
+                    {g.is_primary && <Badge variant="default" className="text-[10px] px-1.5 py-0">Primary</Badge>}
+                    {g.status === "pending" && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning text-warning">
+                        Pending acceptance — will still be alerted
+                      </Badge>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">{g.relation || "Guardian"} · {g.guardian_phone}</p>
                   {g.guardian_email && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
