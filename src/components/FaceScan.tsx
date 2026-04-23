@@ -336,7 +336,7 @@ const FaceScan = () => {
         stressScore: parsed.stress_score || 50,
         confidence: "Fair",
       };
-      await saveResults(scanResult, 0);
+      await saveResults(scanResult, 0, parsed, file);
 
       setResults(scanResult);
       setPhase("results");

@@ -23,7 +23,7 @@ import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const RECORD_TYPES = [
-  "Doctor's Diagnosis", "Lab Report", "Discharge Summary",
+  "Doctor's Diagnosis", "Lab Report", "Visual Check", "Discharge Summary",
   "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Legal Will", "Other",
 ];
 
@@ -545,9 +545,12 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
       </div>
 
       <Tabs defaultValue="records">
-        <TabsList className="w-full grid grid-cols-3">
+        <TabsList className="w-full grid grid-cols-4">
           <TabsTrigger value="records" className="text-xs gap-1">
             <FileText className="w-3 h-3" /> Records
+          </TabsTrigger>
+          <TabsTrigger value="visual" className="text-xs gap-1">
+            <Eye className="w-3 h-3" /> Visual
           </TabsTrigger>
           <TabsTrigger value="profile" className="text-xs gap-1">
             <Heart className="w-3 h-3" /> Profile
