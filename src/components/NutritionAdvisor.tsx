@@ -300,6 +300,10 @@ const NutritionAdvisor = () => {
   const mealFileRef = useRef<HTMLInputElement>(null);
   const autoLaunchedRef = useRef(false);
 
+  // Full-screen camera-only mode: blocks all other actions until photo is captured or user cancels
+  const [cameraOnly, setCameraOnly] = useState(true);
+  const [captureFailed, setCaptureFailed] = useState(false);
+
   // Auto-open camera on first mount: jump straight into Analyze This Meal → camera capture
   useEffect(() => {
     if (autoLaunchedRef.current) return;
@@ -312,6 +316,18 @@ const NutritionAdvisor = () => {
     }, 50);
     return () => clearTimeout(t);
   }, []);
+
+  const openCameraInput = () => {
+    setCaptureFailed(false);
+    mealFileRef.current?.click();
+  };
+
+  const exitCameraOnly = () => {
+    setCameraOnly(false);
+    setCaptureFailed(false);
+    setActiveAction(null);
+    setShowMealUpload(false);
+  };
 
   // Manual meal entry state
   const [showManualEntry, setShowManualEntry] = useState(false);
