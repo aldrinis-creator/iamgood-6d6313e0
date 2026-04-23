@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Wind, Loader2, Thermometer, MapPin, Search, Droplets, CloudRain, Sun, Clock } from "lucide-react";
+import { Wind, Loader2, Thermometer, MapPin, Search, Droplets, CloudRain, Sun, Clock, RefreshCw } from "lucide-react";
 import { formatISTDateTime } from "@/lib/istTime";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -184,6 +184,33 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     );
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (isGuardian) {
+        await fetchWardLocation();
+      } else if (aqiData?.locationName && aqiData.locationName !== "Current Location") {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(aqiData.locationName)}&limit=1`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          await fetchEnvironmentData(parseFloat(data[0].lat), parseFloat(data[0].lon), aqiData.locationName);
+        } else {
+          fetchDefaultLocation();
+        }
+      } else {
+        fetchDefaultLocation();
+      }
+      toast.success("Updated");
+    } catch {
+      toast.error("Failed to refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
     if (isGuardian) {
@@ -305,12 +332,24 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
                 onClick={() => { if (role === "guardian") toast.info("Subscribe as a User"); }}
               >{aqiData.locationName}</p>
             </div>
-            {fetchedAt && (
-              <div className="flex items-center gap-1 mb-3 ml-6">
-                <Clock className="w-3 h-3 text-muted-foreground" />
-                <p className="text-[10px] text-muted-foreground">Updated: {formatISTDateTime(fetchedAt)}</p>
-              </div>
-            )}
+            <div className="flex items-center justify-between mb-3 ml-6">
+              {fetchedAt ? (
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-muted-foreground" />
+                  <p className="text-[10px] text-muted-foreground">Updated: {formatISTDateTime(fetchedAt)}</p>
+                </div>
+              ) : <span />}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleRefresh}
+                disabled={refreshing || loading}
+                aria-label="Refresh"
+              >
+                {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
             <div className="flex items-center gap-4">
               <div className={cn(
                 "w-14 h-14 rounded-full flex flex-col items-center justify-center text-white shrink-0 shadow-inner",

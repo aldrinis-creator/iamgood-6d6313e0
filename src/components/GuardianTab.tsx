@@ -4,7 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Trash2, Mail, Lock, RefreshCw } from "lucide-react";
+import { Loader2, Trash2, Mail, Lock, RefreshCw, Star } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,6 +53,9 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [relation, setRelation] = useState("");
+
+  const [primaryCandidate, setPrimaryCandidate] = useState<Guardian | null>(null);
+  const [settingPrimary, setSettingPrimary] = useState(false);
 
   const fetchGuardians = useCallback(async () => {
     if (!userId) return;
@@ -135,6 +148,33 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     setAdding(false);
   };
 
+  const handleSetPrimary = async () => {
+    if (!primaryCandidate || !userId) return;
+    setSettingPrimary(true);
+    const { error: clearError } = await supabase
+      .from("guardians")
+      .update({ is_primary: false })
+      .eq("user_id", userId)
+      .eq("is_primary", true);
+    if (clearError) {
+      toast.error("Failed to update primary guardian");
+      setSettingPrimary(false);
+      return;
+    }
+    const { error: setError } = await supabase
+      .from("guardians")
+      .update({ is_primary: true })
+      .eq("id", primaryCandidate.id);
+    if (setError) {
+      toast.error("Failed to update primary guardian");
+    } else {
+      toast.success("Primary guardian updated");
+      fetchGuardians();
+    }
+    setSettingPrimary(false);
+    setPrimaryCandidate(null);
+  };
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("guardians").delete().eq("id", id);
     if (error) {
@@ -194,9 +234,20 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {g.is_primary && (
+                    {g.is_primary ? (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">Primary</span>
-                    )}
+                    ) : g.status === "accepted" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setPrimaryCandidate(g)}
+                        title="Set as Primary"
+                        aria-label="Set as Primary"
+                      >
+                        <Star className="w-4 h-4" />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -287,6 +338,24 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
         requiredPlan={plan === "free" ? "basic" : "premium"}
         description={`Your current plan allows ${guardianLimit} guardian(s). Upgrade to add more.`}
       />
+
+      <AlertDialog open={!!primaryCandidate} onOpenChange={(o) => !o && setPrimaryCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make {primaryCandidate?.guardian_name} your Primary Guardian?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will be the first contact for SOS alerts and emergency profile sharing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={settingPrimary}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleSetPrimary(); }} disabled={settingPrimary}>
+              {settingPrimary && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Set as Primary
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TabsContent>
   );
 };
