@@ -57,9 +57,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setRole = useCallback((r: UserRole) => setRoleOverride(r), []);
 
   const invokeSosAlertOnce = useCallback(async (sosId: string) => {
-    if (invokedSosIdsRef.current.has(sosId)) return;
+    if (invokedSosIdsRef.current.has(sosId)) {
+      console.log("[triggerSOS] skipping duplicate invoke for sosId:", sosId);
+      return { skipped: true } as any;
+    }
     invokedSosIdsRef.current.add(sosId);
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) return { error: "no-session" } as any;
     try {
       const currentUserName = profile?.full_name || "User";
       const { data: guardianRows } = await supabase
@@ -71,7 +74,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const guardian_emails = (guardianRows ?? []).map((g: any) => g.guardian_email).filter(Boolean);
       const guardian_phones = (guardianRows ?? []).map((g: any) => g.guardian_phone).filter(Boolean);
 
-      await supabase.functions.invoke("send-sos-alert", {
+      console.log("[triggerSOS] invoking send-sos-alert", {
+        sosId,
+        acceptedGuardians: guardianRows?.length ?? 0,
+        phones: guardian_phones.length,
+        emails: guardian_emails.length,
+      });
+
+      const { data, error } = await supabase.functions.invoke("send-sos-alert", {
         body: {
           user_id: session.user.id,
           message: `🚨 SOS ALERT from ${currentUserName} — immediate attention needed.`,
@@ -80,8 +90,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           user_name: currentUserName,
         },
       });
-    } catch (e) {
-      console.error("Failed to invoke send-sos-alert:", e);
+
+      if (error) {
+        console.error("[triggerSOS] send-sos-alert invoke error:", error);
+        toast.error(`SOS backend error: ${error.message || "invoke failed"}`);
+        return { error };
+      }
+
+      console.log("[triggerSOS] send-sos-alert response:", data);
+
+      const recipientCount = (data as any)?.recipientCount ?? 0;
+      const whatsappQueued = (data as any)?.whatsappQueued ?? 0;
+      const smsQueued = (data as any)?.smsQueued ?? 0;
+
+      if (recipientCount === 0) {
+        toast.error("SOS sent, but no accepted guardians have valid phone numbers.");
+      } else if (whatsappQueued === 0 && smsQueued === 0) {
+        const errs = (data as any)?.errors || {};
+        toast.error(`SOS delivery failed. WhatsApp: ${errs.whatsapp || "n/a"} | SMS: ${errs.sms || "n/a"}`);
+      }
+
+      return { data };
+    } catch (e: any) {
+      console.error("[triggerSOS] Failed to invoke send-sos-alert:", e);
+      toast.error(`SOS invoke failed: ${e?.message || String(e)}`);
+      return { error: e };
     }
   }, [session?.user?.id, profile?.full_name]);
 
@@ -117,8 +150,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw error;
       } else if (data) {
         setActiveSosId(data.id);
-        // Fire-and-forget edge function invocation (deduped by sos id)
-        invokeSosAlertOnce(data.id);
+        // Await invoke so we surface backend errors instead of silently failing.
+        await invokeSosAlertOnce(data.id);
       }
     } catch (err) {
       console.error("Failed to create SOS event (may be offline):", err);
