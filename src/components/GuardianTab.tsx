@@ -338,6 +338,24 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
         requiredPlan={plan === "free" ? "basic" : "premium"}
         description={`Your current plan allows ${guardianLimit} guardian(s). Upgrade to add more.`}
       />
+
+      <AlertDialog open={!!primaryCandidate} onOpenChange={(o) => !o && setPrimaryCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make {primaryCandidate?.guardian_name} your Primary Guardian?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They will be the first contact for SOS alerts and emergency profile sharing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={settingPrimary}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleSetPrimary(); }} disabled={settingPrimary}>
+              {settingPrimary && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Set as Primary
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TabsContent>
   );
 };
