@@ -58,7 +58,7 @@ const wellnessHubSubItems = [
 
 const subToolComponents: Record<string, React.FC> = {
   "Doctor Visit Report": DoctorVisitReport,
-  "Medical Documents": MedicalDocuments,
+  
   "Document Analyzer": DocumentAnalyzer,
   "Symptom Checker": SymptomChecker,
   "Medication Info": MedicationInfo,
