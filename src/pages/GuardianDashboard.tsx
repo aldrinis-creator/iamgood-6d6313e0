@@ -339,17 +339,25 @@ const GuardianDashboard = () => {
         endsAt: s?.checkOutConfig?.endsAt,
         reason: s?.checkOutConfig?.reason,
       });
-      setLocationConsent(s?.shareLocationWithGuardian !== false);
+      // Strict consent: must be ON for BOTH the SOS-location toggle AND the
+      // always-share-with-guardian toggle. Either being false hides the map.
+      const consent =
+        s?.shareLocationWithGuardian !== false && s?.shareLocation !== false;
+      setLocationConsent(consent);
       if (typeof s?.batteryLevel === "number") {
         setWardBattery(s.batteryLevel);
       }
       if ((data as any)?.updated_at) {
         setBatteryUpdatedAt((data as any).updated_at);
       }
-      // Read ward's saved location
-      if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+      // Read ward's saved location only if consent is on — otherwise wipe state
+      // so a previously-shown dot can't leak after consent flips off.
+      if (consent && s?.lastLocation?.lat && s?.lastLocation?.lng) {
         setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
         if (s?.lastLocationAt) setLocationUpdatedAt(s.lastLocationAt);
+      } else if (!consent) {
+        setWardLocation(null);
+        setLocationUpdatedAt(null);
       }
     }
   }, []);
@@ -611,6 +619,8 @@ const GuardianDashboard = () => {
 
   const handleRefreshLocation = async () => {
     if (!wardUserId) return;
+    // Hard guard: never load location if consent is off (unless active SOS).
+    if (!locationConsent && !activeSOS) return;
     // First try user_settings (latest saved location)
     const { data: settingsData } = await supabase
       .from("user_settings" as any)
@@ -825,7 +835,14 @@ const GuardianDashboard = () => {
           {wardUserId && <GuardianPingDialog wardUserId={wardUserId} wardName={wardName} />}
         </div>
 
-        {showAmbulance && <AmbulanceBooking />}
+        {showAmbulance && (
+          <AmbulanceBooking
+            wardUserId={wardUserId || undefined}
+            wardName={wardName}
+            wardLocation={locationConsent || activeSOS ? wardLocation : null}
+            wardPhone={wardPhone || ""}
+          />
+        )}
 
         {/* ===== TODAY'S CHECK-INS (moved above Alerts) ===== */}
         <Card>

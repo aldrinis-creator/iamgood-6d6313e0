@@ -33,11 +33,13 @@ const GuardianServices = () => {
     if (profile?.phone) setWardPhone(profile.phone);
     else setWardPhone("");
 
-    // Fetch last known location from user_settings
+    // Fetch last known location from user_settings — only honor it if the
+    // ward has consented to sharing location with guardians.
     const { data: settings } = await supabase.from("user_settings" as any).select("settings").eq("user_id", wardUserId).maybeSingle();
     if (settings) {
       const s = (settings as any).settings;
-      if (s?.lastLocation?.lat && s?.lastLocation?.lng) {
+      const consent = s?.shareLocationWithGuardian !== false && s?.shareLocation !== false;
+      if (consent && s?.lastLocation?.lat && s?.lastLocation?.lng) {
         setWardLocation({ lat: s.lastLocation.lat, lng: s.lastLocation.lng });
       } else {
         setWardLocation(null);
