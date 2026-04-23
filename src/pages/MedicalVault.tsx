@@ -547,13 +547,19 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
         </div>
       </div>
 
-      <Tabs defaultValue="records">
-        <TabsList className="w-full grid grid-cols-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="records" className="text-xs gap-1">
             <FileText className="w-3 h-3" /> Records
           </TabsTrigger>
           <TabsTrigger value="visual" className="text-xs gap-1">
             <Eye className="w-3 h-3" /> Visual
+          </TabsTrigger>
+          <TabsTrigger value="doctor-report" className="text-xs gap-1">
+            <FileText className="w-3 h-3" /> Dr Report
+          </TabsTrigger>
+          <TabsTrigger value="doc-analyzer" className="text-xs gap-1">
+            <Search className="w-3 h-3" /> Analyzer
           </TabsTrigger>
           <TabsTrigger value="profile" className="text-xs gap-1">
             <Heart className="w-3 h-3" /> Profile
