@@ -13,7 +13,7 @@ import HealthServices from "@/components/HealthServices";
 import FaceScan from "@/components/FaceScan";
 import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
-import MedicalDocuments from "@/components/health-tools/MedicalDocuments";
+
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
 import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
@@ -38,7 +38,6 @@ const healthTools = [
 
 const healthToolsSubItems = [
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
-  { icon: Upload, label: "Medical Documents", desc: "Upload and organize medical documents" },
   { icon: Search, label: "Document Analyzer", desc: "AI-powered document analysis" },
   { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
@@ -59,7 +58,7 @@ const wellnessHubSubItems = [
 
 const subToolComponents: Record<string, React.FC> = {
   "Doctor Visit Report": DoctorVisitReport,
-  "Medical Documents": MedicalDocuments,
+  
   "Document Analyzer": DocumentAnalyzer,
   "Symptom Checker": SymptomChecker,
   "Medication Info": MedicationInfo,
