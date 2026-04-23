@@ -21,11 +21,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
+import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
 
-const RECORD_TYPES = [
-  "Doctor's Diagnosis", "Lab Report", "Visual Check", "Discharge Summary",
-  "X-Ray / Scan", "Insurance Document", "Vaccination Record", "Legal Will", "Other",
-];
+const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Other"];
+
+const ANALYZER_TYPES = ["Lab Report", "X-Ray / Scan", "Discharge Summary", "Doctor's Diagnosis", "Insurance Document"];
 
 interface MedicalRecord {
   id: string;
