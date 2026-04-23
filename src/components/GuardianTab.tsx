@@ -148,6 +148,33 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     setAdding(false);
   };
 
+  const handleSetPrimary = async () => {
+    if (!primaryCandidate || !userId) return;
+    setSettingPrimary(true);
+    const { error: clearError } = await supabase
+      .from("guardians")
+      .update({ is_primary: false })
+      .eq("user_id", userId)
+      .eq("is_primary", true);
+    if (clearError) {
+      toast.error("Failed to update primary guardian");
+      setSettingPrimary(false);
+      return;
+    }
+    const { error: setError } = await supabase
+      .from("guardians")
+      .update({ is_primary: true })
+      .eq("id", primaryCandidate.id);
+    if (setError) {
+      toast.error("Failed to update primary guardian");
+    } else {
+      toast.success("Primary guardian updated");
+      fetchGuardians();
+    }
+    setSettingPrimary(false);
+    setPrimaryCandidate(null);
+  };
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("guardians").delete().eq("id", id);
     if (error) {
