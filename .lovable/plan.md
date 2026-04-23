@@ -1,37 +1,79 @@
 
-## Plan — Fix MSG91 template name validation error
+## Plan — Show which pending guardians were included or skipped, and why
 
-### What the error means
+Today the SOS confirmation already lists every guardian and tags them `(pending)`, but the included/skipped reason is inferred client-side from the phone number. That breaks down for cases the client can't see (e.g. a backend-side dedupe, an invalid normalization, or a guardian row whose status changed between the dialog opening and the SOS firing). I'll make the backend the source of truth and surface its decision per recipient in the UI.
 
-MSG91 is rejecting the template name with: *"The message template name can only have lower-case letters and underscores."*
+### Backend — `supabase/functions/send-sos-alert/index.ts`
 
-This is a **MSG91 dashboard validation rule** when you create/register a new WhatsApp or SMS template. The template **name field** (not the body content) must match: `^[a-z_]+$` — only lowercase letters and underscores. No digits, no hyphens, no spaces, no uppercase.
+Add an explicit `recipients` array to the response so the UI shows exactly what the function decided for each guardian:
 
-This is not a code issue in your project — it's about what you type into the "Template Name" field in the MSG91 dashboard when registering the Guardian Invite template from the previous step.
+```ts
+recipients: [
+  {
+    guardian_id: string,
+    name: string,
+    phone_raw: string,         // as stored in guardians table
+    phone_normalized: string,  // E.164 form, or null if invalid
+    status: "accepted" | "pending",
+    included: boolean,
+    skip_reason: null
+      | "self_targeted"        // matches MSG91 sender 917045868482
+      | "invalid_phone"        // failed normalization
+      | "duplicate_phone",     // same number as another guardian, deduped
+    channels: {
+      whatsapp: "accepted" | "rejected" | "not_attempted",
+      sms:      "accepted" | "rejected" | "not_attempted",
+    },
+  },
+]
+```
 
-### Recommended template names
+Build this list during the recipient-resolution pass (where `phoneMeta` is already built). Tag each row with `status` from the guardians table (so pending vs accepted is preserved), and stamp the per-channel outcome from the existing `whatsappAccepted` / `smsAccepted` / `whatsappError` / `smsError` results once the WA + SMS calls return.
 
-For the Guardian Invite templates you're creating, use these MSG91-valid names:
+No DB schema changes. The existing `sos_message_attempts` insert is unchanged.
 
-- **WhatsApp template name:** `guardian_nomination_invite`
-- **SMS template name:** `guardian_nomination_invite_sms`
+### Frontend — `src/components/SOSDialog.tsx`
 
-Both are all lowercase, underscores only — they will pass MSG91 validation.
+Replace the current ad-hoc per-guardian row with a structured "Recipients" section in the confirmation banner, driven by the backend `recipients` array (with a graceful fallback to the existing local-inference behavior if the backend doesn't return it yet, e.g. during deploy lag).
 
-### After approval — what to do with the Template ID
+Layout (rendered inside the existing delivery summary card):
 
-1. MSG91 will issue a Template ID once the template is approved (different from the name).
-2. Copy that Template ID.
-3. Update the `MSG91_INVITE_TEMPLATE_ID` secret in Lovable Cloud → Backend → Secrets with the new ID (the secret already exists; just paste the new value).
-4. No code redeploy is needed — `send-guardian-invite` reads the secret at request time.
+```text
+Recipients (2)
 
-### Verification
+✓ Don Carlos · +91 98xxxxxx12   [accepted]    WA submitted · SMS submitted
+✓ Aisha M.   · +91 99xxxxxx34   [pending]     WA submitted · SMS submitted
+                                              Pending acceptance — alerted anyway
 
-1. MSG91 accepts the template name without the lowercase/underscore error.
-2. Once approved, sending an invite from My Profile triggers `send-guardian-invite`, and the function logs (already added in the previous step) show MSG91 returning `type: "success"` with a `request_id`.
-3. The new guardian receives the WhatsApp invite on their handset.
+✗ Skipped (1)
+  Test Guardian · +91 70 4586 8482  [pending]
+  Reason: phone matches the WhatsApp sender number — MSG91 cannot
+          deliver from sender to itself. Update in My Profile.
+```
+
+Rules:
+- Included guardians get a green check, an `accepted` or `pending` badge (amber for pending), and a per-channel status line.
+- Pending-included guardians get a one-line note: *"Pending acceptance — alerted anyway."*
+- Skipped guardians are grouped under a red "Skipped" header with a plain-English reason mapped from `skip_reason` (`self_targeted` → "matches sender number", `invalid_phone` → "phone number is invalid", `duplicate_phone` → "duplicate of another guardian — deduped").
+- Top-of-card summary updates accordingly: `Submitted via WhatsApp + SMS for N guardian(s) · M skipped`.
+
+### Type updates
+
+- Extend `SOSDeliveryResult` in `src/contexts/AppContext.tsx` with the new `recipients` array (optional, so older backends don't break the build).
+- Pass it through unchanged from `triggerSOS` to the dialog.
+
+### Verification (after deploy)
+
+1. Trigger SOS with a mix of accepted + pending guardians, including one whose phone matches `917045868482` and one with a malformed number.
+2. Edge logs show the new `recipients` array in the response.
+3. The SOS confirmation card renders:
+   - Included accepted + pending guardians with per-channel "submitted" tags.
+   - A "Skipped" group listing the self-targeted and invalid-phone guardians with the right reason.
+4. Refreshing the dialog while a pending guardian's status flips to accepted in another tab still shows the correct per-recipient state on the next SOS.
 
 ### What I will NOT change
 
-- No code edits — this is purely a MSG91 dashboard naming issue.
-- No secret rotation unless MSG91 issues a new Template ID after approval.
+- No DB migration.
+- No change to MSG91 templates or secrets.
+- No change to the existing 24h auto-accept rule for pending guardians.
+- Resolved/closed SOS history view is unchanged in this pass.
