@@ -264,6 +264,24 @@ const UserDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Hydration High-Risk Banner */}
+        {showHydrationBanner && (
+          <Card className="border-amber-500/40 bg-amber-500/10">
+            <CardContent className="p-3 flex items-center gap-3">
+              <Droplets className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Hot &amp; humid today</p>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round(hydration!.temp!)}°C / {Math.round(hydration!.humidity!)}% humidity. Sip water often.
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={dismissHydrationBanner} aria-label="Dismiss">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Check-In Card */}
         <CheckInCard />
 
