@@ -51,7 +51,16 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     // not inside provider — ignore
   }
 
+  const { userName } = useApp();
   const [aqiData, setAqiData] = useState<AQIData | null>(null);
+
+  // Humidity-triggered hydration nudge (user role only)
+  useHydrationNudge(
+    !isGuardian ? aqiData?.humidity : undefined,
+    !isGuardian ? aqiData?.temp : undefined,
+    userName,
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [noWardLocation, setNoWardLocation] = useState(false);
