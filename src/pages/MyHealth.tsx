@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Eye } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Eye, Receipt } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
+import HospitalBillAnalyzer from "@/components/health-tools/HospitalBillAnalyzer";
 import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
@@ -39,6 +40,7 @@ const healthTools = [
 const healthToolsSubItems = [
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
   { icon: Search, label: "Document Analyzer", desc: "AI-powered document analysis" },
+  { icon: Receipt, label: "Hospital Bill Analyzer", desc: "Check bill for duplicates & overcharging" },
   { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
   { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
@@ -60,6 +62,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Doctor Visit Report": DoctorVisitReport,
   
   "Document Analyzer": DocumentAnalyzer,
+  "Hospital Bill Analyzer": HospitalBillAnalyzer,
   "Symptom Checker": SymptomChecker,
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
