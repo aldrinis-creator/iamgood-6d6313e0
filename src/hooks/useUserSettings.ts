@@ -91,6 +91,9 @@ export interface UserSettings {
   liveLocationGuardianIds: string[];
   // Voice Query custom prompts
   voiceQueryPrompts: string[];
+  // Hydration prompts (humidity-triggered)
+  hydrationNudges: boolean;
+  hydrationAdvisoryToGuardian: boolean;
 }
 
 export const DEFAULT_VOICE_QUERY_PROMPTS = [
