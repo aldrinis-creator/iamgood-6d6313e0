@@ -157,6 +157,8 @@ const DEFAULTS: UserSettings = {
     "Is my calorie goal on track?",
     "Did I take my medications today?",
   ],
+  hydrationNudges: true,
+  hydrationAdvisoryToGuardian: true,
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle
