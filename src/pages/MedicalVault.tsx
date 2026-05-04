@@ -28,7 +28,7 @@ import { useVaultReminderScheduler } from "@/hooks/useVaultReminderScheduler";
 
 const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Other"];
 
-const ANALYZER_TYPES = ["Lab Report", "X-Ray / Scan", "Discharge Summary", "Doctor's Diagnosis", "Insurance Document"];
+const ANALYZER_TYPES = ["Lab Report", "X-Ray / Scan", "Discharge Summary", "Doctor's Diagnosis", "Insurance Document", "Hospital Bill"];
 
 interface MedicalRecord {
   id: string;
