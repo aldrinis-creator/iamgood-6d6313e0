@@ -585,38 +585,89 @@ const HospitalBillAnalyzer = () => {
 
       <Card>
         <CardContent className="p-4 space-y-3">
-          {extracting ? (
-            <div className="flex flex-col items-center gap-2 p-8 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
+          {extracting && (
+            <div className="flex flex-col items-center gap-2 p-6 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
               <span className="text-sm font-medium">Reading the bill…</span>
             </div>
-          ) : imagePreview ? (
-            <div className="relative">
-              <img src={imagePreview} alt="Bill preview" className="w-full rounded-lg border max-h-64 object-contain bg-muted" />
-              <Button size="icon" variant="destructive" className="absolute top-2 right-2 h-7 w-7" onClick={clearFile}>
-                <X className="w-4 h-4" />
-              </Button>
+          )}
+
+          {!extracting && pages.length === 0 && !docFileName && (
+            <div className="space-y-2">
+              <label className="flex flex-col items-center gap-2 p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 bg-gradient-to-b from-muted/30 to-transparent border-border/60">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium">Tap to upload photos of bill pages</span>
+                <span className="text-xs text-muted-foreground">Select multiple — JPG, PNG · max {MAX_PAGES} pages, 10MB each</span>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImagesSelect} className="hidden" />
+              </label>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => docInputRef.current?.click()}
+                  className="text-xs text-primary underline underline-offset-2 hover:text-primary/80"
+                >
+                  Or upload a PDF / Word file instead
+                </button>
+                <input
+                  ref={docInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleDocSelect}
+                  className="hidden"
+                />
+              </div>
             </div>
-          ) : docFileName ? (
+          )}
+
+          {!extracting && pages.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">{pages.length} page{pages.length > 1 ? "s" : ""} selected</span>
+                <Button size="sm" variant="ghost" onClick={clearAll} className="h-7 text-xs">Clear all</Button>
+              </div>
+              <ScrollArea className="w-full">
+                <div className="flex gap-2 pb-2">
+                  {pages.map((p, i) => (
+                    <div key={p.id} className="relative shrink-0 w-24">
+                      <img src={p.previewUrl} alt={`Page ${i + 1}`} className="w-24 h-32 rounded-lg border object-cover bg-muted" />
+                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-background/90 text-[10px] font-semibold border">
+                        {i + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePage(p.id)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90"
+                        aria-label="Remove page"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {pages.length < MAX_PAGES && (
+                    <label className="shrink-0 w-24 h-32 border-2 border-dashed border-primary/40 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary bg-primary/5">
+                      <Upload className="w-5 h-5 text-primary" />
+                      <span className="text-[10px] text-primary font-medium">Add more</span>
+                      <input type="file" accept="image/*" multiple onChange={handleImagesSelect} className="hidden" />
+                    </label>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {!extracting && docFileName && (
             <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
               <FileText className="w-10 h-10 text-primary shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{docFileName}</p>
-                <p className="text-xs text-muted-foreground">{extractedText ? "Text extracted ✓" : "Rendered as image ✓"}</p>
+                <p className="text-xs text-muted-foreground">{extractedText ? "Text extracted ✓" : "Document loaded"}</p>
               </div>
-              <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={clearFile}>
+              <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={clearAll}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
-          ) : (
-            <label className="flex flex-col items-center gap-2 p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 bg-gradient-to-b from-muted/30 to-transparent border-border/60">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Upload className="w-6 h-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Tap to upload bill or take photo</span>
-              <span className="text-xs text-muted-foreground">JPG, PNG, PDF, DOCX — max 10MB</span>
-              <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} onChange={handleFileSelect} className="hidden" />
-            </label>
           )}
 
           <div className="grid grid-cols-2 gap-2 pt-2">
@@ -626,8 +677,8 @@ const HospitalBillAnalyzer = () => {
             <Input type="number" min={0} max={365} placeholder="Admission days" value={admissionDays} onChange={(e) => setAdmissionDays(e.target.value)} />
           </div>
 
-          <Button onClick={analyze} disabled={loading || extracting || (!imageBase64 && !extractedText)} className="w-full">
-            <Receipt className="w-4 h-4 mr-2" /> Analyze Bill
+          <Button onClick={analyze} disabled={loading || extracting || (pages.length === 0 && !extractedText)} className="w-full">
+            <Receipt className="w-4 h-4 mr-2" /> Analyze Bill {pages.length > 1 && `(${pages.length} pages)`}
           </Button>
         </CardContent>
       </Card>
