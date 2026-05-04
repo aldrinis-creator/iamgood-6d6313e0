@@ -40,7 +40,9 @@ export function useHydrationNudge(humidity?: number, temp?: number, userName?: s
   useEffect(() => {
     const lvl = classifyHydration(humidity, temp);
     setLevel(lvl);
-
+    try {
+      window.dispatchEvent(new CustomEvent("hydration-level", { detail: { level: lvl, humidity, temp } }));
+    } catch {}
     if (!settings.hydrationNudges) return;
     if (pauseMode === "sleep" || pauseMode === "checked-out") return;
     if (lvl === "comfortable") return;
