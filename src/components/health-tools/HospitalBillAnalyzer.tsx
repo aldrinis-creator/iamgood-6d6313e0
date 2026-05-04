@@ -397,20 +397,26 @@ const HospitalBillAnalyzer = () => {
       <div className="space-y-4">
         <Button variant="ghost" onClick={() => { setReport(null); setRawResponse(""); setSaved(false); }}>← Back</Button>
 
-        {(imagePreview || extractedText) && (
+        {(pages.length > 0 || extractedText) && (
           <Collapsible className="border border-border rounded-xl overflow-hidden">
             <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-muted/30 hover:bg-muted/50">
               <span className="flex items-center gap-2 font-semibold text-sm">
                 <FileText className="w-4 h-4 text-primary" /> Original Bill
                 {docFileName && <span className="text-xs font-normal text-muted-foreground">— {docFileName}</span>}
+                {pages.length > 1 && <span className="text-xs font-normal text-muted-foreground">— {pages.length} pages</span>}
               </span>
               <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <ScrollArea className="max-h-[300px]">
-                <div className="p-4">
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Bill" className="w-full rounded-lg border object-contain bg-muted" />
+                <div className="p-4 space-y-2">
+                  {pages.length > 0 ? (
+                    pages.map((p, i) => (
+                      <div key={p.id}>
+                        <p className="text-xs text-muted-foreground mb-1">Page {i + 1}</p>
+                        <img src={p.previewUrl} alt={`Page ${i + 1}`} className="w-full rounded-lg border object-contain bg-muted" />
+                      </div>
+                    ))
                   ) : (
                     <pre className="text-xs whitespace-pre-wrap text-foreground/80">{extractedText}</pre>
                   )}
