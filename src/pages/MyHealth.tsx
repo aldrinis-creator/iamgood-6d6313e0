@@ -15,6 +15,7 @@ import VitalsMonitor from "@/components/VitalsMonitor";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 
 import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
+import HospitalBillAnalyzer from "@/components/health-tools/HospitalBillAnalyzer";
 import SymptomChecker from "@/components/health-tools/SymptomChecker";
 import MedicationInfo from "@/components/health-tools/MedicationInfo";
 import TeleConsult from "@/components/health-tools/TeleConsult";
