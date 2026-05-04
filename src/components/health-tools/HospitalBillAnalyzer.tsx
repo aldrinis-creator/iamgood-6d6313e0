@@ -49,14 +49,52 @@ const verdictMeta: Record<Verdict, { label: string; cls: string; icon: typeof Ch
 const fmtINR = (n: number | null | undefined) =>
   typeof n === "number" ? `₹${n.toLocaleString("en-IN")}` : "—";
 
+const MAX_PAGES = 8;
+const MAX_DIMENSION = 1600;
+
+async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error("blob fail"));
+          resolve({ dataUrl, previewUrl: URL.createObjectURL(blob), blob });
+        }, "image/jpeg", 0.8);
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+interface PageItem {
+  id: string;
+  fileName: string;
+  previewUrl: string;
+  base64: string;
+  blob: Blob;
+}
+
 const HospitalBillAnalyzer = () => {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
+  const [pages, setPages] = useState<PageItem[]>([]);
+  const [originalDocFile, setOriginalDocFile] = useState<File | null>(null);
   const [docFileName, setDocFileName] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
 
@@ -85,72 +123,105 @@ const HospitalBillAnalyzer = () => {
     return () => cancelAnimationFrame(frame);
   }, [loading]);
 
-  const clearFile = () => {
-    setOriginalFile(null);
+  const clearAll = () => {
+    pages.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    setPages([]);
+    setOriginalDocFile(null);
     setDocFileName(null);
-    setImagePreview(null);
-    setImageBase64(null);
     setExtractedText(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (docInputRef.current) docInputRef.current.value = "";
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const removePage = (id: string) => {
+    setPages(prev => {
+      const removed = prev.find(p => p.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter(p => p.id !== id);
+    });
+  };
+
+  const handleImagesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    e.target.value = "";
+
+    if (originalDocFile || extractedText) {
+      setOriginalDocFile(null);
+      setDocFileName(null);
+      setExtractedText(null);
+    }
+
+    const remaining = MAX_PAGES - pages.length;
+    if (remaining <= 0) { toast.error(`Max ${MAX_PAGES} pages`); return; }
+    const toProcess = files.slice(0, remaining);
+    if (files.length > remaining) toast.error(`Only ${remaining} more page(s) allowed`);
+
+    setExtracting(true);
+    try {
+      const newPages: PageItem[] = [];
+      for (const f of toProcess) {
+        if (!f.type.startsWith("image/")) { toast.error(`${f.name} is not an image`); continue; }
+        if (f.size > MAX_FILE_SIZE) { toast.error(`${f.name} exceeds 10MB`); continue; }
+        const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(f);
+        newPages.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          fileName: f.name, previewUrl, base64: dataUrl, blob,
+        });
+      }
+      setPages(prev => [...prev, ...newPages]);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to read images");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleDocSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
-    if (selected.size > MAX_FILE_SIZE) {
-      toast.error("File must be under 10MB");
-      e.target.value = "";
-      return;
+    e.target.value = "";
+
+    if (selected.size > MAX_FILE_SIZE) { toast.error("File must be under 10MB"); return; }
+    if (!isDocument(selected)) { toast.error("Please choose a PDF or Word file"); return; }
+
+    if (pages.length) {
+      pages.forEach(p => URL.revokeObjectURL(p.previewUrl));
+      setPages([]);
     }
-
-    setOriginalFile(selected);
-
-    if (isDocument(selected)) {
-      setExtracting(true);
-      setDocFileName(selected.name);
-      setImagePreview(null);
-      setImageBase64(null);
-      try {
-        if (isPDF(selected)) {
-          const { text, hasText } = await extractTextFromPDF(selected);
-          if (hasText) setExtractedText(text);
-          else {
-            const img = await renderPDFPageToImage(selected);
-            setImageBase64(img);
-            setExtractedText(null);
-          }
-        } else if (isDOCX(selected)) {
-          const text = await extractTextFromDOCX(selected);
-          if (text.trim().length > 10) setExtractedText(text);
-          else { toast.error("Could not extract text"); clearFile(); return; }
+    setOriginalDocFile(selected);
+    setDocFileName(selected.name);
+    setExtracting(true);
+    try {
+      if (isPDF(selected)) {
+        const { text, hasText } = await extractTextFromPDF(selected);
+        if (hasText) setExtractedText(text);
+        else {
+          const img = await renderPDFPageToImage(selected);
+          const blobRes = await (await fetch(img)).blob();
+          setPages([{ id: `${Date.now()}-pdf`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes }]);
+          setOriginalDocFile(null);
+          setDocFileName(null);
+          setExtractedText(null);
         }
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to read document");
-        clearFile();
-        return;
-      } finally {
-        setExtracting(false);
+      } else {
+        const text = await extractTextFromDOCX(selected);
+        if (text.trim().length > 10) setExtractedText(text);
+        else { toast.error("Could not extract text"); clearAll(); return; }
       }
-      return;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to read document");
+      clearAll();
+    } finally {
+      setExtracting(false);
     }
-
-    if (!selected.type.startsWith("image/")) {
-      toast.error("Please upload an image, PDF, or Word file");
-      e.target.value = "";
-      return;
-    }
-    setDocFileName(null);
-    setExtractedText(null);
-    setImagePreview(URL.createObjectURL(selected));
-    const reader = new FileReader();
-    reader.onload = () => setImageBase64(reader.result as string);
-    reader.readAsDataURL(selected);
   };
 
   const analyze = async () => {
-    if (!imageBase64 && !extractedText) {
-      toast.error("Please upload a bill (photo, PDF, or Word file)");
+    if (!pages.length && !extractedText) {
+      toast.error("Please upload at least one bill page");
       return;
     }
     setLoading(true);
@@ -174,14 +245,14 @@ const HospitalBillAnalyzer = () => {
         const content = extractedText.substring(0, MAX_TEXT_LENGTH);
         payload = `${ctxLines || "(no extra context)"}\n\nBill content:\n${content}`;
       } else {
-        payload = { image: imageBase64, context };
+        payload = { images: pages.map(p => p.base64), context };
       }
 
       const result = await Promise.race([
         supabase.functions.invoke("health-tools", {
           body: { type: "hospital_bill_analysis", payload },
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 90000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 120000)),
       ]);
       const { data, error } = result;
       if (error) throw error;
@@ -197,7 +268,7 @@ const HospitalBillAnalyzer = () => {
         toast.error("Could not parse the analysis. Please try again.");
       }
     } catch (err: any) {
-      toast.error(err?.message === "timeout" ? "Analysis timed out. Try a smaller file." : "Analysis failed");
+      toast.error(err?.message === "timeout" ? "Analysis timed out. Try fewer/smaller pages." : "Analysis failed");
     } finally {
       setLoading(false);
     }
