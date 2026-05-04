@@ -364,6 +364,15 @@ serve(async (req) => {
         visionPrompt = "Analyze this urine dipstick test strip photo. Read each of the 10 reagent pads against the bottle's reference chart if visible. Return only the JSON object specified.";
       } else if (type === "tongue_analysis") {
         visionPrompt = "Analyze this tongue photo. Identify color, coating, moisture, shape, and any surface features. Flag red flags and set see_doctor level. Return only the JSON object specified.";
+      } else if (type === "hospital_bill_analysis") {
+        const ctx = payload.context || {};
+        const ctxLines = [
+          ctx.hospital_name ? `Hospital: ${ctx.hospital_name}` : null,
+          ctx.city ? `City: ${ctx.city}` : null,
+          ctx.bill_date ? `Bill date: ${ctx.bill_date}` : null,
+          ctx.admission_days ? `Admission days: ${ctx.admission_days}` : null,
+        ].filter(Boolean).join("\n");
+        visionPrompt = `Analyse this hospital / medical bill image for duplicates, overcharging, bundling concerns and missing details.\n\n${ctxLines || "(no extra context provided)"}\n\nReturn only the JSON object specified.`;
       } else if (type === "pill_identification") {
         const activeMeds = Array.isArray(payload.active_medications) ? payload.active_medications : [];
         const bannedList = Array.isArray(payload.banned_substances) ? payload.banned_substances : [];
