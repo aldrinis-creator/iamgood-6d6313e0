@@ -315,23 +315,37 @@ const HospitalBillAnalyzer = () => {
     try {
       let fileUrl: string | null = null;
       let fileName: string | null = docFileName;
+      const extraPaths: string[] = [];
 
-      if (originalFile) {
-        fileName = fileName || originalFile.name;
+      if (originalDocFile) {
+        fileName = fileName || originalDocFile.name;
         const storagePath = `${user.id}/${Date.now()}-${fileName}`;
         const { error: upErr } = await supabase.storage
           .from("medical-documents")
-          .upload(storagePath, originalFile, { contentType: originalFile.type });
+          .upload(storagePath, originalDocFile, { contentType: originalDocFile.type });
         if (!upErr) fileUrl = storagePath;
+      } else if (pages.length) {
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const path = `${user.id}/${Date.now()}-page-${i + 1}.jpg`;
+          const { error: upErr } = await supabase.storage
+            .from("medical-documents")
+            .upload(path, p.blob, { contentType: "image/jpeg" });
+          if (!upErr) {
+            if (!fileUrl) { fileUrl = path; fileName = `Bill (${pages.length} page${pages.length > 1 ? "s" : ""})`; }
+            else extraPaths.push(path);
+          }
+        }
       }
 
       const md = buildShareableMarkdown(report);
+      const extraNote = extraPaths.length ? `\n\n_Additional pages: ${extraPaths.join(", ")}_` : "";
       const title = `Hospital Bill — ${hospitalName.trim() || new Date().toLocaleDateString("en-IN")}`.substring(0, 80);
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
         title,
         record_type: "Hospital Bill",
-        description: md.substring(0, 50000),
+        description: (md + extraNote).substring(0, 50000),
         file_name: fileName,
         file_url: fileUrl,
         record_date: billDate || new Date().toISOString().split("T")[0],
