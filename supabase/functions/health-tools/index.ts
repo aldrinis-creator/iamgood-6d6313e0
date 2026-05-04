@@ -348,9 +348,15 @@ serve(async (req) => {
     let model = config.model;
     let messages: any[];
 
-    if (typeof payload === "object" && payload?.image) {
-      // Vision mode: always use gemini-2.5-flash for multimodal
-      model = "google/gemini-2.5-flash";
+    const imagesArray: string[] | null = (typeof payload === "object" && Array.isArray(payload?.images) && payload.images.length > 0)
+      ? (payload.images as string[]).slice(0, 8)
+      : null;
+    const singleImage: string | null = (typeof payload === "object" && typeof payload?.image === "string") ? payload.image : null;
+    const hasVision = imagesArray || singleImage;
+
+    if (hasVision) {
+      // Vision mode: gemini-2.5-flash for single image, gemini-2.5-pro for multi-page
+      model = imagesArray && imagesArray.length > 1 ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 
       let visionPrompt = "Please read and analyze this image.";
       if (type === "prescription_scan") {
@@ -372,7 +378,10 @@ serve(async (req) => {
           ctx.bill_date ? `Bill date: ${ctx.bill_date}` : null,
           ctx.admission_days ? `Admission days: ${ctx.admission_days}` : null,
         ].filter(Boolean).join("\n");
-        visionPrompt = `Analyse this hospital / medical bill image for duplicates, overcharging, bundling concerns and missing details.\n\n${ctxLines || "(no extra context provided)"}\n\nReturn only the JSON object specified.`;
+        const multiNote = imagesArray && imagesArray.length > 1
+          ? `\n\nThe bill spans ${imagesArray.length} pages provided IN ORDER. Treat them as ONE single bill: sum totals across pages, do not double-count items repeated in headers/footers, and identify duplicates only if the same line item appears twice in the body.`
+          : "";
+        visionPrompt = `Analyse this hospital / medical bill image for duplicates, overcharging, bundling concerns and missing details.\n\n${ctxLines || "(no extra context provided)"}${multiNote}\n\nReturn only the JSON object specified.`;
       } else if (type === "pill_identification") {
         const activeMeds = Array.isArray(payload.active_medications) ? payload.active_medications : [];
         const bannedList = Array.isArray(payload.banned_substances) ? payload.banned_substances : [];
@@ -383,13 +392,18 @@ serve(async (req) => {
         visionPrompt = `Identify this pill from the photo.\n\nUSER'S ACTIVE MEDICATIONS:\n${medsBlock}\n\nBANNED/RESTRICTED SUBSTANCES IN INDIA (single-substance keywords):\n${bannedBlock}\n\nReturn only the JSON object specified.`;
       }
 
+      const imageParts = (imagesArray || [singleImage as string]).map((url) => ({
+        type: "image_url",
+        image_url: { url },
+      }));
+
       messages = [
         { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
             { type: "text", text: visionPrompt },
-            { type: "image_url", image_url: { url: payload.image as string } },
+            ...imageParts,
           ],
         },
       ];
