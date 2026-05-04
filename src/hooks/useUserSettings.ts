@@ -91,6 +91,9 @@ export interface UserSettings {
   liveLocationGuardianIds: string[];
   // Voice Query custom prompts
   voiceQueryPrompts: string[];
+  // Hydration prompts (humidity-triggered)
+  hydrationNudges: boolean;
+  hydrationAdvisoryToGuardian: boolean;
 }
 
 export const DEFAULT_VOICE_QUERY_PROMPTS = [
@@ -154,6 +157,8 @@ const DEFAULTS: UserSettings = {
     "Is my calorie goal on track?",
     "Did I take my medications today?",
   ],
+  hydrationNudges: true,
+  hydrationAdvisoryToGuardian: true,
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle

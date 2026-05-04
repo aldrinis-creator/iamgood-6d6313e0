@@ -638,12 +638,26 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.guardianPush} onCheckedChange={(v) => updateSetting("guardianPush", v)} />
                 </div>
-                <div className="flex items-center justify-between py-3">
+                <div className="flex items-center justify-between py-3 border-b border-border">
                   <div>
                     <p className="text-sm font-medium">Medication Missed Alerts</p>
                     <p className="text-xs text-muted-foreground">Get notified when your ward misses a medication dose</p>
                   </div>
                   <Switch checked={settings.medicationMissedNotify} onCheckedChange={(v) => updateSetting("medicationMissedNotify", v)} />
+                </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div>
+                    <p className="text-sm font-medium">Hydration Reminders</p>
+                    <p className="text-xs text-muted-foreground">Gentle nudges when it's hot & humid outside</p>
+                  </div>
+                  <Switch checked={settings.hydrationNudges} onCheckedChange={(v) => updateSetting("hydrationNudges", v)} />
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium">Hydration Advisory to Guardian</p>
+                    <p className="text-xs text-muted-foreground">Notify primary guardian on extreme heat & humidity days</p>
+                  </div>
+                  <Switch checked={settings.hydrationAdvisoryToGuardian} onCheckedChange={(v) => updateSetting("hydrationAdvisoryToGuardian", v)} />
                 </div>
               </CardContent>
             </Card>

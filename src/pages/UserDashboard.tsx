@@ -1,4 +1,4 @@
-import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight, Droplets, X } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
 import VaultClaimCancelBanner from "@/components/vault/VaultClaimCancelBanner";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
@@ -76,6 +76,27 @@ const UserDashboard = () => {
     return !localStorage.getItem("onboarding_complete");
   });
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Hydration high-risk banner state
+  const [hydration, setHydration] = useState<{ humidity?: number; temp?: number; level: string } | null>(null);
+  const [hydrationDismissed, setHydrationDismissed] = useState(() => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    return localStorage.getItem("hydration_banner_dismissed_date") === today;
+  });
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      setHydration(d);
+    };
+    window.addEventListener("hydration-level", handler);
+    return () => window.removeEventListener("hydration-level", handler);
+  }, []);
+  const dismissHydrationBanner = () => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    localStorage.setItem("hydration_banner_dismissed_date", today);
+    setHydrationDismissed(true);
+  };
+  const showHydrationBanner = settings.hydrationNudges && hydration?.level === "high_risk" && !hydrationDismissed;
 
   // Notify all guardians about mode change
   const notifyGuardians = useCallback(async (title: string, message: string) => {
@@ -242,6 +263,24 @@ const UserDashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Hydration High-Risk Banner */}
+        {showHydrationBanner && (
+          <Card className="border-amber-500/40 bg-amber-500/10">
+            <CardContent className="p-3 flex items-center gap-3">
+              <Droplets className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Hot &amp; humid today</p>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round(hydration!.temp!)}°C / {Math.round(hydration!.humidity!)}% humidity. Sip water often.
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={dismissHydrationBanner} aria-label="Dismiss">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Check-In Card */}
         <CheckInCard />

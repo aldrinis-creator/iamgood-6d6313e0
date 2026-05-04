@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useHydrationNudge } from "@/hooks/useHydrationNudge";
+import { useApp } from "@/contexts/AppContext";
 
 // Public browser key, restricted in Google Cloud (HTTP referrers + Air Quality API only).
 const API_KEY = "AIzaSyAhR4Tw_kXEQyzxbD2O3kXlr5YzJDq_Psc";
@@ -49,7 +51,16 @@ const AQIWidget = ({ role = "user" }: { role?: "user" | "guardian" }) => {
     // not inside provider — ignore
   }
 
+  const { userName } = useApp();
   const [aqiData, setAqiData] = useState<AQIData | null>(null);
+
+  // Humidity-triggered hydration nudge (user role only)
+  useHydrationNudge(
+    !isGuardian ? aqiData?.humidity : undefined,
+    !isGuardian ? aqiData?.temp : undefined,
+    userName,
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [noWardLocation, setNoWardLocation] = useState(false);
