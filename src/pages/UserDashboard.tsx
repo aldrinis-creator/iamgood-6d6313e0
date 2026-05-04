@@ -77,6 +77,27 @@ const UserDashboard = () => {
   });
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout>>();
 
+  // Hydration high-risk banner state
+  const [hydration, setHydration] = useState<{ humidity?: number; temp?: number; level: string } | null>(null);
+  const [hydrationDismissed, setHydrationDismissed] = useState(() => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    return localStorage.getItem("hydration_banner_dismissed_date") === today;
+  });
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      setHydration(d);
+    };
+    window.addEventListener("hydration-level", handler);
+    return () => window.removeEventListener("hydration-level", handler);
+  }, []);
+  const dismissHydrationBanner = () => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    localStorage.setItem("hydration_banner_dismissed_date", today);
+    setHydrationDismissed(true);
+  };
+  const showHydrationBanner = settings.hydrationNudges && hydration?.level === "high_risk" && !hydrationDismissed;
+
   // Notify all guardians about mode change
   const notifyGuardians = useCallback(async (title: string, message: string) => {
     if (!session?.user?.id) return;
