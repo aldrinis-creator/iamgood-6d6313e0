@@ -62,6 +62,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Doctor Visit Report": DoctorVisitReport,
   
   "Document Analyzer": DocumentAnalyzer,
+  "Hospital Bill Analyzer": HospitalBillAnalyzer,
   "Symptom Checker": SymptomChecker,
   "Medication Info": MedicationInfo,
   "Tele-Consult": TeleConsult,
