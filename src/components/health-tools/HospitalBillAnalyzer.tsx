@@ -323,7 +323,8 @@ const HospitalBillAnalyzer = () => {
         const { error: upErr } = await supabase.storage
           .from("medical-documents")
           .upload(storagePath, originalDocFile, { contentType: originalDocFile.type });
-        if (!upErr) fileUrl = storagePath;
+        if (upErr) console.warn("[HospitalBillAnalyzer] doc upload failed:", upErr);
+        else fileUrl = storagePath;
       } else if (pages.length) {
         for (let i = 0; i < pages.length; i++) {
           const p = pages[i];
@@ -331,7 +332,9 @@ const HospitalBillAnalyzer = () => {
           const { error: upErr } = await supabase.storage
             .from("medical-documents")
             .upload(path, p.blob, { contentType: "image/jpeg" });
-          if (!upErr) {
+          if (upErr) {
+            console.warn(`[HospitalBillAnalyzer] page ${i + 1} upload failed:`, upErr);
+          } else {
             if (!fileUrl) { fileUrl = path; fileName = `Bill (${pages.length} page${pages.length > 1 ? "s" : ""})`; }
             else extraPaths.push(path);
           }
