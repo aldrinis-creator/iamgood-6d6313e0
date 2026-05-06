@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { queueSOS } from "@/lib/offlineQueue";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 export type UserRole = "user" | "guardian";
 export type PauseMode = "active" | "sleep" | "checked-out";
