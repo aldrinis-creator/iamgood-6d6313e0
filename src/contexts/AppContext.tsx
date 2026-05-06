@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { queueSOS } from "@/lib/offlineQueue";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 export type UserRole = "user" | "guardian";
 export type PauseMode = "active" | "sleep" | "checked-out";
@@ -102,6 +103,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeSosId, setActiveSosId] = useState<string | null>(null);
   const [roleOverride, setRoleOverride] = useState<UserRole | null>(null);
   const [pauseMode, setPauseMode] = useState<PauseMode>("active");
+  const { settings, isLoading: settingsLoading } = useUserSettings();
+  const pauseHydratedRef = useRef(false);
+
+  // Hydrate pauseMode from persisted settings on first load (per session).
+  // Only restore "checked-out" if endsAt is still in the future.
+  useEffect(() => {
+    if (pauseHydratedRef.current) return;
+    if (!session?.user?.id) return;
+    if (settingsLoading) return;
+    pauseHydratedRef.current = true;
+    if (settings.pauseMode === "checked-out") {
+      const endsAt = settings.checkOutConfig?.endsAt;
+      if (endsAt && new Date(endsAt).getTime() > Date.now()) {
+        setPauseMode("checked-out");
+      }
+    }
+    // sleep mode is re-asserted by useAutoSleepMode based on schedule
+  }, [session?.user?.id, settingsLoading, settings.pauseMode, settings.checkOutConfig]);
+
   const invokedSosIdsRef = React.useRef<Set<string>>(new Set());
 
   const isLoggedIn = !!session;
