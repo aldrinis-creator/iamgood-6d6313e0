@@ -1,28 +1,46 @@
-## Fix: Hospital Bill Analyzer not saving to Medical Vault
+## Problem
 
-### Root cause
-The `medical_records.record_type` column has a CHECK constraint whitelist that doesn't include `'Hospital Bill'`. Every save from the Hospital Bill Analyzer is rejected by Postgres, so nothing reaches the Analyzer tab.
+When a user picks "Date Range" in Check-Out (e.g. 10 days), the dialog correctly saves `checkOutConfig` (with `endsAt` = end-of-day on the last selected date) to `user_settings` in the DB. However, after a reload (or even a re-render when settings finish loading), the dashboard shows **Active** mode again, so daily check-in reminders resume.
 
-Current allowed values: `Doctor's Diagnosis, Lab Report, Discharge Summary, X-Ray / Scan, Insurance Document, Vaccination Record, Legal Will, Visual Check, Other`.
+## Root cause
 
-### Changes
+`pauseMode` lives in `AppContext` as plain React state, initialised to `"active"`:
 
-**1. DB migration** — replace the CHECK constraint to add `'Hospital Bill'`:
-
-```sql
-ALTER TABLE public.medical_records DROP CONSTRAINT IF EXISTS medical_records_record_type_check;
-
-ALTER TABLE public.medical_records ADD CONSTRAINT medical_records_record_type_check
-  CHECK (record_type = ANY (ARRAY[
-    'Doctor''s Diagnosis','Lab Report','Discharge Summary','X-Ray / Scan',
-    'Insurance Document','Vaccination Record','Legal Will','Visual Check',
-    'Hospital Bill','Other'
-  ]));
+```ts
+// src/contexts/AppContext.tsx:104
+const [pauseMode, setPauseMode] = useState<PauseMode>("active");
 ```
 
-**2. Frontend hardening** in `src/components/health-tools/HospitalBillAnalyzer.tsx` `saveToVault`:
-- Log storage upload errors via `console.warn` instead of silently swallowing them, so future partial-save issues are visible in the console.
-- Keep existing behavior of inserting the record even if some page uploads fail (analysis text is preserved).
+It is **never hydrated from `settings.pauseMode`** (which IS persisted via `useUserSettings`). So although `updateSetting("pauseMode", "checked-out")` writes to the DB, the in-memory `pauseMode` resets to `"active"` on every fresh app load. The auto-return effect then runs and, finding nothing to do for `"active"`, leaves it active.
 
-### Out of scope
-No changes to `MedicalVault.tsx` — `ANALYZER_TYPES` already contains `"Hospital Bill"`, so once the row inserts it appears under the Analyzer tab automatically.
+The same issue silently affects the Sleep mode persistence on reload, but is masked by `useAutoSleepMode` re-asserting it from the schedule.
+
+## Fix
+
+Hydrate `pauseMode` from persisted settings, and on hydration honour an unexpired `checkOutConfig.endsAt`.
+
+### 1. `src/contexts/AppContext.tsx`
+- Import `useUserSettings` (already used elsewhere — safe inside `AppProvider`, which is nested under `AuthProvider` and `QueryClientProvider`).
+- Add an effect that, once `settings` are loaded, syncs `pauseMode` from `settings.pauseMode` exactly once per session:
+  - If `settings.pauseMode === "checked-out"` and `settings.checkOutConfig?.endsAt` is in the future → `setPauseMode("checked-out")`.
+  - If `settings.pauseMode === "checked-out"` but `endsAt` is past/missing → leave at `"active"` (auto-return semantics).
+  - If `settings.pauseMode === "sleep"` → leave it for `useAutoSleepMode` to re-assert (don't fight it).
+- Track a `hydratedRef` so subsequent local changes via `setPauseMode` are not overridden.
+
+### 2. `src/pages/UserDashboard.tsx`
+- The existing on-mount auto-return effect already handles expired `endsAt`. No change needed there.
+- Confirm `handleCheckOutSave` continues to call `updateSetting("pauseMode", "checked-out")` (already does).
+
+### 3. No DB / migration changes
+`user_settings.settings.pauseMode` is already stored as JSON; nothing to migrate.
+
+## Out of scope
+- Dialog UX (the date-range picker itself works correctly).
+- Guardian notifications (already fire on save).
+- Sleep-mode persistence rework (auto-sleep handles it).
+
+## Verification
+1. Set Check-Out → Date Range → today + 10 days → Save.
+2. Hard reload the app.
+3. Dashboard should still show **Checked Out** with the "Returns at …" line, and check-in reminders should remain paused for the full window.
+4. After `endsAt` passes, the auto-return effect flips back to **Active** and shows the resume toast.
