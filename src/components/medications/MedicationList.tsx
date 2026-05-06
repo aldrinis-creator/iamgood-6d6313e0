@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Pill, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { formatScheduleTime } from "@/lib/istTime";
+import { formatScheduleTime, getISTDateString } from "@/lib/istTime";
 
 interface Medication {
   id: string;
@@ -58,10 +58,12 @@ const MedicationList = () => {
 
   const loadMeds = useCallback(async () => {
     if (!session?.user?.id) return;
+    const today = getISTDateString();
     const { data } = await supabase
       .from("medications")
       .select("*")
       .eq("user_id", session.user.id)
+      .or(`end_date.is.null,end_date.gt.${today}`)
       .order("name");
     setMeds((data as Medication[]) || []);
     setLoading(false);
