@@ -105,6 +105,22 @@ const GuardianServices = () => {
               </CardContent>
             </Card>
           ))}
+          {vaultEligible && wardUserId && (
+            <Card
+              className="cursor-pointer hover:border-primary/30 transition-colors"
+              onClick={() => setShowVault(v => !v)}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Vault Nominee Access</p>
+                  <p className="text-xs text-muted-foreground">Available if the worst should happen.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {showAmbulance && (
@@ -114,6 +130,10 @@ const GuardianServices = () => {
             wardLocation={wardLocation}
             wardPhone={wardPhone}
           />
+        )}
+
+        {showVault && wardUserId && (
+          <VaultClaimCard wardUserId={wardUserId} wardName={wardName} />
         )}
 
         {/* Restricted services */}
