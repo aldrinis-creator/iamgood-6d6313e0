@@ -32,6 +32,7 @@ const MyProfile = lazy(() => import("./pages/MyProfile"));
 const ContactUs = lazy(() => import("./pages/ContactUs"));
 const EmergencyProfile = lazy(() => import("./pages/EmergencyProfile"));
 const GuardianMessages = lazy(() => import("./pages/GuardianMessages"));
+const GuardianAppointments = lazy(() => import("./pages/GuardianAppointments"));
 const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
 
 // Lazy-loaded heavy / rarely-used routes
