@@ -66,6 +66,35 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
   return <WardEmergencyCard wardUserId={wardUserId} wardName={wardName} />;
 };
 
+// Slim Vault claim status strip — renders only when a claim row exists.
+// Tap routes to /services where the full claim card lives.
+const STRIP_LABELS: Record<string, string> = {
+  initiated: "Vault claim started — tap to continue",
+  docs_uploaded: "Vault claim submitted — under review",
+  user_window_open: "Vault claim in 7-day grace window",
+  released: "Vault released — check email for access",
+  rejected: "Vault claim rejected — tap for details",
+};
+const VaultClaimStatusStrip = ({ wardUserId }: { wardUserId: string }) => {
+  const navigate = useNavigate();
+  const { eligible, claim } = useVaultClaimStatus(wardUserId);
+  if (!eligible || !claim) return null;
+  const label = STRIP_LABELS[claim.status];
+  if (!label) return null; // ignore cancelled etc.
+  const isAlert = claim.status === "rejected" || claim.status === "released";
+  return (
+    <button
+      onClick={() => navigate("/services")}
+      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-xs ${
+        isAlert ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-border bg-muted/40 text-muted-foreground"
+      }`}
+    >
+      <span className="flex items-center gap-2"><ShieldAlert className="w-3.5 h-3.5" />{label}</span>
+      <ChevronRight className="w-3.5 h-3.5" />
+    </button>
+  );
+};
+
 // Collapsible section wrapper
 const CollapsibleSection = ({ title, icon, children, defaultOpen = false, forceOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean }) => {
   const [open, setOpen] = useState(defaultOpen || forceOpen);
