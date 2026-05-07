@@ -17,6 +17,8 @@ const GuardianServices = () => {
   const wardUserId = selectedWard?.userId || null;
   const wardName = selectedWard?.name || "User";
   const [showAmbulance, setShowAmbulance] = useState(false);
+  const [showVault, setShowVault] = useState(false);
+  const { eligible: vaultEligible } = useVaultClaimStatus(wardUserId);
   const [showApptDialog, setShowApptDialog] = useState(false);
   const [wardAppointments, setWardAppointments] = useState<any[]>([]);
   const [wardPhone, setWardPhone] = useState<string>("");
