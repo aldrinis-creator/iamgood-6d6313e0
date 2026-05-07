@@ -67,8 +67,14 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
 };
 
 // Collapsible section wrapper
-const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) => {
-  const [open, setOpen] = useState(defaultOpen);
+const CollapsibleSection = ({ title, icon, children, defaultOpen = false, forceOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean }) => {
+  const [open, setOpen] = useState(defaultOpen || forceOpen);
+  const prevForceRef = useRef(forceOpen);
+  useEffect(() => {
+    // When forceOpen transitions false -> true (e.g. SOS just became active), open the section.
+    if (forceOpen && !prevForceRef.current) setOpen(true);
+    prevForceRef.current = forceOpen;
+  }, [forceOpen]);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
