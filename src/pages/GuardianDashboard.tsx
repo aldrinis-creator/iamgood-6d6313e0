@@ -30,7 +30,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
-import VaultClaimCard from "@/components/vault/VaultClaimCard";
+import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
 
 interface Notification {
   id: string;
