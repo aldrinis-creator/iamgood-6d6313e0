@@ -162,6 +162,7 @@ const GuardianServices = () => {
             onOpenChange={setShowApptDialog}
             editId={null}
             appointments={wardAppointments}
+            wardUserId={wardUserId}
           />
         )}
       </div>
