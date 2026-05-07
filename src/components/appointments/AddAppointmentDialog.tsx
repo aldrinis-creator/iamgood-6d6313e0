@@ -63,12 +63,13 @@ const addOneHour = (timeStr: string, dateStr: string): { time: string; date: str
   };
 };
 
-const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Props) => {
+const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments, wardUserId }: Props) => {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(makeEmpty);
   const endTimeManuallyEdited = useRef(false);
   const endDateManuallyEdited = useRef(false);
+  const isGuardianMode = !!wardUserId && wardUserId !== session?.user?.id;
 
   useEffect(() => {
     if (editId) {
@@ -103,8 +104,9 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
   const mutation = useMutation({
     mutationFn: async () => {
       if (!session?.user?.id) throw new Error("Not authenticated");
-      const payload = {
-        user_id: session.user.id,
+      const ownerId = wardUserId || session.user.id;
+      const payload: any = {
+        user_id: ownerId,
         title: form.title,
         description: form.description || null,
         start_date: form.start_date,
@@ -124,6 +126,7 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
         const { error } = await supabase.from("appointments").update(payload).eq("id", editId);
         if (error) throw error;
       } else {
+        payload.created_by = session.user.id;
         const { error } = await supabase.from("appointments").insert(payload);
         if (error) throw error;
       }
@@ -132,8 +135,8 @@ const AddAppointmentDialog = ({ open, onOpenChange, editId, appointments }: Prop
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       toast.success(editId ? "Appointment updated" : "Appointment added");
       onOpenChange(false);
-      // Send appointment confirmation email for new appointments
-      if (!editId && session?.user?.email) {
+      // Send appointment confirmation email for new appointments (skip when a guardian books for a ward)
+      if (!editId && !isGuardianMode && session?.user?.email) {
         supabase.functions.invoke("send-transactional-email", {
           body: {
             templateName: "appointment-confirmation",
