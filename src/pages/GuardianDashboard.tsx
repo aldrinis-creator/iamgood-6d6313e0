@@ -196,8 +196,8 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones =
           <ExternalLink className="w-3 h-3" /> Open
         </a>
       </div>
-      {locationUpdatedAt && !activeSOS && (
-        <p className="text-[10px] text-muted-foreground text-center">
+      {locationUpdatedAt && (
+        <p className={`text-[10px] text-center ${activeSOS ? "text-destructive font-medium" : "text-muted-foreground"}`}>
           Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
         </p>
       )}
