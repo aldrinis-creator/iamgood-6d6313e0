@@ -130,14 +130,24 @@ const Appointments = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {filtered.map((apt) => {
               const isDueToday = isToday(parseISO(apt.start_date));
+              const addedByGuardian = apt.created_by && apt.created_by !== session?.user?.id;
+              const guardianName = addedByGuardian ? (guardiansMap as Record<string,string>)[apt.created_by] : null;
               return (
               <Card key={apt.id} className={`p-4 space-y-3 overflow-hidden min-w-0 ${isDueToday ? "border-destructive border-2 shadow-[0_0_8px_hsl(var(--destructive)/0.3)]" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1 min-w-0">
                     <h3 className="font-semibold text-base break-words">{apt.title}</h3>
-                    <Badge variant={apt.appointment_type === "online" ? "secondary" : "outline"} className="text-xs">
-                      {apt.appointment_type === "online" ? "Online" : "In-Person"}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <Badge variant={apt.appointment_type === "online" ? "secondary" : "outline"} className="text-xs">
+                        {apt.appointment_type === "online" ? "Online" : "In-Person"}
+                      </Badge>
+                      {addedByGuardian && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <UserCircle className="w-3 h-3" />
+                          Added by {guardianName || "guardian"}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(apt.id); setShowAdd(true); }}>
