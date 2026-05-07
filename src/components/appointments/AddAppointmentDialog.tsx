@@ -21,6 +21,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   editId: string | null;
   appointments: any[];
+  wardUserId?: string;
 }
 
 const makeEmpty = () => {
