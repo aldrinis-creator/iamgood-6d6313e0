@@ -39,6 +39,23 @@ const Appointments = () => {
     enabled: !!session?.user?.id,
   });
 
+  const { data: guardiansMap = {} } = useQuery({
+    queryKey: ["guardians-map", session?.user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("guardians")
+        .select("guardian_user_id, guardian_name")
+        .eq("user_id", session!.user!.id)
+        .eq("status", "accepted");
+      const map: Record<string, string> = {};
+      (data || []).forEach((g: any) => {
+        if (g.guardian_user_id) map[g.guardian_user_id] = g.guardian_name;
+      });
+      return map;
+    },
+    enabled: !!session?.user?.id,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("appointments").delete().eq("id", id);
