@@ -67,8 +67,14 @@ const EmergencyCardGated = ({ wardUserId, wardName }: { wardUserId: string; ward
 };
 
 // Collapsible section wrapper
-const CollapsibleSection = ({ title, icon, children, defaultOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) => {
-  const [open, setOpen] = useState(defaultOpen);
+const CollapsibleSection = ({ title, icon, children, defaultOpen = false, forceOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean }) => {
+  const [open, setOpen] = useState(defaultOpen || forceOpen);
+  const prevForceRef = useRef(forceOpen);
+  useEffect(() => {
+    // When forceOpen transitions false -> true (e.g. SOS just became active), open the section.
+    if (forceOpen && !prevForceRef.current) setOpen(true);
+    prevForceRef.current = forceOpen;
+  }, [forceOpen]);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
@@ -190,8 +196,8 @@ const MapExpandable = ({ wardLocation, activeSOS, locationUpdatedAt, safeZones =
           <ExternalLink className="w-3 h-3" /> Open
         </a>
       </div>
-      {locationUpdatedAt && !activeSOS && (
-        <p className="text-[10px] text-muted-foreground text-center">
+      {locationUpdatedAt && (
+        <p className={`text-[10px] text-center ${activeSOS ? "text-destructive font-medium" : "text-muted-foreground"}`}>
           Updated {formatDistanceToNow(new Date(locationUpdatedAt), { addSuffix: true })}
         </p>
       )}
@@ -967,7 +973,7 @@ const GuardianDashboard = () => {
         <CollapsibleSection
           title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
           icon={<MapPin className="w-5 h-5 text-primary" />}
-          defaultOpen={!!activeSOS}
+          forceOpen={!!activeSOS}
         >
           <Card>
             <CardContent className="pt-3">
