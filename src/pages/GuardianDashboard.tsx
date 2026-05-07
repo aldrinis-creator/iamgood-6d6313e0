@@ -911,6 +911,11 @@ const GuardianDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* ===== TODAY'S APPOINTMENTS (compact strip) ===== */}
+        {wardUserId && (
+          <WardTodayAppointmentsStrip wardUserId={wardUserId} wardName={wardName} />
+        )}
+
         {/* ===== MEDICATIONS SUMMARY (moved above Alerts) ===== */}
         {wardUserId && (
           <Card>
