@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart } from "lucide-react";
+import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart, ShieldCheck } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,8 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
+import VaultClaimCard from "@/components/vault/VaultClaimCard";
+import { useVaultClaimStatus } from "@/components/vault/useVaultClaimStatus";
 
 const GuardianServices = () => {
   const { session } = useAuth();
