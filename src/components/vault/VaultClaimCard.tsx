@@ -383,13 +383,13 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
 
   return (
     <>
-      <Card className="border-destructive/30">
+      <Card className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-destructive" /> Vault Nominee Access
+            <ShieldAlert className="w-4 h-4 text-primary" /> Vault Nominee Access
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            You are nominated to receive {wardName}'s Vault contents in the event of their death.
+            You are nominated to receive {wardName}'s Vault contents. Available if the worst should happen.
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -416,8 +416,8 @@ const VaultClaimCard = ({ wardUserId, wardName }: Props) => {
           ) : claimActive ? (
             <p className="text-xs text-muted-foreground">A claim is already in progress. The admin will review after the grace window ends.</p>
           ) : (
-            <Button variant="destructive" className="w-full" onClick={() => { resetWizard(); setOpen(true); }}>
-              <ShieldAlert className="w-4 h-4 mr-2" /> Report Bereavement & Claim Vault
+            <Button variant="outline" className="w-full" onClick={() => { resetWizard(); setOpen(true); }}>
+              <ShieldAlert className="w-4 h-4 mr-2" /> Initiate Vault Claim
             </Button>
           )}
         </CardContent>
