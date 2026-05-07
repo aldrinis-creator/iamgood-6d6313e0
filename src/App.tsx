@@ -32,6 +32,7 @@ const MyProfile = lazy(() => import("./pages/MyProfile"));
 const ContactUs = lazy(() => import("./pages/ContactUs"));
 const EmergencyProfile = lazy(() => import("./pages/EmergencyProfile"));
 const GuardianMessages = lazy(() => import("./pages/GuardianMessages"));
+const GuardianAppointments = lazy(() => import("./pages/GuardianAppointments"));
 const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
 
 // Lazy-loaded heavy / rarely-used routes
@@ -85,6 +86,7 @@ const App = () => (
                 <Route path="/guardian/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/services" element={<GuardianRoute><GuardianWardProvider><GuardianServices /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/messages" element={<GuardianRoute><GuardianWardProvider><GuardianMessages /></GuardianWardProvider></GuardianRoute>} />
+                <Route path="/guardian/appointments" element={<GuardianRoute><GuardianWardProvider><GuardianAppointments /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian-settings" element={<GuardianRoute><Settings /></GuardianRoute>} />
                 {/* Shared routes (both roles) */}

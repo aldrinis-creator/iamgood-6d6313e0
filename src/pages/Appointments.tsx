@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Share2, Bell, Hourglass } from "lucide-react";
+import { CalendarDays, Clock, MapPin, Plus, Pencil, Trash2, Share2, Bell, Hourglass, UserCircle } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -35,6 +35,23 @@ const Appointments = () => {
         .order("start_time", { ascending: true });
       if (error) throw error;
       return data;
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const { data: guardiansMap = {} } = useQuery({
+    queryKey: ["guardians-map", session?.user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("guardians")
+        .select("guardian_user_id, guardian_name")
+        .eq("user_id", session!.user!.id)
+        .eq("status", "accepted");
+      const map: Record<string, string> = {};
+      (data || []).forEach((g: any) => {
+        if (g.guardian_user_id) map[g.guardian_user_id] = g.guardian_name;
+      });
+      return map;
     },
     enabled: !!session?.user?.id,
   });
@@ -113,14 +130,24 @@ const Appointments = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {filtered.map((apt) => {
               const isDueToday = isToday(parseISO(apt.start_date));
+              const addedByGuardian = apt.created_by && apt.created_by !== session?.user?.id;
+              const guardianName = addedByGuardian ? (guardiansMap as Record<string,string>)[apt.created_by] : null;
               return (
               <Card key={apt.id} className={`p-4 space-y-3 overflow-hidden min-w-0 ${isDueToday ? "border-destructive border-2 shadow-[0_0_8px_hsl(var(--destructive)/0.3)]" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1 min-w-0">
                     <h3 className="font-semibold text-base break-words">{apt.title}</h3>
-                    <Badge variant={apt.appointment_type === "online" ? "secondary" : "outline"} className="text-xs">
-                      {apt.appointment_type === "online" ? "Online" : "In-Person"}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <Badge variant={apt.appointment_type === "online" ? "secondary" : "outline"} className="text-xs">
+                        {apt.appointment_type === "online" ? "Online" : "In-Person"}
+                      </Badge>
+                      {addedByGuardian && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <UserCircle className="w-3 h-3" />
+                          Added by {guardianName || "guardian"}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(apt.id); setShowAdd(true); }}>

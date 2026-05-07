@@ -332,6 +332,7 @@ export type Database = {
           alarm_sound: string
           appointment_type: string
           created_at: string
+          created_by: string | null
           description: string | null
           doctor_name: string | null
           end_date: string | null
@@ -354,6 +355,7 @@ export type Database = {
           alarm_sound?: string
           appointment_type?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           doctor_name?: string | null
           end_date?: string | null
@@ -376,6 +378,7 @@ export type Database = {
           alarm_sound?: string
           appointment_type?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           doctor_name?: string | null
           end_date?: string | null
