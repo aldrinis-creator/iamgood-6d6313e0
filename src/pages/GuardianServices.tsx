@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart } from "lucide-react";
+import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart, ShieldCheck } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,8 @@ import AmbulanceBooking from "@/components/AmbulanceBooking";
 import AddAppointmentDialog from "@/components/appointments/AddAppointmentDialog";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
+import VaultClaimCard from "@/components/vault/VaultClaimCard";
+import { useVaultClaimStatus } from "@/components/vault/useVaultClaimStatus";
 
 const GuardianServices = () => {
   const { session } = useAuth();
@@ -15,6 +17,8 @@ const GuardianServices = () => {
   const wardUserId = selectedWard?.userId || null;
   const wardName = selectedWard?.name || "User";
   const [showAmbulance, setShowAmbulance] = useState(false);
+  const [showVault, setShowVault] = useState(false);
+  const { eligible: vaultEligible } = useVaultClaimStatus(wardUserId);
   const [showApptDialog, setShowApptDialog] = useState(false);
   const [wardAppointments, setWardAppointments] = useState<any[]>([]);
   const [wardPhone, setWardPhone] = useState<string>("");
@@ -101,6 +105,22 @@ const GuardianServices = () => {
               </CardContent>
             </Card>
           ))}
+          {vaultEligible && wardUserId && (
+            <Card
+              className="cursor-pointer hover:border-primary/30 transition-colors"
+              onClick={() => setShowVault(v => !v)}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Vault Nominee Access</p>
+                  <p className="text-xs text-muted-foreground">Available if the worst should happen.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {showAmbulance && (
@@ -110,6 +130,10 @@ const GuardianServices = () => {
             wardLocation={wardLocation}
             wardPhone={wardPhone}
           />
+        )}
+
+        {showVault && wardUserId && (
+          <VaultClaimCard wardUserId={wardUserId} wardName={wardName} />
         )}
 
         {/* Restricted services */}
