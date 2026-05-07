@@ -973,7 +973,7 @@ const GuardianDashboard = () => {
         <CollapsibleSection
           title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
           icon={<MapPin className="w-5 h-5 text-primary" />}
-          defaultOpen={!!activeSOS}
+          forceOpen={!!activeSOS}
         >
           <Card>
             <CardContent className="pt-3">
