@@ -716,8 +716,8 @@ const GuardianDashboard = () => {
           );
         })()}
 
-        {/* Vault Nominee Claim (only if eligible) */}
-        {wardUserId && <VaultClaimCard wardUserId={wardUserId} wardName={wardName} />}
+        {/* Vault Nominee Claim status strip — only when a claim exists. Full access lives in /services. */}
+        {wardUserId && <VaultClaimStatusStrip wardUserId={wardUserId} />}
 
         {/* User Status */}
         <Card>
