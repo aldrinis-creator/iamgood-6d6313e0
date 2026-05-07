@@ -1,22 +1,32 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { haversineDistance } from "@/lib/haversine";
 
 const ZONE_ALERT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+const NORMAL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+const SOS_INTERVAL_MS = 30 * 1000; // 30 sec
+const SOS_FAST_CAP_MS = 15 * 60 * 1000; // 15 min hard cap on accelerated cadence
 
 /**
  * Periodically saves the user's geolocation to user_settings
  * so guardians can view the ward's location on their dashboard.
  * Also checks safe zones and alerts guardians on zone exit.
- * Runs every 5 minutes and on initial mount.
+ *
+ * Cadence:
+ * - Normal: every 5 minutes.
+ * - During active SOS (emergencyMode === true): every 30 seconds, capped at 15 min,
+ *   then reverts to 5 min to protect battery (resets when SOS clears and re-fires).
  */
 export default function useLocationSync() {
   const { session } = useAuth();
   const { settings } = useUserSettings();
+  const { emergencyMode } = useApp();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const lastZoneAlertRef = useRef<string | null>(null); // ISO timestamp
+  const lastZoneAlertRef = useRef<string | null>(null);
+  const sosStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -51,7 +61,6 @@ export default function useLocationSync() {
 
     const checkSafeZones = async (latitude: number, longitude: number) => {
       try {
-        // Fetch enabled safe zones
         const { data: zones } = await supabase
           .from("safe_zones" as any)
           .select("*")
@@ -60,24 +69,20 @@ export default function useLocationSync() {
 
         if (!zones || zones.length === 0) return;
 
-        // Check if user is outside ALL enabled zones
         const isInsideAny = (zones as any[]).some((zone) =>
           haversineDistance(latitude, longitude, zone.lat, zone.lng) <= zone.radius_m
         );
 
         if (isInsideAny) {
-          // Reset cooldown when back inside
           lastZoneAlertRef.current = null;
           return;
         }
 
-        // Check cooldown
         if (lastZoneAlertRef.current) {
           const elapsed = Date.now() - new Date(lastZoneAlertRef.current).getTime();
           if (elapsed < ZONE_ALERT_COOLDOWN_MS) return;
         }
 
-        // Check if there's an active journey (don't alert during journeys)
         const { data: activeJourney } = await supabase
           .from("journeys")
           .select("id")
@@ -87,14 +92,12 @@ export default function useLocationSync() {
 
         if (activeJourney) return;
 
-        // Find the nearest zone name for the alert message
         const nearest = (zones as any[]).reduce((prev, curr) => {
           const prevDist = haversineDistance(latitude, longitude, prev.lat, prev.lng);
           const currDist = haversineDistance(latitude, longitude, curr.lat, curr.lng);
           return currDist < prevDist ? curr : prev;
         });
 
-        // Get user profile name
         const { data: profile } = await supabase
           .from("profiles")
           .select("full_name")
@@ -103,7 +106,6 @@ export default function useLocationSync() {
 
         const userName = profile?.full_name || "Your ward";
 
-        // Get all accepted guardians
         const { data: guardians } = await supabase
           .from("guardians")
           .select("guardian_user_id")
@@ -113,18 +115,13 @@ export default function useLocationSync() {
 
         if (!guardians || guardians.length === 0) return;
 
-        // Filter by user's locationSharingGuardianIds if set
         const selectedIds = settings.locationSharingGuardianIds;
         const filteredGuardians = selectedIds && selectedIds.length > 0
-          ? guardians.filter((g) => {
-              // Match by guardian row id (from guardians table)
-              return selectedIds.includes(g.guardian_user_id!);
-            })
+          ? guardians.filter((g) => selectedIds.includes(g.guardian_user_id!))
           : guardians;
 
         if (filteredGuardians.length === 0) return;
 
-        // Insert notifications for selected guardians
         const notifications = filteredGuardians.map((g) => ({
           user_id: g.guardian_user_id!,
           title: "⚠️ Outside Safe Zone",
@@ -162,21 +159,49 @@ export default function useLocationSync() {
               { onConflict: "user_id" }
             )
             .then(() => {
-              // After saving location, check safe zones
               checkSafeZones(latitude, longitude);
             });
         },
-        () => {}, // silently ignore permission denied
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        () => {},
+        // During SOS use high-accuracy + fresh fix; otherwise stay battery-friendly.
+        emergencyMode
+          ? { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          : { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
       );
     };
 
-    // Save immediately then every 5 minutes
+    // Track SOS window for the 15-minute battery cap.
+    if (emergencyMode) {
+      if (sosStartedAtRef.current === null) sosStartedAtRef.current = Date.now();
+    } else {
+      sosStartedAtRef.current = null;
+    }
+
+    const sosWithinCap =
+      emergencyMode &&
+      sosStartedAtRef.current !== null &&
+      Date.now() - sosStartedAtRef.current < SOS_FAST_CAP_MS;
+
+    const cadence = sosWithinCap ? SOS_INTERVAL_MS : NORMAL_INTERVAL_MS;
+
+    // Immediate save (especially important the moment SOS becomes active)
     saveLocation();
-    intervalRef.current = setInterval(saveLocation, 5 * 60 * 1000);
+    intervalRef.current = setInterval(() => {
+      // If we crossed the SOS cap mid-flight, downgrade cadence.
+      if (
+        emergencyMode &&
+        sosStartedAtRef.current !== null &&
+        Date.now() - sosStartedAtRef.current >= SOS_FAST_CAP_MS &&
+        cadence === SOS_INTERVAL_MS
+      ) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        intervalRef.current = setInterval(saveLocation, NORMAL_INTERVAL_MS);
+      }
+      saveLocation();
+    }, cadence);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [session?.user?.id, settings.shareLocation]);
+  }, [session?.user?.id, settings.shareLocation, emergencyMode]);
 }
