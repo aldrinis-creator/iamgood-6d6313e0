@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +14,9 @@ import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
 import JourneyReportCard from "@/components/JourneyReportCard";
 import NutritionTrendChart, { type NutritionTrendPoint } from "@/components/NutritionTrendChart";
+import HospitalVisitTab from "@/components/guardian/HospitalVisitTab";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit";
 
 const GuardianReports = () => {
   const { session } = useAuth();
