@@ -327,6 +327,11 @@ const GuardianReports = () => {
             )}
           </div>
         )}
+
+        {/* Hospital Visit */}
+        {activeSection === "hospital_visit" && wardUserId && (
+          <HospitalVisitTab wardUserId={wardUserId} wardName={wardName} />
+        )}
       </div>
     </AppLayout>
   );
