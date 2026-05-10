@@ -22,6 +22,7 @@ import {
 import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
 import PastMedicalHistory from "@/components/PastMedicalHistory";
+import IdInsuranceSection from "@/components/profile/IdInsuranceSection";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const BMI_CATEGORIES = [
@@ -687,6 +688,9 @@ const ProfileContent = () => {
 
       {/* Past Medical History */}
       <PastMedicalHistory editing={editing} />
+
+      {/* ID & Insurance — Hospital Kit */}
+      <IdInsuranceSection />
 
       {/* Family Doctor */}
       <Card>

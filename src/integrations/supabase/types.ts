@@ -1273,6 +1273,7 @@ export type Database = {
           hospital_name: string | null
           id: string
           record_date: string | null
+          record_slot: string | null
           record_type: string
           title: string
           updated_at: string
@@ -1287,6 +1288,7 @@ export type Database = {
           hospital_name?: string | null
           id?: string
           record_date?: string | null
+          record_slot?: string | null
           record_type: string
           title: string
           updated_at?: string
@@ -1301,6 +1303,7 @@ export type Database = {
           hospital_name?: string | null
           id?: string
           record_date?: string | null
+          record_slot?: string | null
           record_type?: string
           title?: string
           updated_at?: string
