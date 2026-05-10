@@ -161,6 +161,7 @@ const GuardianReports = () => {
     { id: "vitals", label: "Vitals", icon: Heart },
     { id: "nutrition", label: "Nutrition", icon: Utensils },
     { id: "journeys", label: "Journeys", icon: Navigation },
+    { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
   ];
 
   return (
