@@ -12,7 +12,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-04-20";
+export const FAQ_VERSION = "2026-05-11";
 
 export const faqSections: FaqSection[] = [
   {
