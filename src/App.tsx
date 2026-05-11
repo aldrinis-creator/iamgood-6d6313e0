@@ -59,6 +59,16 @@ const PageFallback = () => (
   <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading…</div>
 );
 
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+const HelpRouter = () => {
+  const { session, profile, loading } = useAuth();
+  if (loading) return <PageFallback />;
+  if (!session) return <Navigate to="/login" replace />;
+  if (profile?.role === "guardian") return <GuardianWardProvider><GuardianHelp /></GuardianWardProvider>;
+  return <Help />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
