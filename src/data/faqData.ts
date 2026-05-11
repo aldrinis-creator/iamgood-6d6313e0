@@ -881,4 +881,250 @@ export const faqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "Hospital Visit & Admission Kit",
+    icon: "briefcase-medical",
+    items: [
+      {
+        question: "What is the Hospital Visit tab in Guardian Reports?",
+        answer: "Hospital Visit is a dedicated tab in the Guardian Reports section that bundles your ward's identity and insurance documents into a one-tap 'Admission Kit' for hospital reception. It shows 5 document cards (Aadhaar, PAN, Insurance Primary, Insurance Secondary, Passport Photo) with availability status (✅ Available / ⚠️ Missing).",
+      },
+      {
+        question: "What documents are included in the Admission Kit?",
+        answer: "The kit includes: Aadhaar Card, PAN Card, Health Insurance (primary and optional secondary), and a recent Passport Photo. It also generates a branded cover page with the ward's name, DOB, blood group, allergies, chronic conditions, and primary guardian contact.",
+      },
+      {
+        question: "How does the one-tap Admission Kit PDF work?",
+        answer: "Tap 'Download Admission Kit (PDF)' from the Hospital Visit tab. The app fetches all available documents, embeds images full-page, links to PDFs, and produces a single Check-iN branded PDF — ready to print or share at hospital reception.",
+      },
+      {
+        question: "How do I share the Admission Kit via WhatsApp?",
+        answer: "Tap 'Share via WhatsApp'. The app uploads the generated PDF to a private bucket, creates a 24-hour secure link, and opens WhatsApp with a templated message containing the link. The link expires after 24 hours for security.",
+      },
+      {
+        question: "What if the ward hasn't uploaded a document?",
+        answer: "Missing documents show a ⚠️ status. Tap 'Nudge {ward}' to send an in-app notification asking them to upload the missing items. The Admission Kit can still be generated with whatever documents are available.",
+      },
+    ],
+  },
+  {
+    title: "ID & Insurance (Ward Profile)",
+    icon: "id-card",
+    items: [
+      {
+        question: "What is the ID & Insurance section?",
+        answer: "A dedicated section in My Profile with 5 fixed slots for the documents most often requested at hospital admission: Aadhaar, PAN, Health Insurance (Primary), Health Insurance (Secondary), and a Passport Photo.",
+      },
+      {
+        question: "How do I upload or replace a document?",
+        answer: "Tap the Upload button on any empty slot to pick a file or take a photo. To replace an existing document, tap 'Replace' on the slot. Each slot holds exactly one current document — replacing automatically removes the old one.",
+      },
+      {
+        question: "Can I take a passport photo using the camera?",
+        answer: "Yes. The Passport Photo slot offers a 'Take Selfie' shortcut that opens your front camera so you can capture a fresh photo without leaving the app.",
+      },
+      {
+        question: "Who can see my ID & Insurance documents?",
+        answer: "Only you and your accepted guardians. Guardians access them through the Hospital Visit tab in their Reports section. Documents are stored in private storage with strict row-level security — pending or expired guardians cannot see them.",
+      },
+    ],
+  },
+  {
+    title: "Guardian Reports & Appointments",
+    icon: "clipboard",
+    items: [
+      {
+        question: "What sections are in Guardian Reports?",
+        answer: "Guardian Reports brings together all the information a guardian needs about their ward: Health Passport, Vitals, Medication Adherence, Activity, Care Journal, Wellness Trends, and the new Hospital Visit Admission Kit.",
+      },
+      {
+        question: "How do Guardian Appointments work?",
+        answer: "Guardians can view their ward's upcoming appointments in the Guardian Appointments page. Today's appointments also surface as a strip on the Guardian Dashboard with the next appointment time and a count badge.",
+      },
+      {
+        question: "What is the 'Today's Appointments' strip on the Guardian Dashboard?",
+        answer: "A compact card on the Guardian Dashboard that appears whenever the ward has appointments scheduled for today. It shows the count and next appointment title/time, and tapping it opens the full Guardian Appointments view.",
+      },
+      {
+        question: "Where do I find Appointments in the Guardian app?",
+        answer: "Open the Profile menu in the top-right corner and select 'Appointments'. You can also tap the 'Today's Appointments' strip on the Guardian Dashboard when active.",
+      },
+    ],
+  },
+  {
+    title: "Health Passport",
+    icon: "stamp",
+    items: [
+      {
+        question: "What is the Health Passport?",
+        answer: "A daily snapshot of your overall health, scored from 0–100 across 7 categories. It gives you and your guardians a single, easy-to-read indicator of how your wellbeing is trending over time.",
+      },
+      {
+        question: "What are the 7 categories?",
+        answer: "Vitals, Activity, Nutrition, Sleep, Medication Adherence, Mental Wellness, and Hydration. Each category contributes to your overall Health Passport score.",
+      },
+      {
+        question: "How does Face Scan feed into the Passport?",
+        answer: "When fresh vitals are missing, the Health Passport falls back to your latest Face Scan results (heart rate, respiratory rate, hydration) so your score stays current without manual entry.",
+      },
+      {
+        question: "Can my Guardian see my Health Passport?",
+        answer: "Yes — the WardHealthScoreRing on the Guardian Dashboard shows the latest passport score, and Guardian Reports includes a trend chart over time.",
+      },
+    ],
+  },
+  {
+    title: "Pill Identifier",
+    icon: "pill",
+    items: [
+      {
+        question: "What is the Pill Identifier?",
+        answer: "A photo-based AI tool that identifies tablets and capsules from your camera. Snap a clear photo of a pill and the app returns the likely name, strength, and common uses.",
+      },
+      {
+        question: "Does it cross-check against my prescription?",
+        answer: "Yes. The Pill Identifier compares the identified medication against your current Tablets list to flag mismatches — useful for spotting dispensing errors at the pharmacy.",
+      },
+      {
+        question: "What happens if a banned drug is detected?",
+        answer: "If the pill matches a medication on India's banned drugs registry, the app shows an immediate red-flag warning and notifies your primary guardian via SMS/WhatsApp.",
+      },
+    ],
+  },
+  {
+    title: "Safe Zones & Geofencing",
+    icon: "map-pin",
+    items: [
+      {
+        question: "What are Safe Zones?",
+        answer: "Safe Zones are geographic areas you define (home, day-care centre, family member's home) where you're expected to be. The app monitors your location every 5 minutes and alerts your guardians if you leave a Safe Zone unexpectedly.",
+      },
+      {
+        question: "How do I set up a Safe Zone?",
+        answer: "Open the Safe Zone Editor from Settings, drop a pin on the map, set a radius (in metres), and name the zone. You can create multiple zones.",
+      },
+      {
+        question: "What happens when I leave a Safe Zone?",
+        answer: "Your primary guardian receives an in-app, push, and (if configured) WhatsApp alert with your current location. A 30-minute cooldown prevents repeat alerts for the same exit event.",
+      },
+    ],
+  },
+  {
+    title: "Map My Journey — Safety Net",
+    icon: "navigation",
+    items: [
+      {
+        question: "What is the MMJ Safety Net?",
+        answer: "An extra layer of safety that runs while you're on a Map My Journey trip. It includes low-battery guardian alerts, automatic SOS escalation if you don't respond to a route-deviation prompt, and a public live-tracking link your guardians can open without signing in.",
+      },
+      {
+        question: "What is the low-battery guardian alert?",
+        answer: "If your phone battery drops below 10% during an active journey, your primary guardian is automatically alerted with your last known location — so they know your phone may shut off soon.",
+      },
+      {
+        question: "What is auto-SOS escalation on route deviation?",
+        answer: "If the app detects you've deviated from your planned route, it shows an 'Are you OK?' prompt. If you don't respond within the timeout, a full SOS is automatically triggered to all your guardians.",
+      },
+      {
+        question: "What is the public live-tracking share link?",
+        answer: "When you start a journey, the app generates a public URL that shows your live location on a map. Share it via WhatsApp/SMS — recipients don't need a Check-iN account to follow along.",
+      },
+    ],
+  },
+  {
+    title: "Voice Query & AI Voice Check-ins",
+    icon: "mic",
+    items: [
+      {
+        question: "What is the Voice Query button?",
+        answer: "A floating microphone button that lets you ask the app questions out loud — like 'When is my next medication?' or 'Show today's appointments'. Designed for hands-free use by elderly users.",
+      },
+      {
+        question: "What are AI voice check-ins?",
+        answer: "When a check-in is missed or a fall is suspected, the app can play a spoken prompt ('Are you okay?') and listen for your voice reply. A confirmed 'yes' resolves the alert; silence escalates to your guardians.",
+      },
+    ],
+  },
+  {
+    title: "Onboarding Wizard",
+    icon: "list-checks",
+    items: [
+      {
+        question: "What is the Onboarding Wizard?",
+        answer: "A 4-step setup modal shown on first sign-in for users (not guardians). It walks you through: (1) basic profile, (2) check-in times, (3) adding your primary guardian, and (4) enabling notifications.",
+      },
+      {
+        question: "Can I skip steps and complete them later?",
+        answer: "Yes — most steps can be skipped. You can finish the remaining setup any time from Settings and My Profile.",
+      },
+    ],
+  },
+  {
+    title: "Battery Monitoring",
+    icon: "battery-low",
+    items: [
+      {
+        question: "How does battery monitoring work?",
+        answer: "The app reads your device's battery level and shows a warning when it drops below safe thresholds. This helps ensure your phone stays charged enough to receive check-ins, alarms, and to send an SOS if needed.",
+      },
+      {
+        question: "What are the alert thresholds?",
+        answer: "Two thresholds: 30% (gentle reminder) and 10% (urgent — also notifies your primary guardian if you're on an active Map My Journey trip).",
+      },
+      {
+        question: "Do guardians get battery alerts on their own phone?",
+        answer: "No. Local battery alerts are only shown on user (ward) accounts. Guardians only receive a notification when the ward's battery drops critically during a live journey.",
+      },
+    ],
+  },
+  {
+    title: "Accessibility Menu",
+    icon: "accessibility",
+    items: [
+      {
+        question: "What is the Accessibility Menu?",
+        answer: "A quick-access menu in the top header that lets you adjust the app for easier reading and use — including font size, high-contrast mode, and reduced motion.",
+      },
+      {
+        question: "How does it help elderly users?",
+        answer: "The app already enforces a minimum 18px font size and a single mobile-first layout. The Accessibility Menu lets seniors further increase text size, boost contrast, and turn off animations for a calmer experience.",
+      },
+    ],
+  },
+  {
+    title: "SOS Event Lifecycle",
+    icon: "siren",
+    items: [
+      {
+        question: "What is the Active SOS banner?",
+        answer: "A persistent red banner that appears at the top of the app whenever an SOS is active — for both the user and their guardians. Tap it to view details, resolve, or escalate.",
+      },
+      {
+        question: "How is SOS resolution synced across roles?",
+        answer: "When the user, any guardian, or an SMS reply (SAFE/OK) resolves an SOS, the status syncs in real time across every connected device. The Active SOS banner disappears for everyone, and resolution is logged with timestamp and source.",
+      },
+      {
+        question: "What is the trigger stability guard?",
+        answer: "A short debounce window that prevents rapid duplicate SOS triggers from accidental button-mashing, fall re-detection, or flapping sensor signals — so guardians don't get bombarded with repeat alerts.",
+      },
+    ],
+  },
+  {
+    title: "Check-In Settings & Vacation Mode",
+    icon: "settings",
+    items: [
+      {
+        question: "What is the Check-In Settings dialog?",
+        answer: "A unified settings dialog where you can configure your check-in times, Sleep Mode hours, Fall Detection, and Check-Out (Vacation) periods — all in one place.",
+      },
+      {
+        question: "How does Sleep Mode differ from Check-Out?",
+        answer: "Sleep Mode pauses check-ins every night between your sleep and wake times (recurring). Check-Out (Vacation Mode) disables all check-ins for a one-off date range — useful for trips or hospital stays.",
+      },
+      {
+        question: "Can I configure my check-in times?",
+        answer: "The default windows are 7 AM, 12 PM, and 7 PM IST. You can adjust them during the Onboarding Wizard or later from Settings → Check-In tab.",
+      },
+    ],
+  },
 ];
