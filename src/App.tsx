@@ -40,6 +40,8 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Help = lazy(() => import("./pages/Help"));
+const GuardianSettings = lazy(() => import("./pages/GuardianSettings"));
+const GuardianHelp = lazy(() => import("./pages/GuardianHelp"));
 const Install = lazy(() => import("./pages/Install"));
 const PublicJourneyView = lazy(() => import("./pages/PublicJourneyView"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
@@ -88,10 +90,11 @@ const App = () => (
                 <Route path="/guardian/messages" element={<GuardianRoute><GuardianWardProvider><GuardianMessages /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/appointments" element={<GuardianRoute><GuardianWardProvider><GuardianAppointments /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
-                <Route path="/guardian-settings" element={<GuardianRoute><Settings /></GuardianRoute>} />
+                <Route path="/guardian-settings" element={<GuardianRoute><GuardianWardProvider><GuardianSettings /></GuardianWardProvider></GuardianRoute>} />
+                <Route path="/guardian-help" element={<GuardianRoute><GuardianWardProvider><GuardianHelp /></GuardianWardProvider></GuardianRoute>} />
                 {/* Shared routes (both roles) */}
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+                <Route path="/settings" element={<UserRoute><Settings /></UserRoute>} />
+                <Route path="/help" element={<HelpRouter />} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
                 {/* Public routes */}
