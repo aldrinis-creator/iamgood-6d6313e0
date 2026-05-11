@@ -1,89 +1,96 @@
-# FAQ Update — All Recent Ward & Guardian Features
+# Fix Guardian Settings & Help (separate from Ward)
 
-## Current State
-The FAQ file (`src/data/faqData.ts`, last updated 2026-04-20) has 32 sections but is missing coverage for many recently shipped features.
+## The problem
 
-## Gaps to Fill
+1. **Shared Settings/Help pages.** `/guardian-settings` and `/help` route a guardian to the same `Settings.tsx` and `Help.tsx` files used by the Ward. Those screens are full of Ward-only controls (Check-In times, SOS, Safe Zones, Sleep/Vacation Mode, Health Passport FAQs, audio alerts, fall detection, etc.) that have no meaning for a Guardian.
+2. **Ward shown as "Primary Guardian".** The Guardians tab in Settings queries `guardians` with `user_id = session.user.id`. For a Guardian account this returns rows where they themselves are listed as a ward's guardian — but the UI then renders the **ward's name** (and whichever row is `is_primary`) as the Guardian's "Primary Guardian". This inverts the relationship.
+3. **Help/FAQ content** is 100 % ward-centric (heart tap, SOS, Sleep Mode, Vault claim, etc.). A Guardian has different concerns: ward switching, alerts, reports, hospital admission kit, nudges, ward-limit tier.
 
-### 1. Hospital Visit & Admission Kit (NEW — just implemented)
-- What is the Hospital Visit tab in Guardian Reports?
-- What docs are included in the Admission Kit?
-- How does the one-tap PDF download work?
-- How does WhatsApp sharing work?
-- What if a document is missing? (Nudge ward flow)
+## What we will build
 
-### 2. ID & Insurance Documents (NEW — just implemented)
-- What is the ID & Insurance section in My Profile?
-- Which 5 slots are available? (Aadhaar, PAN, Insurance Primary, Insurance Secondary, Photo)
-- How do I upload or replace documents?
-- How do I take a passport photo using the camera?
-- Who can see these documents?
+### A. Dedicated Guardian Settings page (`src/pages/GuardianSettings.tsx`)
 
-### 3. Guardian Reports & Appointments
-- What tabs are in the Guardian Reports section?
-- How do Guardian Appointments work?
-- What is the "Today's Appointments" strip on the Guardian Dashboard?
-- How does the red glow indicator work for today's appointments?
+Route `/guardian-settings` will mount this new page (wrapped in `GuardianRoute` + `GuardianWardProvider`). Tabs:
 
-### 4. Health Passport
-- What is the Health Passport?
-- How is the Health Passport score calculated?
-- What are the 7 categories?
-- How do face scan results feed into the passport?
+- **Profile** — guardian's own name, phone, email, relation to ward (read-only, comes from the ward's nomination), profile photo.
+- **Wards** — list of wards monitored (from `guardians` where `guardian_user_id = session.user.id` AND `status='accepted'`). Shows ward name, relation, primary badge if **the guardian is the primary guardian for that ward**, "Leave this ward" action, ward-limit indicator (Free 1 / Basic 3 / Pro 5 — from `useFeatureGate`).
+- **Notifications** — push toggle (re-uses `usePushSubscription`), email digest opt-in, WhatsApp opt-in, alert categories (Missed Check-In, SOS, Low Battery, Medication Missed, Geofence Exit, Journey Deviation) with per-category mute.
+- **Quiet Hours** — guardian's own do-not-disturb window (alerts still arrive for SOS).
+- **Language** — language selector (re-use existing logic).
+- **Accessibility** — font size, contrast, reduced motion (re-use existing `AccessibilityMenu`).
+- **Privacy** — data access / export / deletion requests scoped to guardian's own data (re-use the existing `PrivacyTab` component but fed with guardian-only context; remove guardian-of-ward selector).
+- **Subscription** — current plan, ward-limit, link to upgrade.
 
-### 5. Pill Identifier
-- What is the Pill Identifier?
-- How does photo-based pill identification work?
-- What happens if a banned drug is detected?
-- How does the prescription cross-check work?
+Removed from the guardian view (kept Ward-only): Check-In times, SOS configuration, Safe Zones, Sleep Mode, Vacation Mode, Fall Detection, Battery thresholds (these are device-level for the ward), Audio alerts, Health Passport opt-ins, Vault nominee setup.
 
-### 6. Safe Zones & Geofencing
-- What are Safe Zones?
-- How do I set up a Safe Zone?
-- What happens when I leave a Safe Zone?
-- How do guardians get notified?
+### B. Dedicated Guardian Help page (`src/pages/GuardianHelp.tsx`)
 
-### 7. Map My Journey — Safety Net
-- What is the MMJ Safety Net?
-- What is low-battery guardian alert?
-- What is auto-SOS escalation on unanswered route deviation?
-- What is the public live-tracking share link?
+Route `/help` for guardian role will redirect / branch to this new page. New `src/data/guardianFaqData.ts` with sections targeted at the Guardian:
 
-### 8. Voice Query & AI Check-ins
-- What is the Voice Query button?
-- How do AI voice check-ins work?
-- When are they triggered?
+- Getting started as a Guardian (nomination, accept invite, opt-in)
+- Ward Picker & switching between multiple wards
+- Reading the Dashboard (alerts hierarchy, health-score ring, today's appointments strip)
+- Reports: Hospital Visit / Admission Kit, Appointments, Adherence, Journeys
+- Responding to alerts (Missed Check-In, SOS, Low Battery, Geofence, Journey Deviation, Medication Missed)
+- Nudges to the ward (missing ID/insurance docs, missed check-ins)
+- Ward-limit tiers (Free 1, Basic 3, Pro 5) and how to upgrade
+- Privacy: what a Guardian can / cannot see in the ward's app
+- Settings (their own — quiet hours, notification channels)
+- Account, leaving a ward, contact support
 
-### 9. Onboarding Wizard
-- What is the 4-step onboarding wizard?
-- What does each step cover?
-- Can I skip steps and complete them later?
+The "How Check-iN Works" intro card is re-written from the guardian's perspective. Reuse the same Accordion UI, search box, and Markdown download as `Help.tsx`.
 
-### 10. Battery Monitoring
-- How does battery monitoring work?
-- At what thresholds do alerts trigger?
-- Who receives battery alerts?
+### C. Fix the "Ward as Primary Guardian" inversion
 
-### 11. Accessibility Menu
-- What is the Accessibility Menu?
-- What options does it provide?
-- How does it help elderly users?
+- Remove the Guardians tab and all Ward-side controls from the Guardian view by routing to `GuardianSettings` instead of `Settings`.
+- In the new `GuardianSettings` Wards tab, query strictly:
+  ```
+  guardians.select(...).eq('guardian_user_id', session.user.id).eq('status','accepted')
+  ```
+  and label rows as **"Ward"** (with relation, e.g. "Mother", "Father"). The `is_primary` flag is interpreted as "you are this ward's primary guardian" and rendered with a clear label such as "You are the Primary Guardian" — never as the ward themselves being a guardian.
 
-### 12. SOS Event Lifecycle
-- What is the Active SOS banner?
-- How is SOS resolution synced across roles?
-- What is the trigger stability guard?
+### D. Routing & navigation
 
-### 13. Check-In Settings & Vacation Mode
-- What is the Check-In Settings dialog?
-- How does Sleep Mode differ from Check-Out (Vacation Mode)?
-- How do I configure check-in times?
+- `src/App.tsx`:
+  - `/guardian-settings` → new `GuardianSettings` page.
+  - `/help` is split: if `profile.role === 'guardian'` → render `GuardianHelp`, else render existing `Help`. Done with a small `HelpRouter` wrapper to avoid two URLs.
+- `AppHeader` (guardian variant) and `NavTabs` already point to `/guardian-settings` and `/help`; no link changes needed.
 
-## Implementation
-- Update `src/data/faqData.ts` with new sections and update existing ones.
-- Bump `FAQ_VERSION` to `2026-05-11`.
-- Keep answer style consistent: 2-4 sentences, clear and direct.
-- No code or UI changes needed — this is a content-only update.
+### E. Memory update
 
-## Files Touched
-- `src/data/faqData.ts` (content update + version bump)
+Add a project memory note:
+
+- Guardian and Ward have distinct Settings and Help surfaces.
+- `guardians` table semantics: `user_id` = ward, `guardian_user_id` = guardian. Never query `guardians` by `user_id = session.user.id` on the Guardian side.
+
+## Files
+
+**New**
+
+- `src/pages/GuardianSettings.tsx`
+- `src/pages/GuardianHelp.tsx`
+- `src/data/guardianFaqData.ts`
+
+**Edited**
+
+- `src/App.tsx` — route `/guardian-settings` to `GuardianSettings`; add `HelpRouter` for `/help`.
+- (Optional) `src/pages/Settings.tsx` — guard against being mounted by a guardian (defensive `<Navigate to="/guardian-settings" />` if `profile.role === 'guardian'`).
+- `.lovable/memory/index.md` + new memory file `features/guardian-settings-help.md`.
+
+**Untouched**
+
+- `src/pages/Settings.tsx` and `src/pages/Help.tsx` keep all Ward content as-is.
+- No DB schema or RLS changes required.
+
+## Open questions before I build
+
+1. Should the Guardian be able to **leave a ward** from Settings (sets `status='left'` and notifies the ward), or only the ward can revoke?
+2. For **Quiet Hours** on the guardian side, should SOS still break through (recommended) or strictly mute everything?
+3. Do you want a single combined **Guardian Help** page, or split into "Quick Start" + "FAQ" tabs like the Ward Help has Settings/Privacy/Terms tabs too?
+
+Answer these (or say "use sensible defaults") and I'll implement.  
+1. No. Only the Ward can revoke  
+2. In Quiet Hours, the SOS must still breakthrough  
+3. Single combined Gaurdian Help page
+
+&nbsp;
