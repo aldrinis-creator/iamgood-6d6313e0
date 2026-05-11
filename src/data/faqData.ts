@@ -1,5 +1,5 @@
 // FAQ data — update this file whenever FAQs change.
-// Last updated: 2026-04-20
+// Last updated: 2026-05-11
 
 export interface FaqItem {
   question: string;

@@ -1,76 +1,89 @@
-# Hospital Visit Tab — Admission Kit for Guardians
+# FAQ Update — All Recent Ward & Guardian Features
 
-## Goal
-Give guardians a one-tap "Admission Kit" for hospital reception: ward's Aadhaar, PAN, Health Insurance (primary + secondary), and a recent photo — bundled into a single branded PDF, shareable via WhatsApp.
+## Current State
+The FAQ file (`src/data/faqData.ts`, last updated 2026-04-20) has 32 sections but is missing coverage for many recently shipped features.
 
-## User Flow
+## Gaps to Fill
 
-**Ward side (new):**
-- New "ID & Insurance" section in ward's MyProfile (or as a dedicated card on My Health) with 5 fixed slots:
-  1. Aadhaar Card
-  2. PAN Card
-  3. Health Insurance — Primary
-  4. Health Insurance — Secondary (optional)
-  5. Passport Photo (with "Take selfie" camera shortcut)
-- Each slot shows: thumbnail, Replace, Delete. Empty slots show a prominent Upload button.
+### 1. Hospital Visit & Admission Kit (NEW — just implemented)
+- What is the Hospital Visit tab in Guardian Reports?
+- What docs are included in the Admission Kit?
+- How does the one-tap PDF download work?
+- How does WhatsApp sharing work?
+- What if a document is missing? (Nudge ward flow)
 
-**Guardian side (new):**
-- New 7th tab in Guardian Reports: **"Hospital Visit"** (icon: `BriefcaseMedical`).
-- Shows 5 doc cards with status chips (✅ Available / ⚠️ Missing).
-- Each card: tap to preview (image/PDF in Dialog), Download.
-- Sticky top action bar:
-  - **"Download Admission Kit (PDF)"** — merges all available docs into one branded PDF with a cover page (ward name, DOB, blood group, allergies, primary guardian phone, emergency contacts).
-  - **"Share via WhatsApp"** — sends the PDF + a templated message to a chosen number.
-  - **"Nudge {ward}"** button appears when ≥1 doc is missing → in-app notification + optional WhatsApp template asking ward to upload.
+### 2. ID & Insurance Documents (NEW — just implemented)
+- What is the ID & Insurance section in My Profile?
+- Which 5 slots are available? (Aadhaar, PAN, Insurance Primary, Insurance Secondary, Photo)
+- How do I upload or replace documents?
+- How do I take a passport photo using the camera?
+- Who can see these documents?
 
-## Technical Details
+### 3. Guardian Reports & Appointments
+- What tabs are in the Guardian Reports section?
+- How do Guardian Appointments work?
+- What is the "Today's Appointments" strip on the Guardian Dashboard?
+- How does the red glow indicator work for today's appointments?
 
-### Data model
-Reuse `medical_records` table + `medical-documents` storage bucket. Add a new column `record_slot text` to tag fixed-slot docs (values: `aadhaar`, `pan`, `insurance_primary`, `insurance_secondary`, `id_photo`). Backwards compatible — existing records have `record_slot = null` and continue to flow into the regular Medical Documents view.
+### 4. Health Passport
+- What is the Health Passport?
+- How is the Health Passport score calculated?
+- What are the 7 categories?
+- How do face scan results feed into the passport?
 
-Unique partial index on `(user_id, record_slot)` where `record_slot is not null` so each slot holds exactly one current record (replace = delete + insert, or update file_url).
+### 5. Pill Identifier
+- What is the Pill Identifier?
+- How does photo-based pill identification work?
+- What happens if a banned drug is detected?
+- How does the prescription cross-check work?
 
-RLS: existing policies already allow guardians to read their accepted ward's `medical_records` — no changes needed. Verify during implementation.
+### 6. Safe Zones & Geofencing
+- What are Safe Zones?
+- How do I set up a Safe Zone?
+- What happens when I leave a Safe Zone?
+- How do guardians get notified?
 
-### Ward UI
-- New component `src/components/profile/IdInsuranceSection.tsx` with 5 slot cards.
-- Reuses upload/camera logic from `MedicalDocuments.tsx`.
-- Mounted inside `MyProfile.tsx` as a collapsible section, plus a "Hospital ID Kit" entry-point card on `MyHealth.tsx`.
+### 7. Map My Journey — Safety Net
+- What is the MMJ Safety Net?
+- What is low-battery guardian alert?
+- What is auto-SOS escalation on unanswered route deviation?
+- What is the public live-tracking share link?
 
-### Guardian UI
-- Add `hospital_visit` to `ReportSection` enum in `GuardianReports.tsx`.
-- New component `src/components/guardian/HospitalVisitTab.tsx` that fetches the 5 slot records for `selectedWard.userId`, generates 1-hour signed URLs (matching Medical Vault pattern), and renders the cards + action bar.
-- New component `src/components/guardian/HospitalDocPreviewDialog.tsx` (img/iframe preview).
+### 8. Voice Query & AI Check-ins
+- What is the Voice Query button?
+- How do AI voice check-ins work?
+- When are they triggered?
 
-### PDF generation (Admission Kit)
-- New helper `src/lib/admissionKitPdf.ts` using `jsPDF` (already in project via `reportPdf.ts`).
-- Cover page: Check-iN letterhead (per existing PDF branding memory), ward photo top-right, ward name + DOB + blood group + allergies + primary guardian phone + emergency contacts.
-- Subsequent pages: each doc embedded full-page (images via `addImage`, PDFs flattened by fetching the file and embedding pages — for v1, embed PDFs as a "see attached" link page if PDF-merge is heavy; revisit if needed).
-- Output as Blob → download or pass to WhatsApp share.
+### 9. Onboarding Wizard
+- What is the 4-step onboarding wizard?
+- What does each step cover?
+- Can I skip steps and complete them later?
 
-### WhatsApp share
-- Reuse `src/lib/whatsapp.ts` pattern. Generate a public, time-limited shareable link to the PDF (upload generated PDF to a new `admission-kits` private bucket with 24h signed URL) and send via wa.me with a templated message: "Here is {ward}'s hospital admission kit. Link valid 24h: {url}".
-- New private bucket `admission-kits` with RLS: only the generating guardian can read; auto-cleanup via cron (out of v1 scope — accept as known debt).
+### 10. Battery Monitoring
+- How does battery monitoring work?
+- At what thresholds do alerts trigger?
+- Who receives battery alerts?
 
-### Nudge ward
-- Reuse `insert_notification_deduped` RPC with type `id_doc_missing` and message listing missing slots.
-- Optional MSG91 WhatsApp template (out of v1 unless a template already exists; v1 = in-app notification only).
+### 11. Accessibility Menu
+- What is the Accessibility Menu?
+- What options does it provide?
+- How does it help elderly users?
 
-## Out of Scope (v1)
-- Auto-cleanup cron for `admission-kits` bucket.
-- OCR/validation of Aadhaar/PAN numbers.
-- Multi-ward bundle (one ward at a time).
-- Editing the cover page contents inline (pulled from existing profile/emergency data).
+### 12. SOS Event Lifecycle
+- What is the Active SOS banner?
+- How is SOS resolution synced across roles?
+- What is the trigger stability guard?
 
-## Verification
-- Ward uploads all 5 docs → Guardian sees ✅ on all 5 cards.
-- Ward removes Insurance Secondary → Guardian sees ⚠️ on that card; "Nudge" button enabled.
-- Tap "Download Admission Kit" → single PDF with cover + each doc page renders correctly.
-- Tap "Share via WhatsApp" → wa.me opens with prefilled message + signed URL.
-- Guardian without accepted nomination cannot see ward's docs (RLS check).
-- Mobile-first 430px max width respected; min 18px font.
+### 13. Check-In Settings & Vacation Mode
+- What is the Check-In Settings dialog?
+- How does Sleep Mode differ from Check-Out (Vacation Mode)?
+- How do I configure check-in times?
+
+## Implementation
+- Update `src/data/faqData.ts` with new sections and update existing ones.
+- Bump `FAQ_VERSION` to `2026-05-11`.
+- Keep answer style consistent: 2-4 sentences, clear and direct.
+- No code or UI changes needed — this is a content-only update.
 
 ## Files Touched
-- **New:** `src/components/profile/IdInsuranceSection.tsx`, `src/components/guardian/HospitalVisitTab.tsx`, `src/components/guardian/HospitalDocPreviewDialog.tsx`, `src/lib/admissionKitPdf.ts`
-- **Edited:** `src/pages/MyProfile.tsx`, `src/pages/MyHealth.tsx`, `src/pages/GuardianReports.tsx`
-- **Migration:** add `record_slot` column + partial unique index on `medical_records`; create `admission-kits` storage bucket with guardian-scoped RLS
+- `src/data/faqData.ts` (content update + version bump)
