@@ -47,14 +47,21 @@ const emptyForm = {
   end_date: "",
 };
 
-const MedicationList = () => {
+interface MedicationListProps {
+  onChange?: () => void;
+}
+
+const MedicationList = ({ onChange }: MedicationListProps = {}) => {
   const { session } = useAuth();
-  const [meds, setMeds] = useState<Medication[]>([]);
+  const [activeMeds, setActiveMeds] = useState<Medication[]>([]);
+  const [endedMeds, setEndedMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Medication | null>(null);
+  const [continueTarget, setContinueTarget] = useState<Medication | null>(null);
+  const [continueDate, setContinueDate] = useState<string>("");
 
   const loadMeds = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -63,9 +70,10 @@ const MedicationList = () => {
       .from("medications")
       .select("*")
       .eq("user_id", session.user.id)
-      .or(`end_date.is.null,end_date.gt.${today}`)
       .order("name");
-    setMeds((data as Medication[]) || []);
+    const all = (data as Medication[]) || [];
+    setActiveMeds(all.filter((m) => !m.end_date || m.end_date >= today));
+    setEndedMeds(all.filter((m) => m.end_date && m.end_date < today));
     setLoading(false);
   }, [session?.user?.id]);
 
