@@ -320,6 +320,7 @@ const Help = () => {
         </div>
       </div>
     </AppLayout>
+  </>
   );
 };
 
