@@ -3,7 +3,7 @@
 
 import type { FaqSection } from "./faqData";
 
-export const GUARDIAN_FAQ_VERSION = "2026-05-11";
+export const GUARDIAN_FAQ_VERSION = "2026-05-15";
 
 export const guardianFaqSections: FaqSection[] = [
   {
