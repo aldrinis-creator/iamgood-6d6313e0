@@ -1,96 +1,73 @@
-# Fix Guardian Settings & Help (separate from Ward)
+# Plan: SEO Blog — 8 FAQ Posts Across 4 Topic Clusters
 
-## The problem
+## Goal
+Launch a public blog at `/blog` targeting the four winnable Semrush keyword clusters identified earlier (medication reminder app, elderly care app, senior safety app, emergency alert app). Each post answers a high-intent FAQ, ends with a "Get Check-iN free" CTA to `/register`, and is fully indexable.
 
-1. **Shared Settings/Help pages.** `/guardian-settings` and `/help` route a guardian to the same `Settings.tsx` and `Help.tsx` files used by the Ward. Those screens are full of Ward-only controls (Check-In times, SOS, Safe Zones, Sleep/Vacation Mode, Health Passport FAQs, audio alerts, fall detection, etc.) that have no meaning for a Guardian.
-2. **Ward shown as "Primary Guardian".** The Guardians tab in Settings queries `guardians` with `user_id = session.user.id`. For a Guardian account this returns rows where they themselves are listed as a ward's guardian — but the UI then renders the **ward's name** (and whichever row is `is_primary`) as the Guardian's "Primary Guardian". This inverts the relationship.
-3. **Help/FAQ content** is 100 % ward-centric (heart tap, SOS, Sleep Mode, Vault claim, etc.). A Guardian has different concerns: ward switching, alerts, reports, hospital admission kit, nudges, ward-limit tier.
+## Posts (slug → target keyword → headline)
 
-## What we will build
+**Medication reminders**
+1. `medication-reminder-app-india` — "medication reminder app" — *Best Medication Reminder App for Elderly Parents in India (2026 Guide)*
+2. `how-to-never-miss-medication` — long-tail FAQ — *How to Make Sure Elderly Parents Never Miss Their Medication*
 
-### A. Dedicated Guardian Settings page (`src/pages/GuardianSettings.tsx`)
+**Elderly care**
+3. `elderly-care-app-features` — "elderly care app" — *What Does an Elderly Care App Actually Do? A Family Guide*
+4. `caring-for-aging-parents-remotely` — long-tail — *Caring for Aging Parents from Another City: A Practical Playbook*
 
-Route `/guardian-settings` will mount this new page (wrapped in `GuardianRoute` + `GuardianWardProvider`). Tabs:
+**Senior safety**
+5. `senior-safety-app-guide` — "senior safety app" — *Senior Safety Apps: What to Look For (and What to Skip)*
+6. `fall-detection-for-elderly` — long-tail — *Fall Detection for Elderly Parents: How It Works on a Phone*
 
-- **Profile** — guardian's own name, phone, email, relation to ward (read-only, comes from the ward's nomination), profile photo.
-- **Wards** — list of wards monitored (from `guardians` where `guardian_user_id = session.user.id` AND `status='accepted'`). Shows ward name, relation, primary badge if **the guardian is the primary guardian for that ward**, "Leave this ward" action, ward-limit indicator (Free 1 / Basic 3 / Pro 5 — from `useFeatureGate`).
-- **Notifications** — push toggle (re-uses `usePushSubscription`), email digest opt-in, WhatsApp opt-in, alert categories (Missed Check-In, SOS, Low Battery, Medication Missed, Geofence Exit, Journey Deviation) with per-category mute.
-- **Quiet Hours** — guardian's own do-not-disturb window (alerts still arrive for SOS).
-- **Language** — language selector (re-use existing logic).
-- **Accessibility** — font size, contrast, reduced motion (re-use existing `AccessibilityMenu`).
-- **Privacy** — data access / export / deletion requests scoped to guardian's own data (re-use the existing `PrivacyTab` component but fed with guardian-only context; remove guardian-of-ward selector).
-- **Subscription** — current plan, ward-limit, link to upgrade.
+**Emergency alerts**
+7. `emergency-alert-app-for-seniors` — "emergency alert app" — *Emergency Alert Apps for Seniors: SOS Without a Pendant*
+8. `what-to-do-in-medical-emergency-india` — long-tail — *What to Do in a Medical Emergency in India: First 10 Minutes*
 
-Removed from the guardian view (kept Ward-only): Check-In times, SOS configuration, Safe Zones, Sleep Mode, Vacation Mode, Fall Detection, Battery thresholds (these are device-level for the ward), Audio alerts, Health Passport opt-ins, Vault nominee setup.
+Each post: ~900 words, H1 + 4–6 H2s, FAQ block at the bottom (rendered as `FAQPage` JSON-LD), single soft CTA card at the end linking to `/register`.
 
-### B. Dedicated Guardian Help page (`src/pages/GuardianHelp.tsx`)
+## Architecture
 
-Route `/help` for guardian role will redirect / branch to this new page. New `src/data/guardianFaqData.ts` with sections targeted at the Guardian:
+```
+src/
+  data/
+    blogPosts.ts            ← typed array; title, slug, excerpt, keyword,
+                              date, readTimeMin, sections[], faqs[]
+  pages/
+    Blog.tsx                ← /blog index — card grid, SeoMeta
+    BlogPost.tsx            ← /blog/:slug — renders post by slug,
+                              SeoMeta + Article + FAQPage JSON-LD,
+                              CTA card to /register
+  components/
+    blog/
+      BlogPostCard.tsx      ← card used on index
+      BlogCTA.tsx           ← shared "Get Check-iN free" footer
+```
 
-- Getting started as a Guardian (nomination, accept invite, opt-in)
-- Ward Picker & switching between multiple wards
-- Reading the Dashboard (alerts hierarchy, health-score ring, today's appointments strip)
-- Reports: Hospital Visit / Admission Kit, Appointments, Adherence, Journeys
-- Responding to alerts (Missed Check-In, SOS, Low Battery, Geofence, Journey Deviation, Medication Missed)
-- Nudges to the ward (missing ID/insurance docs, missed check-ins)
-- Ward-limit tiers (Free 1, Basic 3, Pro 5) and how to upgrade
-- Privacy: what a Guardian can / cannot see in the ward's app
-- Settings (their own — quiet hours, notification channels)
-- Account, leaving a ward, contact support
+Posts live as typed data (not MDX) — keeps the bundle small, no extra deps, content is a structured array of `{ heading, paragraphs[] }` sections plus an `faqs` array. Easy to extend later.
 
-The "How Check-iN Works" intro card is re-written from the guardian's perspective. Reuse the same Accordion UI, search box, and Markdown download as `Help.tsx`.
+## Routing & navigation
+- Add `/blog` and `/blog/:slug` routes in `src/App.tsx`, public (no auth guard), placed alongside `/help`, `/contact`.
+- **No in-app link** (per user choice). Discoverable only via Google + direct URL. Optional: a small footer link on `/` only — leave out unless asked.
 
-### C. Fix the "Ward as Primary Guardian" inversion
+## SEO wiring
+- Use existing `SeoMeta` component for title/description/canonical/og.
+- `BlogPost.tsx` additionally injects two JSON-LD blocks via `<Helmet>`: `Article` (headline, datePublished, author=Check-iN) and `FAQPage` (question/answer pairs from the post's `faqs[]`).
+- Update `scripts/generate-sitemap.ts` to add `/blog` and one entry per post slug (priority 0.7, changefreq monthly). Auto-runs on `predev`/`prebuild`.
+- One H1 per post, semantic `<article>`, internal links between related posts (e.g. medication-reminder ↔ how-to-never-miss).
 
-- Remove the Guardians tab and all Ward-side controls from the Guardian view by routing to `GuardianSettings` instead of `Settings`.
-- In the new `GuardianSettings` Wards tab, query strictly:
-  ```
-  guardians.select(...).eq('guardian_user_id', session.user.id).eq('status','accepted')
-  ```
-  and label rows as **"Ward"** (with relation, e.g. "Mother", "Father"). The `is_primary` flag is interpreted as "you are this ward's primary guardian" and rendered with a clear label such as "You are the Primary Guardian" — never as the ward themselves being a guardian.
+## CTA
+Shared `BlogCTA` card at the bottom of every post: navy headline "Try Check-iN free", one-line value prop, `<Link to="/register">` primary button. No popups, no scroll interrupts.
 
-### D. Routing & navigation
+## Out of scope
+- No MDX/markdown pipeline, no CMS, no comments, no author profiles, no images (reduce noise; can add hero images later if requested).
+- No changes to in-app navigation, dashboards, or any role-gated logic.
+- No translation — English only (matches current site).
 
-- `src/App.tsx`:
-  - `/guardian-settings` → new `GuardianSettings` page.
-  - `/help` is split: if `profile.role === 'guardian'` → render `GuardianHelp`, else render existing `Help`. Done with a small `HelpRouter` wrapper to avoid two URLs.
-- `AppHeader` (guardian variant) and `NavTabs` already point to `/guardian-settings` and `/help`; no link changes needed.
+## Files to create
+- `src/data/blogPosts.ts`
+- `src/pages/Blog.tsx`
+- `src/pages/BlogPost.tsx`
+- `src/components/blog/BlogPostCard.tsx`
+- `src/components/blog/BlogCTA.tsx`
 
-### E. Memory update
-
-Add a project memory note:
-
-- Guardian and Ward have distinct Settings and Help surfaces.
-- `guardians` table semantics: `user_id` = ward, `guardian_user_id` = guardian. Never query `guardians` by `user_id = session.user.id` on the Guardian side.
-
-## Files
-
-**New**
-
-- `src/pages/GuardianSettings.tsx`
-- `src/pages/GuardianHelp.tsx`
-- `src/data/guardianFaqData.ts`
-
-**Edited**
-
-- `src/App.tsx` — route `/guardian-settings` to `GuardianSettings`; add `HelpRouter` for `/help`.
-- (Optional) `src/pages/Settings.tsx` — guard against being mounted by a guardian (defensive `<Navigate to="/guardian-settings" />` if `profile.role === 'guardian'`).
-- `.lovable/memory/index.md` + new memory file `features/guardian-settings-help.md`.
-
-**Untouched**
-
-- `src/pages/Settings.tsx` and `src/pages/Help.tsx` keep all Ward content as-is.
-- No DB schema or RLS changes required.
-
-## Open questions before I build
-
-1. Should the Guardian be able to **leave a ward** from Settings (sets `status='left'` and notifies the ward), or only the ward can revoke?
-2. For **Quiet Hours** on the guardian side, should SOS still break through (recommended) or strictly mute everything?
-3. Do you want a single combined **Guardian Help** page, or split into "Quick Start" + "FAQ" tabs like the Ward Help has Settings/Privacy/Terms tabs too?
-
-Answer these (or say "use sensible defaults") and I'll implement.  
-1. No. Only the Ward can revoke  
-2. In Quiet Hours, the SOS must still breakthrough  
-3. Single combined Gaurdian Help page
-
-&nbsp;
+## Files to edit
+- `src/App.tsx` — register two routes
+- `scripts/generate-sitemap.ts` — append blog entries

@@ -52,6 +52,8 @@ const AdminVerify = lazy(() => import("./pages/AdminVerify"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminVaultClaims = lazy(() => import("./pages/AdminVaultClaims"));
 const VaultClaim = lazy(() => import("./pages/VaultClaim"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
 
 const queryClient = new QueryClient();
 
@@ -112,6 +114,8 @@ const App = () => (
                 <Route path="/j/:token" element={<PublicJourneyView />} />
                 <Route path="/install" element={<Install />} />
                 <Route path="/unsubscribe" element={<Unsubscribe />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 {/* Admin routes */}
