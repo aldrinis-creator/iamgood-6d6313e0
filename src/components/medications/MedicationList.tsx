@@ -155,6 +155,7 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
 
     setDialogOpen(false);
     loadMeds();
+    onChange?.();
   };
 
   const handleDelete = async (id: string) => {
@@ -162,6 +163,29 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
     if (error) { toast.error("Failed to delete"); return; }
     toast.success("Medication deleted");
     loadMeds();
+    onChange?.();
+  };
+
+  const handleContinue = async () => {
+    if (!continueTarget) return;
+    const newEnd = continueDate || null;
+    const { error } = await supabase
+      .from("medications")
+      .update({ end_date: newEnd })
+      .eq("id", continueTarget.id);
+    if (error) { toast.error("Failed to continue"); return; }
+    toast.success(newEnd ? `${continueTarget.name} continued until ${newEnd}` : `${continueTarget.name} continued (no end date)`);
+    setContinueTarget(null);
+    setContinueDate("");
+    loadMeds();
+    onChange?.();
+  };
+
+  const openContinue = (med: Medication) => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    setContinueDate(d.toISOString().split("T")[0]);
+    setContinueTarget(med);
   };
 
   const addScheduleTime = () => {
