@@ -34,12 +34,19 @@ const MedicationManager = () => {
 
   const checkLowStock = useCallback(async () => {
     if (!session?.user?.id) return;
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
     const { data } = await supabase
       .from("medications")
-      .select("id, remaining_quantity, low_stock_threshold")
+      .select("id, remaining_quantity, low_stock_threshold, end_date")
       .eq("user_id", session.user.id);
     if (data) {
-      setHasLowStock(data.some((m: any) => m.remaining_quantity <= m.low_stock_threshold));
+      setHasLowStock(
+        data.some(
+          (m: any) =>
+            m.remaining_quantity <= m.low_stock_threshold &&
+            (!m.end_date || m.end_date >= today),
+        ),
+      );
     }
   }, [session?.user?.id]);
 
@@ -96,7 +103,7 @@ const MedicationManager = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="meds"><MedicationList /></TabsContent>
+            <TabsContent value="meds"><MedicationList onChange={checkLowStock} /></TabsContent>
             <TabsContent value="scan">
               <PrescriptionScanner
                 alternativeMode={altContext}

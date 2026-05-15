@@ -47,14 +47,21 @@ const emptyForm = {
   end_date: "",
 };
 
-const MedicationList = () => {
+interface MedicationListProps {
+  onChange?: () => void;
+}
+
+const MedicationList = ({ onChange }: MedicationListProps = {}) => {
   const { session } = useAuth();
-  const [meds, setMeds] = useState<Medication[]>([]);
+  const [activeMeds, setActiveMeds] = useState<Medication[]>([]);
+  const [endedMeds, setEndedMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Medication | null>(null);
+  const [continueTarget, setContinueTarget] = useState<Medication | null>(null);
+  const [continueDate, setContinueDate] = useState<string>("");
 
   const loadMeds = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -63,9 +70,10 @@ const MedicationList = () => {
       .from("medications")
       .select("*")
       .eq("user_id", session.user.id)
-      .or(`end_date.is.null,end_date.gt.${today}`)
       .order("name");
-    setMeds((data as Medication[]) || []);
+    const all = (data as Medication[]) || [];
+    setActiveMeds(all.filter((m) => !m.end_date || m.end_date >= today));
+    setEndedMeds(all.filter((m) => m.end_date && m.end_date < today));
     setLoading(false);
   }, [session?.user?.id]);
 
@@ -147,6 +155,7 @@ const MedicationList = () => {
 
     setDialogOpen(false);
     loadMeds();
+    onChange?.();
   };
 
   const handleDelete = async (id: string) => {
@@ -154,6 +163,29 @@ const MedicationList = () => {
     if (error) { toast.error("Failed to delete"); return; }
     toast.success("Medication deleted");
     loadMeds();
+    onChange?.();
+  };
+
+  const handleContinue = async () => {
+    if (!continueTarget) return;
+    const newEnd = continueDate || null;
+    const { error } = await supabase
+      .from("medications")
+      .update({ end_date: newEnd })
+      .eq("id", continueTarget.id);
+    if (error) { toast.error("Failed to continue"); return; }
+    toast.success(newEnd ? `${continueTarget.name} continued until ${newEnd}` : `${continueTarget.name} continued (no end date)`);
+    setContinueTarget(null);
+    setContinueDate("");
+    loadMeds();
+    onChange?.();
+  };
+
+  const openContinue = (med: Medication) => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    setContinueDate(d.toISOString().split("T")[0]);
+    setContinueTarget(med);
   };
 
   const addScheduleTime = () => {
@@ -180,14 +212,47 @@ const MedicationList = () => {
         <Plus className="w-4 h-4 mr-1" /> Add Medication
       </Button>
 
-      {meds.length === 0 && (
+      {endedMeds.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            Ended medications — continue or delete?
+          </p>
+          {endedMeds.map((med) => (
+            <Card key={med.id} className="border-amber-500/30">
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <Pill className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{med.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {med.dosage} · ended {med.end_date}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => openContinue(med)}>
+                    Continue
+                  </Button>
+                  <Button size="sm" variant="destructive" className="flex-1" onClick={() => setDeleteTarget(med)}>
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {activeMeds.length === 0 && endedMeds.length === 0 && (
         <div className="text-center py-8 space-y-2">
           <Pill className="w-10 h-10 text-muted-foreground mx-auto" />
           <p className="text-sm text-muted-foreground">No medications added yet.</p>
         </div>
       )}
 
-      {meds.map((med) => {
+      {activeMeds.map((med) => {
         const isLowStock = med.remaining_quantity <= med.low_stock_threshold;
         return (
           <Card key={med.id} className={isLowStock ? "border-destructive/30" : ""}>
@@ -315,6 +380,27 @@ const MedicationList = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!continueTarget} onOpenChange={(open) => { if (!open) { setContinueTarget(null); setContinueDate(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Continue {continueTarget?.name}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Set a new end date or leave blank for no end date.
+            </p>
+            <div>
+              <Label className="text-sm">New End Date</Label>
+              <Input type="date" value={continueDate} onChange={(e) => setContinueDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setContinueTarget(null); setContinueDate(""); }}>Cancel</Button>
+            <Button onClick={handleContinue}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
