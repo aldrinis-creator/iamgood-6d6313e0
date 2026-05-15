@@ -1,4 +1,5 @@
 import LegalPageLayout from "@/components/LegalPageLayout";
+import SeoMeta from "@/components/SeoMeta";
 
 const sections = [
   { heading: "Acceptance of Terms", content: "By accessing or using Check-iN, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services." },
@@ -13,7 +14,14 @@ const sections = [
 ];
 
 const TermsOfService = () => (
-  <LegalPageLayout title="Terms of Service" sections={sections} />
+  <>
+    <SeoMeta
+      title="Terms of Service"
+      description="Check-iN Terms of Service — India's medication reminder, elderly care & emergency alert app. Subscriptions, emergency disclaimer, and liability."
+      canonicalPath="/terms-of-service"
+    />
+    <LegalPageLayout title="Terms of Service" sections={sections} />
+  </>
 );
 
 export default TermsOfService;

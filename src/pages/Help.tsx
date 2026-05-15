@@ -9,6 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import { faqSections, FAQ_VERSION } from "@/data/faqData";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import SeoMeta from "@/components/SeoMeta";
 
 const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="w-5 h-5 text-destructive" />,
@@ -127,6 +128,11 @@ const Help = () => {
 
   return (
     <AppLayout>
+      <SeoMeta
+        title="Help & Settings"
+        description="Check-iN Help Centre — FAQs, settings, privacy policy, and terms of service for India's medication reminder, elderly care & emergency alert app."
+        canonicalPath="/help"
+      />
       <div className="p-4 space-y-4">
         {/* Tab bar */}
         <nav className="flex gap-1 overflow-x-auto bg-muted rounded-lg p-1">
