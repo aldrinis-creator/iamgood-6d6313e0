@@ -103,7 +103,7 @@ const MedicationManager = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="meds"><MedicationList /></TabsContent>
+            <TabsContent value="meds"><MedicationList onChange={checkLowStock} /></TabsContent>
             <TabsContent value="scan">
               <PrescriptionScanner
                 alternativeMode={altContext}
