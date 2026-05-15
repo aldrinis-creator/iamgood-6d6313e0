@@ -22,6 +22,15 @@ const entries: SitemapEntry[] = [
   { path: "/terms-of-service", changefreq: "monthly", priority: "0.4" },
   { path: "/contact-us", changefreq: "monthly", priority: "0.5" },
   { path: "/help", changefreq: "weekly", priority: "0.6" },
+  { path: "/blog", changefreq: "weekly", priority: "0.8" },
+  { path: "/blog/medication-reminder-app-india", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/how-to-never-miss-medication", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/elderly-care-app-features", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/caring-for-aging-parents-remotely", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/senior-safety-app-guide", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/fall-detection-for-elderly", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/emergency-alert-app-for-seniors", changefreq: "monthly", priority: "0.7" },
+  { path: "/blog/what-to-do-in-medical-emergency-india", changefreq: "monthly", priority: "0.7" },
 ];
 
 function generateSitemap(entries: SitemapEntry[]) {
