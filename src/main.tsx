@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
 
@@ -26,7 +27,6 @@ const isPreview =
         await Promise.all(regs.map((r) => r.unregister()));
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
-        // Also remove the legacy push SW if still cached
         try {
           await caches.delete("emergency-profile-v1");
         } catch {}
@@ -47,5 +47,9 @@ const isPreview =
     }
   }
 
-  createRoot(document.getElementById("root")!).render(<App />);
+  createRoot(document.getElementById("root")!).render(
+    <HelmetProvider>
+      <App />
+    </HelmetProvider>
+  );
 })();
