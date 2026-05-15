@@ -10,7 +10,6 @@ import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone, Mail } from "luci
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import SeoMeta from "@/components/SeoMeta";
 
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
