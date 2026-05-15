@@ -1,4 +1,5 @@
 import LegalPageLayout from "@/components/LegalPageLayout";
+import SeoMeta from "@/components/SeoMeta";
 
 const sections = [
   { heading: "Information We Collect", content: "We collect personal information you provide, including your name, phone number, emergency contacts, health data, and location when using emergency features. We also collect device information and usage data to improve our services." },
@@ -11,7 +12,14 @@ const sections = [
 ];
 
 const PrivacyPolicy = () => (
-  <LegalPageLayout title="Privacy Policy" sections={sections} />
+  <>
+    <SeoMeta
+      title="Privacy Policy"
+      description="Check-iN Privacy Policy — how we protect your health data, medical vault records, and guardian alerts. DPDP Act compliant."
+      canonicalPath="/privacy-policy"
+    />
+    <LegalPageLayout title="Privacy Policy" sections={sections} />
+  </>
 );
 
 export default PrivacyPolicy;

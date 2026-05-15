@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Heart, Shield, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SeoMeta from "@/components/SeoMeta";
 
 const Index = () => {
   const { isLoggedIn, role } = useApp();
@@ -15,7 +16,14 @@ const Index = () => {
   }, [isLoggedIn, role, navigate]);
 
   return (
-    <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 text-primary-foreground">
+    <>
+      <SeoMeta
+        title="Check-iN — Medication Reminder & Senior Safety App for India"
+        description="India's medication reminder, elderly care & emergency alert app for seniors. One-tap SOS, guardian alerts, medical vault & health tracking."
+        keywords="medication reminder app, elderly care app, senior safety app, emergency alert app, personal emergency response system, senior health app India, guardian alert app, fall detection, medical vault, pill reminder"
+        canonicalPath="/"
+      />
+      <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 text-primary-foreground">
       <div className="max-w-md w-full space-y-8 text-center">
         <div className="space-y-4">
           <div className="w-24 h-24 rounded-full bg-success mx-auto flex items-center justify-center">
@@ -63,7 +71,7 @@ const Index = () => {
           Protecting seniors & lone dwellers across India 🇮🇳
         </p>
       </div>
-    </div>
+    </>
   );
 };
 
