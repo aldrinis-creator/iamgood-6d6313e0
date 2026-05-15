@@ -380,6 +380,27 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!continueTarget} onOpenChange={(open) => { if (!open) { setContinueTarget(null); setContinueDate(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Continue {continueTarget?.name}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Set a new end date or leave blank for no end date.
+            </p>
+            <div>
+              <Label className="text-sm">New End Date</Label>
+              <Input type="date" value={continueDate} onChange={(e) => setContinueDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setContinueTarget(null); setContinueDate(""); }}>Cancel</Button>
+            <Button onClick={handleContinue}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
