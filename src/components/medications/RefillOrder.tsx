@@ -178,10 +178,12 @@ const RefillOrder = ({ onScanAlternative, selectedAlternative, onClearSelectedAl
 
   const load = useCallback(async () => {
     if (!session?.user?.id) return;
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
     const { data } = await supabase
       .from("medications")
       .select("id, name, dosage, remaining_quantity, total_quantity, low_stock_threshold")
       .eq("user_id", session.user.id)
+      .or(`end_date.is.null,end_date.gte.${today}`)
       .order("remaining_quantity", { ascending: true });
 
     const all = (data as Medication[]) || [];

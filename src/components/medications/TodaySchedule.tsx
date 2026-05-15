@@ -79,11 +79,13 @@ const TodaySchedule = () => {
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
 
+    const todayStr = format(now, "yyyy-MM-dd");
     const { data: meds, error: medErr } = await supabase
       .from("medications")
       .select("id, name, dosage, instructions, schedule_times, remaining_quantity")
       .eq("user_id", userId)
-      .lte("start_date", format(now, "yyyy-MM-dd"));
+      .lte("start_date", todayStr)
+      .or(`end_date.is.null,end_date.gte.${todayStr}`);
 
     if (medErr || !meds) { setLoading(false); return; }
 
