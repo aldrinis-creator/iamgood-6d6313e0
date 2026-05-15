@@ -3,7 +3,7 @@
 
 import type { FaqSection } from "./faqData";
 
-export const GUARDIAN_FAQ_VERSION = "2026-05-11";
+export const GUARDIAN_FAQ_VERSION = "2026-05-15";
 
 export const guardianFaqSections: FaqSection[] = [
   {
@@ -163,6 +163,78 @@ export const guardianFaqSections: FaqSection[] = [
       {
         question: "How do I contact support?",
         answer: "Email checkin_support@futurewave.in or use Help → Contact Us inside the app."
+      },
+    ],
+  },
+  {
+    title: "Devices & Compatibility",
+    icon: "settings",
+    items: [
+      {
+        question: "Does my Ward need a smartphone for Check-iN to work?",
+        answer: "Yes. Check-iN runs on the Ward's smartphone (Android 8+ or iOS 14+) to capture vitals, location, check-ins and SOS triggers. Without it, the Guardian side has nothing to monitor."
+      },
+      {
+        question: "Which platforms does the Guardian app support?",
+        answer: "Check-iN is a Progressive Web App (PWA) that works on Android, iOS, Windows and Mac via any modern browser (Chrome, Safari, Edge). Install it to your home screen for push notifications and an app-like experience."
+      },
+      {
+        question: "Will the app drain my Ward's battery?",
+        answer: "Background location and check-in services are tuned to minimise drain — typically 3–6% per day on modern phones. Active SOS or Map My Journey sessions use more, so the Ward also gets low-battery warnings at 30% and 10%."
+      },
+      {
+        question: "What if my Ward's phone dies or loses signal?",
+        answer: "You receive a Low Battery push at 30% and 10%. If the phone goes fully offline, missed check-ins escalate to you within the configured window. The last known location is preserved from the most recent sync."
+      },
+    ],
+  },
+  {
+    title: "Emergency Response",
+    icon: "alert-triangle",
+    items: [
+      {
+        question: "Can I call emergency services directly from the app?",
+        answer: "Yes — the active SOS banner shows a one-tap dialer for India's 112 emergency number, alongside the Ward's last known location and primary care contacts."
+      },
+      {
+        question: "What happens if it turns out to be a false alarm?",
+        answer: "Only the Ward can mark themselves 'I'm Safe' to resolve their own SOS. The resolution syncs to all guardians in real-time. False alarms are not penalised — better safe than sorry."
+      },
+      {
+        question: "Can I book an ambulance for my Ward?",
+        answer: "Yes. From the Guardian Dashboard, open Services → Book Ambulance. The Ward's emergency profile (blood group, allergies, primary contact) is auto-attached to the request."
+      },
+    ],
+  },
+  {
+    title: "Sharing with Doctors",
+    icon: "file-text",
+    items: [
+      {
+        question: "Can I share my Ward's reports with their doctor?",
+        answer: "Yes — every report (Adherence, Vitals, Health Passport, Hospital Visit Kit) exports to a branded PDF. Use Share → WhatsApp or download and email. Hospital Visit Kit shares generate a secure 24-hour link."
+      },
+      {
+        question: "Can I bring the Hospital Visit Kit to an in-person appointment?",
+        answer: "Yes. Generate the PDF in advance, save it to your phone, or print a copy. It contains all IDs, insurance, vitals, allergies and chronic conditions in one document."
+      },
+    ],
+  },
+  {
+    title: "Privacy & Data Security",
+    icon: "shield",
+    items: [
+      {
+        question: "Is my Ward's health data secure?",
+        answer: "Yes. All data is encrypted in transit (TLS) and at rest. Medical Vault contents use additional client-side encryption. We comply with India's Digital Personal Data Protection (DPDP) Act."
+      },
+      {
+        question: "Who else can see my Ward's data?",
+        answer: "Only the Ward, their accepted guardians (within the access scope they grant), and Check-iN's automated alerting systems. Data is never sold, never shared with advertisers, and never used to train AI models without explicit consent."
+      },
+      {
+        question: "What happens to the data if my Ward deletes their account?",
+        answer: "All personal data is permanently deleted within 30 days, including vitals, location history, vault contents, and your guardian linkage. Anonymised aggregate metrics may be retained for service improvement."
       },
     ],
   },
