@@ -84,6 +84,11 @@ const GuardianHelp = () => {
 
   return (
     <AppLayout>
+      <SeoMeta
+        title="Guardian Help Centre"
+        description="Check-iN Guardian Help — how to monitor your ward, respond to SOS alerts, track medications, and use the elderly care & emergency alert app."
+        canonicalPath="/guardian-help"
+      />
       <div className="p-4 space-y-4">
         <Card className="bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
           <CardHeader className="pb-2">

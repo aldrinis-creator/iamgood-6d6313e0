@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, Smartphone, Share, Plus, MoreVertical } from "lucide-react";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import AppLayout from "@/components/AppLayout";
+import SeoMeta from "@/components/SeoMeta";
 
 const Install = () => {
   const { canInstall, installApp, isInstalled } = usePwaInstall();
@@ -11,6 +12,11 @@ const Install = () => {
 
   return (
     <AppLayout>
+      <SeoMeta
+        title="Install Check-iN"
+        description="Install Check-iN as a PWA on your phone for instant access to India's medication reminder, elderly care & emergency alert app. Works offline with push notifications."
+        canonicalPath="/install"
+      />
       <div className="p-4 space-y-6">
         <div className="text-center space-y-2">
           <Smartphone className="w-12 h-12 mx-auto text-primary" />
