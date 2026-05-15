@@ -127,7 +127,7 @@ const Help = () => {
   }, [searchQuery]);
 
   return (
-    <>
+    <React.Fragment>
       <SeoMeta
         title="Help & Settings"
         description="Check-iN Help Centre — FAQs, settings, privacy policy, and terms of service for India's medication reminder, elderly care & emergency alert app."
@@ -320,7 +320,7 @@ const Help = () => {
         </div>
       </div>
     </AppLayout>
-  </>
+  </React.Fragment>
   );
 };
 

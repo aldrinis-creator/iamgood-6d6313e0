@@ -16,7 +16,7 @@ const Index = () => {
   }, [isLoggedIn, role, navigate]);
 
   return (
-    <>
+    <React.Fragment>
       <SeoMeta
         title="Check-iN — Medication Reminder & Senior Safety App for India"
         description="India's medication reminder, elderly care & emergency alert app for seniors. One-tap SOS, guardian alerts, medical vault & health tracking."
@@ -71,7 +71,7 @@ const Index = () => {
           Protecting seniors & lone dwellers across India 🇮🇳
         </p>
       </div>
-    </>
+    </React.Fragment>
   );
 };
 
