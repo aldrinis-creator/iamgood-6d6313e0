@@ -212,14 +212,47 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
         <Plus className="w-4 h-4 mr-1" /> Add Medication
       </Button>
 
-      {meds.length === 0 && (
+      {endedMeds.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            Ended medications — continue or delete?
+          </p>
+          {endedMeds.map((med) => (
+            <Card key={med.id} className="border-amber-500/30">
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <Pill className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{med.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {med.dosage} · ended {med.end_date}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => openContinue(med)}>
+                    Continue
+                  </Button>
+                  <Button size="sm" variant="destructive" className="flex-1" onClick={() => setDeleteTarget(med)}>
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {activeMeds.length === 0 && endedMeds.length === 0 && (
         <div className="text-center py-8 space-y-2">
           <Pill className="w-10 h-10 text-muted-foreground mx-auto" />
           <p className="text-sm text-muted-foreground">No medications added yet.</p>
         </div>
       )}
 
-      {meds.map((med) => {
+      {activeMeds.map((med) => {
         const isLowStock = med.remaining_quantity <= med.low_stock_threshold;
         return (
           <Card key={med.id} className={isLowStock ? "border-destructive/30" : ""}>
