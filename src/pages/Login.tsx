@@ -157,16 +157,8 @@ const Login = () => {
     }
   };
 
-  return (
-    <>
-      <SeoMeta
-        title="Sign In"
-        description="Sign in to Check-iN — India's medication reminder, elderly care & emergency alert app for seniors and guardians."
-        keywords="sign in, login, elderly care app login, senior safety app login, medication reminder app India"
-        canonicalPath="/login"
-      />
-      {(() => {
-        if (otpMode) {
+  // OTP login mode
+  if (otpMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
