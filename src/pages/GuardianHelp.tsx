@@ -9,6 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import { guardianFaqSections, GUARDIAN_FAQ_VERSION } from "@/data/guardianFaqData";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
+import SeoMeta from "@/components/SeoMeta";
 
 const iconMap: Record<string, React.ReactNode> = {
   "shield-check": <ShieldCheck className="w-5 h-5 text-success" />,
