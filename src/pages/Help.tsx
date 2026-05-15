@@ -127,14 +127,13 @@ const Help = () => {
   }, [searchQuery]);
 
   return (
-    <React.Fragment>
+    <AppLayout>
       <SeoMeta
         title="Help & Settings"
         description="Check-iN Help Centre — FAQs, settings, privacy policy, and terms of service for India's medication reminder, elderly care & emergency alert app."
         canonicalPath="/help"
       />
-      <AppLayout>
-        <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4">
         {/* Tab bar */}
         <nav className="flex gap-1 overflow-x-auto bg-muted rounded-lg p-1">
           {tabs.map((tab) => (
@@ -320,7 +319,6 @@ const Help = () => {
         </div>
       </div>
     </AppLayout>
-  </React.Fragment>
   );
 };
 
