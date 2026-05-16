@@ -81,6 +81,12 @@ const useCheckInAudio = () => {
       const preKey = `checkin-pre-${dateKey}-${h}`;
       const missedKey = `missed-${dateKey}-${h}`;
 
+      // --- Ignore completely if more than 1 hour past scheduled time ---
+      if (diffMin >= 60) {
+        missedSentRef.current.add(missedKey);
+        continue;
+      }
+
       // --- T-5: Browser notification only (no popup, no audio) ---
       if (diffMin >= -PRE_ALERT_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
         const responded = await isCheckInResponded(h, now);
