@@ -23,6 +23,7 @@ import useLocationSync from "@/hooks/useLocationSync";
 import SOSActiveBar from "@/components/SOSActiveBar";
 import useAbnormalPatternCheck from "@/hooks/useAbnormalPatternCheck";
 import useActivityHeartbeat from "@/hooks/useActivityHeartbeat";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
