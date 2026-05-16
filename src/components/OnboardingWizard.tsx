@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Heart, UserPlus, Clock, Shield, ChevronRight, Check } from "lucide-react";
+import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import PhoneInput from "@/components/PhoneInput";
@@ -19,6 +19,7 @@ const STEPS = [
   { icon: Heart, title: "Welcome to Check-iN", color: "text-primary" },
   { icon: UserPlus, title: "Add Your First Guardian", color: "text-success" },
   { icon: Clock, title: "Set Check-In Times", color: "text-warning" },
+  { icon: Pill, title: "Add a Medication", color: "text-primary" },
   { icon: Shield, title: "Emergency Profile", color: "text-destructive" },
 ];
 
@@ -41,6 +42,10 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   // Check-in
   const [selectedPreset, setSelectedPreset] = useState(1);
 
+  // Medication
+  const [medName, setMedName] = useState("");
+  const [medTime, setMedTime] = useState("");
+
   // Emergency profile
   const [bloodGroup, setBloodGroup] = useState("");
   const [allergies, setAllergies] = useState("");
@@ -52,12 +57,12 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
       // Save selected check-in preset to user_settings
       await saveCheckInTimes();
     }
-    if (step < 3) setStep(step + 1);
+    if (step < 4) setStep(step + 1);
     else handleFinish();
   };
 
   const handleSkip = () => {
-    if (step < 3) setStep(step + 1);
+    if (step < 4) setStep(step + 1);
     else handleFinish();
   };
 
@@ -116,6 +121,26 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
     }
   };
 
+  const saveMedication = async () => {
+    if (!session?.user?.id || !medName.trim() || !medTime) {
+      toast.error("Name and time are required");
+      return;
+    }
+    const { error } = await supabase.from("medications").insert({
+      user_id: session.user.id,
+      name: medName.trim(),
+      schedule_times: [medTime],
+      alarm_enabled: true,
+      alarm_mode: "both",
+    });
+    if (error) {
+      toast.error("Failed to add medication");
+    } else {
+      toast.success("Medication added!");
+      handleNext();
+    }
+  };
+
   const saveEmergencyProfile = async () => {
     if (!session?.user?.id) return;
     const updates: any = {};
@@ -149,7 +174,7 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
             <StepIcon className={`w-7 h-7 ${STEPS[step].color}`} />
           </div>
           <h2 className="text-lg font-bold">{STEPS[step].title}</h2>
-          <Badge variant="outline" className="mt-1 text-xs">Step {step + 1} of 4</Badge>
+          <Badge variant="outline" className="mt-1 text-xs">Step {step + 1} of {STEPS.length}</Badge>
         </div>
 
         {/* Step 0: Welcome */}
@@ -162,6 +187,7 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
               <p className="text-xs font-medium">Here's what we'll set up:</p>
               <p className="text-xs text-muted-foreground">✅ Add a trusted guardian</p>
               <p className="text-xs text-muted-foreground">✅ Set your check-in schedule</p>
+              <p className="text-xs text-muted-foreground">✅ Add a daily medication</p>
               <p className="text-xs text-muted-foreground">✅ Fill your emergency health profile</p>
             </div>
             <Button className="w-full gap-1" onClick={handleNext}>
@@ -235,8 +261,31 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
           </div>
         )}
 
-        {/* Step 3: Emergency Profile */}
+        {/* Step 3: Medication */}
         {step === 3 && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground text-center">
+              Add your most important daily medication. You can add more later.
+            </p>
+            <div>
+              <Label className="text-xs">Medication Name</Label>
+              <Input value={medName} onChange={(e) => setMedName(e.target.value)} placeholder="e.g. Vitamin D" className="text-base" />
+            </div>
+            <div>
+              <Label className="text-xs">Scheduled Time</Label>
+              <Input type="time" value={medTime} onChange={(e) => setMedTime(e.target.value)} className="text-base" />
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={saveMedication} disabled={!medName.trim() || !medTime}>
+                <Check className="w-4 h-4 mr-1" /> Save Medication
+              </Button>
+              <Button variant="ghost" className="flex-1" onClick={handleSkip}>Skip</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Emergency Profile */}
+        {step === 4 && (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">
               This info helps first responders in an emergency.

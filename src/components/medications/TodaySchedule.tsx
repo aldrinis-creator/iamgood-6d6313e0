@@ -168,6 +168,37 @@ const TodaySchedule = () => {
       const diffMin = differenceInMinutes(now, slot.scheduledAt);
       const effectiveStatus = diffMin > 60 ? "taken_late" : "taken";
 
+      if (!navigator.onLine) {
+        const req = indexedDB.open("checkin-offline", 2);
+        req.onsuccess = async () => {
+          const db = req.result;
+          const tx = db.transaction("med_queue", "readwrite");
+          tx.objectStore("med_queue").add({
+            medication_id: slot.medication.id,
+            user_id: session.user.id,
+            scheduled_at: slot.scheduledAt.toISOString(),
+            taken_at: now.toISOString(),
+            status: effectiveStatus,
+            queued_at: Date.now()
+          });
+          const sw = await navigator.serviceWorker.ready;
+          // @ts-ignore
+          sw.sync.register("med-sync");
+        };
+        const label = effectiveStatus === "taken_late" ? "taken (late)" : "taken";
+        toast.success(`${slot.medication.name} marked as ${label} ✓ (Saved offline)`);
+        import("canvas-confetti").then((module) => {
+          const confetti = module.default;
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#3b82f6', '#eab308'] });
+        });
+        setFadingOut((prev) => new Set(prev).add(key));
+        setTimeout(() => {
+          setFadingOut((prev) => { const n = new Set(prev); n.delete(key); return n; });
+          setHiddenTaken((prev) => new Set(prev).add(key));
+        }, 800);
+        return;
+      }
+
       if (slot.logId) {
         await supabase.from("medication_logs").update({ status: effectiveStatus, taken_at: now.toISOString() }).eq("id", slot.logId);
       } else {
@@ -180,6 +211,16 @@ const TodaySchedule = () => {
       const label = effectiveStatus === "taken_late" ? "taken (late)" : "taken";
       toast.success(`${slot.medication.name} marked as ${label} ✓`);
       notifyGuardians(session.user.id, slot.medication.name, effectiveStatus, slot.scheduledAt.toISOString());
+
+      import("canvas-confetti").then((module) => {
+        const confetti = module.default;
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#22c55e', '#3b82f6', '#eab308']
+        });
+      });
 
       // Fade out then hide
       setFadingOut((prev) => new Set(prev).add(key));

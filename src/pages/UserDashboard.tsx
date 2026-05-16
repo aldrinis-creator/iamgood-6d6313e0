@@ -20,6 +20,7 @@ import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import VoiceQueryButton from "@/components/VoiceQueryButton";
+import AudioUnlocker from "@/components/AudioUnlocker";
 import { formatISTTime } from "@/lib/istTime";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
@@ -222,6 +223,7 @@ const UserDashboard = () => {
       <div className="p-4 space-y-4">
         <VaultClaimCancelBanner />
         <EmailPromptBanner userEmail={session?.user?.email} />
+        <AudioUnlocker />
         {/* Mode Selector */}
         <Card className="bg-primary/5">
           <CardContent className="p-3 space-y-3">

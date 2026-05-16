@@ -85,7 +85,7 @@ export const showReminderOverlay = (data: ReminderData) => {
   window.dispatchEvent(new CustomEvent(REMINDER_EVENT, { detail: data }));
 };
 
-const AUTO_DISMISS_MS = 30_000; // 30 seconds
+const AUTO_DISMISS_MS = 10_000; // 10 seconds
 const REPEAT_INTERVAL_MS = 5 * 60_000; // 5 minutes
 const MAX_SHOWS = 3;
 
@@ -261,7 +261,7 @@ const ReminderOverlay = () => {
             </p>
           )}
           <p className="text-sm text-muted-foreground">
-            Reminder {currentShow} of {MAX_SHOWS} · Auto-closes in 30s
+            Reminder {currentShow} of {MAX_SHOWS} · Auto-closes in 10s
           </p>
         </div>
 

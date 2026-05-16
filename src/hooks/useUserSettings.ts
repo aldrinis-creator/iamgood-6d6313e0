@@ -94,6 +94,8 @@ export interface UserSettings {
   // Hydration prompts (humidity-triggered)
   hydrationNudges: boolean;
   hydrationAdvisoryToGuardian: boolean;
+  // Accessibility
+  largeTextMode: boolean;
 }
 
 export const DEFAULT_VOICE_QUERY_PROMPTS = [
@@ -159,6 +161,7 @@ const DEFAULTS: UserSettings = {
   ],
   hydrationNudges: true,
   hydrationAdvisoryToGuardian: true,
+  largeTextMode: false,
 };
 
 // Module-level refs so flushPendingWrites can work outside React lifecycle

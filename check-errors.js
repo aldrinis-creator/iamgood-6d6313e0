@@ -18,7 +18,8 @@ import { chromium } from '@playwright/test';
   try {
     console.log('Navigating to http://localhost:4175/ ...');
     await page.goto('http://localhost:4175/', { waitUntil: 'networkidle', timeout: 15000 });
-    console.log('Page loaded successfully');
+    console.log('Page loaded successfully, waiting for 10 seconds...');
+    await page.waitForTimeout(10000);
     const content = await page.content();
     console.log('PAGE CONTENT LENGTH:', content.length);
     console.log('BODY:', await page.innerHTML('body'));

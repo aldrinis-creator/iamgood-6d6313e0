@@ -962,6 +962,13 @@ const Settings = () => {
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-border">
                   <div>
+                    <p className="text-sm font-medium">Large Text Mode</p>
+                    <p className="text-xs text-muted-foreground">Increases overall text size for better readability</p>
+                  </div>
+                  <Switch checked={(settings as any).largeTextMode} onCheckedChange={(v) => updateSetting("largeTextMode" as any, v)} />
+                </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div>
                     <p className="text-sm font-medium">Camera Access</p>
                     <p className="text-xs text-muted-foreground">Used for Face Scan and document scanning</p>
                   </div>

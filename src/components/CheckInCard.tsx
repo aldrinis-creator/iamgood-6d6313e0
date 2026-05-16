@@ -235,6 +235,37 @@ const CheckInCard = () => {
       ? getCheckInWindowStart(windowHour)
       : now;
 
+    if (!navigator.onLine) {
+      try {
+        const req = indexedDB.open("checkin-offline", 2);
+        req.onsuccess = async () => {
+          const db = req.result;
+          const tx = db.transaction("checkin_queue", "readwrite");
+          tx.objectStore("checkin_queue").add({
+            user_id: session.user.id,
+            scheduled_at: scheduledAt.toISOString(),
+            status: "responded",
+            response: "ok",
+            responded_at: now.toISOString(),
+            queued_at: Date.now()
+          });
+          const sw = await navigator.serviceWorker.ready;
+          // @ts-ignore
+          sw.sync.register("checkin-sync");
+        };
+        setCheckedIn(true);
+        toast.success("Check-in saved offline. Will sync when reconnected.");
+        import("canvas-confetti").then((module) => {
+          const confetti = module.default;
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#3b82f6', '#eab308'] });
+        });
+      } catch {
+        toast.error("Offline check-in failed.");
+      }
+      setLoading(false);
+      return;
+    }
+
     // Upsert to handle race conditions — creates if missing, no-ops if exists
     if (!currentCheckInId) {
       const { data: created, error: insertError } = await supabase
@@ -280,6 +311,15 @@ const CheckInCard = () => {
     } else {
       setCheckedIn(true);
       toast.success("Check-in recorded! Your guardians have been notified.");
+      import("canvas-confetti").then((module) => {
+        const confetti = module.default;
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#22c55e', '#3b82f6', '#eab308']
+        });
+      });
     }
     setLoading(false);
   };

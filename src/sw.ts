@@ -63,13 +63,17 @@ self.addEventListener("fetch", (event: FetchEvent) => {
 // IndexedDB helpers
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("checkin-offline", 1);
+    const request = indexedDB.open("checkin-offline", 2);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains("sos_queue"))
         db.createObjectStore("sos_queue", { keyPath: "id", autoIncrement: true });
       if (!db.objectStoreNames.contains("auth_store"))
         db.createObjectStore("auth_store", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("checkin_queue"))
+        db.createObjectStore("checkin_queue", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("med_queue"))
+        db.createObjectStore("med_queue", { keyPath: "id", autoIncrement: true });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -90,11 +94,11 @@ async function getAuth(): Promise<any | null> {
   }
 }
 
-async function dequeueAllSOS(): Promise<any[]> {
+async function dequeueAll(storeName: string): Promise<any[]> {
   try {
     const db = await openDB();
-    const tx = db.transaction("sos_queue", "readwrite");
-    const store = tx.objectStore("sos_queue");
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
     return await new Promise((resolve) => {
       const req = store.getAll();
       req.onsuccess = () => {
@@ -218,35 +222,41 @@ self.addEventListener("notificationclose", (event) => {
   console.log("[SW] Notification dismissed:", event.notification.tag);
 });
 
-// Background Sync for offline SOS
+// Background Sync
 self.addEventListener("sync", (event: any) => {
   if (event.tag === "sos-sync") {
-    event.waitUntil(syncQueuedSOS());
+    event.waitUntil(syncQueuedData("sos_queue", "/rest/v1/sos_events"));
+  }
+  if (event.tag === "checkin-sync") {
+    event.waitUntil(syncQueuedData("checkin_queue", "/rest/v1/check_ins"));
+  }
+  if (event.tag === "med-sync") {
+    event.waitUntil(syncQueuedData("med_queue", "/rest/v1/medication_logs"));
   }
 });
 
-async function syncQueuedSOS() {
-  const items = await dequeueAllSOS();
+async function syncQueuedData(storeName: string, endpoint: string) {
+  const items = await dequeueAll(storeName);
   if (!items.length) return;
 
   const auth = await getAuth();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     apikey: SUPABASE_ANON_KEY,
-    Prefer: "return=minimal",
+    Prefer: storeName === "checkin_queue" || storeName === "med_queue" ? "resolution=merge-duplicates, return=minimal" : "return=minimal",
   };
   if (auth?.accessToken) headers["Authorization"] = `Bearer ${auth.accessToken}`;
 
   for (const item of items) {
     try {
       const { id, queued_at, ...payload } = item;
-      await fetch(`${SUPABASE_URL}/rest/v1/sos_events`, {
+      await fetch(`${SUPABASE_URL}${endpoint}`, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
       });
     } catch (err) {
-      console.error("[SW] Failed to sync SOS:", err);
+      console.error(`[SW] Failed to sync ${storeName}:`, err);
     }
   }
 }
