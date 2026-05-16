@@ -192,11 +192,59 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Filter out users who are Checked-Out or in Sleep mode ──
+    const validUserIds = [...new Set(userCheckIns.map((ci) => ci.user_id))];
+    const { data: settingsData } = await supabase
+      .from("user_settings")
+      .select("user_id, settings")
+      .in("user_id", validUserIds);
+
+    const pausedUserIds = new Set<string>();
+    if (settingsData) {
+      const nowMs = now.getTime();
+      for (const row of settingsData) {
+        const settings = row.settings as any;
+        if (settings?.pauseMode && settings.pauseMode !== "active") {
+          let isPaused = true;
+          // Verify expiration if checked-out
+          if (settings.pauseMode === "checked-out" && settings.checkOutConfig) {
+            const expiryStr = settings.checkOutConfig.endsAt || settings.checkOutConfig.endDate;
+            if (expiryStr) {
+              const expiryMs = new Date(expiryStr).getTime();
+              if (expiryMs && expiryMs < nowMs) {
+                isPaused = false; // Checkout expired
+              }
+            }
+          }
+          if (isPaused) {
+            pausedUserIds.add(row.user_id);
+          }
+        }
+      }
+    }
+
+    const pausedCheckInIds = userCheckIns
+      .filter((ci) => pausedUserIds.has(ci.user_id))
+      .map((ci) => ci.id);
+
+    if (pausedCheckInIds.length > 0) {
+      await supabase.from("check_ins").update({ status: "missed" }).in("id", pausedCheckInIds);
+      console.log(`Silently dismissed ${pausedCheckInIds.length} paused user check-ins`);
+    }
+
+    const activeUserCheckIns = userCheckIns.filter((ci) => !pausedUserIds.has(ci.user_id));
+    if (activeUserCheckIns.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No active user check-ins to process", processed: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Deduplicate: keep only ONE pending check-in per user+scheduled_hour
     const seen = new Set<string>();
-    const uniqueCheckIns: typeof userCheckIns = [];
+    const uniqueCheckIns: typeof activeUserCheckIns = [];
     const duplicateIds: string[] = [];
-    for (const ci of userCheckIns) {
+    for (const ci of activeUserCheckIns) {
       const scheduledDate = new Date(ci.scheduled_at);
       const key = `${ci.user_id}-${scheduledDate.getUTCFullYear()}-${scheduledDate.getUTCMonth()}-${scheduledDate.getUTCDate()}-${scheduledDate.getUTCHours()}`;
       if (seen.has(key)) {
@@ -213,7 +261,7 @@ Deno.serve(async (req) => {
       console.log(`Silently marked ${duplicateIds.length} duplicate check-ins as missed`);
     }
 
-    console.log(`Found ${userCheckIns.length} user check-ins (${guardianCheckInIds.length} guardian-role skipped)`);
+    console.log(`Found ${activeUserCheckIns.length} active user check-ins`);
 
     let notificationsCreated = 0;
     let emailsSent = 0;

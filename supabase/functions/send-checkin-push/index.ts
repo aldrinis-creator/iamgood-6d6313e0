@@ -138,9 +138,37 @@ serve(async (req) => {
 
     // Get unique user IDs
     const userIds = [...new Set(checkIns.map((ci: any) => ci.user_id))];
+
+    // Filter out users who are paused
+    const { data: settingsData } = await supabase
+      .from("user_settings")
+      .select("user_id, settings")
+      .in("user_id", userIds);
+
+    const activeUserIds = new Set(userIds);
+    if (settingsData) {
+      const nowMs = now.getTime();
+      for (const row of settingsData) {
+        const settings = row.settings as any;
+        if (settings?.pauseMode && settings.pauseMode !== "active") {
+          let isPaused = true;
+          if (settings.pauseMode === "checked-out" && settings.checkOutConfig) {
+            const expiryStr = settings.checkOutConfig.endsAt || settings.checkOutConfig.endDate;
+            if (expiryStr) {
+              const expiryMs = new Date(expiryStr).getTime();
+              if (expiryMs && expiryMs < nowMs) {
+                isPaused = false;
+              }
+            }
+          }
+          if (isPaused) activeUserIds.delete(row.user_id);
+        }
+      }
+    }
+
     let sentCount = 0;
 
-    for (const userId of userIds) {
+    for (const userId of activeUserIds) {
       const { data: subs } = await supabase
         .from("push_subscriptions")
         .select("endpoint, p256dh, auth")
