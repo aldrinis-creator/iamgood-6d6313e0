@@ -545,9 +545,21 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
 // ===================================================================
 
 function EntryForm({
-  category, draft, onChange,
-}: { category: VaultCategory; draft: AnyEntry; onChange: (d: AnyEntry) => void }) {
+  category, draft, onChange, pin,
+  pendingFile, onSelectFile, removeAttachment, onToggleRemoveAttachment,
+}: {
+  category: VaultCategory;
+  draft: AnyEntry;
+  onChange: (d: AnyEntry) => void;
+  pin: string;
+  pendingFile: File | null;
+  onSelectFile: (f: File | null) => void;
+  removeAttachment: boolean;
+  onToggleRemoveAttachment: (r: boolean) => void;
+}) {
   const set = (patch: Partial<AnyEntry>) => onChange({ ...draft, ...patch } as AnyEntry);
+  const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
+
 
   return (
     <div className="space-y-3 py-2">
@@ -720,6 +732,15 @@ function EntryForm({
           </>
         );
       })()}
+
+      <VaultAttachmentField
+        existing={existingAttachment}
+        pendingFile={pendingFile}
+        onSelectFile={onSelectFile}
+        removed={removeAttachment}
+        onToggleRemove={onToggleRemoveAttachment}
+        pin={pin}
+      />
 
       <div>
         <Label>Notes</Label>
