@@ -622,6 +622,8 @@ const DocumentAnalyzer = () => {
                   <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
                 </label>
               )}
+                </>
+              )}
             </>
           ) : (
             <>
