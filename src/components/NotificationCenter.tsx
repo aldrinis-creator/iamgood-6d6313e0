@@ -44,8 +44,21 @@ const NotificationCenter = () => {
           fetchNotifications();
           if (payload.new && (payload.new as Notification).title) {
             const notif = payload.new as Notification;
+            const isNudge = notif.type === "id_doc_missing";
+
             toast(notif.title, {
               description: notif.message,
+              duration: isNudge ? 10000 : 5000,
+              action: {
+                label: "Dismiss",
+                onClick: () => {}, // empty function triggers dismissal
+              },
+              classNames: {
+                toast: isNudge ? "p-5" : "", // slightly more padding for nudges
+                title: isNudge ? "text-lg font-bold text-foreground" : "",
+                description: isNudge ? "text-base text-muted-foreground mt-1" : "",
+                actionButton: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              }
             });
           }
         }
