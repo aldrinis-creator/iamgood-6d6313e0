@@ -1054,6 +1054,9 @@ const GuardianDashboard = () => {
           </Card>
         )}
 
+        {/* Hospital Admission Kit */}
+        {wardUserId && <HospitalKitCard wardUserId={wardUserId} wardName={wardName} />}
+
         {/* Care Journal */}
         {wardUserId && (
           <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
