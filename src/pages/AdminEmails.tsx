@@ -168,11 +168,11 @@ const AdminEmails = () => {
       // DLQ contents
       const { data: dlqA } = await supabase.rpc("read_dlq_messages", {
         dlq_name: "auth_emails_dlq",
-        limit_count: 50,
+        limit_count: dlqLimitAuth,
       });
       const { data: dlqT } = await supabase.rpc("read_dlq_messages", {
         dlq_name: "transactional_emails_dlq",
-        limit_count: 50,
+        limit_count: dlqLimitTxn,
       });
       setDlqAuth((dlqA ?? []) as DlqMessage[]);
       setDlqTxn((dlqT ?? []) as DlqMessage[]);
