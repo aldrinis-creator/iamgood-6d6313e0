@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/components/ui/sonner";
 
 interface Notification {
   id: string;
@@ -38,7 +39,20 @@ const NotificationCenter = () => {
       .channel("notification-center")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${session?.user?.id}` },
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${session?.user?.id}` },
+        (payload) => {
+          fetchNotifications();
+          if (payload.new && (payload.new as Notification).title) {
+            const notif = payload.new as Notification;
+            toast(notif.title, {
+              description: notif.message,
+            });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${session?.user?.id}` },
         () => fetchNotifications()
       )
       .subscribe();
