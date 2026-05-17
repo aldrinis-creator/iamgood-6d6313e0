@@ -40,6 +40,7 @@ export interface EmailEntry {
   password: string;
   recovery_email?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export interface BankEntry {
@@ -53,6 +54,7 @@ export interface BankEntry {
   nominee_phone: string;
   branch?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export type InsuranceCategory = "life" | "health" | "general";
@@ -72,6 +74,7 @@ export interface InsuranceEntry {
   renewal_date?: string;  // YYYY-MM-DD
   expiry_date?: string;   // YYYY-MM-DD
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export interface WillEntry {
@@ -85,6 +88,7 @@ export interface WillEntry {
   nominee_name?: string;
   nominee_phone?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 // Identity is kept as a free-form string (unchanged from original DOC_TYPES flow),
@@ -95,6 +99,7 @@ export interface IdentityEntry {
   label: string;
   value: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 // ---------- Reminder helpers ----------
