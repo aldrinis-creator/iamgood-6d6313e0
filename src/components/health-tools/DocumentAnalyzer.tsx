@@ -18,6 +18,44 @@ import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, ex
 const MAX_TEXT_LENGTH = 10000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for documents
 
+const MAX_PAGES = 8;
+const MAX_DIMENSION = 1600;
+
+async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.onload = () => {
+        const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error("blob fail"));
+          resolve({ dataUrl, previewUrl: URL.createObjectURL(blob), blob });
+        }, "image/jpeg", 0.8);
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+interface PageItem {
+  id: string;
+  fileName: string;
+  previewUrl: string;
+  base64: string;
+  blob: Blob;
+}
+
 const categories = [
   { label: "Medical Images", icon: FileImage, bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-600", activeBg: "bg-blue-500/20" },
   { label: "Lab Reports", icon: FlaskConical, bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-600", activeBg: "bg-emerald-500/20" },
@@ -49,11 +87,8 @@ const DocumentAnalyzer = () => {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [mode, setMode] = useState<InputMode>("photo");
   const [customTitle, setCustomTitle] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [docFileName, setDocFileName] = useState<string | null>(null);
+  const [pages, setPages] = useState<PageItem[]>([]);
+  const [originalDocFiles, setOriginalDocFiles] = useState<File[]>([]);
   const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [textInput, setTextInput] = useState("");
@@ -86,77 +121,85 @@ const DocumentAnalyzer = () => {
   }, [result, loading]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    e.target.value = "";
 
-    if (selected.size > MAX_FILE_SIZE) {
-      toast.error("File must be under 10MB");
-      e.target.value = "";
-      return;
-    }
+    const totalItems = pages.length + originalDocFiles.length;
+    const remaining = MAX_PAGES - totalItems;
+    if (remaining <= 0) { toast.error(`Max ${MAX_PAGES} items allowed`); return; }
+    const toProcess = files.slice(0, remaining);
+    if (files.length > remaining) toast.error(`Only ${remaining} more item(s) allowed`);
 
-    // Handle PDF/DOCX documents
-    if (isDocument(selected)) {
-      setExtracting(true);
-      setDocFileName(selected.name);
-      setOriginalFile(selected);
-      setImagePreview(null);
-      setImageBase64(null);
-      try {
-        if (isPDF(selected)) {
-          const { text, hasText } = await extractTextFromPDF(selected);
-          if (hasText) {
-            setExtractedDocText(text);
-          } else {
-            // Scanned PDF — render first page as image
-            const img = await renderPDFPageToImage(selected);
-            setImageBase64(img);
-            setExtractedDocText(null);
-          }
-        } else if (isDOCX(selected)) {
-          const text = await extractTextFromDOCX(selected);
-          if (text.trim().length > 10) {
-            setExtractedDocText(text);
-          } else {
-            toast.error("Could not extract text from this document");
-            clearFile();
-            return;
-          }
+    setExtracting(true);
+    try {
+      let combinedText = extractedDocText || "";
+      const newPages: PageItem[] = [];
+      const newDocs: File[] = [];
+
+      for (const selected of toProcess) {
+        if (selected.size > MAX_FILE_SIZE) {
+          toast.error(`${selected.name} is too large`);
+          continue;
         }
-      } catch (err) {
-        console.error("Document extraction error:", err);
-        toast.error("Failed to read document. Try a different file.");
-        clearFile();
-        return;
-      } finally {
-        setExtracting(false);
+
+        if (isDocument(selected)) {
+          newDocs.push(selected);
+          if (isPDF(selected)) {
+            const { text, hasText } = await extractTextFromPDF(selected);
+            if (hasText) {
+              combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
+            } else {
+              const img = await renderPDFPageToImage(selected);
+              const blobRes = await (await fetch(img)).blob();
+              newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes });
+            }
+          } else if (isDOCX(selected)) {
+            const text = await extractTextFromDOCX(selected);
+            if (text.trim().length > 10) {
+              combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
+            } else {
+              toast.error(`Could not extract text from ${selected.name}`);
+            }
+          }
+        } else if (selected.type.startsWith("image/")) {
+          const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(selected);
+          newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl, base64: dataUrl, blob });
+        } else {
+           toast.error(`${selected.name} is not a supported file type`);
+        }
       }
-      return;
-    }
 
-    // Handle images
-    if (!selected.type.startsWith("image/")) {
-      toast.error("Please select an image, PDF, or Word file");
-      e.target.value = "";
-      return;
-    }
+      if (newDocs.length) setOriginalDocFiles(prev => [...prev, ...newDocs]);
+      if (newPages.length) setPages(prev => [...prev, ...newPages]);
+      if (combinedText) setExtractedDocText(combinedText);
 
-    setDocFileName(null);
-    setExtractedDocText(null);
-    setOriginalFile(selected);
-    setImagePreview(URL.createObjectURL(selected));
-    const reader = new FileReader();
-    reader.onload = () => setImageBase64(reader.result as string);
-    reader.readAsDataURL(selected);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to read files");
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const clearFile = () => {
-    setImagePreview(null);
-    setImageBase64(null);
-    setDocFileName(null);
+    pages.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    setPages([]);
+    setOriginalDocFiles([]);
     setExtractedDocText(null);
-    setOriginalFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removePage = (id: string) => {
+    setPages(prev => {
+      const removed = prev.find(p => p.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter(p => p.id !== id);
+    });
+  };
+
+  const removeDocFile = (index: number) => {
+    setOriginalDocFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleTextFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,11 +227,10 @@ const DocumentAnalyzer = () => {
       let payload: any;
       if (mode === "photo") {
         if (extractedDocText) {
-          // Send extracted text from PDF/DOCX
           const content = extractedDocText.substring(0, MAX_TEXT_LENGTH);
           payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
-        } else if (imageBase64) {
-          payload = { image: imageBase64, category: selectedCat || "General" };
+        } else if (pages.length > 0) {
+          payload = { images: pages.map(p => p.base64), category: selectedCat || "General" };
         }
       } else {
         let content = textInput;
@@ -266,31 +308,31 @@ const DocumentAnalyzer = () => {
     setSaving(true);
     try {
       let fileUrl: string | null = null;
-      let fileName: string | null = docFileName || null;
+      let fileName: string | null = null;
+      const extraPaths: string[] = [];
 
-      // Upload original file to storage
-      if (originalFile) {
-        fileName = fileName || originalFile.name;
-        const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("medical-documents")
-          .upload(storagePath, originalFile, { contentType: originalFile.type });
-        if (!uploadErr) fileUrl = storagePath;
-      } else if (imageBase64 || imagePreview) {
-        // Camera capture fallback — convert base64 to Blob
-        const base64Data = (imageBase64 || imagePreview)!;
-        const mimeMatch = base64Data.match(/^data:(.*?);/);
-        const mime = mimeMatch?.[1] || "image/jpeg";
-        const base64Str = base64Data.split(",")[1];
-        const byteArray = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
-        const blob = new Blob([byteArray], { type: mime });
-        const ext = mime.includes("png") ? "png" : "jpg";
-        fileName = fileName || `doc-scan-${Date.now()}.${ext}`;
-        const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("medical-documents")
-          .upload(storagePath, blob, { contentType: mime });
-        if (!uploadErr) fileUrl = storagePath;
+      // Upload original files to storage
+      if (originalDocFiles.length > 0) {
+        fileName = originalDocFiles.length === 1 ? originalDocFiles[0].name : `Documents (${originalDocFiles.length} files)`;
+        for (let i = 0; i < originalDocFiles.length; i++) {
+          const f = originalDocFiles[i];
+          const path = `${user.id}/${Date.now()}-${f.name}`;
+          const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, f, { contentType: f.type });
+          if (!upErr) {
+            if (!fileUrl) fileUrl = path;
+            else extraPaths.push(path);
+          }
+        }
+      } else if (pages.length > 0) {
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const path = `${user.id}/${Date.now()}-page-${i + 1}.jpg`;
+          const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, p.blob, { contentType: "image/jpeg" });
+          if (!upErr) {
+             if (!fileUrl) { fileUrl = path; fileName = `Scan (${pages.length} pages)`; }
+             else extraPaths.push(path);
+          }
+        }
       }
 
       // Build description: original content + separator + AI analysis
@@ -312,11 +354,14 @@ const DocumentAnalyzer = () => {
 
       const displayTitle = customTitle.trim() || `${selectedCat || "Document"} Analysis — ${new Date().toLocaleDateString("en-IN")}`;
 
+      const extraNote = extraPaths.length > 0 ? `\n\n_Additional items: ${extraPaths.join(", ")}_` : "";
+      const descriptionWithNote = (fullDescription + extraNote).substring(0, 50000);
+
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
         title: displayTitle,
         record_type: "Doctor's Diagnosis",
-        description: fullDescription,
+        description: descriptionWithNote,
         file_name: fileName,
         file_url: fileUrl,
         record_date: new Date().toISOString().split("T")[0],
@@ -340,25 +385,29 @@ const DocumentAnalyzer = () => {
         <Button variant="ghost" onClick={() => { setResult(""); setTextInput(""); setFile(null); clearFile(); setSaved(false); setCustomTitle(""); }}>← Back</Button>
 
         {/* Original Document Reference */}
-        {(imagePreview || imageBase64 || extractedDocText || (mode === "text" && textInput)) && (
+        {(pages.length > 0 || extractedDocText || (mode === "text" && textInput)) && (
           <Collapsible defaultOpen className="border border-border rounded-xl overflow-hidden">
             <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-muted/30 hover:bg-muted/50 transition-colors">
               <span className="flex items-center gap-2 font-semibold text-sm">
                 <FileText className="w-4 h-4 text-primary" />
                 Original Document
-                {docFileName && <span className="text-xs font-normal text-muted-foreground">— {docFileName}</span>}
+                {originalDocFiles.length > 0 && <span className="text-xs font-normal text-muted-foreground">— {originalDocFiles.length} file{originalDocFiles.length > 1 ? "s" : ""}</span>}
+                {pages.length > 0 && <span className="text-xs font-normal text-muted-foreground">— {pages.length} page{pages.length > 1 ? "s" : ""}</span>}
               </span>
               <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
             </CollapsibleTrigger>
             <CollapsibleContent>
               <ScrollArea className="max-h-[300px]">
                 <div className="p-4">
-                  {(imagePreview || (imageBase64 && !extractedDocText)) ? (
-                    <img
-                      src={imagePreview || imageBase64 || ""}
-                      alt="Original document"
-                      className="w-full rounded-lg border border-border object-contain bg-muted"
-                    />
+                  {pages.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {pages.map((p, i) => (
+                        <div key={p.id}>
+                          <p className="text-xs text-muted-foreground mb-1">Page {i + 1}</p>
+                          <img src={p.previewUrl} alt={`Page ${i + 1}`} className="w-full rounded-lg border border-border object-contain bg-muted" />
+                        </div>
+                      ))}
+                    </div>
                   ) : extractedDocText ? (
                     <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
                       {extractedDocText}
@@ -504,40 +553,71 @@ const DocumentAnalyzer = () => {
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
                   <span className="text-sm font-medium">Extracting text from document…</span>
                 </div>
-              ) : imagePreview ? (
-                <div className="relative">
-                  <img src={imagePreview} alt="Document preview" className="w-full rounded-lg border border-border max-h-64 object-contain bg-muted" />
-                  <Button size="icon" variant="destructive" className="absolute top-2 right-2 h-7 w-7" onClick={clearFile}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : docFileName ? (
-                <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
-                  <FileText className="w-10 h-10 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{docFileName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {extractedDocText ? "Text extracted successfully ✓" : "Rendered as image for analysis ✓"}
-                    </p>
+              {pages.length > 0 && (
+                <div className="space-y-2 w-full">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">{pages.length} page{pages.length > 1 ? "s" : ""} selected</span>
+                    <Button size="sm" variant="ghost" onClick={() => { pages.forEach(p => URL.revokeObjectURL(p.previewUrl)); setPages([]); }} className="h-7 text-xs">Clear images</Button>
                   </div>
-                  <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={clearFile}>
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-2 pb-2">
+                      {pages.map((p, i) => (
+                        <div key={p.id} className="relative shrink-0 w-24">
+                          <img src={p.previewUrl} alt={`Page ${i + 1}`} className="w-24 h-32 rounded-lg border object-cover bg-muted" />
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-background/90 text-[10px] font-semibold border">{i + 1}</span>
+                          <button type="button" onClick={() => removePage(p.id)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {pages.length + originalDocFiles.length < MAX_PAGES && (
+                        <label className="shrink-0 w-24 h-32 border-2 border-dashed border-primary/40 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary bg-primary/5">
+                          <Upload className="w-5 h-5 text-primary" />
+                          <span className="text-[10px] text-primary font-medium">Add more</span>
+                          <input type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
+                        </label>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-gradient-to-b from-muted/30 to-transparent border-border/60">
+              )}
+
+              {originalDocFiles.length > 0 && (
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">{originalDocFiles.length} document{originalDocFiles.length > 1 ? "s" : ""} selected</span>
+                    <Button size="sm" variant="ghost" onClick={() => setOriginalDocFiles([])} className="h-7 text-xs">Clear docs</Button>
+                  </div>
+                  {originalDocFiles.map((file, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5 w-full">
+                      <FileText className="w-8 h-8 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">{extractedDocText ? "Text extracted ✓" : "Document loaded"}</p>
+                      </div>
+                      <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={() => removeDocFile(i)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {pages.length + originalDocFiles.length < MAX_PAGES && (
+                    <div className="text-center pt-2 w-full">
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-primary underline underline-offset-2 hover:text-primary/80">
+                        + Add more files
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {pages.length === 0 && originalDocFiles.length === 0 && (
+                <label className="flex flex-col items-center justify-center gap-2 w-full p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-gradient-to-b from-muted/30 to-transparent border-border/60">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <Upload className="w-6 h-6 text-primary" />
                   </div>
-                  <span className="text-sm font-medium">Tap to upload file or take photo</span>
-                  <span className="text-xs text-muted-foreground">JPG, PNG, PDF, DOCX — max 10MB</span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept={ACCEPT_STRING}
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
+                  <span className="text-sm font-medium">Tap to upload files or take photos</span>
+                  <span className="text-xs text-muted-foreground">Select multiple — JPG, PNG, PDF, DOCX</span>
+                  <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
                 </label>
               )}
             </>

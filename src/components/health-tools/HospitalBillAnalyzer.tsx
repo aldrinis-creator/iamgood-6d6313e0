@@ -93,8 +93,7 @@ const HospitalBillAnalyzer = () => {
   const docInputRef = useRef<HTMLInputElement>(null);
 
   const [pages, setPages] = useState<PageItem[]>([]);
-  const [originalDocFile, setOriginalDocFile] = useState<File | null>(null);
-  const [docFileName, setDocFileName] = useState<string | null>(null);
+  const [originalDocFiles, setOriginalDocFiles] = useState<File[]>([]);
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
 
@@ -126,8 +125,7 @@ const HospitalBillAnalyzer = () => {
   const clearAll = () => {
     pages.forEach(p => URL.revokeObjectURL(p.previewUrl));
     setPages([]);
-    setOriginalDocFile(null);
-    setDocFileName(null);
+    setOriginalDocFiles([]);
     setExtractedText(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (docInputRef.current) docInputRef.current.value = "";
@@ -146,9 +144,8 @@ const HospitalBillAnalyzer = () => {
     if (!files.length) return;
     e.target.value = "";
 
-    if (originalDocFile || extractedText) {
-      setOriginalDocFile(null);
-      setDocFileName(null);
+    if (originalDocFiles.length > 0 || extractedText) {
+      setOriginalDocFiles([]);
       setExtractedText(null);
     }
 
@@ -179,44 +176,66 @@ const HospitalBillAnalyzer = () => {
   };
 
   const handleDocSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     e.target.value = "";
 
-    if (selected.size > MAX_FILE_SIZE) { toast.error("File must be under 10MB"); return; }
-    if (!isDocument(selected)) { toast.error("Please choose a PDF or Word file"); return; }
+    const remaining = MAX_PAGES - originalDocFiles.length;
+    if (remaining <= 0) { toast.error(`Max ${MAX_PAGES} documents`); return; }
+    const toProcess = files.slice(0, remaining);
+    if (files.length > remaining) toast.error(`Only ${remaining} more document(s) allowed`);
 
     if (pages.length) {
       pages.forEach(p => URL.revokeObjectURL(p.previewUrl));
       setPages([]);
     }
-    setOriginalDocFile(selected);
-    setDocFileName(selected.name);
+
     setExtracting(true);
     try {
-      if (isPDF(selected)) {
-        const { text, hasText } = await extractTextFromPDF(selected);
-        if (hasText) setExtractedText(text);
-        else {
-          const img = await renderPDFPageToImage(selected);
-          const blobRes = await (await fetch(img)).blob();
-          setPages([{ id: `${Date.now()}-pdf`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes }]);
-          setOriginalDocFile(null);
-          setDocFileName(null);
-          setExtractedText(null);
+      let combinedText = extractedText || "";
+      const newPages: PageItem[] = [];
+      const newDocs: File[] = [];
+
+      for (const selected of toProcess) {
+        if (selected.size > MAX_FILE_SIZE) { toast.error(`${selected.name} must be under 10MB`); continue; }
+        if (!isDocument(selected)) { toast.error(`${selected.name} is not a PDF or Word file`); continue; }
+
+        newDocs.push(selected);
+
+        if (isPDF(selected)) {
+          const { text, hasText } = await extractTextFromPDF(selected);
+          if (hasText) {
+            combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
+          } else {
+            const img = await renderPDFPageToImage(selected);
+            const blobRes = await (await fetch(img)).blob();
+            newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes });
+          }
+        } else {
+          const text = await extractTextFromDOCX(selected);
+          if (text.trim().length > 10) {
+            combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
+          } else {
+            toast.error(`Could not extract text from ${selected.name}`);
+          }
         }
-      } else {
-        const text = await extractTextFromDOCX(selected);
-        if (text.trim().length > 10) setExtractedText(text);
-        else { toast.error("Could not extract text"); clearAll(); return; }
       }
+
+      setOriginalDocFiles(prev => [...prev, ...newDocs]);
+      if (combinedText) setExtractedText(combinedText);
+      if (newPages.length) setPages(prev => [...prev, ...newPages]);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to read document");
-      clearAll();
+      toast.error("Failed to read document(s)");
     } finally {
       setExtracting(false);
     }
+  };
+
+  const removeDocFile = (index: number) => {
+    setOriginalDocFiles(prev => prev.filter((_, i) => i !== index));
+    // Reset extracted text since we can't easily remove just one doc's text from the combined string
+    // Realistically, the user might just want to clear all if they make a mistake with text docs
   };
 
   const analyze = async () => {
@@ -314,17 +333,24 @@ const HospitalBillAnalyzer = () => {
     setSaving(true);
     try {
       let fileUrl: string | null = null;
-      let fileName: string | null = docFileName;
+      let fileName: string | null = null;
       const extraPaths: string[] = [];
 
-      if (originalDocFile) {
-        fileName = fileName || originalDocFile.name;
-        const storagePath = `${user.id}/${Date.now()}-${fileName}`;
-        const { error: upErr } = await supabase.storage
-          .from("medical-documents")
-          .upload(storagePath, originalDocFile, { contentType: originalDocFile.type });
-        if (upErr) console.warn("[HospitalBillAnalyzer] doc upload failed:", upErr);
-        else fileUrl = storagePath;
+      if (originalDocFiles.length > 0) {
+        fileName = originalDocFiles.length === 1 ? originalDocFiles[0].name : `Bills (${originalDocFiles.length} docs)`;
+        for (let i = 0; i < originalDocFiles.length; i++) {
+          const f = originalDocFiles[i];
+          const path = `${user.id}/${Date.now()}-${f.name}`;
+          const { error: upErr } = await supabase.storage
+            .from("medical-documents")
+            .upload(path, f, { contentType: f.type });
+          if (upErr) {
+            console.warn(`[HospitalBillAnalyzer] doc ${i + 1} upload failed:`, upErr);
+          } else {
+            if (!fileUrl) fileUrl = path;
+            else extraPaths.push(path);
+          }
+        }
       } else if (pages.length) {
         for (let i = 0; i < pages.length; i++) {
           const p = pages[i];
@@ -405,8 +431,8 @@ const HospitalBillAnalyzer = () => {
             <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-muted/30 hover:bg-muted/50">
               <span className="flex items-center gap-2 font-semibold text-sm">
                 <FileText className="w-4 h-4 text-primary" /> Original Bill
-                {docFileName && <span className="text-xs font-normal text-muted-foreground">— {docFileName}</span>}
-                {pages.length > 1 && <span className="text-xs font-normal text-muted-foreground">— {pages.length} pages</span>}
+                {originalDocFiles.length > 0 && <span className="text-xs font-normal text-muted-foreground">— {originalDocFiles.length} document{originalDocFiles.length > 1 ? "s" : ""}</span>}
+                {pages.length > 0 && <span className="text-xs font-normal text-muted-foreground">— {pages.length} page{pages.length > 1 ? "s" : ""}</span>}
               </span>
               <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
             </CollapsibleTrigger>
@@ -595,7 +621,7 @@ const HospitalBillAnalyzer = () => {
             </div>
           )}
 
-          {!extracting && pages.length === 0 && !docFileName && (
+          {!extracting && pages.length === 0 && originalDocFiles.length === 0 && (
             <div className="space-y-2">
               <label className="flex flex-col items-center gap-2 p-8 border-2 border-dashed rounded-xl cursor-pointer hover:border-primary/50 bg-gradient-to-b from-muted/30 to-transparent border-border/60">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -616,6 +642,7 @@ const HospitalBillAnalyzer = () => {
                 <input
                   ref={docInputRef}
                   type="file"
+                  multiple
                   accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={handleDocSelect}
                   className="hidden"
@@ -660,16 +687,31 @@ const HospitalBillAnalyzer = () => {
             </div>
           )}
 
-          {!extracting && docFileName && (
-            <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-xl border-primary/30 bg-primary/5">
-              <FileText className="w-10 h-10 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{docFileName}</p>
-                <p className="text-xs text-muted-foreground">{extractedText ? "Text extracted ✓" : "Document loaded"}</p>
+          {!extracting && originalDocFiles.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">{originalDocFiles.length} document{originalDocFiles.length > 1 ? "s" : ""} selected</span>
+                <Button size="sm" variant="ghost" onClick={clearAll} className="h-7 text-xs">Clear all docs</Button>
               </div>
-              <Button size="icon" variant="destructive" className="h-7 w-7 shrink-0" onClick={clearAll}>
-                <X className="w-4 h-4" />
-              </Button>
+              {originalDocFiles.map((file, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 border border-border rounded-xl bg-muted/20">
+                  <FileText className="w-6 h-6 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">Document loaded</p>
+                  </div>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => removeDocFile(i)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              {originalDocFiles.length < MAX_PAGES && (
+                <div className="text-center pt-2">
+                  <button type="button" onClick={() => docInputRef.current?.click()} className="text-xs text-primary underline underline-offset-2 hover:text-primary/80">
+                    + Add more documents
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -680,8 +722,8 @@ const HospitalBillAnalyzer = () => {
             <Input type="number" min={0} max={365} placeholder="Admission days" value={admissionDays} onChange={(e) => setAdmissionDays(e.target.value)} />
           </div>
 
-          <Button onClick={analyze} disabled={loading || extracting || (pages.length === 0 && !extractedText)} className="w-full">
-            <Receipt className="w-4 h-4 mr-2" /> Analyze Bill {pages.length > 1 && `(${pages.length} pages)`}
+          <Button onClick={analyze} disabled={loading || extracting || (pages.length === 0 && !extractedText && originalDocFiles.length === 0)} className="w-full">
+            <Receipt className="w-4 h-4 mr-2" /> Analyze Bill {pages.length > 1 || originalDocFiles.length > 1 ? `(${pages.length || originalDocFiles.length} items)` : ""}
           </Button>
         </CardContent>
       </Card>
