@@ -2657,6 +2657,7 @@ export type Database = {
         }
         Returns: number
       }
+      purge_dlq: { Args: { dlq_name: string }; Returns: number }
       read_dlq_messages: {
         Args: { dlq_name: string; limit_count?: number }
         Returns: {

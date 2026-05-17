@@ -96,6 +96,8 @@ const AdminEmails = () => {
   const [config, setConfig] = useState<AlertConfig | null>(null);
   const [savingConfig, setSavingConfig] = useState(false);
   const [runningCheck, setRunningCheck] = useState(false);
+  const [dlqLimitAuth, setDlqLimitAuth] = useState(200);
+  const [dlqLimitTxn, setDlqLimitTxn] = useState(200);
 
   const hours = useMemo(() => RANGE_OPTIONS.find((r) => r.value === range)?.hours ?? 24, [range]);
   const sinceIso = useMemo(() => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString(), [hours]);
@@ -166,11 +168,11 @@ const AdminEmails = () => {
       // DLQ contents
       const { data: dlqA } = await supabase.rpc("read_dlq_messages", {
         dlq_name: "auth_emails_dlq",
-        limit_count: 50,
+        limit_count: dlqLimitAuth,
       });
       const { data: dlqT } = await supabase.rpc("read_dlq_messages", {
         dlq_name: "transactional_emails_dlq",
-        limit_count: 50,
+        limit_count: dlqLimitTxn,
       });
       setDlqAuth((dlqA ?? []) as DlqMessage[]);
       setDlqTxn((dlqT ?? []) as DlqMessage[]);
@@ -197,6 +199,17 @@ const AdminEmails = () => {
   }, [sinceIso]);
 
   useEffect(() => { load(); }, [load]);
+
+  const purgeDlq = async (queueName: string) => {
+    try {
+      const { data, error } = await supabase.rpc("purge_dlq", { dlq_name: queueName });
+      if (error) throw error;
+      toast.success(`Purged ${data ?? 0} message(s) from ${queueName}`);
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   const filtered = useMemo(() => {
     return logs.filter((r) => {
@@ -460,15 +473,23 @@ const AdminEmails = () => {
               title="Auth emails DLQ"
               queueName="auth_emails_dlq"
               messages={dlqAuth}
+              totalDepth={queueDepth("auth_emails_dlq")}
+              currentLimit={dlqLimitAuth}
+              onLoadMore={() => setDlqLimitAuth((n) => n + 200)}
               onRequeue={requeueDlq}
               onDelete={deleteDlqMessage}
+              onPurge={purgeDlq}
             />
             <DlqSection
               title="Transactional emails DLQ"
               queueName="transactional_emails_dlq"
               messages={dlqTxn}
+              totalDepth={queueDepth("transactional_emails_dlq")}
+              currentLimit={dlqLimitTxn}
+              onLoadMore={() => setDlqLimitTxn((n) => n + 200)}
               onRequeue={requeueDlq}
               onDelete={deleteDlqMessage}
+              onPurge={purgeDlq}
             />
           </TabsContent>
 
@@ -594,70 +615,161 @@ const NumField = ({ label, value, onChange, step }: { label: string; value: numb
     <Input type="number" step={step ?? 1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
   </div>
 );
-const DlqSection = ({ title, queueName, messages, onRequeue, onDelete }: {
-  title: string; queueName: string; messages: DlqMessage[]; onRequeue: (q: string, id: number) => void; onDelete: (q: string, id: number) => void;
-}) => (
-  <Card>
-    <CardHeader><CardTitle className="text-base">{title} ({messages.length})</CardTitle></CardHeader>
-    <CardContent>
-      {messages.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Empty — no failed messages.</p>
-      ) : (
-        <div className="space-y-2">
-          {messages.map((m) => (
-            <div key={m.msg_id} className="border rounded p-3 text-xs space-y-1">
-              <div className="flex justify-between items-start gap-2 flex-wrap">
-                <div>
-                  <p><span className="font-medium">To:</span> {m.message?.to ?? "—"}</p>
-                  <p><span className="font-medium">Template:</span> {m.message?.label ?? "—"}</p>
-                  <p><span className="font-medium">Subject:</span> {m.message?.subject ?? "—"}</p>
-                  <p className="text-muted-foreground">
-                    Enqueued: {format(new Date(m.enqueued_at), "dd MMM HH:mm")}
-                  </p>
-                </div>
-                <div className="flex gap-1">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Requeue this message?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          It will be moved back to {queueName.replace("_dlq", "")} and retried by the next dispatcher run.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onRequeue(queueName, m.msg_id)}>Requeue</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This permanently removes the message from the dead-letter queue. It will not be retried or logged again.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(queueName, m.msg_id)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+const inferTemplate = (msg: any): string => {
+  if (!msg) return "—";
+  if (msg.templateName) return msg.templateName;
+  if (msg.label) return msg.label;
+  const subj: string = msg.subject ?? "";
+  if (/welcome/i.test(subj)) return "welcome (inferred)";
+  if (/reset/i.test(subj)) return "password-reset (inferred)";
+  if (/verify|confirm/i.test(subj)) return "verification (inferred)";
+  if (/invite|invitation/i.test(subj)) return "invite (inferred)";
+  if (/booking|appointment/i.test(subj)) return "booking (inferred)";
+  return "(pre-rendered payload)";
+};
+
+const DlqSection = ({
+  title, queueName, messages, totalDepth, currentLimit, onLoadMore, onRequeue, onDelete, onPurge,
+}: {
+  title: string;
+  queueName: string;
+  messages: DlqMessage[];
+  totalDepth: number;
+  currentLimit: number;
+  onLoadMore: () => void;
+  onRequeue: (q: string, id: number) => void;
+  onDelete: (q: string, id: number) => void;
+  onPurge: (q: string) => void;
+}) => {
+  const [purgeConfirm, setPurgeConfirm] = useState("");
+  const truncated = totalDepth > messages.length;
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+        <CardTitle className="text-base">
+          {title} (showing {messages.length} of {totalDepth})
+        </CardTitle>
+        {totalDepth > 0 && (
+          <AlertDialog onOpenChange={(o) => !o && setPurgeConfirm("")}>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive">
+                <Trash2 className="w-3 h-3 mr-1" />Purge all
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Purge entire dead-letter queue?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes <strong>all {totalDepth} message(s)</strong> in <code>{queueName}</code>. They will not be retried or logged again. This cannot be undone.
+                  <br /><br />
+                  Type the queue name <code>{queueName}</code> below to confirm:
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Input
+                value={purgeConfirm}
+                onChange={(e) => setPurgeConfirm(e.target.value)}
+                placeholder={queueName}
+                autoFocus
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={purgeConfirm !== queueName}
+                  onClick={() => onPurge(queueName)}
+                >
+                  Purge {totalDepth} message(s)
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardHeader>
+      <CardContent>
+        {messages.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {totalDepth === 0 ? "Empty — no failed messages." : "No messages loaded — try Load more."}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {truncated && (
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                Showing the most recent {messages.length} of {totalDepth} messages. Older messages are not loaded.
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </CardContent>
-  </Card>
-);
+            )}
+            {messages.map((m) => {
+              const to = m.message?.to ?? m.message?.recipientEmail ?? "—";
+              const subject = m.message?.subject ?? "—";
+              const tpl = inferTemplate(m.message);
+              return (
+                <div key={m.msg_id} className="border rounded p-3 text-xs space-y-1">
+                  <div className="flex justify-between items-start gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <p><span className="font-medium">To:</span> {to}</p>
+                      <p><span className="font-medium">Template:</span> {tpl}</p>
+                      <p className="truncate"><span className="font-medium">Subject:</span> {subject}</p>
+                      <p className="text-muted-foreground">
+                        Enqueued: {format(new Date(m.enqueued_at), "dd MMM HH:mm")}
+                      </p>
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">View raw payload</summary>
+                        <pre className="mt-1 p-2 bg-muted rounded text-[10px] overflow-auto max-h-48">
+                          {JSON.stringify(m.message, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Requeue this message?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              It will be moved back to {queueName.replace("_dlq", "")} and retried by the next dispatcher run.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onRequeue(queueName, m.msg_id)}>Requeue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This permanently removes the message from the dead-letter queue. It will not be retried or logged again.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(queueName, m.msg_id)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {truncated && (
+              <div className="flex justify-center pt-2">
+                <Button size="sm" variant="outline" onClick={onLoadMore}>
+                  Load more ({totalDepth - messages.length} remaining)
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 export default AdminEmails;
