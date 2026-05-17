@@ -133,6 +133,8 @@ Deno.serve(async (req) => {
     // before the server escalates to guardians.
     const graceMs = 60 * 60 * 1000;
     const graceCutoff = new Date(now.getTime() - graceMs);
+    const veryLateMs = 120 * 60 * 1000; // 2 hours
+    const veryLateCutoff = new Date(now.getTime() - veryLateMs);
 
     // Compute today's IST boundaries (UTC+5:30) to prevent previous-day spillover
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
@@ -295,15 +297,22 @@ Deno.serve(async (req) => {
       }
 
       // ── Mark as missed FIRST to prevent duplicate processing by next cron run ──
-      const { error: updateError } = await supabase
+      const { data: updatedData, error: updateError } = await supabase
         .from("check_ins")
         .update({ status: "missed" })
         .eq("id", checkIn.id)
-        .eq("status", "pending"); // optimistic lock: only if still pending
+        .eq("status", "pending")
+        .select("id"); // MUST select to verify rows were actually updated
 
-      if (updateError) {
-        console.error("Error marking check-in as missed:", updateError);
-        continue; // skip — another run likely already processed it
+      if (updateError || !updatedData || updatedData.length === 0) {
+        console.log(`Skipping check-in ${checkIn.id} (already responded or processed)`);
+        continue; // skip — another run likely already processed it or user responded
+      }
+
+      const isVeryLate = scheduledDate.getTime() < veryLateCutoff.getTime();
+      if (isVeryLate) {
+        console.log(`Check-in ${checkIn.id} is >2 hours late, marked as missed silently without SMS`);
+        continue;
       }
 
       const { data: profile } = await supabase

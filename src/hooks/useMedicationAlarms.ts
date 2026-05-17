@@ -72,6 +72,7 @@ const useMedicationAlarms = () => {
     const preAlertSlots = new Map<string, string[]>(); // T-5 notification
     const popupSlots = new Map<string, string[]>(); // T+5/+15/+25 popups
     const finalSlots = new Map<string, { names: string[]; medsToLog: Array<{ id: string; scheduledAt: Date }> }>();
+    const silentMissedSlots = new Map<string, Array<{ id: string; scheduledAt: Date }>>();
     const firedMedNames: string[] = [];
 
     for (const med of meds) {
@@ -113,7 +114,7 @@ const useMedicationAlarms = () => {
         }
 
         // --- Final escalation (T+60): log missed + guardian notify ---
-        if (diffMin >= HARD_CUTOFF_MIN && diffMin < HARD_CUTOFF_MIN + 15 && !missedSentRef.current.has(missedKey)) {
+        if (diffMin >= HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           const alreadyTaken = logs.some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
             return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && (l.status === "taken" || l.status === "taken_late");
@@ -131,12 +132,21 @@ const useMedicationAlarms = () => {
 
           missedSentRef.current.add(missedKey);
 
-          if (!finalSlots.has(timeStr)) finalSlots.set(timeStr, { names: [], medsToLog: [] });
-          const slot = finalSlots.get(timeStr)!;
-          slot.names.push(med.name);
+          const isVeryLate = diffMin > HARD_CUTOFF_MIN + 60; // > 2 hours
 
-          if (!alreadyMissedLog) {
-            slot.medsToLog.push({ id: med.id, scheduledAt });
+          if (isVeryLate) {
+            if (!alreadyMissedLog) {
+              if (!silentMissedSlots.has(timeStr)) silentMissedSlots.set(timeStr, []);
+              silentMissedSlots.get(timeStr)!.push({ id: med.id, scheduledAt });
+            }
+          } else {
+            if (!finalSlots.has(timeStr)) finalSlots.set(timeStr, { names: [], medsToLog: [] });
+            const slot = finalSlots.get(timeStr)!;
+            slot.names.push(med.name);
+
+            if (!alreadyMissedLog) {
+              slot.medsToLog.push({ id: med.id, scheduledAt });
+            }
           }
         }
       }
@@ -220,6 +230,18 @@ const useMedicationAlarms = () => {
           names,
           medsToLog.map((ml) => ml.scheduledAt.toISOString())
         );
+      }
+    }
+
+    // --- Silent Missed Logging ---
+    for (const [timeStr, medsToLog] of silentMissedSlots) {
+      for (const { id, scheduledAt } of medsToLog) {
+        await supabase.from("medication_logs").insert({
+          medication_id: id,
+          user_id: session.user.id,
+          scheduled_at: scheduledAt.toISOString(),
+          status: "missed",
+        });
       }
     }
 

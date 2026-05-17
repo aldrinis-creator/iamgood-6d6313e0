@@ -64,6 +64,46 @@ Deno.serve(async (req) => {
     const notificationType = status === "taken" ? "medication_taken" : status === "taken_late" ? "medication_taken_late" : "medication_missed";
     const isMissed = status !== "taken" && status !== "taken_late";
 
+    if (isMissed && scheduled_time) {
+      const scheduledDate = new Date(scheduled_time);
+      const isVeryLate = scheduledDate.getTime() < now.getTime() - (2 * 60 * 60 * 1000); // > 2 hours
+      
+      if (isVeryLate) {
+        console.log(`Medication alert is >2 hours late, skipping missed alert for ${user_id}`);
+        return new Response(JSON.stringify({ message: "Medication is very late, skipping missed alert" }), { headers: corsHeaders });
+      }
+
+      // Verify if the medications were already taken
+      const medNameList = medication_name.split(",").map((n: string) => n.trim());
+      const { data: medsData } = await supabase
+        .from("medications")
+        .select("id")
+        .eq("user_id", user_id)
+        .in("name", medNameList);
+
+      if (medsData && medsData.length > 0) {
+        const medIds = medsData.map(m => m.id);
+        const slotStart = new Date(scheduledDate);
+        slotStart.setSeconds(0, 0);
+        const slotEnd = new Date(slotStart.getTime() + 60000);
+
+        const { data: existingLogs } = await supabase
+          .from("medication_logs")
+          .select("id, medication_id")
+          .in("medication_id", medIds)
+          .eq("user_id", user_id)
+          .gte("scheduled_at", slotStart.toISOString())
+          .lt("scheduled_at", slotEnd.toISOString())
+          .in("status", ["taken", "taken_late"]);
+
+        // If the number of taken logs is greater than or equal to the medications requested, skip alert
+        if (existingLogs && existingLogs.length >= medIds.length) {
+          console.log(`Medications already taken, skipping missed alert for ${user_id}`);
+          return new Response(JSON.stringify({ message: "Medications already taken, skipping missed alert" }), { headers: corsHeaders });
+        }
+      }
+    }
+
     // For missed notifications, check each guardian's preference
     const eligibleGuardians = [];
     for (const g of guardians) {
