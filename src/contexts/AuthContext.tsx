@@ -62,32 +62,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await fetchProfile(session.user.id);
             // Auto-link guardian records by email/phone
             try { await supabase.rpc("link_guardian_user_id" as any); } catch {};
-            // Send welcome email once (idempotent)
+            // Send welcome email once per account (guarded by profiles.welcome_sent_at)
             if (session.user.email) {
-              const profileData = await supabase.from("profiles").select("full_name, phone").eq("id", session.user.id).single();
-              const { data: guardianData } = await supabase
-                .from("guardians")
-                .select("guardian_name, guardian_phone")
-                .eq("user_id", session.user.id)
-                .eq("is_primary", true)
-                .maybeSingle();
-              const primaryGuardian = guardianData
-                ? `${guardianData.guardian_name} (${guardianData.guardian_phone})`
-                : "None nominated yet";
-              const isPhoneOnly = session.user.email?.endsWith("@phone.checkin.app");
-              supabase.functions.invoke("send-transactional-email", {
-                body: {
-                  templateName: "welcome",
-                  recipientEmail: session.user.email,
-                  idempotencyKey: `welcome-${session.user.id}`,
-                  templateData: {
-                    name: profileData.data?.full_name || "",
-                    phone: profileData.data?.phone || "",
-                    primaryGuardian,
-                    ...(isPhoneOnly ? { setPasswordUrl: `${window.location.origin}/reset-password` } : {}),
-                  },
-                },
-              }).catch(() => {});
+              const profileData = await supabase
+                .from("profiles")
+                .select("full_name, phone, welcome_sent_at")
+                .eq("id", session.user.id)
+                .single();
+              if (!profileData.data?.welcome_sent_at) {
+                // Claim the send slot atomically to prevent double-fire across devices/tabs
+                const { data: claimed } = await supabase
+                  .from("profiles")
+                  .update({ welcome_sent_at: new Date().toISOString() })
+                  .eq("id", session.user.id)
+                  .is("welcome_sent_at", null)
+                  .select("id")
+                  .maybeSingle();
+                if (claimed) {
+                  const { data: guardianData } = await supabase
+                    .from("guardians")
+                    .select("guardian_name, guardian_phone")
+                    .eq("user_id", session.user.id)
+                    .eq("is_primary", true)
+                    .maybeSingle();
+                  const primaryGuardian = guardianData
+                    ? `${guardianData.guardian_name} (${guardianData.guardian_phone})`
+                    : "None nominated yet";
+                  const isPhoneOnly = session.user.email?.endsWith("@phone.checkin.app");
+                  supabase.functions.invoke("send-transactional-email", {
+                    body: {
+                      templateName: "welcome",
+                      recipientEmail: session.user.email,
+                      idempotencyKey: `welcome-${session.user.id}`,
+                      templateData: {
+                        name: profileData.data?.full_name || "",
+                        phone: profileData.data?.phone || "",
+                        primaryGuardian,
+                        ...(isPhoneOnly ? { setPasswordUrl: `${window.location.origin}/reset-password` } : {}),
+                      },
+                    },
+                  }).catch(() => {});
+                }
+              }
             }
             setLoginInProgress(false);
             // Request notification permission after login completes
