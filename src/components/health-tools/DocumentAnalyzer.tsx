@@ -92,6 +92,8 @@ const DocumentAnalyzer = () => {
   const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const imageBase64 = pages[0]?.base64 || null;
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
