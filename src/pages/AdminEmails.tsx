@@ -96,6 +96,8 @@ const AdminEmails = () => {
   const [config, setConfig] = useState<AlertConfig | null>(null);
   const [savingConfig, setSavingConfig] = useState(false);
   const [runningCheck, setRunningCheck] = useState(false);
+  const [dlqLimitAuth, setDlqLimitAuth] = useState(200);
+  const [dlqLimitTxn, setDlqLimitTxn] = useState(200);
 
   const hours = useMemo(() => RANGE_OPTIONS.find((r) => r.value === range)?.hours ?? 24, [range]);
   const sinceIso = useMemo(() => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString(), [hours]);
