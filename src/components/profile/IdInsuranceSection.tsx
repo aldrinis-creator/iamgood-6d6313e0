@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Camera, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon } from "lucide-react";
+import { Upload, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon, Loader2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
+import IdMultiPageField, { type CaptureMode } from "./IdMultiPageField";
 
 type SlotKey = "aadhaar" | "pan" | "insurance_primary" | "insurance_secondary" | "id_photo";
 
@@ -20,15 +21,17 @@ interface SlotDef {
   hint: string;
   icon: any;
   recordType: string;
-  acceptCamera?: boolean;
+  mode: CaptureMode;
+  baseFileName: string;
+  maxPages?: number;
 }
 
 const SLOTS: SlotDef[] = [
-  { key: "aadhaar", label: "Aadhaar Card", hint: "Front & back combined or PDF", icon: IdCard, recordType: "ID - Aadhaar" },
-  { key: "pan", label: "PAN Card", hint: "Clear photo or PDF", icon: IdCard, recordType: "ID - PAN" },
-  { key: "insurance_primary", label: "Health Insurance — Primary", hint: "Card or policy first page", icon: ShieldCheck, recordType: "Insurance - Primary" },
-  { key: "insurance_secondary", label: "Health Insurance — Secondary", hint: "Optional second policy", icon: ShieldCheck, recordType: "Insurance - Secondary" },
-  { key: "id_photo", label: "Passport Photo", hint: "Recent passport-style photo", icon: ImageIcon, recordType: "ID - Photo", acceptCamera: true },
+  { key: "aadhaar", label: "Aadhaar Card", hint: "Capture front & back — combined into one PDF", icon: IdCard, recordType: "ID - Aadhaar", mode: "front-back", baseFileName: "aadhaar" },
+  { key: "pan", label: "PAN Card", hint: "Capture front & back — combined into one PDF", icon: IdCard, recordType: "ID - PAN", mode: "front-back", baseFileName: "pan" },
+  { key: "insurance_primary", label: "Health Insurance — Primary", hint: "Add all policy pages — combined into one PDF", icon: ShieldCheck, recordType: "Insurance - Primary", mode: "pages", baseFileName: "insurance-primary", maxPages: 15 },
+  { key: "insurance_secondary", label: "Health Insurance — Secondary", hint: "Optional second policy — add all pages", icon: ShieldCheck, recordType: "Insurance - Secondary", mode: "pages", baseFileName: "insurance-secondary", maxPages: 15 },
+  { key: "id_photo", label: "Passport Photo", hint: "Recent passport-style photo", icon: ImageIcon, recordType: "ID - Photo", mode: "single", baseFileName: "passport-photo" },
 ];
 
 interface SlotRecord {
@@ -44,11 +47,11 @@ const IdInsuranceSection = () => {
   const [records, setRecords] = useState<Record<string, SlotRecord>>({});
   const [loading, setLoading] = useState(true);
   const [uploadingSlot, setUploadingSlot] = useState<SlotKey | null>(null);
+  const [captureSlot, setCaptureSlot] = useState<SlotDef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SlotDef | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>("");
   const [previewIsPdf, setPreviewIsPdf] = useState(false);
-  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const fetchRecords = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -72,12 +75,14 @@ const IdInsuranceSection = () => {
     try {
       const ext = file.name.split(".").pop() || "bin";
       const path = `${session.user.id}/slots/${slot.key}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, file);
+      const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
       if (upErr) throw upErr;
 
       const existing = records[slot.key];
       if (existing) {
-        // remove old file then update record
         if (existing.file_url) {
           await supabase.storage.from("medical-documents").remove([existing.file_url]);
         }
@@ -102,6 +107,7 @@ const IdInsuranceSection = () => {
       await fetchRecords();
     } catch (e: any) {
       toast.error(e?.message || "Upload failed");
+      throw e;
     } finally {
       setUploadingSlot(null);
     }
@@ -126,18 +132,6 @@ const IdInsuranceSection = () => {
     setPreviewIsPdf((r.file_name || "").toLowerCase().endsWith(".pdf"));
   };
 
-  const triggerCamera = (slot: SlotDef) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment";
-    input.onchange = (e) => {
-      const f = (e.target as HTMLInputElement).files?.[0];
-      if (f) uploadFile(slot, f);
-    };
-    input.click();
-  };
-
   const filledCount = Object.keys(records).length;
 
   return (
@@ -160,6 +154,7 @@ const IdInsuranceSection = () => {
         ) : SLOTS.map((slot) => {
           const r = records[slot.key];
           const Icon = slot.icon;
+          const isUploading = uploadingSlot === slot.key;
           return (
             <div key={slot.key} className="border border-border rounded-lg p-3 space-y-2">
               <div className="flex items-start gap-2">
@@ -182,7 +177,7 @@ const IdInsuranceSection = () => {
                   <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
                     <Eye className="w-3 h-3" />
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => fileInputs.current[slot.key]?.click()}>
+                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setCaptureSlot(slot)}>
                     <Upload className="w-3 h-3" />
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => setDeleteTarget(slot)}>
@@ -190,40 +185,39 @@ const IdInsuranceSection = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={uploadingSlot === slot.key}
-                    onClick={() => fileInputs.current[slot.key]?.click()}
-                  >
-                    <Upload className="w-3 h-3 mr-1" />
-                    {uploadingSlot === slot.key ? "Uploading…" : "Upload"}
-                  </Button>
-                  {slot.acceptCamera && (
-                    <Button size="sm" variant="outline" onClick={() => triggerCamera(slot)} disabled={uploadingSlot === slot.key}>
-                      <Camera className="w-3 h-3 mr-1" /> Camera
-                    </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={isUploading}
+                  onClick={() => setCaptureSlot(slot)}
+                >
+                  {isUploading ? (
+                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload className="w-3 h-3 mr-1" /> Capture / Upload</>
                   )}
-                </div>
+                </Button>
               )}
-
-              <input
-                ref={(el) => { fileInputs.current[slot.key] = el; }}
-                type="file"
-                accept={slot.key === "id_photo" ? "image/*" : "image/*,.pdf"}
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadFile(slot, f);
-                  e.target.value = "";
-                }}
-              />
             </div>
           );
         })}
       </CardContent>
+
+      {captureSlot && (
+        <IdMultiPageField
+          open={!!captureSlot}
+          onOpenChange={(o) => { if (!o) setCaptureSlot(null); }}
+          mode={captureSlot.mode}
+          slotLabel={captureSlot.label}
+          baseFileName={captureSlot.baseFileName}
+          maxPages={captureSlot.maxPages}
+          uploading={uploadingSlot === captureSlot.key}
+          onComplete={async (file) => {
+            await uploadFile(captureSlot, file);
+          }}
+        />
+      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
