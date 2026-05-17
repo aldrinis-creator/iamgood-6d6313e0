@@ -1,8 +1,30 @@
-I found the code already renders a per-message Delete button beside Requeue, and a Purge all button in each DLQ card header. If you only see Requeue, the most likely issue is the action area is cramped/overflowing at your current viewport or the deployed preview is showing an older layout.
+## Problem
+`purge_dlq()` runs `DELETE FROM pgmq.q_<name>` with no WHERE clause. Postgres (with `sql_safe_updates` on, which Supabase enables by default for some roles) rejects this with "No where clause for Delete".
 
-Plan:
-1. Make each DLQ message action area stack responsively so Requeue and Delete are always visible, not squeezed off-screen.
-2. Change Delete to a clearer destructive button using the existing design system variant, keeping the required confirmation dialog.
-3. Keep the existing backend delete behavior (`delete_email`) and existing Purge all behavior unchanged.
-4. Add a short inline label near DLQ actions so it is obvious that individual messages can be requeued or permanently deleted.
-5. Verify the DLQ row layout in the preview after the change.
+## Fix
+Update the `purge_dlq` database function to use pgmq's built-in purge helper instead of a raw unqualified DELETE:
+
+```sql
+CREATE OR REPLACE FUNCTION public.purge_dlq(dlq_name text)
+RETURNS bigint ...
+AS $$
+DECLARE deleted_count bigint;
+BEGIN
+  -- auth checks unchanged
+  SELECT pgmq.purge_queue(dlq_name) INTO deleted_count;
+  RETURN deleted_count;
+EXCEPTION WHEN undefined_function THEN
+  -- fallback for older pgmq: use TRUNCATE (no WHERE needed, bypasses safe_updates)
+  EXECUTE format('TRUNCATE pgmq.q_%I', dlq_name);
+  RETURN 0;
+END;
+$$;
+```
+
+`pgmq.purge_queue` returns the number of deleted rows and is the supported API. `TRUNCATE` is the safe fallback. Neither triggers the no-WHERE error.
+
+No frontend changes needed — UI already calls this RPC.
+
+## Steps
+1. Migration to replace `public.purge_dlq` with the version above.
+2. Test by clicking "Purge all" on the DLQ tab; expect the row count to clear and the toast to show success.
