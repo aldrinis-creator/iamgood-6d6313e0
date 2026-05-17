@@ -145,7 +145,7 @@ const IdInsuranceSection = () => {
           </Badge>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Upload these once. Your guardian can share them with the hospital in one tap.
+          Upload these once. Your guardians instantly see them in their app under Reports → Hospital Visit and can share with the hospital in one tap.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
