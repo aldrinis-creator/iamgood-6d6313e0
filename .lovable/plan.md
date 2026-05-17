@@ -1,60 +1,77 @@
-## Goal
+## Email Queue Monitoring & Automated Alerts
 
-Two changes to the **Tablets** tab medication flows:
+Build an admin-only monitoring dashboard plus a scheduled health-check job that proactively alerts admins when the email pipeline degrades.
 
-1. When a medication's **End Date** has passed, prompt the user to **Continue** or **Delete** it (instead of silently hiding it). If Delete is chosen, the medication is permanently removed and never appears in any sub-tab.
-2. Fix the bug where medications past their end date still show up in **Refill** and **Today's Schedule** (and in the low-stock badge counter). Today only `MedicationList` filters on `end_date`; the other surfaces don't.
+### 1. Admin Email Monitoring Dashboard
 
-## Investigation findings
+New route `/admin/emails` (gated by existing `AdminRoute` + `has_role(admin)`).
 
-End-date filtering today:
+**Stat cards (last 24h / 7d / 30d toggle):**
+- Total unique emails (deduped by `message_id`)
+- Sent / Failed / DLQ / Suppressed counts
+- Bounce + complaint rate (%)
+- Current queue depth (`auth_emails`, `transactional_emails`)
+- DLQ depth (`auth_emails_dlq`, `transactional_emails_dlq`)
+- Rate-limit cooldown status (from `email_send_state.retry_after_until`)
+- Last successful cron run timestamp
 
-| Surface | File | Filters on `end_date`? |
-|---|---|---|
-| Meds list | `MedicationList.tsx` | Yes (`.or("end_date.is.null,end_date.gt.<today>")`) |
-| Today's Schedule | `TodaySchedule.tsx` | **No** |
-| Refill | `RefillOrder.tsx` (`load()`) | **No** |
-| Low-stock badge dot | `MedicationManager.tsx` (`checkLowStock`) | **No** |
+**Charts:**
+- Line chart: sends/failures per hour over selected range
+- Breakdown by `template_name`
 
-That's why an expired med keeps appearing in Refill and elsewhere with no way to remove it.
+**Tables (paginated, 50/page):**
+- Recent sends — filterable by template, status, recipient search, date range
+- DLQ contents — viewable payload, recipient, failure reason, with a "Requeue" action that moves a message back to its source queue
+- Suppressed addresses — with reason and ability to remove a suppression
 
-## Plan
+All queries deduplicate on `message_id` using `DISTINCT ON`.
 
-### 1. "Ended medications" prompt in the Meds sub-tab
+### 2. Health-Check Edge Function (`email-queue-health-check`)
 
-In `MedicationList.tsx`:
+Runs every 15 minutes via `pg_cron`. Evaluates thresholds and inserts admin notifications + sends a transactional alert email when any trigger.
 
-- Change the load query to fetch **all** of the user's meds (drop the `end_date` `.or` filter) and split them in memory into:
-  - `activeMeds`: `end_date` is null OR `end_date >= today` (IST via `getISTDateString()`)
-  - `endedMeds`: `end_date < today`
-- Render `activeMeds` in the existing list exactly as today.
-- If `endedMeds.length > 0`, render a new **"Ended medications"** section above the active list (amber/muted card) listing each ended med with name, dosage, and end date, plus two buttons per row:
-  - **Continue** — opens an `AlertDialog` ("Continue this medication?") with a date input prefilled to today + 30 days. On confirm, `UPDATE medications SET end_date = <new date>` (or set to null if user picks "No end date"). Reload.
-  - **Delete** — opens the existing destructive `AlertDialog` pattern; on confirm, `DELETE FROM medications WHERE id = ...`. Reload.
-- Both actions call `onRefillDone`-equivalent / re-trigger parent low-stock check (lift via a small `onChange` callback prop, or just rely on the existing `MedicationManager.checkLowStock` re-firing on tab switch — simplest: add an `onChange` prop and call it after Continue/Delete).
+**Alert triggers (configurable thresholds stored in `email_alert_config` table):**
+- DLQ depth grew by ≥ N messages since last check (default N=5)
+- Total DLQ depth exceeds threshold (default 20)
+- Queue depth stuck: any message older than 10 minutes still unsent
+- No successful sends in last 30 min while pending messages exist (likely cron/auth broken)
+- Bounce rate > 5% over last 1h (min 20 sends)
+- Complaint rate > 0.1% over last 24h
+- `retry_after_until` rate-limit cooldown active > 30 min
 
-### 2. Apply the end-date filter everywhere meds are read
+**Deduplication:** Each alert type writes to a new `email_alert_log` table with a cooldown window (e.g. don't re-fire same alert within 2h) so admins aren't spammed.
 
-Add the same "active only" predicate to the three other reads, so an expired med never leaks into Refill, Today's Schedule, or the low-stock dot:
+**Recipients:** Send to all users with `admin` role (lookup `user_roles` + `profiles.email`/`auth.users.email`).
 
-- `MedicationManager.tsx` `checkLowStock`: also select `end_date` and filter in JS (`!end_date || end_date >= today`) before computing `hasLowStock`.
-- `RefillOrder.tsx` `load()`: select `end_date`, append `.or("end_date.is.null,end_date.gte.<today>")` so expired meds disappear from both the low-stock list and the "all meds" picker.
-- `TodaySchedule.tsx` `loadSchedule()`: same `.or` filter alongside the existing `start_date` filter, so expired meds drop out of today's schedule.
+### 3. In-App Admin Notifications
 
-Use IST today via the existing `getISTDateString()` helper for consistency with `MedicationList`.
+Health-check inserts into existing `notifications` table for each admin user (type `email_health_alert`). The admin dashboard surfaces an unread badge.
+
+### 4. Database changes (migration)
+
+- `email_alert_config` — single-row config table: thresholds, cooldown minutes, enabled flag, comma-separated extra recipient emails
+- `email_alert_log` — id, alert_type, severity, message, metadata jsonb, created_at; RLS admin-read-only
+- RPC `email_queue_stats()` SECURITY DEFINER — returns queue depth per queue (reads `pgmq.q_<name>` tables which aren't directly exposed)
+- RPC `requeue_dlq_message(dlq_name, msg_id)` SECURITY DEFINER, admin-only
+- RLS: admin-only on all new tables
+- `pg_cron` job calling `email-queue-health-check` every 15 min (uses vault `email_queue_service_role_key`)
+
+### 5. Transactional alert email template
+
+New template `email-health-alert.tsx` (Check-iN navy branding, per email branding memory). Scaffolded via existing `send-transactional-email` flow.
+
+### Technical notes
+- Reuse existing `process-email-queue` infrastructure — no changes to it
+- Reuse existing pgmq RPC pattern (`SECURITY DEFINER` wrappers) for the new queue-stats and requeue RPCs
+- Charts via `recharts` (already in project)
+- All time displays in IST per project standards
+- Admin route protection via existing `AdminRoute` component
+- No new external services or secrets required
 
 ### Out of scope
+- SMS/WhatsApp alerts (email only for v1)
+- Auto-remediation (e.g. auto-purge DLQ) — admin must act manually via Requeue button
+- Per-template SLA tracking
 
-- No DB migration (uses existing `end_date` column).
-- No changes to `medication_logs` history (past adherence records remain).
-- No guardian-side changes.
-- No change to alarms code beyond what falls out of `TodaySchedule` filtering (alarms hook uses its own query, not touched here unless you want; flag if you do).
-
-## Files to edit
-
-- `src/components/medications/MedicationList.tsx` — split active/ended, add Continue/Delete prompts, add `onChange` callback prop.
-- `src/components/medications/MedicationManager.tsx` — pass `onChange={checkLowStock}` to `MedicationList`; filter `end_date` in `checkLowStock`.
-- `src/components/medications/RefillOrder.tsx` — add `end_date` filter in `load()`.
-- `src/components/medications/TodaySchedule.tsx` — add `end_date` filter in `loadSchedule()`.
-
-No new files, no schema changes.
+### Estimated work
+~4–6 hours: dashboard (2h), health-check function + cron (1.5h), migration + RPCs (1h), alert template + wiring (0.5h), testing (1h).
