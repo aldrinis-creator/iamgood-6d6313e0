@@ -1,35 +1,37 @@
-# Swap to clean email subdomain
+## Problem
 
-## Goal
-Replace failed `notify.www.futurewave.in` with `notify.futurewave.in` so email verification can complete and emails start sending.
+DLQ growth alert is caused by the welcome email being re-sent on every sign-in (not just first signup). The repeated calls reuse `idempotencyKey: welcome-${user.id}`, and the original "run" for that key has long expired, so the Email API rejects every retry with `410 run_expired`. After 5 retries per batch the messages move to the DLQ.
 
-## Why
-`notify.www.futurewave.in` is permanently failed — the provider reports it's owned by another Mailgun account (`DOMAIN_OWNED_BY_ANOTHER_ACCOUNT`). DNS will never fix this. `notify.futurewave.in` is a clean, unused subdomain on the same root with no conflicts.
+Domain `notify.futurewave.in` is verified. Provider is healthy. No DNS, suppression, or rate-limit issue.
 
-## Steps
+## Fix
 
-### 1. Delete failed domain (you)
-In **Cloud → Emails → Manage Domains**, delete `notify.www.futurewave.in`.
+### 1. Send welcome email only once, on actual signup
+In `src/contexts/AuthContext.tsx`, stop invoking `send-transactional-email` for "welcome" inside `onAuthStateChange`. Move/guard it so it fires exactly once per account:
 
-### 2. Add clean subdomain (you)
-In the same dialog, add `notify.futurewave.in`. Lovable will display 2 NS records (`ns3.lovable.cloud`, `ns4.lovable.cloud`).
+- Track a `welcome_sent_at` (timestamptz, nullable) column on `profiles`.
+- In the auth listener, only call the welcome email when `profile.welcome_sent_at IS NULL`. Immediately update the row to `now()` before invoking (so concurrent sign-ins on multiple devices don't double-fire).
+- Alternative (simpler, no schema change): only fire welcome on the `SIGNED_UP` / first `SIGNED_IN` event when `event === 'SIGNED_IN'` AND profile was just created (e.g. `created_at` within the last 2 minutes). The DB column is cleaner — recommended.
 
-### 3. Add NS records at registrar (you)
-At the `futurewave.in` DNS provider, add the two NS records for the `notify` subdomain. Verification typically completes in minutes to hours (max 72h).
+### 2. Clear the current DLQ backlog
+After the code fix is deployed:
+- Open **Admin → Emails** dashboard.
+- Inspect `auth_emails_dlq` (4 msgs) and `transactional_emails_dlq` (12 msgs).
+- **Do not requeue** the welcome failures — they will fail again (same expired run). Discard/delete them from the DLQ.
+- If any non-welcome messages are in the DLQ, evaluate individually and requeue if appropriate.
 
-### 4. Update sender domain in code (me)
-Update the `SENDER_DOMAIN` and `FROM_DOMAIN` constants in `supabase/functions/send-transactional-email/index.ts`:
-- `SENDER_DOMAIN`: `notify.www.futurewave.in` → `notify.futurewave.in`
-- `FROM_DOMAIN`: `www.futurewave.in` → `futurewave.in`
+### 3. Suppress the alert noise during cleanup (optional)
+The `email_alert_config.cooldown_minutes` already deduplicates, but if alerts keep firing while the backlog clears, temporarily raise `dlq_growth_threshold` in `email_alert_config`, then restore after cleanup.
 
-Check `auth-email-hook/index.ts` for any hardcoded domain references and update similarly. Redeploy both functions.
+## Files touched
+- `src/contexts/AuthContext.tsx` — guard the welcome-email invoke.
+- New migration — add `profiles.welcome_sent_at timestamptz` (if going with the column approach).
 
-### 5. Verify (me + you)
-Monitor verification status in **Cloud → Emails**. Once active, trigger a test transactional email and a test password reset to confirm both pipelines deliver.
+## Verification
+1. Sign in as an existing user with `welcome_sent_at` set → confirm no `send-transactional-email` network call is made.
+2. Create a brand-new account → confirm welcome email sends successfully and `welcome_sent_at` is populated.
+3. Watch `email_send_log` for ~15 min: no new `welcome` rows with `run_expired`. DLQ depth stops growing.
+4. Next `email-queue-health-check` cycle should not raise `dlq_growth`.
 
-## What stays unchanged
-Email queue (pgmq), `process-email-queue` cron, health monitoring, admin dashboard at `/admin/emails`, all transactional templates, suppression list, unsubscribe tokens, send logs.
-
-## What you need to do
-- Delete the failed domain and add `notify.futurewave.in` via the Cloud → Emails dialog
-- Add 2 NS records at your DNS provider when prompted
+## Not in scope
+- No changes to the email provider, domain, DNS, or `send-transactional-email` function itself — those are working correctly.
