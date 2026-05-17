@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
-  Landmark, ShieldAlert, Scroll, ExternalLink,
+  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -538,6 +538,16 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
     );
   }
   return null;
+}
+
+function AttachmentBadge({ entry }: { entry: AnyEntry }) {
+  const a = (entry as any).attachment as VaultAttachment | undefined;
+  if (!a) return null;
+  return (
+    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
+      <Paperclip className="w-3 h-3" /> Attachment
+    </div>
+  );
 }
 
 // ===================================================================
