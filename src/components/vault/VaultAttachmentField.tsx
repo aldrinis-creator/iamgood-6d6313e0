@@ -19,15 +19,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { decryptBytes } from "@/lib/encryption";
 import type { VaultAttachment } from "@/lib/vaultCategories";
 import { toast } from "@/components/ui/sonner";
+import { CROP_LIMITS, formatBytes, fileToDataUrl, exportCropToFile } from "@/lib/cropImage";
 
-// ---- Limits (tune here) -------------------------------------------------
-const MAX_IMAGE_INPUT = 5 * 1024 * 1024;      // 5 MB raw image upload
-const MAX_PDF_INPUT   = 10 * 1024 * 1024;     // 10 MB PDF upload
-const MAX_OUTPUT      = 1.5 * 1024 * 1024;    // 1.5 MB after compression
-const MAX_LONG_EDGE   = 2000;                 // px
-const JPEG_QUALITY_HI = 0.85;
-const JPEG_QUALITY_LO = 0.7;
-// ------------------------------------------------------------------------
+const { MAX_IMAGE_INPUT, MAX_PDF_INPUT, MAX_OUTPUT } = CROP_LIMITS;
 
 interface Props {
   existing?: VaultAttachment;
