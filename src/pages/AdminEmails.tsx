@@ -674,7 +674,7 @@ const DlqSection = ({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   disabled={purgeConfirm !== queueName}
                   onClick={() => onPurge(queueName)}
                 >
@@ -703,8 +703,8 @@ const DlqSection = ({
               const tpl = inferTemplate(m.message);
               return (
                 <div key={m.msg_id} className="border rounded p-3 text-xs space-y-1">
-                  <div className="flex justify-between items-start gap-2 flex-wrap">
-                    <div className="min-w-0 flex-1">
+                  <div className="space-y-3">
+                    <div className="min-w-0">
                       <p><span className="font-medium">To:</span> {to}</p>
                       <p><span className="font-medium">Template:</span> {tpl}</p>
                       <p className="truncate"><span className="font-medium">Subject:</span> {subject}</p>
@@ -718,10 +718,12 @@ const DlqSection = ({
                         </pre>
                       </details>
                     </div>
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-muted-foreground">Message actions</span>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:shrink-0">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="outline"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
+                          <Button size="sm" variant="outline" className="w-full justify-center"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -738,7 +740,7 @@ const DlqSection = ({
                       </AlertDialog>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
+                          <Button size="sm" variant="destructive" className="w-full justify-center"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -749,10 +751,11 @@ const DlqSection = ({
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(queueName, m.msg_id)}>Delete</AlertDialogAction>
+                            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => onDelete(queueName, m.msg_id)}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      </div>
                     </div>
                   </div>
                 </div>
