@@ -1,77 +1,46 @@
-## Email Queue Monitoring & Automated Alerts
+# Swap to a clean email subdomain
 
-Build an admin-only monitoring dashboard plus a scheduled health-check job that proactively alerts admins when the email pipeline degrades.
+## Goal
+Replace the failed `notify.www.futurewave.in` domain with `notify.futurewave.in` so email verification can complete and auth + transactional emails start sending.
 
-### 1. Admin Email Monitoring Dashboard
+## Why this approach
+- `notify.www.futurewave.in` is in a permanent **failed** state — the email provider reports the domain is already registered elsewhere, so DNS propagation will never fix it.
+- `notify.futurewave.in` is a clean, unused subdomain on the same root domain — no conflict, no DNS changes at the registrar beyond the new NS records Lovable will request.
+- All existing email infrastructure (queues, edge functions, templates, monitoring) stays intact — only the sender domain changes.
 
-New route `/admin/emails` (gated by existing `AdminRoute` + `has_role(admin)`).
+## Steps
 
-**Stat cards (last 24h / 7d / 30d toggle):**
-- Total unique emails (deduped by `message_id`)
-- Sent / Failed / DLQ / Suppressed counts
-- Bounce + complaint rate (%)
-- Current queue depth (`auth_emails`, `transactional_emails`)
-- DLQ depth (`auth_emails_dlq`, `transactional_emails_dlq`)
-- Rate-limit cooldown status (from `email_send_state.retry_after_until`)
-- Last successful cron run timestamp
+### 1. Remove the failed domain
+- Open **Cloud → Emails → Manage Domains**.
+- Delete `notify.www.futurewave.in`.
 
-**Charts:**
-- Line chart: sends/failures per hour over selected range
-- Breakdown by `template_name`
+### 2. Add the new subdomain
+- In the same dialog, add `notify.futurewave.in` via the email setup flow.
+- Lovable will display 2 NS records (`ns3.lovable.cloud`, `ns4.lovable.cloud`) to add at the futurewave.in registrar.
 
-**Tables (paginated, 50/page):**
-- Recent sends — filterable by template, status, recipient search, date range
-- DLQ contents — viewable payload, recipient, failure reason, with a "Requeue" action that moves a message back to its source queue
-- Suppressed addresses — with reason and ability to remove a suppression
+### 3. Add the NS records at the registrar
+- Log in to wherever `futurewave.in` DNS is managed.
+- Add the two NS records exactly as shown for the `notify` subdomain.
+- DNS verification typically completes within minutes to a few hours (max 72h).
 
-All queries deduplicate on `message_id` using `DISTINCT ON`.
+### 4. Update sender domain in code
+Once the new domain is added, I'll update the `SENDER_DOMAIN` constant in:
+- `supabase/functions/send-transactional-email/index.ts`
+- `supabase/functions/auth-email-hook/index.ts` (if hardcoded)
 
-### 2. Health-Check Edge Function (`email-queue-health-check`)
+From `notify.www.futurewave.in` → `notify.futurewave.in`, then redeploy both functions.
 
-Runs every 15 minutes via `pg_cron`. Evaluates thresholds and inserts admin notifications + sends a transactional alert email when any trigger.
+### 5. Verify
+- Monitor verification status in **Cloud → Emails**.
+- Once active, trigger a test transactional email and a test auth email (password reset) to confirm both pipelines deliver.
 
-**Alert triggers (configurable thresholds stored in `email_alert_config` table):**
-- DLQ depth grew by ≥ N messages since last check (default N=5)
-- Total DLQ depth exceeds threshold (default 20)
-- Queue depth stuck: any message older than 10 minutes still unsent
-- No successful sends in last 30 min while pending messages exist (likely cron/auth broken)
-- Bounce rate > 5% over last 1h (min 20 sends)
-- Complaint rate > 0.1% over last 24h
-- `retry_after_until` rate-limit cooldown active > 30 min
+## What stays unchanged
+- Email queue (`pgmq`), `process-email-queue` cron job, health monitoring edge function and admin dashboard at `/admin/emails`.
+- All transactional templates and the `auth-email-hook`.
+- Suppression list, unsubscribe tokens, send logs.
 
-**Deduplication:** Each alert type writes to a new `email_alert_log` table with a cooldown window (e.g. don't re-fire same alert within 2h) so admins aren't spammed.
+## What you need to do
+- Confirm you want to proceed.
+- Be ready to add 2 NS records at your DNS provider for `futurewave.in` when prompted.
 
-**Recipients:** Send to all users with `admin` role (lookup `user_roles` + `profiles.email`/`auth.users.email`).
-
-### 3. In-App Admin Notifications
-
-Health-check inserts into existing `notifications` table for each admin user (type `email_health_alert`). The admin dashboard surfaces an unread badge.
-
-### 4. Database changes (migration)
-
-- `email_alert_config` — single-row config table: thresholds, cooldown minutes, enabled flag, comma-separated extra recipient emails
-- `email_alert_log` — id, alert_type, severity, message, metadata jsonb, created_at; RLS admin-read-only
-- RPC `email_queue_stats()` SECURITY DEFINER — returns queue depth per queue (reads `pgmq.q_<name>` tables which aren't directly exposed)
-- RPC `requeue_dlq_message(dlq_name, msg_id)` SECURITY DEFINER, admin-only
-- RLS: admin-only on all new tables
-- `pg_cron` job calling `email-queue-health-check` every 15 min (uses vault `email_queue_service_role_key`)
-
-### 5. Transactional alert email template
-
-New template `email-health-alert.tsx` (Check-iN navy branding, per email branding memory). Scaffolded via existing `send-transactional-email` flow.
-
-### Technical notes
-- Reuse existing `process-email-queue` infrastructure — no changes to it
-- Reuse existing pgmq RPC pattern (`SECURITY DEFINER` wrappers) for the new queue-stats and requeue RPCs
-- Charts via `recharts` (already in project)
-- All time displays in IST per project standards
-- Admin route protection via existing `AdminRoute` component
-- No new external services or secrets required
-
-### Out of scope
-- SMS/WhatsApp alerts (email only for v1)
-- Auto-remediation (e.g. auto-purge DLQ) — admin must act manually via Requeue button
-- Per-template SLA tracking
-
-### Estimated work
-~4–6 hours: dashboard (2h), health-check function + cron (1.5h), migration + RPCs (1h), alert template + wiring (0.5h), testing (1h).
+I'll handle steps 1–2 guidance, the code update in step 4, and the deploy.
