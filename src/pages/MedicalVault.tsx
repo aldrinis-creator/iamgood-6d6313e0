@@ -22,13 +22,10 @@ import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
-import DocumentAnalyzer from "@/components/health-tools/DocumentAnalyzer";
 import VaultCategorisedSection from "@/components/vault/VaultCategorisedSection";
 import { useVaultReminderScheduler } from "@/hooks/useVaultReminderScheduler";
 
 const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Other"];
-
-const ANALYZER_TYPES = ["Lab Report", "X-Ray / Scan", "Discharge Summary", "Doctor's Diagnosis", "Insurance Document", "Hospital Bill"];
 
 interface MedicalRecord {
   id: string;
@@ -585,9 +582,6 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
           <TabsTrigger value="doctor-report" className="text-xs gap-1">
             <FileText className="w-3 h-3" /> Dr Report
           </TabsTrigger>
-          <TabsTrigger value="doc-analyzer" className="text-xs gap-1">
-            <Search className="w-3 h-3" /> Analyzer
-          </TabsTrigger>
           <TabsTrigger value="profile" className="text-xs gap-1">
             <Heart className="w-3 h-3" /> Profile
           </TabsTrigger>
@@ -795,62 +789,6 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
               <Card key={r.id}>
                 <CardContent className="p-3 flex items-center gap-3">
                   <FileText className="w-8 h-8 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{r.title}</p>
-                    <div className="flex gap-2 items-center flex-wrap">
-                      <Badge variant="secondary" className="text-[10px]">{r.record_type}</Badge>
-                      {r.record_date && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(r.record_date).toLocaleDateString("en-IN")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleViewRecord(r)} title="View">
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                    {r.file_url && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDownload(r)} title="Save As">
-                        <Save className="w-3 h-3" />
-                      </Button>
-                    )}
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(r)} title="Share">
-                      <Share2 className="w-3 h-3" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDelete(r)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ));
-          })()}
-        </TabsContent>
-
-        {/* ========== DOCUMENT ANALYZER TAB ========== */}
-        <TabsContent value="doc-analyzer" className="space-y-3 mt-4">
-          <DocumentAnalyzer />
-          {(() => {
-            const analyzerRecords = records
-              .filter((r) => ANALYZER_TYPES.includes(r.record_type))
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            if (analyzerRecords.length === 0) {
-              return (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <Search className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      No analyzed documents yet — upload a report above.
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            }
-            return analyzerRecords.map((r) => (
-              <Card key={r.id}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <File className="w-8 h-8 text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{r.title}</p>
                     <div className="flex gap-2 items-center flex-wrap">
