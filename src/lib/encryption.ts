@@ -70,6 +70,41 @@ export async function decrypt(
   return new TextDecoder().decode(decrypted);
 }
 
+export async function encryptBytes(
+  bytes: ArrayBuffer,
+  pin: string
+): Promise<{ ciphertext: string; iv: string; salt: string }> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(pin, salt);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
+    key,
+    bytes
+  );
+  return {
+    ciphertext: toBase64(encrypted),
+    iv: toBase64(iv.buffer as ArrayBuffer),
+    salt: toBase64(salt.buffer as ArrayBuffer),
+  };
+}
+
+export async function decryptBytes(
+  ciphertextB64: string,
+  ivB64: string,
+  saltB64: string,
+  pin: string
+): Promise<ArrayBuffer> {
+  const salt = fromBase64(saltB64);
+  const iv = fromBase64(ivB64);
+  const key = await deriveKey(pin, salt);
+  return crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
+    key,
+    fromBase64(ciphertextB64) as unknown as ArrayBuffer
+  );
+}
+
 export async function hashPin(pin: string): Promise<string> {
   const hash = await crypto.subtle.digest(
     "SHA-256",
