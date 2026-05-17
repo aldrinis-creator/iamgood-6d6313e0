@@ -579,8 +579,22 @@ const NumField = ({ label, value, onChange, step }: { label: string; value: numb
   </div>
 );
 
-const DlqSection = ({ title, queueName, messages, onRequeue }: {
-  title: string; queueName: string; messages: DlqMessage[]; onRequeue: (q: string, id: number) => void;
+  const deleteDlqMessage = async (queueName: string, msgId: number) => {
+    try {
+      const { error } = await supabase.rpc("delete_email", {
+        queue_name: queueName,
+        message_id: msgId,
+      });
+      if (error) throw error;
+      toast.success("Message deleted");
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+const DlqSection = ({ title, queueName, messages, onRequeue, onDelete }: {
+  title: string; queueName: string; messages: DlqMessage[]; onRequeue: (q: string, id: number) => void; onDelete: (q: string, id: number) => void;
 }) => (
   <Card>
     <CardHeader><CardTitle className="text-base">{title} ({messages.length})</CardTitle></CardHeader>
@@ -600,23 +614,42 @@ const DlqSection = ({ title, queueName, messages, onRequeue }: {
                     Enqueued: {format(new Date(m.enqueued_at), "dd MMM HH:mm")}
                   </p>
                 </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="outline"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Requeue this message?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        It will be moved back to {queueName.replace("_dlq", "")} and retried by the next dispatcher run.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onRequeue(queueName, m.msg_id)}>Requeue</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex gap-1">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline"><RefreshCw className="w-3 h-3 mr-1" />Requeue</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Requeue this message?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          It will be moved back to {queueName.replace("_dlq", "")} and retried by the next dispatcher run.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onRequeue(queueName, m.msg_id)}>Requeue</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700"><Trash2 className="w-3 h-3 mr-1" />Delete</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This permanently removes the message from the dead-letter queue. It will not be retried or logged again.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(queueName, m.msg_id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             </div>
           ))}
