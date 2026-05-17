@@ -92,6 +92,8 @@ const DocumentAnalyzer = () => {
   const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const imageBase64 = pages[0]?.base64 || null;
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -553,6 +555,8 @@ const DocumentAnalyzer = () => {
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
                   <span className="text-sm font-medium">Extracting text from document…</span>
                 </div>
+              ) : (
+                <>
               {pages.length > 0 && (
                 <div className="space-y-2 w-full">
                   <div className="flex items-center justify-between">
@@ -619,6 +623,8 @@ const DocumentAnalyzer = () => {
                   <span className="text-xs text-muted-foreground">Select multiple — JPG, PNG, PDF, DOCX</span>
                   <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
                 </label>
+              )}
+                </>
               )}
             </>
           ) : (
