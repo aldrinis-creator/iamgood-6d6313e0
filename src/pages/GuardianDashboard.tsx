@@ -32,6 +32,7 @@ import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import WardPicker from "@/components/WardPicker";
 import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
+import HospitalKitCard from "@/components/guardian/HospitalKitCard";
 
 interface Notification {
   id: string;
@@ -1052,6 +1053,9 @@ const GuardianDashboard = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Hospital Admission Kit */}
+        {wardUserId && <HospitalKitCard wardUserId={wardUserId} wardName={wardName} />}
 
         {/* Care Journal */}
         {wardUserId && (

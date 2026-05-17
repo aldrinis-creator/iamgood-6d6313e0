@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical } from "lucide-react";
@@ -21,7 +22,9 @@ type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutri
 const GuardianReports = () => {
   const { session } = useAuth();
   const { selectedWard } = useGuardianWard();
-  const [activeSection, setActiveSection] = useState<ReportSection>("medications");
+  const [searchParams] = useSearchParams();
+  const initialSection = (searchParams.get("section") as ReportSection) || "medications";
+  const [activeSection, setActiveSection] = useState<ReportSection>(initialSection);
   const wardUserId = selectedWard?.userId || null;
   const wardName = selectedWard?.name || "User";
   const [loading, setLoading] = useState(true);

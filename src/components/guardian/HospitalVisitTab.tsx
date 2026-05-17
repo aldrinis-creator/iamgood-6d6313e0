@@ -59,6 +59,19 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
+  useEffect(() => {
+    if (!wardUserId) return;
+    const channel = supabase
+      .channel(`hospital-visit-${wardUserId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "medical_records", filter: `user_id=eq.${wardUserId}` },
+        () => fetchRecords()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [wardUserId, fetchRecords]);
+
   const openPreview = async (r: SlotRecord, label: string) => {
     if (!r.file_url) return;
     const { data, error } = await supabase.storage.from("medical-documents").createSignedUrl(r.file_url, 3600);
