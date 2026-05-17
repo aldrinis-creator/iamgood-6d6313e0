@@ -461,12 +461,14 @@ const AdminEmails = () => {
               queueName="auth_emails_dlq"
               messages={dlqAuth}
               onRequeue={requeueDlq}
+              onDelete={deleteDlqMessage}
             />
             <DlqSection
               title="Transactional emails DLQ"
               queueName="transactional_emails_dlq"
               messages={dlqTxn}
               onRequeue={requeueDlq}
+              onDelete={deleteDlqMessage}
             />
           </TabsContent>
 
