@@ -141,6 +141,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDialogCategory(category);
     setEditingDoc(null);
     setDraft(blankDraft(category));
+    setPendingFile(null);
+    setRemoveAttachment(false);
     setDialogOpen(true);
   };
   const openEdit = (doc: DocRow) => {
@@ -152,7 +154,17 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDialogCategory((doc.category as VaultCategory) || "identity");
     setEditingDoc(doc);
     setDraft({ ...entry });
+    setPendingFile(null);
+    setRemoveAttachment(false);
     setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setDraft(null);
+    setEditingDoc(null);
+    setPendingFile(null);
+    setRemoveAttachment(false);
   };
 
   // ---------- Save ----------
@@ -161,27 +173,23 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     if (!validateDraft(dialogCategory, draft)) return;
     setSaving(true);
     try {
-      const { ciphertext, iv, salt } = await encrypt(JSON.stringify(draft), pin);
+      const finalDraft: AnyEntry = { ...(draft as any) };
+      const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
+
       const docType = `${dialogCategory}_${(draft as any).label?.toLowerCase().replace(/\s+/g, "_") || Date.now()}`;
       const label = (draft as any).label || dialogCategory;
 
+      // Step 1: ensure row exists so we have a docId for the storage path.
       let docId: string;
       if (editingDoc) {
-        const { error } = await supabase
-          .from("encrypted_documents")
-          .update({
-            encrypted_value: ciphertext, iv, salt,
-            label, category: dialogCategory,
-          })
-          .eq("id", editingDoc.id);
-        if (error) throw error;
         docId = editingDoc.id;
       } else {
+        const placeholder = await encrypt(JSON.stringify({ ...finalDraft, attachment: undefined }), pin);
         const { data, error } = await supabase
           .from("encrypted_documents")
           .insert({
             user_id: userId, doc_type: docType,
-            encrypted_value: ciphertext, iv, salt,
+            encrypted_value: placeholder.ciphertext, iv: placeholder.iv, salt: placeholder.salt,
             label, category: dialogCategory,
           })
           .select("id")
@@ -190,13 +198,44 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
         docId = data!.id;
       }
 
-      // Sync reminders for insurance & will
-      await syncReminders(userId, docId, dialogCategory, draft);
+      // Step 2: resolve attachment changes
+      if (pendingFile) {
+        const bytes = await pendingFile.arrayBuffer();
+        const enc = await encryptBytes(bytes, pin);
+        const path = `${userId}/${docId}.bin`;
+        const blob = new Blob([enc.ciphertext], { type: "text/plain" });
+        const { error: upErr } = await supabase.storage
+          .from("vault-attachments")
+          .upload(path, blob, { upsert: true, contentType: "text/plain" });
+        if (upErr) throw upErr;
+        (finalDraft as any).attachment = {
+          path,
+          file_name: pendingFile.name,
+          mime_type: pendingFile.type || "application/octet-stream",
+          iv: enc.iv,
+          salt: enc.salt,
+          size: pendingFile.size,
+        } as VaultAttachment;
+      } else if (removeAttachment && existingAttachment) {
+        await supabase.storage.from("vault-attachments").remove([existingAttachment.path]);
+        (finalDraft as any).attachment = undefined;
+      }
+
+      // Step 3: re-encrypt with final draft (including attachment metadata).
+      const { ciphertext, iv, salt } = await encrypt(JSON.stringify(finalDraft), pin);
+      const { error: updErr } = await supabase
+        .from("encrypted_documents")
+        .update({
+          encrypted_value: ciphertext, iv, salt,
+          label, category: dialogCategory,
+        })
+        .eq("id", docId);
+      if (updErr) throw updErr;
+
+      await syncReminders(userId, docId, dialogCategory, finalDraft);
 
       toast.success(editingDoc ? "Entry updated" : "Entry encrypted & saved");
-      setDialogOpen(false);
-      setDraft(null);
-      setEditingDoc(null);
+      closeDialog();
       await reload();
     } catch (err: any) {
       toast.error(err?.message || "Save failed");
@@ -208,6 +247,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   // ---------- Delete ----------
   const removeEntry = async (doc: DocRow) => {
     if (!confirm("Delete this vault entry? This cannot be undone.")) return;
+    const entry = decryptedById[doc.id] as any;
+    const att = entry?.attachment as VaultAttachment | undefined;
+    if (att?.path) {
+      await supabase.storage.from("vault-attachments").remove([att.path]);
+    }
     await supabase.from("vault_reminder_meta" as any).delete().eq("doc_id", doc.id);
     const { error } = await supabase.from("encrypted_documents").delete().eq("id", doc.id);
     if (error) {
@@ -217,6 +261,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     toast.success("Entry deleted");
     await reload();
   };
+
 
   return (
     <>
