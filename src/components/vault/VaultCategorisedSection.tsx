@@ -37,13 +37,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt, decrypt, encryptBytes } from "@/lib/encryption";
 import {
   VAULT_CATEGORIES, type VaultCategory,
   type EmailEntry, type BankEntry, type InsuranceEntry, type WillEntry, type IdentityEntry,
-  type InsuranceCategory, computeInsuranceReminderTier, computeWillReviewFireAt,
+  type InsuranceCategory, type VaultAttachment, computeInsuranceReminderTier, computeWillReviewFireAt,
   formatReminderLabel,
 } from "@/lib/vaultCategories";
+import VaultAttachmentField from "./VaultAttachmentField";
 
 type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InsuranceEntry | WillEntry;
 
@@ -83,6 +84,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   const [editingDoc, setEditingDoc] = useState<DocRow | null>(null);
   const [draft, setDraft] = useState<AnyEntry | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   // ---------- Load + decrypt ----------
   const reload = useCallback(async () => {
