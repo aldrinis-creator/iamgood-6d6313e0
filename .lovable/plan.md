@@ -1,37 +1,45 @@
-## Problem
+# Fix: DLQ messages not visible in Admin → Emails
 
-DLQ growth alert is caused by the welcome email being re-sent on every sign-in (not just first signup). The repeated calls reuse `idempotencyKey: welcome-${user.id}`, and the original "run" for that key has long expired, so the Email API rejects every retry with `410 run_expired`. After 5 retries per batch the messages move to the DLQ.
+## Diagnosis
 
-Domain `notify.futurewave.in` is verified. Provider is healthy. No DNS, suppression, or rate-limit issue.
+Database has **1,657 messages stuck in DLQ** (1 in `auth_emails_dlq`, 1,656 in `transactional_emails_dlq`), but the Admin → Emails → DLQ tab appears empty / unhelpful. Two real bugs combine to make them "invisible":
 
-## Fix
+1. **Wrong field names in the DLQ row renderer.** `DlqSection` reads `m.message?.to`, `m.message?.label`, `m.message?.subject`. But messages in the DLQ are the **pre-rendered Lovable Email API payload** (`from`, `to`, `subject`, `html`), not the original enqueue envelope (`templateName`, `recipientEmail`, `label`). Result:
+   - `Template:` always shows `—`
+   - `To:` happens to work (field is also called `to`)
+   - `Subject:` works only because the payload also has `subject`
+   - There is no visible cue that these are welcome emails — so the user scrolls and sees a wall of "Template: —" entries and assumes the DLQ is empty / wrong.
 
-### 1. Send welcome email only once, on actual signup
-In `src/contexts/AuthContext.tsx`, stop invoking `send-transactional-email` for "welcome" inside `onAuthStateChange`. Move/guard it so it fires exactly once per account:
+2. **Hard `LIMIT 50` per DLQ.** `read_dlq_messages` is called with `limit_count: 50`. With 1,656 messages in the transactional DLQ, 1,606 are silently hidden and there is no pagination, no "load more", no count of how many are truncated. The card title shows `(50)` even though the queue depth stat card shows 1,656 → looks like a UI bug or stale data.
 
-- Track a `welcome_sent_at` (timestamptz, nullable) column on `profiles`.
-- In the auth listener, only call the welcome email when `profile.welcome_sent_at IS NULL`. Immediately update the row to `now()` before invoking (so concurrent sign-ins on multiple devices don't double-fire).
-- Alternative (simpler, no schema change): only fire welcome on the `SIGNED_UP` / first `SIGNED_IN` event when `event === 'SIGNED_IN'` AND profile was just created (e.g. `created_at` within the last 2 minutes). The DB column is cleaner — recommended.
+The earlier "16 stuck welcome emails" estimate was wrong — the welcome-email failure has been recurring for weeks and the real backlog is ~1,656. The DLQ growth alert kept firing because new failures keep arriving.
 
-### 2. Clear the current DLQ backlog
-After the code fix is deployed:
-- Open **Admin → Emails** dashboard.
-- Inspect `auth_emails_dlq` (4 msgs) and `transactional_emails_dlq` (12 msgs).
-- **Do not requeue** the welcome failures — they will fail again (same expired run). Discard/delete them from the DLQ.
-- If any non-welcome messages are in the DLQ, evaluate individually and requeue if appropriate.
+## Plan
 
-### 3. Suppress the alert noise during cleanup (optional)
-The `email_alert_config.cooldown_minutes` already deduplicates, but if alerts keep firing while the backlog clears, temporarily raise `dlq_growth_threshold` in `email_alert_config`, then restore after cleanup.
+### 1. Show real fields in the DLQ row
+Update `DlqSection` (`src/pages/AdminEmails.tsx`, ~line 607-617) to read fields actually present on a pre-rendered payload, with fallback to envelope fields for backward compatibility:
+- **To:** `m.message?.to ?? m.message?.recipientEmail ?? "—"`
+- **Subject:** `m.message?.subject ?? "—"`
+- **Template:** derive from subject heuristics OR show `m.message?.templateName ?? m.message?.label ?? "(pre-rendered payload)"`
+- Add a small expandable "View raw payload" `<details>` so the admin can confirm what each stuck message actually is.
+
+### 2. Surface the true backlog size and add pagination
+- Change card title from `({messages.length})` to `({messages.length} of {queueDepth(queueName)})` so the truncation is visible.
+- Bump default `limit_count` from 50 → 200, and add a **Load more** button that re-calls `read_dlq_messages` with a larger limit (e.g. +200 each click). Keep the RPC's existing hard cap.
+- Show a warning banner above the list when `queueDepth > messages.length`: "Showing N of M. Older messages are not loaded."
+
+### 3. Add a "Purge all" action for the welcome-email backlog
+With 1,656 messages, deleting one-by-one is not viable. Add a single **Purge all messages in this DLQ** button (with a strong confirmation dialog requiring the user to type the queue name) that calls a new SECURITY DEFINER RPC `purge_dlq(dlq_name text)` wrapping `pgmq.purge_queue`. This is the only realistic way to clear the existing backlog so the `dlq_total_threshold` alert stops firing.
+
+### 4. (Out of scope, but noted) Root-cause the welcome-email failures
+The 1,656 messages all look like the same welcome email template repeatedly failing. The code fix to stop *new* failures was shipped earlier, but the historical backlog still needs purging (step 3). After purging, monitor for 24h to confirm the queue stays at 0.
 
 ## Files touched
-- `src/contexts/AuthContext.tsx` — guard the welcome-email invoke.
-- New migration — add `profiles.welcome_sent_at timestamptz` (if going with the column approach).
 
-## Verification
-1. Sign in as an existing user with `welcome_sent_at` set → confirm no `send-transactional-email` network call is made.
-2. Create a brand-new account → confirm welcome email sends successfully and `welcome_sent_at` is populated.
-3. Watch `email_send_log` for ~15 min: no new `welcome` rows with `run_expired`. DLQ depth stops growing.
-4. Next `email-queue-health-check` cycle should not raise `dlq_growth`.
+- `src/pages/AdminEmails.tsx` — fix field names, add pagination/load-more, add purge button, update card title.
+- New migration — add `purge_dlq(text)` RPC (admin + service_role only, restricted to the two DLQ queue names).
 
-## Not in scope
-- No changes to the email provider, domain, DNS, or `send-transactional-email` function itself — those are working correctly.
+## Out of scope
+
+- Changing the dispatcher behaviour or DLQ retention policy.
+- Investigating *why* welcome emails fail (already addressed in earlier turn; this plan only restores visibility + cleanup).
