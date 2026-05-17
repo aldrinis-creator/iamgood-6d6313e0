@@ -1,46 +1,35 @@
-# Swap to a clean email subdomain
+# Swap to clean email subdomain
 
 ## Goal
-Replace the failed `notify.www.futurewave.in` domain with `notify.futurewave.in` so email verification can complete and auth + transactional emails start sending.
+Replace failed `notify.www.futurewave.in` with `notify.futurewave.in` so email verification can complete and emails start sending.
 
-## Why this approach
-- `notify.www.futurewave.in` is in a permanent **failed** state — the email provider reports the domain is already registered elsewhere, so DNS propagation will never fix it.
-- `notify.futurewave.in` is a clean, unused subdomain on the same root domain — no conflict, no DNS changes at the registrar beyond the new NS records Lovable will request.
-- All existing email infrastructure (queues, edge functions, templates, monitoring) stays intact — only the sender domain changes.
+## Why
+`notify.www.futurewave.in` is permanently failed — the provider reports it's owned by another Mailgun account (`DOMAIN_OWNED_BY_ANOTHER_ACCOUNT`). DNS will never fix this. `notify.futurewave.in` is a clean, unused subdomain on the same root with no conflicts.
 
 ## Steps
 
-### 1. Remove the failed domain
-- Open **Cloud → Emails → Manage Domains**.
-- Delete `notify.www.futurewave.in`.
+### 1. Delete failed domain (you)
+In **Cloud → Emails → Manage Domains**, delete `notify.www.futurewave.in`.
 
-### 2. Add the new subdomain
-- In the same dialog, add `notify.futurewave.in` via the email setup flow.
-- Lovable will display 2 NS records (`ns3.lovable.cloud`, `ns4.lovable.cloud`) to add at the futurewave.in registrar.
+### 2. Add clean subdomain (you)
+In the same dialog, add `notify.futurewave.in`. Lovable will display 2 NS records (`ns3.lovable.cloud`, `ns4.lovable.cloud`).
 
-### 3. Add the NS records at the registrar
-- Log in to wherever `futurewave.in` DNS is managed.
-- Add the two NS records exactly as shown for the `notify` subdomain.
-- DNS verification typically completes within minutes to a few hours (max 72h).
+### 3. Add NS records at registrar (you)
+At the `futurewave.in` DNS provider, add the two NS records for the `notify` subdomain. Verification typically completes in minutes to hours (max 72h).
 
-### 4. Update sender domain in code
-Once the new domain is added, I'll update the `SENDER_DOMAIN` constant in:
-- `supabase/functions/send-transactional-email/index.ts`
-- `supabase/functions/auth-email-hook/index.ts` (if hardcoded)
+### 4. Update sender domain in code (me)
+Update the `SENDER_DOMAIN` and `FROM_DOMAIN` constants in `supabase/functions/send-transactional-email/index.ts`:
+- `SENDER_DOMAIN`: `notify.www.futurewave.in` → `notify.futurewave.in`
+- `FROM_DOMAIN`: `www.futurewave.in` → `futurewave.in`
 
-From `notify.www.futurewave.in` → `notify.futurewave.in`, then redeploy both functions.
+Check `auth-email-hook/index.ts` for any hardcoded domain references and update similarly. Redeploy both functions.
 
-### 5. Verify
-- Monitor verification status in **Cloud → Emails**.
-- Once active, trigger a test transactional email and a test auth email (password reset) to confirm both pipelines deliver.
+### 5. Verify (me + you)
+Monitor verification status in **Cloud → Emails**. Once active, trigger a test transactional email and a test password reset to confirm both pipelines deliver.
 
 ## What stays unchanged
-- Email queue (`pgmq`), `process-email-queue` cron job, health monitoring edge function and admin dashboard at `/admin/emails`.
-- All transactional templates and the `auth-email-hook`.
-- Suppression list, unsubscribe tokens, send logs.
+Email queue (pgmq), `process-email-queue` cron, health monitoring, admin dashboard at `/admin/emails`, all transactional templates, suppression list, unsubscribe tokens, send logs.
 
 ## What you need to do
-- Confirm you want to proceed.
-- Be ready to add 2 NS records at your DNS provider for `futurewave.in` when prompted.
-
-I'll handle steps 1–2 guidance, the code update in step 4, and the deploy.
+- Delete the failed domain and add `notify.futurewave.in` via the Cloud → Emails dialog
+- Add 2 NS records at your DNS provider when prompted
