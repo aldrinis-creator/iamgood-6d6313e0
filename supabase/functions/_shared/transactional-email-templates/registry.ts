@@ -20,6 +20,7 @@ import { template as premiumPlusWaitlistConfirmation } from './premium-plus-wait
 import { template as premiumPlusLaunch } from './premium-plus-launch.tsx'
 import { template as trialStarted } from './trial-started.tsx'
 import { template as admin2faCode } from './admin-2fa-code.tsx'
+import { template as emailHealthAlert } from './email-health-alert.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'contact-confirmation': contactConfirmation,
@@ -33,4 +34,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'premium-plus-launch': premiumPlusLaunch,
   'trial-started': trialStarted,
   'admin-2fa-code': admin2faCode,
+  'email-health-alert': emailHealthAlert,
 }
