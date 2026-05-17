@@ -18,12 +18,29 @@ export const VAULT_CATEGORIES: { key: VaultCategory; label: string; emptyHint: s
 
 // ---------- Per-category payload shapes ----------
 
+/**
+ * Optional encrypted photo / scan attached to any vault entry.
+ * The file is AES-256-GCM encrypted client-side with the vault PIN and
+ * uploaded to the private `vault-attachments` storage bucket. Because this
+ * metadata lives inside the encrypted entry JSON, even storage admins
+ * cannot decrypt the file without the PIN.
+ */
+export interface VaultAttachment {
+  path: string;       // storage path within `vault-attachments`
+  file_name: string;  // original filename
+  mime_type: string;
+  iv: string;         // base64
+  salt: string;       // base64
+  size: number;       // plaintext bytes
+}
+
 export interface EmailEntry {
   label: string;          // e.g. "Personal Gmail"
   email: string;
   password: string;
   recovery_email?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export interface BankEntry {
@@ -37,6 +54,7 @@ export interface BankEntry {
   nominee_phone: string;
   branch?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export type InsuranceCategory = "life" | "health" | "general";
@@ -56,6 +74,7 @@ export interface InsuranceEntry {
   renewal_date?: string;  // YYYY-MM-DD
   expiry_date?: string;   // YYYY-MM-DD
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 export interface WillEntry {
@@ -69,6 +88,7 @@ export interface WillEntry {
   nominee_name?: string;
   nominee_phone?: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 // Identity is kept as a free-form string (unchanged from original DOC_TYPES flow),
@@ -79,6 +99,7 @@ export interface IdentityEntry {
   label: string;
   value: string;
   notes?: string;
+  attachment?: VaultAttachment;
 }
 
 // ---------- Reminder helpers ----------

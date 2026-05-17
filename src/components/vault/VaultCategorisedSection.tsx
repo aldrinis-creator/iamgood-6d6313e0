@@ -33,17 +33,18 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
-  Landmark, ShieldAlert, Scroll, ExternalLink,
+  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt, decrypt, encryptBytes } from "@/lib/encryption";
 import {
   VAULT_CATEGORIES, type VaultCategory,
   type EmailEntry, type BankEntry, type InsuranceEntry, type WillEntry, type IdentityEntry,
-  type InsuranceCategory, computeInsuranceReminderTier, computeWillReviewFireAt,
+  type InsuranceCategory, type VaultAttachment, computeInsuranceReminderTier, computeWillReviewFireAt,
   formatReminderLabel,
 } from "@/lib/vaultCategories";
+import VaultAttachmentField from "./VaultAttachmentField";
 
 type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InsuranceEntry | WillEntry;
 
@@ -83,6 +84,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   const [editingDoc, setEditingDoc] = useState<DocRow | null>(null);
   const [draft, setDraft] = useState<AnyEntry | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   // ---------- Load + decrypt ----------
   const reload = useCallback(async () => {
@@ -138,6 +141,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDialogCategory(category);
     setEditingDoc(null);
     setDraft(blankDraft(category));
+    setPendingFile(null);
+    setRemoveAttachment(false);
     setDialogOpen(true);
   };
   const openEdit = (doc: DocRow) => {
@@ -149,7 +154,17 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDialogCategory((doc.category as VaultCategory) || "identity");
     setEditingDoc(doc);
     setDraft({ ...entry });
+    setPendingFile(null);
+    setRemoveAttachment(false);
     setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setDraft(null);
+    setEditingDoc(null);
+    setPendingFile(null);
+    setRemoveAttachment(false);
   };
 
   // ---------- Save ----------
@@ -158,27 +173,23 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     if (!validateDraft(dialogCategory, draft)) return;
     setSaving(true);
     try {
-      const { ciphertext, iv, salt } = await encrypt(JSON.stringify(draft), pin);
+      const finalDraft: AnyEntry = { ...(draft as any) };
+      const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
+
       const docType = `${dialogCategory}_${(draft as any).label?.toLowerCase().replace(/\s+/g, "_") || Date.now()}`;
       const label = (draft as any).label || dialogCategory;
 
+      // Step 1: ensure row exists so we have a docId for the storage path.
       let docId: string;
       if (editingDoc) {
-        const { error } = await supabase
-          .from("encrypted_documents")
-          .update({
-            encrypted_value: ciphertext, iv, salt,
-            label, category: dialogCategory,
-          })
-          .eq("id", editingDoc.id);
-        if (error) throw error;
         docId = editingDoc.id;
       } else {
+        const placeholder = await encrypt(JSON.stringify({ ...finalDraft, attachment: undefined }), pin);
         const { data, error } = await supabase
           .from("encrypted_documents")
           .insert({
             user_id: userId, doc_type: docType,
-            encrypted_value: ciphertext, iv, salt,
+            encrypted_value: placeholder.ciphertext, iv: placeholder.iv, salt: placeholder.salt,
             label, category: dialogCategory,
           })
           .select("id")
@@ -187,13 +198,44 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
         docId = data!.id;
       }
 
-      // Sync reminders for insurance & will
-      await syncReminders(userId, docId, dialogCategory, draft);
+      // Step 2: resolve attachment changes
+      if (pendingFile) {
+        const bytes = await pendingFile.arrayBuffer();
+        const enc = await encryptBytes(bytes, pin);
+        const path = `${userId}/${docId}.bin`;
+        const blob = new Blob([enc.ciphertext], { type: "text/plain" });
+        const { error: upErr } = await supabase.storage
+          .from("vault-attachments")
+          .upload(path, blob, { upsert: true, contentType: "text/plain" });
+        if (upErr) throw upErr;
+        (finalDraft as any).attachment = {
+          path,
+          file_name: pendingFile.name,
+          mime_type: pendingFile.type || "application/octet-stream",
+          iv: enc.iv,
+          salt: enc.salt,
+          size: pendingFile.size,
+        } as VaultAttachment;
+      } else if (removeAttachment && existingAttachment) {
+        await supabase.storage.from("vault-attachments").remove([existingAttachment.path]);
+        (finalDraft as any).attachment = undefined;
+      }
+
+      // Step 3: re-encrypt with final draft (including attachment metadata).
+      const { ciphertext, iv, salt } = await encrypt(JSON.stringify(finalDraft), pin);
+      const { error: updErr } = await supabase
+        .from("encrypted_documents")
+        .update({
+          encrypted_value: ciphertext, iv, salt,
+          label, category: dialogCategory,
+        })
+        .eq("id", docId);
+      if (updErr) throw updErr;
+
+      await syncReminders(userId, docId, dialogCategory, finalDraft);
 
       toast.success(editingDoc ? "Entry updated" : "Entry encrypted & saved");
-      setDialogOpen(false);
-      setDraft(null);
-      setEditingDoc(null);
+      closeDialog();
       await reload();
     } catch (err: any) {
       toast.error(err?.message || "Save failed");
@@ -205,6 +247,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   // ---------- Delete ----------
   const removeEntry = async (doc: DocRow) => {
     if (!confirm("Delete this vault entry? This cannot be undone.")) return;
+    const entry = decryptedById[doc.id] as any;
+    const att = entry?.attachment as VaultAttachment | undefined;
+    if (att?.path) {
+      await supabase.storage.from("vault-attachments").remove([att.path]);
+    }
     await supabase.from("vault_reminder_meta" as any).delete().eq("doc_id", doc.id);
     const { error } = await supabase.from("encrypted_documents").delete().eq("id", doc.id);
     if (error) {
@@ -214,6 +261,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     toast.success("Entry deleted");
     await reload();
   };
+
 
   return (
     <>
@@ -250,7 +298,10 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
                                 {doc.label || (entry as any)?.label || doc.doc_type}
                               </p>
                               {entry && (
-                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                <>
+                                  <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                  <AttachmentBadge entry={entry} />
+                                </>
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0">
@@ -306,7 +357,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
       </p>
 
       {/* Add / Edit dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) { setDialogOpen(false); setDraft(null); setEditingDoc(null); } }}>
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) closeDialog(); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -321,10 +372,15 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
               category={dialogCategory}
               draft={draft}
               onChange={setDraft}
+              pin={pin}
+              pendingFile={pendingFile}
+              onSelectFile={setPendingFile}
+              removeAttachment={removeAttachment}
+              onToggleRemoveAttachment={setRemoveAttachment}
             />
           )}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
             <Button onClick={saveEntry} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving</>
                 : <><ShieldCheck className="w-4 h-4 mr-1" /> Encrypt & Save</>}
@@ -487,14 +543,36 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
   return null;
 }
 
+function AttachmentBadge({ entry }: { entry: AnyEntry }) {
+  const a = (entry as any).attachment as VaultAttachment | undefined;
+  if (!a) return null;
+  return (
+    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
+      <Paperclip className="w-3 h-3" /> Attachment
+    </div>
+  );
+}
+
 // ===================================================================
 // Entry form
 // ===================================================================
 
 function EntryForm({
-  category, draft, onChange,
-}: { category: VaultCategory; draft: AnyEntry; onChange: (d: AnyEntry) => void }) {
+  category, draft, onChange, pin,
+  pendingFile, onSelectFile, removeAttachment, onToggleRemoveAttachment,
+}: {
+  category: VaultCategory;
+  draft: AnyEntry;
+  onChange: (d: AnyEntry) => void;
+  pin: string;
+  pendingFile: File | null;
+  onSelectFile: (f: File | null) => void;
+  removeAttachment: boolean;
+  onToggleRemoveAttachment: (r: boolean) => void;
+}) {
   const set = (patch: Partial<AnyEntry>) => onChange({ ...draft, ...patch } as AnyEntry);
+  const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
+
 
   return (
     <div className="space-y-3 py-2">
@@ -667,6 +745,15 @@ function EntryForm({
           </>
         );
       })()}
+
+      <VaultAttachmentField
+        existing={existingAttachment}
+        pendingFile={pendingFile}
+        onSelectFile={onSelectFile}
+        removed={removeAttachment}
+        onToggleRemove={onToggleRemoveAttachment}
+        pin={pin}
+      />
 
       <div>
         <Label>Notes</Label>
