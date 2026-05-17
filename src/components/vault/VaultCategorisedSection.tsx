@@ -354,7 +354,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
       </p>
 
       {/* Add / Edit dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) { setDialogOpen(false); setDraft(null); setEditingDoc(null); } }}>
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) closeDialog(); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -369,10 +369,15 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
               category={dialogCategory}
               draft={draft}
               onChange={setDraft}
+              pin={pin}
+              pendingFile={pendingFile}
+              onSelectFile={setPendingFile}
+              removeAttachment={removeAttachment}
+              onToggleRemoveAttachment={setRemoveAttachment}
             />
           )}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
             <Button onClick={saveEntry} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving</>
                 : <><ShieldCheck className="w-4 h-4 mr-1" /> Encrypt & Save</>}
