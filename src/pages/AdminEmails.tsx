@@ -279,6 +279,20 @@ const AdminEmails = () => {
     }
   };
 
+  const deleteDlqMessage = async (queueName: string, msgId: number) => {
+    try {
+      const { error } = await supabase.rpc("delete_email", {
+        queue_name: queueName,
+        message_id: msgId,
+      });
+      if (error) throw error;
+      toast.success("Message deleted");
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const queueDepth = (name: string) =>
     queueStats.find((q) => q.queue_name === name)?.depth ?? 0;
   const cooldownActive = sendState?.retry_after_until && new Date(sendState.retry_after_until) > new Date();
