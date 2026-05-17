@@ -554,6 +554,78 @@ export type Database = {
         }
         Relationships: []
       }
+      email_alert_config: {
+        Row: {
+          bounce_rate_threshold: number
+          complaint_rate_threshold: number
+          cooldown_minutes: number
+          dlq_growth_threshold: number
+          dlq_total_threshold: number
+          enabled: boolean
+          extra_notification_emails: string
+          id: number
+          no_send_window_minutes: number
+          rate_limit_alert_minutes: number
+          stuck_queue_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          bounce_rate_threshold?: number
+          complaint_rate_threshold?: number
+          cooldown_minutes?: number
+          dlq_growth_threshold?: number
+          dlq_total_threshold?: number
+          enabled?: boolean
+          extra_notification_emails?: string
+          id?: number
+          no_send_window_minutes?: number
+          rate_limit_alert_minutes?: number
+          stuck_queue_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          bounce_rate_threshold?: number
+          complaint_rate_threshold?: number
+          cooldown_minutes?: number
+          dlq_growth_threshold?: number
+          dlq_total_threshold?: number
+          enabled?: boolean
+          extra_notification_emails?: string
+          id?: number
+          no_send_window_minutes?: number
+          rate_limit_alert_minutes?: number
+          stuck_queue_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_alert_log: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json
+          severity: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json
+          severity?: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          severity?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -2508,6 +2580,14 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      email_queue_stats: {
+        Args: never
+        Returns: {
+          depth: number
+          oldest_age_seconds: number
+          queue_name: string
+        }[]
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -2574,6 +2654,14 @@ export type Database = {
         }
         Returns: number
       }
+      read_dlq_messages: {
+        Args: { dlq_name: string; limit_count?: number }
+        Returns: {
+          enqueued_at: string
+          message: Json
+          msg_id: number
+        }[]
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -2581,6 +2669,14 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      remove_email_suppression: {
+        Args: { email_addr: string }
+        Returns: boolean
+      }
+      requeue_dlq_message: {
+        Args: { dlq_name: string; msg_id: number }
+        Returns: number
       }
     }
     Enums: {
