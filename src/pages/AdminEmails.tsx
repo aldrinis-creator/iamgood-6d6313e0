@@ -200,6 +200,17 @@ const AdminEmails = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const purgeDlq = async (queueName: string) => {
+    try {
+      const { data, error } = await supabase.rpc("purge_dlq", { dlq_name: queueName });
+      if (error) throw error;
+      toast.success(`Purged ${data ?? 0} message(s) from ${queueName}`);
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const filtered = useMemo(() => {
     return logs.filter((r) => {
       if (tplFilter !== "all" && r.template_name !== tplFilter) return false;
