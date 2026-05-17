@@ -118,7 +118,7 @@ const NavTabs = () => {
   const tabs = role === "guardian" ? guardianTabs : userTabs;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
+    <nav className="sticky bottom-0 w-full bg-card border-t border-border z-40 mt-auto pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-md mx-auto flex">
         {tabs.map((tab, tabIdx) => {
           const isActive = location.pathname === tab.path;

@@ -75,7 +75,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <SOSActiveBar />
         <PwaInstallBanner />
         <AppHeader />
-        <main className="flex-1 overflow-y-auto pb-24">
+        <main className="flex-1 overflow-y-auto">
           {children}
 
           {/* Disclaimer Footer */}
