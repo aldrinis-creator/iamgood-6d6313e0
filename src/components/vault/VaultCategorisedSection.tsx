@@ -298,7 +298,10 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
                                 {doc.label || (entry as any)?.label || doc.doc_type}
                               </p>
                               {entry && (
-                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                <>
+                                  <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                  <AttachmentBadge entry={entry} />
+                                </>
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0">
