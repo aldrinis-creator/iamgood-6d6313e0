@@ -473,15 +473,23 @@ const AdminEmails = () => {
               title="Auth emails DLQ"
               queueName="auth_emails_dlq"
               messages={dlqAuth}
+              totalDepth={queueDepth("auth_emails_dlq")}
+              currentLimit={dlqLimitAuth}
+              onLoadMore={() => setDlqLimitAuth((n) => n + 200)}
               onRequeue={requeueDlq}
               onDelete={deleteDlqMessage}
+              onPurge={purgeDlq}
             />
             <DlqSection
               title="Transactional emails DLQ"
               queueName="transactional_emails_dlq"
               messages={dlqTxn}
+              totalDepth={queueDepth("transactional_emails_dlq")}
+              currentLimit={dlqLimitTxn}
+              onLoadMore={() => setDlqLimitTxn((n) => n + 200)}
               onRequeue={requeueDlq}
               onDelete={deleteDlqMessage}
+              onPurge={purgeDlq}
             />
           </TabsContent>
 
