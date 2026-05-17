@@ -594,21 +594,6 @@ const NumField = ({ label, value, onChange, step }: { label: string; value: numb
     <Input type="number" step={step ?? 1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
   </div>
 );
-
-  const deleteDlqMessage = async (queueName: string, msgId: number) => {
-    try {
-      const { error } = await supabase.rpc("delete_email", {
-        queue_name: queueName,
-        message_id: msgId,
-      });
-      if (error) throw error;
-      toast.success("Message deleted");
-      await load();
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  };
-
 const DlqSection = ({ title, queueName, messages, onRequeue, onDelete }: {
   title: string; queueName: string; messages: DlqMessage[]; onRequeue: (q: string, id: number) => void; onDelete: (q: string, id: number) => void;
 }) => (
