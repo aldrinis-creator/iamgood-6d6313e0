@@ -553,6 +553,8 @@ const DocumentAnalyzer = () => {
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
                   <span className="text-sm font-medium">Extracting text from document…</span>
                 </div>
+              ) : (
+                <>
               {pages.length > 0 && (
                 <div className="space-y-2 w-full">
                   <div className="flex items-center justify-between">
