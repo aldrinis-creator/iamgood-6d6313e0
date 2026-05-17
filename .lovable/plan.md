@@ -1,55 +1,46 @@
-## Goal
+# Vault Attachment: Crop + Size Limits
 
-Add the ability to attach a photo or scanned file (camera capture or upload) to every entry in the Medical Vault (Identity Docs, Email, Bank, Insurance, Will). The attachment must respect the vault's existing zero-knowledge promise: the file is AES-256-GCM encrypted client-side with the user's vault PIN before upload, and only decrypted in-browser on reveal.
+Add an in-app image cropper and enforced size limits to `VaultAttachmentField` (used by every Medical Vault entry: IDs, bank, insurance, etc.).
 
-## What you'll see
+## Limits (enforced before encryption/upload)
 
-In every "Add / Edit" dialog inside the unlocked vault (`VaultCategorisedSection`), below the existing fields and above Notes:
+- **Images**: max **5 MB** raw input, auto-compressed after crop to **≤ 1.5 MB** JPEG (quality 0.85, max 2000px long edge).
+- **PDFs**: max **10 MB**, no cropping (passed through as-is).
+- Reject anything else with a toast.
 
-- A **Photo / Scan** section with two buttons: **Take photo** (opens device camera) and **Upload file** (image or PDF).
-- Selected file shows filename + size and a "Remove" link.
-- If an attachment already exists for the entry, a thumbnail/file chip is shown with **View** (decrypts to a temporary blob URL inside a dialog), **Replace**, and **Remove** actions.
-- The entry preview gets a small "📎 Attachment" badge when one is present.
-- Works for all five categories (identity, email, bank, insurance, will) using the same shared sub-component.
+Limits exposed as constants at top of `VaultAttachmentField.tsx` so they're easy to tune.
 
-## Technical approach
+## Cropping UX
 
-1. **Storage bucket** — new private bucket `vault-attachments` with RLS scoped to `auth.uid()::text = (storage.foldername(name))[1]`. Files are stored as encrypted bytes under `<user_id>/<doc_id>.bin`.
+When the user picks/captures an **image** (camera or upload):
+1. Open a `Dialog` cropper before accepting the file.
+2. Use **`react-easy-crop`** (lightweight, touch-friendly, ~15kb) — already common in Lovable projects.
+3. Controls:
+   - Pan + pinch/drag to position
+   - Zoom slider (1×–3×)
+   - Aspect ratio toggle: **Free / 1:1 / 4:3 / ID card (1.586:1)** — defaults to **Free** so receipts/long IDs aren't forced to square.
+   - Rotate 90° button (handy for phone-camera ID shots).
+4. Buttons: **Cancel** (discard) / **Use original** (skip crop) / **Crop & use**.
+5. On confirm: render to canvas → export as JPEG at quality 0.85, downscale so long edge ≤ 2000px → produce a `File` → hand to parent via existing `onSelectFile`.
 
-2. **Encryption helpers** — extend `src/lib/encryption.ts` with `encryptBytes(bytes, pin)` and `decryptBytes(ciphertextB64, iv, salt, pin)` that mirror the existing text helpers but operate on `ArrayBuffer`. The text helpers stay unchanged.
+PDFs skip the cropper entirely and go straight to `onSelectFile`.
 
-3. **Entry shape** — add an optional `attachment` field to every entry type in `src/lib/vaultCategories.ts`:
-   ```ts
-   attachment?: {
-     path: string;          // storage path
-     file_name: string;     // original name
-     mime_type: string;
-     iv: string;            // base64
-     salt: string;          // base64
-     size: number;          // plaintext bytes
-   }
-   ```
-   Because the entry JSON itself is encrypted, the IV/salt of the file live inside the encrypted blob — even storage admins cannot decrypt the file without the PIN.
+## Size enforcement
 
-4. **UI component** — new `VaultAttachmentField` used inside `EntryForm` for all categories. Handles file picker (`accept="image/*,.pdf"`), camera capture (`capture="environment"`), preview, replace, remove, and a "View attachment" dialog that fetches the encrypted blob, decrypts, and renders an `<img>` or `<iframe>` from an object URL (revoked on close).
+- Pre-crop check: reject raw input >5 MB (image) / >10 MB (PDF).
+- Post-crop check: if compressed result still >1.5 MB, re-encode at quality 0.7; if still over, warn and reject.
+- Show human-readable error toasts (e.g. "Image too large (7.2 MB). Max 5 MB.").
 
-5. **Save flow** — `saveEntry` in `VaultCategorisedSection`:
-   - If a new file was selected: encrypt bytes with the vault PIN, upload to `vault-attachments/<userId>/<docId-or-temp>.bin`, then write the metadata into `draft.attachment` before encrypting the JSON.
-   - If the user removed an existing attachment: delete from storage and clear `draft.attachment`.
-   - On entry delete: also remove the file from storage.
+## Files
 
-6. **Backwards compatibility** — entries without `attachment` work exactly as today; no migration of existing rows needed.
-
-## Files to add / change
-
-- `supabase/migrations/<ts>_vault_attachments_bucket.sql` — create private bucket + storage RLS policies.
-- `src/lib/encryption.ts` — add `encryptBytes` / `decryptBytes`.
-- `src/lib/vaultCategories.ts` — add `VaultAttachment` type, extend each entry interface.
-- `src/components/vault/VaultAttachmentField.tsx` — new shared upload/camera/preview component.
-- `src/components/vault/VaultCategorisedSection.tsx` — wire attachment field into `EntryForm`, handle upload/delete in `saveEntry` / `removeEntry`, show 📎 badge in `EntryPreview`.
+- **Modify** `src/components/vault/VaultAttachmentField.tsx`
+  - Add size constants, cropper dialog, canvas export helper.
+  - Wire camera/upload inputs through cropper for images, straight through for PDFs.
+- **Add dep**: `react-easy-crop`.
+- No DB / storage / encryption changes — parent's encrypt + upload flow is unchanged; it just receives a smaller, cropped `File`.
 
 ## Out of scope
 
-- No changes to the existing Medical Records ("Records" tab) flow — it already supports uploads.
-- No changes to the nominee Vault-claim viewer (separate flow).
-- No bulk re-encryption of existing entries.
+- Cropping for the separate Medical Records / Health Tools uploads (different components).
+- Multi-page PDF editing.
+- Server-side image processing.
