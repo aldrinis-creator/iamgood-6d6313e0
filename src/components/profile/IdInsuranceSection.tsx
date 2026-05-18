@@ -113,7 +113,9 @@ const IdInsuranceSection = () => {
       if (upErr) throw upErr;
 
       const existing = records[slot.key];
-      if (existing) {
+      // Only replace if the existing row is slot-owned. For vault-linked rows,
+      // insert a new slot-tagged row and leave the Vault entry untouched.
+      if (existing && existing.source === "slot") {
         if (existing.file_url) {
           await supabase.storage.from("medical-documents").remove([existing.file_url]);
         }
@@ -134,7 +136,7 @@ const IdInsuranceSection = () => {
           record_date: new Date().toISOString().split("T")[0],
         });
       }
-      toast.success(`${slot.label} saved`);
+      toast.success(`${slot.label} saved — guardians can now see it`);
       await fetchRecords();
     } catch (e: any) {
       toast.error(e?.message || "Upload failed");
