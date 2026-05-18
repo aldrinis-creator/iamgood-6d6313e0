@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import { buildAdmissionKitPdf, type AdmissionKitDoc } from "@/lib/admissionKitPdf";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
+import { resolveSlotRows } from "@/lib/hospitalKitSlots";
 
 interface Props {
   wardUserId: string;
