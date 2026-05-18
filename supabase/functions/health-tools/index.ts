@@ -411,7 +411,7 @@ serve(async (req) => {
         },
       ];
     } else {
-      const MAX_PAYLOAD_CHARS = 20000;
+      const MAX_PAYLOAD_CHARS = type === "document_analysis" ? 40000 : 20000;
       let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
       if (userMessage.length > MAX_PAYLOAD_CHARS) {
         userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";
