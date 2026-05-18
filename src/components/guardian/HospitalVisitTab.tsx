@@ -50,11 +50,19 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, file_url, file_name")
-      .eq("user_id", wardUserId)
-      .not("record_slot", "is", null);
+      .select("id, record_slot, record_type, file_url, file_name")
+      .eq("user_id", wardUserId);
+    const resolved = resolveSlotRows((data || []) as any);
     const map: Record<string, SlotRecord> = {};
-    (data || []).forEach((r: any) => { if (r.record_slot) map[r.record_slot] = r; });
+    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+      map[slot] = {
+        id: row.id,
+        record_slot: row.record_slot ?? slot,
+        file_url: row.file_url,
+        file_name: row.file_name,
+        source,
+      };
+    });
     setRecords(map);
     setLoading(false);
   }, [wardUserId]);
