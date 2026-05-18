@@ -24,24 +24,26 @@ const PDF_FALLBACK_PAGES = 4; // render up to N pages for text-less PDFs
 const MAX_DIMENSION_DEFAULT = 1600;
 const MAX_DIMENSION_DENSE = 1200;
 
-async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+async function downscaleImageToBase64(file: File, dense = false): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+  const maxDim = dense ? MAX_DIMENSION_DENSE : MAX_DIMENSION_DEFAULT;
+  const quality = dense ? 0.72 : 0.8;
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
     reader.onload = () => {
       img.onload = () => {
-        const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
         canvas.toBlob((blob) => {
           if (!blob) return reject(new Error("blob fail"));
           resolve({ dataUrl, previewUrl: URL.createObjectURL(blob), blob });
-        }, "image/jpeg", 0.8);
+        }, "image/jpeg", quality);
       };
       img.onerror = reject;
       img.src = reader.result as string;
