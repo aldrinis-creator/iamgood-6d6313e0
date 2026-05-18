@@ -111,6 +111,7 @@ const IdMultiPageField = ({
 
   const [pages, setPages] = useState<PageItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Crop state for the page currently being added
   const [cropOpen, setCropOpen] = useState(false);
@@ -133,8 +134,21 @@ const IdMultiPageField = ({
   }, [pages]);
 
   const handleClose = (next: boolean) => {
-    if (!next && !busy && !uploading) reset();
-    onOpenChange(next);
+    if (next) { onOpenChange(true); return; }
+    if (busy || uploading) return;
+    // If user has captured pages but not saved, confirm discard.
+    if (pages.length > 0) {
+      setDiscardOpen(true);
+      return;
+    }
+    reset();
+    onOpenChange(false);
+  };
+
+  const confirmDiscard = () => {
+    setDiscardOpen(false);
+    reset();
+    onOpenChange(false);
   };
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
