@@ -149,6 +149,13 @@ const IdInsuranceSection = () => {
   const handleDelete = async (slot: SlotDef) => {
     const r = records[slot.key];
     if (!r) return;
+    if (r.source === "vault") {
+      // Don't delete the Vault file; just refresh (nothing to unlink — it was
+      // never slot-tagged on disk). The slot will remain empty until uploaded.
+      toast.success(`${slot.label} unlinked from Hospital Kit`);
+      fetchRecords();
+      return;
+    }
     if (r.file_url) await supabase.storage.from("medical-documents").remove([r.file_url]);
     await supabase.from("medical_records").delete().eq("id", r.id);
     toast.success(`${slot.label} removed`);
