@@ -49,6 +49,7 @@ const IdInsuranceSection = () => {
   const [records, setRecords] = useState<Record<string, SlotRecord>>({});
   const [loading, setLoading] = useState(true);
   const [uploadingSlot, setUploadingSlot] = useState<SlotKey | null>(null);
+  const [promotingSlot, setPromotingSlot] = useState<SlotKey | null>(null);
   const [captureSlot, setCaptureSlot] = useState<SlotDef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SlotDef | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -60,14 +61,42 @@ const IdInsuranceSection = () => {
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, file_url, file_name, updated_at")
-      .eq("user_id", session.user.id)
-      .not("record_slot", "is", null);
+      .select("id, record_slot, record_type, file_url, file_name, updated_at")
+      .eq("user_id", session.user.id);
+    const resolved = resolveSlotRows((data || []) as any);
     const map: Record<string, SlotRecord> = {};
-    (data || []).forEach((r: any) => { if (r.record_slot) map[r.record_slot] = r; });
+    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+      map[slot] = {
+        id: row.id,
+        record_slot: row.record_slot,
+        file_url: row.file_url,
+        file_name: row.file_name,
+        updated_at: row.updated_at || "",
+        source,
+      };
+    });
     setRecords(map);
     setLoading(false);
   }, [session?.user?.id]);
+
+  const promoteVaultRecord = async (slot: SlotDef) => {
+    const r = records[slot.key];
+    if (!r || r.source !== "vault") return;
+    setPromotingSlot(slot.key);
+    try {
+      const { error } = await supabase
+        .from("medical_records")
+        .update({ record_slot: slot.key })
+        .eq("id", r.id);
+      if (error) throw error;
+      toast.success(`${slot.label} linked — guardians can now see it`);
+      await fetchRecords();
+    } catch (e: any) {
+      toast.error(e?.message || "Link failed");
+    } finally {
+      setPromotingSlot(null);
+    }
+  };
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
