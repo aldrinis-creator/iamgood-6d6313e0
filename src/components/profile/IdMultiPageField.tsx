@@ -20,6 +20,10 @@ import { Slider } from "@/components/ui/slider";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Camera, Upload, X, Loader2, Plus, RotateCw, FileText, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import {
