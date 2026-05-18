@@ -1,18 +1,15 @@
 /**
  * IdMultiPageField
  *
- * Captures one or more pages for an ID & Insurance slot, with the same
- * crop + size-limit UX as the Medical Vault. Pages are merged into a
- * single JPEG-embedded PDF (via jsPDF) and handed back to the parent
- * via `onComplete(file)` for upload.
+ * Captures one or more pages for an ID & Insurance slot. Each page is
+ * exported as a JPEG image (cropped, downscaled). The caller receives
+ * an ordered `File[]` — no PDF merging. The Admission Kit PDF is built
+ * later, on-demand, from all images.
  *
- * Modes:
- *  - "single"     → exactly one page, output JPEG
- *  - "front-back" → two labeled pages (Front, Back), output PDF
- *  - "pages"      → unlimited labeled pages (Page 1, 2…), output PDF
+ * Inputs accepted: JPEG / PNG / TIF only. PNG and TIF are re-encoded to
+ * JPEG by the cropper canvas, so what gets stored is always JPEG.
  */
 import { useCallback, useRef, useState } from "react";
-import jsPDF from "jspdf";
 import Cropper, { Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,14 +21,19 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Camera, Upload, X, Loader2, Plus, RotateCw, FileText, Save } from "lucide-react";
+import { Camera, Upload, X, Loader2, Plus, RotateCw, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import {
-  CROP_LIMITS, formatBytes, fileToDataUrl, exportCropToFile, loadImage,
-} from "@/lib/cropImage";
+import { CROP_LIMITS, formatBytes, fileToDataUrl, exportCropToFile } from "@/lib/cropImage";
 
-const { MAX_IMAGE_INPUT, MAX_PDF_INPUT } = CROP_LIMITS;
-const MAX_MERGED_PDF = 8 * 1024 * 1024; // 8 MB cap after merge
+const { MAX_IMAGE_INPUT } = CROP_LIMITS;
+const ACCEPT_ATTR = "image/jpeg,image/png,image/tiff,.jpg,.jpeg,.png,.tif,.tiff";
+
+function isAcceptedImage(f: File): boolean {
+  const t = (f.type || "").toLowerCase();
+  if (t === "image/jpeg" || t === "image/jpg" || t === "image/png" || t === "image/tiff" || t === "image/tif") return true;
+  const name = (f.name || "").toLowerCase();
+  return /\.(jpe?g|png|tiff?)$/.test(name);
+}
 
 export type CaptureMode = "single" | "front-back" | "pages";
 
@@ -40,17 +42,17 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   mode: CaptureMode;
   slotLabel: string;
-  baseFileName: string;       // e.g. "aadhaar"
-  maxPages?: number;          // default 10 for "pages"
+  baseFileName: string;
+  maxPages?: number;
   uploading?: boolean;
-  onComplete: (file: File) => void | Promise<void>;
+  onComplete: (files: File[]) => void | Promise<void>;
 }
 
 interface PageItem {
   id: string;
   label: string;
-  file: File;           // already cropped JPEG
-  previewUrl: string;   // object URL for thumbnail
+  file: File;
+  previewUrl: string;
 }
 
 const ASPECTS: { label: string; value: number | undefined }[] = [
@@ -71,37 +73,6 @@ function expectedPageCount(mode: CaptureMode, maxPages: number): number {
   return maxPages;
 }
 
-/**
- * Merge an ordered list of JPEG files into a single PDF (A4, fit-to-page).
- * Returns null if the resulting PDF exceeds MAX_MERGED_PDF.
- */
-async function mergeToPdf(pages: PageItem[], fileName: string): Promise<File | null> {
-  const pdf = new jsPDF({ unit: "pt", format: "a4" });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 24;
-  const maxW = pageW - margin * 2;
-  const maxH = pageH - margin * 2 - 18; // leave room for label
-  for (let i = 0; i < pages.length; i++) {
-    const p = pages[i];
-    if (i > 0) pdf.addPage();
-    const dataUrl = await fileToDataUrl(p.file);
-    const img = await loadImage(dataUrl);
-    const ratio = Math.min(maxW / img.width, maxH / img.height);
-    const w = img.width * ratio;
-    const h = img.height * ratio;
-    const x = (pageW - w) / 2;
-    const y = margin + 18;
-    pdf.setFontSize(10);
-    pdf.setTextColor("#444");
-    pdf.text(`${p.label}`, margin, margin + 12);
-    pdf.addImage(dataUrl, "JPEG", x, y, w, h, undefined, "FAST");
-  }
-  const blob = pdf.output("blob");
-  if (blob.size > MAX_MERGED_PDF) return null;
-  return new File([blob], `${fileName}.pdf`, { type: "application/pdf" });
-}
-
 const IdMultiPageField = ({
   open, onOpenChange, mode, slotLabel, baseFileName,
   maxPages = 10, uploading, onComplete,
@@ -113,7 +84,6 @@ const IdMultiPageField = ({
   const [busy, setBusy] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
 
-  // Crop state for the page currently being added
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string>("");
   const [cropName, setCropName] = useState<string>("photo.jpg");
@@ -136,11 +106,7 @@ const IdMultiPageField = ({
   const handleClose = (next: boolean) => {
     if (next) { onOpenChange(true); return; }
     if (busy || uploading) return;
-    // If user has captured pages but not saved, confirm discard.
-    if (pages.length > 0) {
-      setDiscardOpen(true);
-      return;
-    }
+    if (pages.length > 0) { setDiscardOpen(true); return; }
     reset();
     onOpenChange(false);
   };
@@ -157,18 +123,8 @@ const IdMultiPageField = ({
 
   const handlePicked = async (f: File | null) => {
     if (!f) return;
-    if (!f.type.startsWith("image/")) {
-      // Accept PDF as a single-page short-circuit only in non-single modes
-      if (f.type === "application/pdf" && mode === "single") {
-        if (f.size > MAX_PDF_INPUT) {
-          toast.error(`PDF too large (${formatBytes(f.size)}). Max ${formatBytes(MAX_PDF_INPUT)}.`);
-          return;
-        }
-        await onComplete(f);
-        onOpenChange(false);
-        return;
-      }
-      toast.error("Please pick an image.");
+    if (!isAcceptedImage(f)) {
+      toast.error("Only JPEG, PNG or TIF images are allowed.");
       return;
     }
     if (f.size > MAX_IMAGE_INPUT) {
@@ -210,12 +166,12 @@ const IdMultiPageField = ({
         file: out,
         previewUrl: URL.createObjectURL(out),
       };
-      setPages((prev) => [...prev, item]);
+      const nextPages = [...pages, item];
+      setPages(nextPages);
       setCropOpen(false);
       setCropSrc("");
-      // For single mode, auto-save right after the first page
       if (mode === "single") {
-        await handleSave([...pages, item]);
+        await handleSave(nextPages);
       }
     } finally {
       setBusy(false);
@@ -227,14 +183,7 @@ const IdMultiPageField = ({
       const next = prev.filter((p) => p.id !== id);
       const removed = prev.find((p) => p.id === id);
       if (removed) URL.revokeObjectURL(removed.previewUrl);
-      // Re-label sequential pages in "pages" mode
-      if (mode === "pages") {
-        return next.map((p, i) => ({ ...p, label: defaultLabelFor(mode, i) }));
-      }
-      if (mode === "front-back") {
-        return next.map((p, i) => ({ ...p, label: defaultLabelFor(mode, i) }));
-      }
-      return next;
+      return next.map((p, i) => ({ ...p, label: defaultLabelFor(mode, i) }));
     });
   };
 
@@ -246,18 +195,11 @@ const IdMultiPageField = ({
     }
     setBusy(true);
     try {
-      let outFile: File;
-      if (mode === "single") {
-        outFile = list[0].file;
-      } else {
-        const merged = await mergeToPdf(list, baseFileName);
-        if (!merged) {
-          toast.error(`Combined PDF too large (>${formatBytes(MAX_MERGED_PDF)}). Remove a page or re-capture at smaller crop.`);
-          return;
-        }
-        outFile = merged;
-      }
-      await onComplete(outFile);
+      // Re-stamp filenames so storage paths are stable & ordered
+      const files = list.map((p, i) =>
+        new File([p.file], `${baseFileName}-${i + 1}.jpg`, { type: p.file.type || "image/jpeg" })
+      );
+      await onComplete(files);
       reset();
       onOpenChange(false);
     } catch (e: any) {
@@ -282,15 +224,15 @@ const IdMultiPageField = ({
           <DialogHeader>
             <DialogTitle>{slotLabel}</DialogTitle>
             <DialogDescription className="text-xs">
-              {mode === "single" && "Capture or upload a clear photo. You can crop it before saving."}
-              {mode === "front-back" && "Add the front, then the back of the card. Tap Save when done."}
-              {mode === "pages" && `Add up to ${maxPages} pages of your policy. Tap Save when done.`}
+              {mode === "single" && "Capture or upload a clear photo (JPEG, PNG or TIF). You can crop before saving."}
+              {mode === "front-back" && "Add the front, then the back (JPEG, PNG or TIF). Tap Save when done."}
+              {mode === "pages" && `Add up to ${maxPages} pages (JPEG, PNG or TIF). They'll be combined into the Admission Kit PDF when your guardian downloads it.`}
             </DialogDescription>
           </DialogHeader>
 
           {pages.length > 0 && (
             <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-              {pages.map((p, i) => (
+              {pages.map((p) => (
                 <div key={p.id} className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
                   <img src={p.previewUrl} alt={p.label} className="w-12 h-12 object-cover rounded shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -304,7 +246,7 @@ const IdMultiPageField = ({
                 </div>
               ))}
               <p className="text-[11px] text-muted-foreground text-right">
-                {pages.length}/{mode === "pages" ? maxPages : maxCount} pages · {formatBytes(totalBytes)}
+                {pages.length}/{maxCount} pages · {formatBytes(totalBytes)}
               </p>
             </div>
           )}
@@ -326,11 +268,9 @@ const IdMultiPageField = ({
                   <Upload className="w-3.5 h-3.5 mr-1" /> Upload file
                 </Button>
               </div>
-              {mode === "single" && (
-                <p className="text-[10px] text-muted-foreground">
-                  PDFs allowed for this slot. Images up to {formatBytes(MAX_IMAGE_INPUT)}.
-                </p>
-              )}
+              <p className="text-[10px] text-muted-foreground">
+                JPEG, PNG or TIF only · up to {formatBytes(MAX_IMAGE_INPUT)} per image
+              </p>
             </div>
           )}
 
@@ -345,7 +285,7 @@ const IdMultiPageField = ({
           <input
             ref={fileRef}
             type="file"
-            accept={mode === "single" ? "image/*,.pdf" : "image/*"}
+            accept={ACCEPT_ATTR}
             className="hidden"
             onChange={(e) => { handlePicked(e.target.files?.[0] || null); e.target.value = ""; }}
           />
@@ -374,7 +314,6 @@ const IdMultiPageField = ({
         </DialogContent>
       </Dialog>
 
-      {/* Discard confirmation */}
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -395,7 +334,6 @@ const IdMultiPageField = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Crop dialog */}
       <Dialog open={cropOpen} onOpenChange={(o) => { if (!o && !busy) { setCropOpen(false); setCropSrc(""); } }}>
         <DialogContent className="max-w-md p-0 overflow-hidden">
           <DialogHeader className="px-4 pt-4">

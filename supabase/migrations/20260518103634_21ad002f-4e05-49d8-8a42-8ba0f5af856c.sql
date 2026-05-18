@@ -1,0 +1,2 @@
+ALTER TABLE public.medical_records ADD COLUMN IF NOT EXISTS page_index integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_medical_records_slot ON public.medical_records (user_id, record_slot, page_index);

@@ -1,13 +1,7 @@
 /**
  * Hospital Admission Kit slot resolution.
  *
- * The 5 slots are populated either by:
- *  1) New flow: `medical_records.record_slot` set explicitly via the
- *     "ID & Insurance — Hospital Kit" card in My Profile.
- *  2) Legacy / Medical Vault flow: rows with `record_type` matching a
- *     known pattern (e.g. "ID - Aadhaar", "Insurance - Primary") but
- *     `record_slot` is NULL. These are treated as linked from the Vault.
- *
+ * Each slot can now hold MULTIPLE image pages (page_index ordered).
  * Slot-tagged rows always win over `record_type` matches.
  */
 
@@ -34,7 +28,6 @@ export const SLOT_LABELS: Record<SlotKey, string> = {
   id_photo: "Passport Photo",
 };
 
-/** record_type prefix → slot key fallback mapping (case-insensitive). */
 const TYPE_PATTERNS: Array<{ slot: SlotKey; re: RegExp }> = [
   { slot: "aadhaar", re: /^id\s*-\s*aadhaar/i },
   { slot: "pan", re: /^id\s*-\s*pan/i },
@@ -55,33 +48,44 @@ export interface SlotRow {
   record_type?: string | null;
   file_url: string | null;
   file_name: string | null;
+  page_index?: number | null;
   updated_at?: string;
 }
 
+export interface ResolvedSlotPages<T extends SlotRow = SlotRow> {
+  rows: T[];                 // ordered by page_index
+  source: "slot" | "vault";
+}
+
+/** Multi-page resolver: groups all rows belonging to a slot, ordered. */
+export function resolveSlotPages<T extends SlotRow>(
+  rows: T[]
+): Record<string, ResolvedSlotPages<T>> {
+  const out: Record<string, ResolvedSlotPages<T>> = {};
+  // Slot-tagged groups
+  for (const k of SLOT_KEYS) {
+    const group = rows
+      .filter((r) => r.record_slot === k)
+      .sort((a, b) => (a.page_index ?? 0) - (b.page_index ?? 0));
+    if (group.length) out[k] = { rows: group, source: "slot" };
+  }
+  // Vault fallback (single row) for any empty slot
+  for (const r of rows) {
+    if (r.record_slot) continue;
+    const slot = slotFromRecordType(r.record_type);
+    if (slot && !out[slot]) out[slot] = { rows: [r], source: "vault" };
+  }
+  return out;
+}
+
+// Backward-compat: first row per slot
 export interface ResolvedSlotRow<T extends SlotRow = SlotRow> {
   row: T;
   source: "slot" | "vault";
 }
-
-/**
- * Resolve a list of medical_records rows into a slot→row map.
- * Rows with `record_slot` win; otherwise the first matching `record_type` row wins.
- */
 export function resolveSlotRows<T extends SlotRow>(rows: T[]): Record<string, ResolvedSlotRow<T>> {
+  const pages = resolveSlotPages(rows);
   const map: Record<string, ResolvedSlotRow<T>> = {};
-  // Pass 1: slot-tagged rows take precedence
-  for (const r of rows) {
-    if (r.record_slot && SLOT_KEYS.includes(r.record_slot as SlotKey)) {
-      if (!map[r.record_slot]) map[r.record_slot] = { row: r, source: "slot" };
-    }
-  }
-  // Pass 2: vault fallback by record_type, only if slot empty
-  for (const r of rows) {
-    if (r.record_slot) continue;
-    const slot = slotFromRecordType(r.record_type);
-    if (slot && !map[slot]) {
-      map[slot] = { row: r, source: "vault" };
-    }
-  }
+  Object.entries(pages).forEach(([k, v]) => { map[k] = { row: v.rows[0], source: v.source }; });
   return map;
 }
