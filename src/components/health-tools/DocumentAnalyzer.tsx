@@ -145,8 +145,11 @@ const DocumentAnalyzer = () => {
       const newDocs: File[] = [];
 
       for (const selected of toProcess) {
-        if (selected.size > MAX_FILE_SIZE) {
-          toast.error(`${selected.name} is too large`);
+        const isImg = selected.type.startsWith("image/");
+        const sizeLimit = isImg ? MAX_IMAGE_FILE_SIZE : MAX_DOC_FILE_SIZE;
+        if (selected.size > sizeLimit) {
+          const mb = Math.round(sizeLimit / 1024 / 1024);
+          toast.error(`${selected.name} is too large (max ${mb}MB)`);
           continue;
         }
 
@@ -157,9 +160,18 @@ const DocumentAnalyzer = () => {
             if (hasText) {
               combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
             } else {
-              const img = await renderPDFPageToImage(selected);
-              const blobRes = await (await fetch(img)).blob();
-              newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes });
+              // Render up to PDF_FALLBACK_PAGES pages as images so multi-page scans aren't lost
+              const remainingPageSlots = MAX_PAGES - (pages.length + newPages.length);
+              const pagesToRender = Math.min(PDF_FALLBACK_PAGES, Math.max(1, remainingPageSlots));
+              for (let p = 1; p <= pagesToRender; p++) {
+                try {
+                  const img = await renderPDFPageToImage(selected, p);
+                  const blobRes = await (await fetch(img)).blob();
+                  newPages.push({ id: `${Date.now()}-${p}-${Math.random().toString(36).slice(2, 6)}`, fileName: `${selected.name} (p${p})`, previewUrl: img, base64: img, blob: blobRes });
+                } catch {
+                  break; // out of pages
+                }
+              }
             }
           } else if (isDOCX(selected)) {
             const text = await extractTextFromDOCX(selected);
@@ -170,7 +182,8 @@ const DocumentAnalyzer = () => {
             }
           }
         } else if (selected.type.startsWith("image/")) {
-          const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(selected);
+          const dense = (pages.length + newPages.length) >= 2;
+          const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(selected, dense);
           newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl, base64: dataUrl, blob });
         } else {
            toast.error(`${selected.name} is not a supported file type`);
