@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon, Loader2, Link2 } from "lucide-react";
+import { Upload, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon, Loader2, Link2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import IdMultiPageField, { type CaptureMode } from "./IdMultiPageField";
-import { resolveSlotRows } from "@/lib/hospitalKitSlots";
+import { resolveSlotPages } from "@/lib/hospitalKitSlots";
 
 type SlotKey = "aadhaar" | "pan" | "insurance_primary" | "insurance_secondary" | "id_photo";
 
@@ -28,66 +28,75 @@ interface SlotDef {
 }
 
 const SLOTS: SlotDef[] = [
-  { key: "aadhaar", label: "Aadhaar Card", hint: "Capture front & back — combined into one PDF", icon: IdCard, recordType: "ID - Aadhaar", mode: "front-back", baseFileName: "aadhaar" },
-  { key: "pan", label: "PAN Card", hint: "Capture front & back — combined into one PDF", icon: IdCard, recordType: "ID - PAN", mode: "front-back", baseFileName: "pan" },
-  { key: "insurance_primary", label: "Health Insurance — Primary", hint: "Add all policy pages — combined into one PDF", icon: ShieldCheck, recordType: "Insurance - Primary", mode: "pages", baseFileName: "insurance-primary", maxPages: 15 },
-  { key: "insurance_secondary", label: "Health Insurance — Secondary", hint: "Optional second policy — add all pages", icon: ShieldCheck, recordType: "Insurance - Secondary", mode: "pages", baseFileName: "insurance-secondary", maxPages: 15 },
+  { key: "aadhaar", label: "Aadhaar Card", hint: "Front & back — stored as images, combined into PDF on download", icon: IdCard, recordType: "ID - Aadhaar", mode: "front-back", baseFileName: "aadhaar" },
+  { key: "pan", label: "PAN Card", hint: "Front & back — stored as images, combined into PDF on download", icon: IdCard, recordType: "ID - PAN", mode: "front-back", baseFileName: "pan" },
+  { key: "insurance_primary", label: "Health Insurance — Primary", hint: "Add all policy pages as images", icon: ShieldCheck, recordType: "Insurance - Primary", mode: "pages", baseFileName: "insurance-primary", maxPages: 15 },
+  { key: "insurance_secondary", label: "Health Insurance — Secondary", hint: "Optional second policy", icon: ShieldCheck, recordType: "Insurance - Secondary", mode: "pages", baseFileName: "insurance-secondary", maxPages: 15 },
   { key: "id_photo", label: "Passport Photo", hint: "Recent passport-style photo", icon: ImageIcon, recordType: "ID - Photo", mode: "single", baseFileName: "passport-photo" },
 ];
 
-interface SlotRecord {
+interface SlotPageRow {
   id: string;
   record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
+  page_index: number;
   updated_at: string;
+}
+interface SlotEntry {
+  pages: SlotPageRow[];
   source: "slot" | "vault";
 }
 
 const IdInsuranceSection = () => {
   const { session } = useAuth();
-  const [records, setRecords] = useState<Record<string, SlotRecord>>({});
+  const [records, setRecords] = useState<Record<string, SlotEntry>>({});
   const [loading, setLoading] = useState(true);
   const [uploadingSlot, setUploadingSlot] = useState<SlotKey | null>(null);
   const [promotingSlot, setPromotingSlot] = useState<SlotKey | null>(null);
   const [captureSlot, setCaptureSlot] = useState<SlotDef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SlotDef | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState<string>("");
-  const [previewIsPdf, setPreviewIsPdf] = useState(false);
+  const [previewPages, setPreviewPages] = useState<{ url: string; name: string; isPdf: boolean }[]>([]);
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const [previewTitle, setPreviewTitle] = useState("");
 
   const fetchRecords = useCallback(async () => {
     if (!session?.user?.id) return;
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, record_type, file_url, file_name, updated_at")
+      .select("id, record_slot, record_type, file_url, file_name, updated_at, page_index")
       .eq("user_id", session.user.id);
-    const resolved = resolveSlotRows((data || []) as any);
-    const map: Record<string, SlotRecord> = {};
-    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+    const resolved = resolveSlotPages((data || []) as any);
+    const map: Record<string, SlotEntry> = {};
+    Object.entries(resolved).forEach(([slot, { rows, source }]) => {
       map[slot] = {
-        id: row.id,
-        record_slot: row.record_slot,
-        file_url: row.file_url,
-        file_name: row.file_name,
-        updated_at: row.updated_at || "",
         source,
+        pages: rows.map((r: any) => ({
+          id: r.id,
+          record_slot: r.record_slot,
+          file_url: r.file_url,
+          file_name: r.file_name,
+          page_index: r.page_index ?? 0,
+          updated_at: r.updated_at || "",
+        })),
       };
     });
     setRecords(map);
     setLoading(false);
   }, [session?.user?.id]);
 
+  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+
   const promoteVaultRecord = async (slot: SlotDef) => {
-    const r = records[slot.key];
-    if (!r || r.source !== "vault") return;
+    const entry = records[slot.key];
+    if (!entry || entry.source !== "vault") return;
     setPromotingSlot(slot.key);
     try {
       const { error } = await supabase
         .from("medical_records")
-        .update({ record_slot: slot.key })
-        .eq("id", r.id);
+        .update({ record_slot: slot.key, page_index: 0 })
+        .eq("id", entry.pages[0].id);
       if (error) throw error;
       toast.success(`${slot.label} linked — guardians can now see it`);
       await fetchRecords();
@@ -98,56 +107,60 @@ const IdInsuranceSection = () => {
     }
   };
 
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
-
-  const uploadFile = async (slot: SlotDef, file: File) => {
-    if (!session?.user?.id) return;
+  const uploadPages = async (slot: SlotDef, files: File[]) => {
+    if (!session?.user?.id || files.length === 0) return;
     setUploadingSlot(slot.key);
-    const ext = file.name.split(".").pop() || "bin";
-    const path = `${session.user.id}/slots/${slot.key}-${Date.now()}.${ext}`;
-    let uploadedPath: string | null = null;
+    const userId = session.user.id;
+    const uploadedPaths: string[] = [];
     try {
-      const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-      if (upErr) throw upErr;
-      uploadedPath = path;
-
-      const existing = records[slot.key];
-      // Only replace if the existing row is slot-owned. For vault-linked rows,
-      // insert a new slot-tagged row and leave the Vault entry untouched.
-      if (existing && existing.source === "slot") {
-        const oldUrl = existing.file_url;
-        const { error: updErr } = await supabase.from("medical_records").update({
-          file_url: path,
-          file_name: file.name,
-          record_type: slot.recordType,
-          title: slot.label,
-        }).eq("id", existing.id);
-        if (updErr) throw updErr;
-        if (oldUrl && oldUrl !== path) {
-          await supabase.storage.from("medical-documents").remove([oldUrl]);
-        }
-      } else {
-        const { error: insErr } = await supabase.from("medical_records").insert({
-          user_id: session.user.id,
-          title: slot.label,
-          record_type: slot.recordType,
-          record_slot: slot.key,
-          file_url: path,
-          file_name: file.name,
-          record_date: new Date().toISOString().split("T")[0],
-        });
-        if (insErr) throw insErr;
+      // 1) Upload all new files first
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `${userId}/slots/${slot.key}-${i}-${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("medical-documents")
+          .upload(path, f, { contentType: f.type || "image/jpeg", upsert: false });
+        if (upErr) throw upErr;
+        uploadedPaths.push(path);
       }
-      uploadedPath = null; // commit — don't rollback
-      toast.success(`${slot.label} saved — guardians can now see it`);
+
+      // 2) Delete existing slot-owned rows + their storage files
+      const existing = records[slot.key];
+      const oldPaths: string[] = [];
+      const oldIds: string[] = [];
+      if (existing && existing.source === "slot") {
+        existing.pages.forEach((p) => {
+          if (p.file_url) oldPaths.push(p.file_url);
+          oldIds.push(p.id);
+        });
+      }
+      if (oldIds.length) {
+        await supabase.from("medical_records").delete().in("id", oldIds);
+      }
+      if (oldPaths.length) {
+        await supabase.storage.from("medical-documents").remove(oldPaths);
+      }
+
+      // 3) Insert one row per page
+      const rows = files.map((f, i) => ({
+        user_id: userId,
+        title: files.length > 1 ? `${slot.label} — Page ${i + 1}` : slot.label,
+        record_type: slot.recordType,
+        record_slot: slot.key,
+        page_index: i,
+        file_url: uploadedPaths[i],
+        file_name: f.name,
+        record_date: new Date().toISOString().split("T")[0],
+      }));
+      const { error: insErr } = await supabase.from("medical_records").insert(rows);
+      if (insErr) throw insErr;
+
+      toast.success(`${slot.label} saved — guardians can now see ${files.length} page${files.length > 1 ? "s" : ""}`);
       await fetchRecords();
     } catch (e: any) {
-      // Roll back the orphan file so we never end up with storage without a DB row.
-      if (uploadedPath) {
-        try { await supabase.storage.from("medical-documents").remove([uploadedPath]); } catch { /* ignore */ }
+      if (uploadedPaths.length) {
+        try { await supabase.storage.from("medical-documents").remove(uploadedPaths); } catch { /* ignore */ }
       }
       toast.error(e?.message || "Save failed — please try again");
       throw e;
@@ -157,29 +170,38 @@ const IdInsuranceSection = () => {
   };
 
   const handleDelete = async (slot: SlotDef) => {
-    const r = records[slot.key];
-    if (!r) return;
-    if (r.source === "vault") {
-      // Don't delete the Vault file; just refresh (nothing to unlink — it was
-      // never slot-tagged on disk). The slot will remain empty until uploaded.
+    const entry = records[slot.key];
+    if (!entry) return;
+    if (entry.source === "vault") {
       toast.success(`${slot.label} unlinked from Hospital Kit`);
       fetchRecords();
       return;
     }
-    if (r.file_url) await supabase.storage.from("medical-documents").remove([r.file_url]);
-    await supabase.from("medical_records").delete().eq("id", r.id);
+    const paths = entry.pages.map((p) => p.file_url).filter(Boolean) as string[];
+    const ids = entry.pages.map((p) => p.id);
+    if (paths.length) await supabase.storage.from("medical-documents").remove(paths);
+    if (ids.length) await supabase.from("medical_records").delete().in("id", ids);
     toast.success(`${slot.label} removed`);
     fetchRecords();
   };
 
   const openPreview = async (slot: SlotDef) => {
-    const r = records[slot.key];
-    if (!r?.file_url) return;
-    const { data, error } = await supabase.storage.from("medical-documents").createSignedUrl(r.file_url, 3600);
-    if (error || !data) { toast.error("Preview failed"); return; }
-    setPreviewUrl(data.signedUrl);
-    setPreviewName(r.file_name || slot.label);
-    setPreviewIsPdf((r.file_name || "").toLowerCase().endsWith(".pdf"));
+    const entry = records[slot.key];
+    if (!entry?.pages.length) return;
+    const out: { url: string; name: string; isPdf: boolean }[] = [];
+    for (const p of entry.pages) {
+      if (!p.file_url) continue;
+      const { data } = await supabase.storage.from("medical-documents").createSignedUrl(p.file_url, 3600);
+      if (data) out.push({
+        url: data.signedUrl,
+        name: p.file_name || slot.label,
+        isPdf: (p.file_name || "").toLowerCase().endsWith(".pdf"),
+      });
+    }
+    if (!out.length) { toast.error("Preview failed"); return; }
+    setPreviewPages(out);
+    setPreviewIdx(0);
+    setPreviewTitle(slot.label);
   };
 
   const filledCount = Object.keys(records).length;
@@ -195,16 +217,17 @@ const IdInsuranceSection = () => {
           </Badge>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Upload these once. Your guardians instantly see them in their app under Reports → Hospital Visit and can share with the hospital in one tap.
+          Upload images once. When your guardian taps "Download PDF" in their Admission Kit, all pages are stitched into a single PDF with images embedded.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-4">Loading…</p>
         ) : SLOTS.map((slot) => {
-          const r = records[slot.key];
+          const entry = records[slot.key];
           const Icon = slot.icon;
           const isUploading = uploadingSlot === slot.key;
+          const pageCount = entry?.pages.length || 0;
           return (
             <div key={slot.key} className="border border-border rounded-lg p-3 space-y-2">
               <div className="flex items-start gap-2">
@@ -213,20 +236,22 @@ const IdInsuranceSection = () => {
                   <p className="text-sm font-medium">{slot.label}</p>
                   <p className="text-[11px] text-muted-foreground">{slot.hint}</p>
                 </div>
-                {r ? (
-                  <Badge variant={r.source === "vault" ? "outline" : "default"} className="text-[10px] shrink-0">
-                    {r.source === "vault" ? "From Vault" : "Saved"}
+                {entry ? (
+                  <Badge variant={entry.source === "vault" ? "outline" : "default"} className="text-[10px] shrink-0">
+                    {entry.source === "vault" ? "From Vault" : `${pageCount} page${pageCount > 1 ? "s" : ""}`}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
                 )}
               </div>
 
-              {r ? (
+              {entry ? (
                 <>
                   <div className="flex items-center gap-2">
                     <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-                    <span className="text-xs truncate flex-1">{r.file_name}</span>
+                    <span className="text-xs truncate flex-1">
+                      {entry.pages[0].file_name}{pageCount > 1 ? ` (+${pageCount - 1} more)` : ""}
+                    </span>
                     <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
                       <Eye className="w-3 h-3" />
                     </Button>
@@ -237,7 +262,7 @@ const IdInsuranceSection = () => {
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
-                  {r.source === "vault" && (
+                  {entry.source === "vault" && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -282,8 +307,8 @@ const IdInsuranceSection = () => {
           baseFileName={captureSlot.baseFileName}
           maxPages={captureSlot.maxPages}
           uploading={uploadingSlot === captureSlot.key}
-          onComplete={async (file) => {
-            await uploadFile(captureSlot, file);
+          onComplete={async (files) => {
+            await uploadPages(captureSlot, files);
           }}
         />
       )}
@@ -293,7 +318,7 @@ const IdInsuranceSection = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {deleteTarget?.label}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the saved file. You can re-upload it later.
+              This will delete the saved pages. You can re-upload later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -308,17 +333,29 @@ const IdInsuranceSection = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
-        <DialogContent className="max-w-[400px]">
+      <Dialog open={previewPages.length > 0} onOpenChange={(o) => !o && setPreviewPages([])}>
+        <DialogContent className="max-w-[420px]">
           <DialogHeader>
-            <DialogTitle className="text-base truncate">{previewName}</DialogTitle>
+            <DialogTitle className="text-base truncate">
+              {previewTitle}{previewPages.length > 1 ? ` — Page ${previewIdx + 1}/${previewPages.length}` : ""}
+            </DialogTitle>
           </DialogHeader>
-          {previewUrl && (
-            previewIsPdf ? (
-              <iframe src={previewUrl} className="w-full h-[60vh] rounded" title={previewName} />
-            ) : (
-              <img src={previewUrl} alt={previewName} className="w-full h-auto rounded" />
-            )
+          {previewPages[previewIdx] && (
+            previewPages[previewIdx].isPdf
+              ? <iframe src={previewPages[previewIdx].url} className="w-full h-[60vh] rounded" title={previewPages[previewIdx].name} />
+              : <img src={previewPages[previewIdx].url} alt={previewPages[previewIdx].name} className="w-full h-auto rounded" />
+          )}
+          {previewPages.length > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <Button size="sm" variant="outline" disabled={previewIdx === 0}
+                onClick={() => setPreviewIdx((i) => Math.max(0, i - 1))}>
+                <ChevronLeft className="w-3 h-3 mr-1" /> Prev
+              </Button>
+              <Button size="sm" variant="outline" disabled={previewIdx >= previewPages.length - 1}
+                onClick={() => setPreviewIdx((i) => Math.min(previewPages.length - 1, i + 1))}>
+                Next <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>
