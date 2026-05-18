@@ -350,13 +350,20 @@ const IdMultiPageField = ({
             onChange={(e) => { handlePicked(e.target.files?.[0] || null); e.target.value = ""; }}
           />
 
+          {mode !== "single" && pages.length > 0 && (
+            <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-[11px] text-foreground">
+              <strong>{pages.length} page{pages.length > 1 ? "s" : ""} captured but not saved.</strong> Tap <span className="font-semibold">Save</span> below to upload — closing this window will discard them.
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-2 flex-row">
             <Button type="button" variant="ghost" size="sm" disabled={busy || !!uploading}
               onClick={() => handleClose(false)}>
               Cancel
             </Button>
             {mode !== "single" && (
-              <Button type="button" size="sm" className="ml-auto"
+              <Button type="button" size="sm"
+                className={`ml-auto ${pages.length > 0 ? "animate-pulse" : ""}`}
                 disabled={busy || !!uploading || pages.length === 0}
                 onClick={() => handleSave()}>
                 {busy || uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
@@ -366,6 +373,27 @@ const IdMultiPageField = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Discard confirmation */}
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard {pages.length} captured page{pages.length > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven't saved yet. Closing now will discard the pages you just captured. Tap "Keep editing" to return and Save.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDiscard}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Crop dialog */}
       <Dialog open={cropOpen} onOpenChange={(o) => { if (!o && !busy) { setCropOpen(false); setCropSrc(""); } }}>
