@@ -16,10 +16,13 @@ import VisualHealthReport, { tryParseVisualReport } from "@/components/health-to
 import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, extractTextFromDOCX, getFileTypeLabel } from "@/lib/documentExtractor";
 
 const MAX_TEXT_LENGTH = 10000;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for documents
+const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB for images
+const MAX_DOC_FILE_SIZE = 25 * 1024 * 1024; // 25MB for PDFs/DOCX
 
 const MAX_PAGES = 8;
-const MAX_DIMENSION = 1600;
+const PDF_FALLBACK_PAGES = 4; // render up to N pages for text-less PDFs
+const MAX_DIMENSION_DEFAULT = 1600;
+const MAX_DIMENSION_DENSE = 1200;
 
 async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
   return new Promise((resolve, reject) => {
