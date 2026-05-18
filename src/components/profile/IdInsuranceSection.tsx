@@ -37,10 +37,11 @@ const SLOTS: SlotDef[] = [
 
 interface SlotRecord {
   id: string;
-  record_slot: string;
+  record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
   updated_at: string;
+  source: "slot" | "vault";
 }
 
 const IdInsuranceSection = () => {
