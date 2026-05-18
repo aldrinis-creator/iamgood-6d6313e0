@@ -163,14 +163,40 @@ serve(async (req) => {
       });
     }
 
+    // Fetch today's logs to check if already taken
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const { data: logs } = await supabase
+      .from("medication_logs")
+      .select("medication_id, scheduled_at, status")
+      .gte("scheduled_at", todayStart.toISOString())
+      .lte("scheduled_at", todayEnd.toISOString())
+      .in("status", ["taken", "taken_late"]);
+
     // Filter medications that have any schedule_time within our ±2min window
+    // AND have not been taken yet for that specific schedule_time.
     const matchingMeds = (medications || []).filter((med: any) => {
       if (!med.schedule_times || !Array.isArray(med.schedule_times)) return false;
-      return med.schedule_times.some((t: string) => validTimes.includes(t));
+      return med.schedule_times.some((t: string) => {
+        if (!validTimes.includes(t)) return false;
+        
+        // Check if there is already a 'taken' log for this specific time slot today
+        const [h, m] = t.split(":").map(Number);
+        const alreadyTaken = (logs || []).some((log: any) => {
+          if (log.medication_id !== med.id) return false;
+          const logDate = new Date(log.scheduled_at);
+          return logDate.getHours() === h && logDate.getMinutes() === (m || 0);
+        });
+        
+        return !alreadyTaken;
+      });
     });
 
     if (matchingMeds.length === 0) {
-      return new Response(JSON.stringify({ message: "No medications due", sent: 0 }), {
+      return new Response(JSON.stringify({ message: "No pending medications due", sent: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

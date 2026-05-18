@@ -85,19 +85,23 @@ const useMedicationAlarms = () => {
         const preKey = `med-pre-${dateKey}-${timeStr}`;
         const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
 
+        const takenLog = logs.some((l) => {
+          const logDate = new Date(l.scheduled_at ?? "");
+          return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && (l.status === "taken" || l.status === "taken_late");
+        });
+
         // --- T-5: Browser notification only ---
         if (diffMin >= -PRE_ALERT_MIN && diffMin < 0 && !firedRef.current.has(preKey)) {
-          if (!preAlertSlots.has(timeStr)) preAlertSlots.set(timeStr, []);
-          preAlertSlots.get(timeStr)!.push(med.name);
+          if (!takenLog) {
+            if (!preAlertSlots.has(timeStr)) preAlertSlots.set(timeStr, []);
+            preAlertSlots.get(timeStr)!.push(med.name);
+          } else {
+            firedRef.current.add(preKey); // mark as fired so we don't keep checking
+          }
         }
 
         // --- T+5 to T+35: Popup reminders 1/3, 2/3, 3/3 ---
         if (diffMin >= POPUP_DELAY_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
-          const takenLog = logs.some((l) => {
-            const logDate = new Date(l.scheduled_at ?? "");
-            return l.medication_id === med.id && logDate.getHours() === h && logDate.getMinutes() === (m || 0) && (l.status === "taken" || l.status === "taken_late");
-          });
-
           if (takenLog) {
             missedSentRef.current.add(missedKey);
             // Slot resolved naturally — clear any lingering acknowledgement

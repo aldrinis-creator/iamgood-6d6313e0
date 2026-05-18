@@ -231,9 +231,15 @@ const CheckInCard = () => {
 
     const now = new Date();
     const windowHour = getCurrentWindow();
-    const scheduledAt = windowHour !== null
+    let scheduledAt = windowHour !== null
       ? getCheckInWindowStart(windowHour)
       : now;
+    
+    // If we're approaching the next window and checking in early, log it for the upcoming window
+    const minsLeft = getMinutesUntilNext();
+    if (windowHour === null && minsLeft <= 30 && minsLeft > 0) {
+      scheduledAt = getNextCheckInTime();
+    }
 
     if (!navigator.onLine) {
       try {
@@ -367,14 +373,17 @@ const CheckInCard = () => {
             <p className="text-accessible font-semibold text-foreground">
               {userName}, Check-iN coming up!
             </p>
-            <div
-              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart"
+            <button
+              onClick={() => setShowDialog(true)}
+              disabled={loading}
+              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              aria-label="Check in early"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
               <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
-            </div>
+            </button>
             <p className="text-sm text-muted-foreground font-medium">
               Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
             </p>
