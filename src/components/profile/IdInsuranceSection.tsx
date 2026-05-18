@@ -103,30 +103,34 @@ const IdInsuranceSection = () => {
   const uploadFile = async (slot: SlotDef, file: File) => {
     if (!session?.user?.id) return;
     setUploadingSlot(slot.key);
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `${session.user.id}/slots/${slot.key}-${Date.now()}.${ext}`;
+    let uploadedPath: string | null = null;
     try {
-      const ext = file.name.split(".").pop() || "bin";
-      const path = `${session.user.id}/slots/${slot.key}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("medical-documents").upload(path, file, {
         contentType: file.type,
         upsert: false,
       });
       if (upErr) throw upErr;
+      uploadedPath = path;
 
       const existing = records[slot.key];
       // Only replace if the existing row is slot-owned. For vault-linked rows,
       // insert a new slot-tagged row and leave the Vault entry untouched.
       if (existing && existing.source === "slot") {
-        if (existing.file_url) {
-          await supabase.storage.from("medical-documents").remove([existing.file_url]);
-        }
-        await supabase.from("medical_records").update({
+        const oldUrl = existing.file_url;
+        const { error: updErr } = await supabase.from("medical_records").update({
           file_url: path,
           file_name: file.name,
           record_type: slot.recordType,
           title: slot.label,
         }).eq("id", existing.id);
+        if (updErr) throw updErr;
+        if (oldUrl && oldUrl !== path) {
+          await supabase.storage.from("medical-documents").remove([oldUrl]);
+        }
       } else {
-        await supabase.from("medical_records").insert({
+        const { error: insErr } = await supabase.from("medical_records").insert({
           user_id: session.user.id,
           title: slot.label,
           record_type: slot.recordType,
@@ -135,11 +139,17 @@ const IdInsuranceSection = () => {
           file_name: file.name,
           record_date: new Date().toISOString().split("T")[0],
         });
+        if (insErr) throw insErr;
       }
+      uploadedPath = null; // commit — don't rollback
       toast.success(`${slot.label} saved — guardians can now see it`);
       await fetchRecords();
     } catch (e: any) {
-      toast.error(e?.message || "Upload failed");
+      // Roll back the orphan file so we never end up with storage without a DB row.
+      if (uploadedPath) {
+        try { await supabase.storage.from("medical-documents").remove([uploadedPath]); } catch { /* ignore */ }
+      }
+      toast.error(e?.message || "Save failed — please try again");
       throw e;
     } finally {
       setUploadingSlot(null);
