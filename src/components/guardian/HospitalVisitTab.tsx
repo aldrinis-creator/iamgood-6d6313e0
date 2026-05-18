@@ -27,9 +27,10 @@ const SLOT_DEFS = [
 
 interface SlotRecord {
   id: string;
-  record_slot: string;
+  record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
+  source: "slot" | "vault";
 }
 
 const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
