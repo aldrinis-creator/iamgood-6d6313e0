@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2 } from "lucide-react";
+import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
-import { buildAdmissionKitPdf, type AdmissionKitDoc } from "@/lib/admissionKitPdf";
+import { buildAdmissionKitPdf, type AdmissionKitDoc, type AdmissionKitPage } from "@/lib/admissionKitPdf";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
-import { resolveSlotRows } from "@/lib/hospitalKitSlots";
+import { resolveSlotPages } from "@/lib/hospitalKitSlots";
 
 interface Props {
   wardUserId: string;
@@ -25,21 +25,25 @@ const SLOT_DEFS = [
   { key: "id_photo", label: "Passport Photo", icon: ImageIcon },
 ] as const;
 
-interface SlotRecord {
+interface SlotPageRow {
   id: string;
   record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
+  page_index: number;
+}
+interface SlotEntry {
+  pages: SlotPageRow[];
   source: "slot" | "vault";
 }
 
 const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
   const { session } = useAuth();
-  const [records, setRecords] = useState<Record<string, SlotRecord>>({});
+  const [records, setRecords] = useState<Record<string, SlotEntry>>({});
   const [loading, setLoading] = useState(true);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState("");
-  const [previewIsPdf, setPreviewIsPdf] = useState(false);
+  const [previewPages, setPreviewPages] = useState<{ url: string; name: string; isPdf: boolean }[]>([]);
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const [previewTitle, setPreviewTitle] = useState("");
   const [generating, setGenerating] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePhone, setSharePhone] = useState("");
@@ -50,17 +54,20 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, record_type, file_url, file_name")
+      .select("id, record_slot, record_type, file_url, file_name, page_index")
       .eq("user_id", wardUserId);
-    const resolved = resolveSlotRows((data || []) as any);
-    const map: Record<string, SlotRecord> = {};
-    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+    const resolved = resolveSlotPages((data || []) as any);
+    const map: Record<string, SlotEntry> = {};
+    Object.entries(resolved).forEach(([slot, { rows, source }]) => {
       map[slot] = {
-        id: row.id,
-        record_slot: row.record_slot ?? slot,
-        file_url: row.file_url,
-        file_name: row.file_name,
         source,
+        pages: rows.map((r: any) => ({
+          id: r.id,
+          record_slot: r.record_slot,
+          file_url: r.file_url,
+          file_name: r.file_name,
+          page_index: r.page_index ?? 0,
+        })),
       };
     });
     setRecords(map);
@@ -82,27 +89,35 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     return () => { supabase.removeChannel(channel); };
   }, [wardUserId, fetchRecords]);
 
-  const openPreview = async (r: SlotRecord, label: string) => {
-    if (!r.file_url) return;
-    const { data, error } = await supabase.storage.from("medical-documents").createSignedUrl(r.file_url, 3600);
-    if (error || !data) { toast.error("Preview failed"); return; }
-    setPreviewUrl(data.signedUrl);
-    setPreviewName(r.file_name || label);
-    setPreviewIsPdf((r.file_name || "").toLowerCase().endsWith(".pdf"));
+  const openPreview = async (entry: SlotEntry, label: string) => {
+    const out: { url: string; name: string; isPdf: boolean }[] = [];
+    for (const p of entry.pages) {
+      if (!p.file_url) continue;
+      const { data } = await supabase.storage.from("medical-documents").createSignedUrl(p.file_url, 3600);
+      if (data) out.push({
+        url: data.signedUrl,
+        name: p.file_name || label,
+        isPdf: (p.file_name || "").toLowerCase().endsWith(".pdf"),
+      });
+    }
+    if (!out.length) { toast.error("Preview failed"); return; }
+    setPreviewPages(out);
+    setPreviewIdx(0);
+    setPreviewTitle(label);
   };
 
-  const downloadOne = async (r: SlotRecord) => {
-    if (!r.file_url) return;
-    const { data } = await supabase.storage.from("medical-documents").download(r.file_url);
+  const downloadFirst = async (entry: SlotEntry) => {
+    const p = entry.pages[0];
+    if (!p?.file_url) return;
+    const { data } = await supabase.storage.from("medical-documents").download(p.file_url);
     if (!data) { toast.error("Download failed"); return; }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(data);
-    a.download = r.file_name || "document";
+    a.download = p.file_name || "document";
     a.click();
   };
 
   const buildKit = async (): Promise<Blob | null> => {
-    // Fetch ward profile + health profile + primary guardian
     const [profileRes, healthRes, guardianRes] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", wardUserId).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes").eq("user_id", wardUserId).maybeSingle(),
@@ -111,21 +126,21 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
 
     const docs: AdmissionKitDoc[] = [];
     for (const def of SLOT_DEFS) {
-      const r = records[def.key];
-      if (!r?.file_url) {
-        docs.push({ slot: def.key, label: def.label, fileName: null, signedUrl: null, isPdf: false, isImage: false });
-        continue;
+      const entry = records[def.key];
+      const pages: AdmissionKitPage[] = [];
+      if (entry) {
+        for (const p of entry.pages) {
+          if (!p.file_url) continue;
+          const { data } = await supabase.storage.from("medical-documents").createSignedUrl(p.file_url, 3600);
+          if (!data) continue;
+          pages.push({
+            signedUrl: data.signedUrl,
+            fileName: p.file_name,
+            isPdf: (p.file_name || p.file_url || "").toLowerCase().endsWith(".pdf"),
+          });
+        }
       }
-      const { data } = await supabase.storage.from("medical-documents").createSignedUrl(r.file_url, 3600);
-      const isPdf = (r.file_name || r.file_url || "").toLowerCase().endsWith(".pdf");
-      docs.push({
-        slot: def.key,
-        label: def.label,
-        fileName: r.file_name,
-        signedUrl: data?.signedUrl || null,
-        isPdf,
-        isImage: !isPdf,
-      });
+      docs.push({ slot: def.key, label: def.label, pages });
     }
 
     return buildAdmissionKitPdf({
@@ -173,7 +188,7 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
       if (upErr) throw upErr;
       const { data: signed, error: signErr } = await supabase.storage.from("admission-kits").createSignedUrl(path, 60 * 60 * 24);
       if (signErr || !signed) throw signErr || new Error("sign failed");
-      const msg = `Hospital Admission Kit for ${wardName}.\nDocuments included: Aadhaar, PAN, Insurance, Photo (where available).\nSecure link (valid 24h): ${signed.signedUrl}`;
+      const msg = `Hospital Admission Kit for ${wardName}.\nAll documents are embedded as images inside the PDF.\nSecure link (valid 24h): ${signed.signedUrl}`;
       window.open(buildWhatsAppUrl(sharePhone, msg), "_blank");
       setShareOpen(false);
       setSharePhone("");
@@ -215,7 +230,6 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
 
   return (
     <div className="space-y-3">
-      {/* Action bar */}
       <Card>
         <CardContent className="p-3 space-y-2">
           <div className="flex items-center gap-2">
@@ -242,10 +256,10 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
         </CardContent>
       </Card>
 
-      {/* Doc cards */}
       {SLOT_DEFS.map((def) => {
-        const r = records[def.key];
+        const entry = records[def.key];
         const Icon = def.icon;
+        const pageCount = entry?.pages.length || 0;
         return (
           <Card key={def.key}>
             <CardContent className="p-3">
@@ -253,27 +267,30 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
                 <Icon className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{def.label}</p>
-                  {r?.file_name && (
+                  {entry?.pages[0]?.file_name && (
                     <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> {r.file_name}
+                      <FileText className="w-3 h-3" />
+                      {entry.pages[0].file_name}{pageCount > 1 ? ` (+${pageCount - 1} more)` : ""}
                     </p>
                   )}
-                  {r?.source === "vault" && (
+                  {entry?.source === "vault" && (
                     <p className="text-[10px] text-muted-foreground italic">linked from Medical Vault</p>
                   )}
                 </div>
-                {r ? (
-                  <Badge variant="default" className="text-[10px] shrink-0">Available</Badge>
+                {entry ? (
+                  <Badge variant="default" className="text-[10px] shrink-0">
+                    {pageCount} page{pageCount > 1 ? "s" : ""}
+                  </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
                 )}
               </div>
-              {r && (
+              {entry && (
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => openPreview(r, def.label)}>
+                  <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => openPreview(entry, def.label)}>
                     <Eye className="w-3 h-3 mr-1" /> View
                   </Button>
-                  <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => downloadOne(r)}>
+                  <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => downloadFirst(entry)}>
                     <Download className="w-3 h-3 mr-1" /> Save
                   </Button>
                 </div>
@@ -283,20 +300,32 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
         );
       })}
 
-      {/* Preview dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={(o) => !o && setPreviewUrl(null)}>
-        <DialogContent className="max-w-[400px]">
+      <Dialog open={previewPages.length > 0} onOpenChange={(o) => !o && setPreviewPages([])}>
+        <DialogContent className="max-w-[420px]">
           <DialogHeader>
-            <DialogTitle className="text-base truncate">{previewName}</DialogTitle>
+            <DialogTitle className="text-base truncate">
+              {previewTitle}{previewPages.length > 1 ? ` — Page ${previewIdx + 1}/${previewPages.length}` : ""}
+            </DialogTitle>
           </DialogHeader>
-          {previewUrl && (previewIsPdf
-            ? <iframe src={previewUrl} className="w-full h-[60vh] rounded" title={previewName} />
-            : <img src={previewUrl} alt={previewName} className="w-full h-auto rounded" />
+          {previewPages[previewIdx] && (previewPages[previewIdx].isPdf
+            ? <iframe src={previewPages[previewIdx].url} className="w-full h-[60vh] rounded" title={previewPages[previewIdx].name} />
+            : <img src={previewPages[previewIdx].url} alt={previewPages[previewIdx].name} className="w-full h-auto rounded" />
+          )}
+          {previewPages.length > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <Button size="sm" variant="outline" disabled={previewIdx === 0}
+                onClick={() => setPreviewIdx((i) => Math.max(0, i - 1))}>
+                <ChevronLeft className="w-3 h-3 mr-1" /> Prev
+              </Button>
+              <Button size="sm" variant="outline" disabled={previewIdx >= previewPages.length - 1}
+                onClick={() => setPreviewIdx((i) => Math.min(previewPages.length - 1, i + 1))}>
+                Next <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Share dialog */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="max-w-[380px]">
           <DialogHeader>
@@ -304,7 +333,7 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              We'll generate a PDF, upload it securely, and open WhatsApp with a 24-hour link.
+              We'll generate a single PDF with all images embedded, upload it securely, and open WhatsApp with a 24-hour link.
             </p>
             <Input
               placeholder="Recipient phone (e.g. 9876543210)"
