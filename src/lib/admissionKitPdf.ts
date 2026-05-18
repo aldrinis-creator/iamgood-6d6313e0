@@ -1,12 +1,15 @@
 import jsPDF from "jspdf";
 
+export interface AdmissionKitPage {
+  signedUrl: string;
+  fileName: string | null;
+  isPdf: boolean;       // legacy: a stored PDF (pre-image-only migration)
+}
+
 export interface AdmissionKitDoc {
   slot: string;
   label: string;
-  fileName: string | null;
-  signedUrl: string | null;
-  isPdf: boolean;
-  isImage: boolean;
+  pages: AdmissionKitPage[]; // empty = missing
 }
 
 export interface AdmissionKitInput {
@@ -24,25 +27,45 @@ export interface AdmissionKitInput {
 
 const NAVY = "#1a365d";
 
-async function loadImageAsDataURL(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+async function fetchAsBlob(url: string): Promise<Blob | null> {
   try {
     const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        const img = new Image();
-        img.onload = () => resolve({ dataUrl, width: img.width, height: img.height });
-        img.onerror = () => reject(new Error("img decode failed"));
-        img.src = dataUrl;
-      };
-      reader.onerror = () => reject(new Error("blob read failed"));
-      reader.readAsDataURL(blob);
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch { return null; }
+}
+
+/**
+ * Load any image (JPEG/PNG/TIF) as a JPEG data URL via canvas so jsPDF can
+ * always embed it cleanly. Returns natural pixel dimensions too.
+ */
+async function loadImageAsJpegDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  const blob = await fetchAsBlob(url);
+  if (!blob) return null;
+  try {
+    // Try native <img> decode first (works for JPEG/PNG; TIF will likely fail).
+    const objUrl = URL.createObjectURL(blob);
+    const img = await new Promise<HTMLImageElement | null>((resolve) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => resolve(null);
+      i.src = objUrl;
     });
-  } catch {
-    return null;
-  }
+    if (img) {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(objUrl); return null; }
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objUrl);
+      return { dataUrl: canvas.toDataURL("image/jpeg", 0.9), width: canvas.width, height: canvas.height };
+    }
+    URL.revokeObjectURL(objUrl);
+  } catch { /* fall through */ }
+  return null;
 }
 
 export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Blob> {
@@ -52,7 +75,6 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
   const margin = 36;
 
   // ===== Cover page =====
-  // Header bar
   pdf.setFillColor(NAVY);
   pdf.rect(0, 0, pageW, 80, "F");
   pdf.setTextColor("#ffffff");
@@ -63,7 +85,6 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
   pdf.setFont("helvetica", "normal");
   pdf.text(`Generated ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST`, margin, 68);
 
-  // Patient block
   let y = 110;
   pdf.setTextColor("#000000");
   pdf.setFontSize(16);
@@ -100,7 +121,6 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
     y += 14 * lines.length;
   }
 
-  // Document index
   y += 16;
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(13);
@@ -108,33 +128,46 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
   pdf.setFontSize(11);
   pdf.setFont("helvetica", "normal");
   for (const d of input.docs) {
-    const status = d.signedUrl ? (d.isImage ? "✓ Embedded" : d.isPdf ? "↗ See PDF link" : "✓ Attached") : "✗ Missing";
+    const n = d.pages.length;
+    const status = n === 0 ? "✗ Missing" : `✓ ${n} page${n > 1 ? "s" : ""} embedded`;
     pdf.text(`• ${d.label}`, margin, y);
     pdf.text(status, pageW - margin, y, { align: "right" });
     y += 16;
   }
 
-  // Footer
   pdf.setFontSize(9);
   pdf.setTextColor("#666666");
   pdf.text("Generated via Check-iN. Verify originals at admission.", margin, pageH - 24);
 
   // ===== Document pages =====
   for (const d of input.docs) {
-    if (!d.signedUrl) continue;
-    if (d.isImage) {
-      const img = await loadImageAsDataURL(d.signedUrl);
-      if (!img) continue;
-      pdf.addPage();
-      // Title
-      pdf.setFillColor(NAVY);
-      pdf.rect(0, 0, pageW, 40, "F");
-      pdf.setTextColor("#ffffff");
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(d.label, margin, 26);
+    if (!d.pages.length) continue;
+    for (let i = 0; i < d.pages.length; i++) {
+      const p = d.pages[i];
 
-      // Fit image
+      if (p.isPdf) {
+        // Legacy stored PDF: cannot embed inline — add link page.
+        pdf.addPage();
+        pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
+        pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
+        pdf.text(`${d.label} — Page ${i + 1} of ${d.pages.length}`, margin, 26);
+        pdf.setTextColor("#000000"); pdf.setFontSize(11); pdf.setFont("helvetica", "normal");
+        pdf.text("Original is a PDF (legacy). Open the secure link below:", margin, 80);
+        pdf.setTextColor(NAVY);
+        const lines = pdf.splitTextToSize(p.signedUrl, pageW - margin * 2);
+        pdf.textWithLink(lines.join("\n"), margin, 110, { url: p.signedUrl });
+        continue;
+      }
+
+      const img = await loadImageAsJpegDataUrl(p.signedUrl);
+      if (!img) continue;
+
+      pdf.addPage();
+      pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
+      pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
+      const header = d.pages.length > 1 ? `${d.label} — Page ${i + 1} of ${d.pages.length}` : d.label;
+      pdf.text(header, margin, 26);
+
       const maxW = pageW - margin * 2;
       const maxH = pageH - 80 - margin;
       const ratio = Math.min(maxW / img.width, maxH / img.height);
@@ -144,25 +177,7 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
       const yImg = 60;
       try {
         pdf.addImage(img.dataUrl, "JPEG", x, yImg, w, h, undefined, "FAST");
-      } catch {
-        try { pdf.addImage(img.dataUrl, "PNG", x, yImg, w, h, undefined, "FAST"); } catch { /* ignore */ }
-      }
-    } else if (d.isPdf) {
-      pdf.addPage();
-      pdf.setFillColor(NAVY);
-      pdf.rect(0, 0, pageW, 40, "F");
-      pdf.setTextColor("#ffffff");
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(d.label, margin, 26);
-      pdf.setTextColor("#000000");
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Original is a PDF document. Open the secure link below to view/download:", margin, 80);
-      pdf.setTextColor(NAVY);
-      const link = d.signedUrl;
-      const lines = pdf.splitTextToSize(link, pageW - margin * 2);
-      pdf.textWithLink(lines.join("\n"), margin, 110, { url: link });
+      } catch { /* ignore */ }
     }
   }
 
