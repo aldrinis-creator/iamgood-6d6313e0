@@ -258,6 +258,9 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
                       <FileText className="w-3 h-3" /> {r.file_name}
                     </p>
                   )}
+                  {r?.source === "vault" && (
+                    <p className="text-[10px] text-muted-foreground italic">linked from Medical Vault</p>
+                  )}
                 </div>
                 {r ? (
                   <Badge variant="default" className="text-[10px] shrink-0">Available</Badge>
