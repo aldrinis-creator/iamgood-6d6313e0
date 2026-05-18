@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { BriefcaseMedical, ChevronRight, Bell, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { SLOT_KEYS, resolveSlotRows } from "@/lib/hospitalKitSlots";
 
 interface Props {
   wardUserId: string;
   wardName: string;
 }
 
-const TOTAL_SLOTS = 5;
+const TOTAL_SLOTS = SLOT_KEYS.length;
 const SLOT_LABELS: Record<string, string> = {
   aadhaar: "Aadhaar",
   pan: "PAN",
