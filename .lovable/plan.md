@@ -1,48 +1,55 @@
-# Fix: Admission Kit shows no documents despite ward uploads
+## Investigation findings
 
-## Root cause
+The guardian UI and RLS are not the main blocker. I found a concrete data mismatch:
 
-I checked the database directly. **Across the entire `medical_records` table there are zero rows with `record_slot` set** — Aadhaar, PAN, Insurance Primary/Secondary, Passport Photo. The Admission Kit only reads slot-tagged rows, so it correctly shows nothing.
+- Slot files exist in private storage under the ward folder, e.g. `.../slots/aadhaar-...pdf`, `.../slots/pan-...pdf`, `.../slots/id_photo-...jpg`.
+- But the matching `medical_records` rows were never created for those storage files.
+- The Guardian Admission Kit only reads `medical_records`, so it shows nothing even though uploads exist in storage.
+- This points to the upload flow uploading the file successfully, then failing or skipping the database insert/update without recovery.
 
-Your ward's actual uploads (Aadhaar, "Mom's Aadhaar Card", face/tongue/urine scans, etc.) live in `medical_records` but without a `record_slot`. So either:
+## Fix plan
 
-1. **Silent save loss in the new 5-slot card.** In "front-back" and "pages" modes the user must explicitly press **Save (n)** in `IdMultiPageField`. If they close the dialog, click outside, or hit Cancel after adding pages, the cropped pages are silently discarded with no warning — only a `reset()`. No toast, no confirm. Very easy to do, especially with a long insurance policy where they "added all pages" and then closed.
-2. **Wrong upload entry-point.** The ward may have uploaded via the older **Medical Vault → Add medical record** flow (which sets `record_type` like `"ID - Aadhaar"` / `"Insurance - Primary"` but **no** `record_slot`), so the Hospital Kit doesn't see them.
+1. **Make Hospital Kit upload atomic and recoverable**
+   - In `IdInsuranceSection.tsx`, after storage upload, verify the `medical_records` insert/update result.
+   - If the database write fails, remove the newly uploaded storage file and show a clear error instead of leaving an orphaned file.
+   - Close the capture dialog only after the database row is successfully saved.
 
-## Fix scope (UI/UX only — no DB schema, no RLS)
+2. **Recover existing orphaned slot uploads automatically**
+   - Add an Admission Kit recovery backend function that runs with secure server permissions.
+   - It will scan the ward’s storage folder under `medical-documents/{wardUserId}/slots/`.
+   - For each latest slot file, it will create or repair the matching `medical_records` row with:
+     - `record_slot`
+     - `record_type`
+     - `title`
+     - `file_url`
+     - `file_name`
+     - `user_id`
+   - It will only operate for the signed-in ward, or for an accepted guardian of that ward.
 
-### 1. Prevent silent save loss in `IdMultiPageField.tsx`
-- In `handleClose`, when `next === false` AND `pages.length > 0`, show a confirm AlertDialog: **"Discard N captured pages?"** with Discard / Keep editing. Only `reset()` on confirmed discard.
-- Disable the dialog's outside-click + ESC dismissal while `pages.length > 0` (`onPointerDownOutside` / `onEscapeKeyDown` preventDefault on DialogContent).
-- Add a subtle pulsing **Save** button when `pages.length >= 1` so it's visually obvious work is unsaved.
-- After successful `onComplete`, show a clear success toast: **"{slot} saved — your guardian can see it now"** (currently the parent already toasts "saved", but add the guardian-visible reassurance).
+3. **Call recovery from both sides before showing empty data**
+   - In `IdInsuranceSection.tsx`, call recovery before resolving the ward’s own Hospital Kit records.
+   - In `HospitalVisitTab.tsx` and `HospitalKitCard.tsx`, call recovery for the selected ward before counting/displaying records.
+   - This means the existing uploaded Aadhaar/PAN/Photo files should appear without asking the ward to re-upload.
 
-### 2. Read fallback in `HospitalVisitTab.tsx` + `HospitalKitCard.tsx`
-- When fetching ward records, also fetch rows where `record_slot IS NULL` but `record_type` matches the slot mapping:
-  - `record_type ILIKE 'ID - Aadhaar%'` → aadhaar
-  - `record_type ILIKE 'ID - PAN%'` → pan
-  - `record_type ILIKE 'Insurance - Primary%'` → insurance_primary
-  - `record_type ILIKE 'Insurance - Secondary%'` → insurance_secondary
-  - `record_type ILIKE 'ID - Photo%'` → id_photo
-- Slot-tagged rows take precedence over `record_type` matches (don't double-count).
-- Surface a small "(linked from Medical Vault)" caption on those cards so guardian knows the source.
+4. **Harden guardian visibility and preview**
+   - Keep current guardian RLS and storage policies intact.
+   - Preserve the existing realtime filtered subscriptions.
+   - Add error handling/toasts if the guardian fetch fails instead of silently rendering empty.
 
-### 3. One-tap "Promote to Hospital Kit" on user side (`IdInsuranceSection.tsx`)
-- If the ward has matching-`record_type` rows but no slot row, show an inline button on the empty slot card: **"Use existing {record_type} from Medical Vault"** that UPDATEs the row to set `record_slot = slot.key` (no re-upload needed). Single click closes the gap for historical uploads.
+5. **Verify with live data**
+   - Confirm `medical_records` rows are created for the orphaned slot files.
+   - Confirm the guardian Admission Kit count updates from `0/5` to the recovered count.
+   - Confirm preview/download uses the recovered `file_url` paths.
 
-## Files to edit
-- `src/components/profile/IdMultiPageField.tsx` — confirm-on-close, lock outside dismissal, pulse Save
-- `src/components/profile/IdInsuranceSection.tsx` — fetch fallback `record_type` rows, render "Promote" CTA, link existing
-- `src/components/guardian/HospitalVisitTab.tsx` — extend fetch + dedupe logic with `record_type` fallback
-- `src/components/guardian/HospitalKitCard.tsx` — same `record_type` fallback in count query
+## Files to change
+
+- `src/components/profile/IdInsuranceSection.tsx`
+- `src/components/guardian/HospitalVisitTab.tsx`
+- `src/components/guardian/HospitalKitCard.tsx`
+- New backend function under `supabase/functions/recover-admission-kit/`
 
 ## Out of scope
-- No DB migration, no new RLS, no storage changes, no edge functions.
-- No changes to Admission Kit PDF builder, WhatsApp share, or nudge flow.
-- Won't touch Medical Vault upload UI itself.
 
-## Verification plan
-1. Open My Profile → 5-slot card, add 2 pages of insurance, close dialog without Save → expect confirm dialog (not silent loss).
-2. After save, query DB → row should have `record_slot = 'insurance_primary'`.
-3. As a guardian, open Reports → Hospital Visit → row should appear with View/Save working.
-4. For ward with old Vault uploads, the empty slot card should show "Use existing …" button; clicking it should fill the slot.
+- No new document categories.
+- No changes to the PDF builder design.
+- No change to guardian nomination rules.
