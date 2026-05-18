@@ -246,11 +246,18 @@ const DocumentAnalyzer = () => {
     try {
       let payload: any;
       if (mode === "photo") {
-        if (extractedDocText) {
-          const content = extractedDocText.substring(0, MAX_TEXT_LENGTH);
+        const hasImages = pages.length > 0;
+        const hasText = !!extractedDocText;
+        if (hasImages) {
+          // Send images (and the extracted text, if any) together so nothing is dropped
+          payload = {
+            images: pages.map(p => p.base64),
+            category: selectedCat || "General",
+            ...(hasText ? { text: extractedDocText!.substring(0, MAX_TEXT_LENGTH) } : {}),
+          };
+        } else if (hasText) {
+          const content = extractedDocText!.substring(0, MAX_TEXT_LENGTH);
           payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
-        } else if (pages.length > 0) {
-          payload = { images: pages.map(p => p.base64), category: selectedCat || "General" };
         }
       } else {
         let content = textInput;
@@ -269,17 +276,32 @@ const DocumentAnalyzer = () => {
           body: { type: "document_analysis", payload },
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 60000)
+          setTimeout(() => reject(new Error("timeout")), 90000)
         ),
       ]);
       const { data, error } = result;
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
+      if (error) {
+        console.error("Document analysis edge error:", error, data);
+        throw error;
+      }
+      if (data?.error) {
+        console.error("Document analysis returned error:", data.error);
+        toast.error(data.error);
+        return;
+      }
+      if (!data?.response) {
+        console.error("Document analysis: empty response", data);
+        toast.error("Analysis returned no result. Please try fewer/smaller files.");
+        return;
+      }
       setResult(data.response);
     } catch (err: any) {
+      console.error("Document analysis failed:", err);
       const msg = err?.message === "timeout"
-        ? "Analysis timed out. Try a smaller file or paste the text manually."
-        : "Analysis failed";
+        ? "Analysis timed out. Try fewer pages or paste the text manually."
+        : err?.message?.includes("body") || err?.message?.includes("size") || err?.message?.includes("Payload")
+          ? "Files too large to analyze together. Remove some pages and retry."
+          : (err?.message || "Analysis failed. Please retry.");
       toast.error(msg);
     } finally {
       setLoading(false);
