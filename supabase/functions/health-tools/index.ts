@@ -363,7 +363,10 @@ serve(async (req) => {
         visionPrompt = "Please read and analyze this prescription image. Extract all medication names, dosages, and details visible in the image.";
       } else if (type === "document_analysis") {
         const category = payload.category || "General";
-        visionPrompt = `Category: ${category}\n\nPlease read and analyze this medical document image. Extract all text, values, and findings visible in the image and provide a detailed analysis.`;
+        const extraText = typeof payload.text === "string" && payload.text.trim().length > 0
+          ? `\n\nAdditional extracted text from accompanying document(s) (use together with the image(s)):\n${payload.text.substring(0, 30000)}`
+          : "";
+        visionPrompt = `Category: ${category}\n\nPlease read and analyze this medical document image. Extract all text, values, and findings visible in the image and provide a detailed analysis.${extraText}`;
       } else if (type === "urine_color_analysis") {
         visionPrompt = "Analyze this urine sample photo. Categorize color, estimate hydration, and flag any urgent concerns. Return only the JSON object specified.";
       } else if (type === "urine_dipstick_analysis") {
@@ -408,7 +411,7 @@ serve(async (req) => {
         },
       ];
     } else {
-      const MAX_PAYLOAD_CHARS = 20000;
+      const MAX_PAYLOAD_CHARS = type === "document_analysis" ? 40000 : 20000;
       let userMessage = typeof payload === "string" ? payload : JSON.stringify(payload);
       if (userMessage.length > MAX_PAYLOAD_CHARS) {
         userMessage = userMessage.substring(0, MAX_PAYLOAD_CHARS) + "\n\n[Content truncated due to length]";

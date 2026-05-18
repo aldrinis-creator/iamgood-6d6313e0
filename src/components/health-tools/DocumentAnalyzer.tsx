@@ -16,29 +16,34 @@ import VisualHealthReport, { tryParseVisualReport } from "@/components/health-to
 import { isPDF, isDOCX, isDocument, extractTextFromPDF, renderPDFPageToImage, extractTextFromDOCX, getFileTypeLabel } from "@/lib/documentExtractor";
 
 const MAX_TEXT_LENGTH = 10000;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for documents
+const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB for images
+const MAX_DOC_FILE_SIZE = 25 * 1024 * 1024; // 25MB for PDFs/DOCX
 
 const MAX_PAGES = 8;
-const MAX_DIMENSION = 1600;
+const PDF_FALLBACK_PAGES = 4; // render up to N pages for text-less PDFs
+const MAX_DIMENSION_DEFAULT = 1600;
+const MAX_DIMENSION_DENSE = 1200;
 
-async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+async function downscaleImageToBase64(file: File, dense = false): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
+  const maxDim = dense ? MAX_DIMENSION_DENSE : MAX_DIMENSION_DEFAULT;
+  const quality = dense ? 0.72 : 0.8;
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
     reader.onload = () => {
       img.onload = () => {
-        const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
         canvas.toBlob((blob) => {
           if (!blob) return reject(new Error("blob fail"));
           resolve({ dataUrl, previewUrl: URL.createObjectURL(blob), blob });
-        }, "image/jpeg", 0.8);
+        }, "image/jpeg", quality);
       };
       img.onerror = reject;
       img.src = reader.result as string;
@@ -140,8 +145,11 @@ const DocumentAnalyzer = () => {
       const newDocs: File[] = [];
 
       for (const selected of toProcess) {
-        if (selected.size > MAX_FILE_SIZE) {
-          toast.error(`${selected.name} is too large`);
+        const isImg = selected.type.startsWith("image/");
+        const sizeLimit = isImg ? MAX_IMAGE_FILE_SIZE : MAX_DOC_FILE_SIZE;
+        if (selected.size > sizeLimit) {
+          const mb = Math.round(sizeLimit / 1024 / 1024);
+          toast.error(`${selected.name} is too large (max ${mb}MB)`);
           continue;
         }
 
@@ -152,9 +160,18 @@ const DocumentAnalyzer = () => {
             if (hasText) {
               combinedText += (combinedText ? `\n\n--- Document: ${selected.name} ---\n\n` : "") + text;
             } else {
-              const img = await renderPDFPageToImage(selected);
-              const blobRes = await (await fetch(img)).blob();
-              newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl: img, base64: img, blob: blobRes });
+              // Render up to PDF_FALLBACK_PAGES pages as images so multi-page scans aren't lost
+              const remainingPageSlots = MAX_PAGES - (pages.length + newPages.length);
+              const pagesToRender = Math.min(PDF_FALLBACK_PAGES, Math.max(1, remainingPageSlots));
+              for (let p = 1; p <= pagesToRender; p++) {
+                try {
+                  const img = await renderPDFPageToImage(selected, p);
+                  const blobRes = await (await fetch(img)).blob();
+                  newPages.push({ id: `${Date.now()}-${p}-${Math.random().toString(36).slice(2, 6)}`, fileName: `${selected.name} (p${p})`, previewUrl: img, base64: img, blob: blobRes });
+                } catch {
+                  break; // out of pages
+                }
+              }
             }
           } else if (isDOCX(selected)) {
             const text = await extractTextFromDOCX(selected);
@@ -165,7 +182,8 @@ const DocumentAnalyzer = () => {
             }
           }
         } else if (selected.type.startsWith("image/")) {
-          const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(selected);
+          const dense = (pages.length + newPages.length) >= 2;
+          const { dataUrl, previewUrl, blob } = await downscaleImageToBase64(selected, dense);
           newPages.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, fileName: selected.name, previewUrl, base64: dataUrl, blob });
         } else {
            toast.error(`${selected.name} is not a supported file type`);
@@ -228,11 +246,18 @@ const DocumentAnalyzer = () => {
     try {
       let payload: any;
       if (mode === "photo") {
-        if (extractedDocText) {
-          const content = extractedDocText.substring(0, MAX_TEXT_LENGTH);
+        const hasImages = pages.length > 0;
+        const hasText = !!extractedDocText;
+        if (hasImages) {
+          // Send images (and the extracted text, if any) together so nothing is dropped
+          payload = {
+            images: pages.map(p => p.base64),
+            category: selectedCat || "General",
+            ...(hasText ? { text: extractedDocText!.substring(0, MAX_TEXT_LENGTH) } : {}),
+          };
+        } else if (hasText) {
+          const content = extractedDocText!.substring(0, MAX_TEXT_LENGTH);
           payload = `Category: ${selectedCat || "General"}\n\nDocument content:\n${content}`;
-        } else if (pages.length > 0) {
-          payload = { images: pages.map(p => p.base64), category: selectedCat || "General" };
         }
       } else {
         let content = textInput;
@@ -251,17 +276,32 @@ const DocumentAnalyzer = () => {
           body: { type: "document_analysis", payload },
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 60000)
+          setTimeout(() => reject(new Error("timeout")), 90000)
         ),
       ]);
       const { data, error } = result;
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
+      if (error) {
+        console.error("Document analysis edge error:", error, data);
+        throw error;
+      }
+      if (data?.error) {
+        console.error("Document analysis returned error:", data.error);
+        toast.error(data.error);
+        return;
+      }
+      if (!data?.response) {
+        console.error("Document analysis: empty response", data);
+        toast.error("Analysis returned no result. Please try fewer/smaller files.");
+        return;
+      }
       setResult(data.response);
     } catch (err: any) {
+      console.error("Document analysis failed:", err);
       const msg = err?.message === "timeout"
-        ? "Analysis timed out. Try a smaller file or paste the text manually."
-        : "Analysis failed";
+        ? "Analysis timed out. Try fewer pages or paste the text manually."
+        : err?.message?.includes("body") || err?.message?.includes("size") || err?.message?.includes("Payload")
+          ? "Files too large to analyze together. Remove some pages and retry."
+          : (err?.message || "Analysis failed. Please retry.");
       toast.error(msg);
     } finally {
       setLoading(false);

@@ -6,7 +6,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-const MAX_PAGES = 10;
+const DEFAULT_MAX_PAGES = 20;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, msg: string): Promise<T> {
   return Promise.race([
@@ -31,14 +31,14 @@ export function isDocument(file: File): boolean {
   return isPDF(file) || isDOCX(file);
 }
 
-export async function extractTextFromPDF(file: File): Promise<{ text: string; hasText: boolean }> {
+export async function extractTextFromPDF(file: File, maxPages: number = DEFAULT_MAX_PAGES): Promise<{ text: string; hasText: boolean }> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await withTimeout(
     pdfjsLib.getDocument({ data: arrayBuffer }).promise,
     15000,
     "PDF loading timed out. Try a smaller file or paste the text manually."
   );
-  const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+  const pageCount = Math.min(pdf.numPages, maxPages);
   let fullText = "";
 
   for (let i = 1; i <= pageCount; i++) {
