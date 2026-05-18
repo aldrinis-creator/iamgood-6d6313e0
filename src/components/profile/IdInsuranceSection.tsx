@@ -204,26 +204,45 @@ const IdInsuranceSection = () => {
                   <p className="text-[11px] text-muted-foreground">{slot.hint}</p>
                 </div>
                 {r ? (
-                  <Badge variant="default" className="text-[10px] shrink-0">Saved</Badge>
+                  <Badge variant={r.source === "vault" ? "outline" : "default"} className="text-[10px] shrink-0">
+                    {r.source === "vault" ? "From Vault" : "Saved"}
+                  </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
                 )}
               </div>
 
               {r ? (
-                <div className="flex items-center gap-2">
-                  <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-xs truncate flex-1">{r.file_name}</span>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
-                    <Eye className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setCaptureSlot(slot)}>
-                    <Upload className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => setDeleteTarget(slot)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-xs truncate flex-1">{r.file_name}</span>
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setCaptureSlot(slot)}>
+                      <Upload className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => setDeleteTarget(slot)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  {r.source === "vault" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-[11px]"
+                      disabled={promotingSlot === slot.key}
+                      onClick={() => promoteVaultRecord(slot)}
+                    >
+                      {promotingSlot === slot.key ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Linking…</>
+                      ) : (
+                        <><Link2 className="w-3 h-3 mr-1" /> Use this Vault doc for Hospital Kit</>
+                      )}
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Button
                   size="sm"
