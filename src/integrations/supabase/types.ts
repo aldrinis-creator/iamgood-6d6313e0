@@ -1344,6 +1344,7 @@ export type Database = {
           file_url: string | null
           hospital_name: string | null
           id: string
+          page_index: number
           record_date: string | null
           record_slot: string | null
           record_type: string
@@ -1359,6 +1360,7 @@ export type Database = {
           file_url?: string | null
           hospital_name?: string | null
           id?: string
+          page_index?: number
           record_date?: string | null
           record_slot?: string | null
           record_type: string
@@ -1374,6 +1376,7 @@ export type Database = {
           file_url?: string | null
           hospital_name?: string | null
           id?: string
+          page_index?: number
           record_date?: string | null
           record_slot?: string | null
           record_type?: string
