@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon, Loader2 } from "lucide-react";
+import { Upload, Trash2, Eye, FileText, BriefcaseMedical, IdCard, ShieldCheck, ImageIcon, Loader2, Link2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import IdMultiPageField, { type CaptureMode } from "./IdMultiPageField";
+import { resolveSlotRows } from "@/lib/hospitalKitSlots";
 
 type SlotKey = "aadhaar" | "pan" | "insurance_primary" | "insurance_secondary" | "id_photo";
 
@@ -36,10 +37,11 @@ const SLOTS: SlotDef[] = [
 
 interface SlotRecord {
   id: string;
-  record_slot: string;
+  record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
   updated_at: string;
+  source: "slot" | "vault";
 }
 
 const IdInsuranceSection = () => {
@@ -47,6 +49,7 @@ const IdInsuranceSection = () => {
   const [records, setRecords] = useState<Record<string, SlotRecord>>({});
   const [loading, setLoading] = useState(true);
   const [uploadingSlot, setUploadingSlot] = useState<SlotKey | null>(null);
+  const [promotingSlot, setPromotingSlot] = useState<SlotKey | null>(null);
   const [captureSlot, setCaptureSlot] = useState<SlotDef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SlotDef | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -58,14 +61,42 @@ const IdInsuranceSection = () => {
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, file_url, file_name, updated_at")
-      .eq("user_id", session.user.id)
-      .not("record_slot", "is", null);
+      .select("id, record_slot, record_type, file_url, file_name, updated_at")
+      .eq("user_id", session.user.id);
+    const resolved = resolveSlotRows((data || []) as any);
     const map: Record<string, SlotRecord> = {};
-    (data || []).forEach((r: any) => { if (r.record_slot) map[r.record_slot] = r; });
+    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+      map[slot] = {
+        id: row.id,
+        record_slot: row.record_slot,
+        file_url: row.file_url,
+        file_name: row.file_name,
+        updated_at: row.updated_at || "",
+        source,
+      };
+    });
     setRecords(map);
     setLoading(false);
   }, [session?.user?.id]);
+
+  const promoteVaultRecord = async (slot: SlotDef) => {
+    const r = records[slot.key];
+    if (!r || r.source !== "vault") return;
+    setPromotingSlot(slot.key);
+    try {
+      const { error } = await supabase
+        .from("medical_records")
+        .update({ record_slot: slot.key })
+        .eq("id", r.id);
+      if (error) throw error;
+      toast.success(`${slot.label} linked — guardians can now see it`);
+      await fetchRecords();
+    } catch (e: any) {
+      toast.error(e?.message || "Link failed");
+    } finally {
+      setPromotingSlot(null);
+    }
+  };
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -82,7 +113,9 @@ const IdInsuranceSection = () => {
       if (upErr) throw upErr;
 
       const existing = records[slot.key];
-      if (existing) {
+      // Only replace if the existing row is slot-owned. For vault-linked rows,
+      // insert a new slot-tagged row and leave the Vault entry untouched.
+      if (existing && existing.source === "slot") {
         if (existing.file_url) {
           await supabase.storage.from("medical-documents").remove([existing.file_url]);
         }
@@ -103,7 +136,7 @@ const IdInsuranceSection = () => {
           record_date: new Date().toISOString().split("T")[0],
         });
       }
-      toast.success(`${slot.label} saved`);
+      toast.success(`${slot.label} saved — guardians can now see it`);
       await fetchRecords();
     } catch (e: any) {
       toast.error(e?.message || "Upload failed");
@@ -116,6 +149,13 @@ const IdInsuranceSection = () => {
   const handleDelete = async (slot: SlotDef) => {
     const r = records[slot.key];
     if (!r) return;
+    if (r.source === "vault") {
+      // Don't delete the Vault file; just refresh (nothing to unlink — it was
+      // never slot-tagged on disk). The slot will remain empty until uploaded.
+      toast.success(`${slot.label} unlinked from Hospital Kit`);
+      fetchRecords();
+      return;
+    }
     if (r.file_url) await supabase.storage.from("medical-documents").remove([r.file_url]);
     await supabase.from("medical_records").delete().eq("id", r.id);
     toast.success(`${slot.label} removed`);
@@ -164,26 +204,45 @@ const IdInsuranceSection = () => {
                   <p className="text-[11px] text-muted-foreground">{slot.hint}</p>
                 </div>
                 {r ? (
-                  <Badge variant="default" className="text-[10px] shrink-0">Saved</Badge>
+                  <Badge variant={r.source === "vault" ? "outline" : "default"} className="text-[10px] shrink-0">
+                    {r.source === "vault" ? "From Vault" : "Saved"}
+                  </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
                 )}
               </div>
 
               {r ? (
-                <div className="flex items-center gap-2">
-                  <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-xs truncate flex-1">{r.file_name}</span>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
-                    <Eye className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setCaptureSlot(slot)}>
-                    <Upload className="w-3 h-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => setDeleteTarget(slot)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-xs truncate flex-1">{r.file_name}</span>
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPreview(slot)}>
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setCaptureSlot(slot)}>
+                      <Upload className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => setDeleteTarget(slot)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  {r.source === "vault" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-[11px]"
+                      disabled={promotingSlot === slot.key}
+                      onClick={() => promoteVaultRecord(slot)}
+                    >
+                      {promotingSlot === slot.key ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Linking…</>
+                      ) : (
+                        <><Link2 className="w-3 h-3 mr-1" /> Use this Vault doc for Hospital Kit</>
+                      )}
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Button
                   size="sm"

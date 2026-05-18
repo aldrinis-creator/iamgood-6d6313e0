@@ -20,6 +20,10 @@ import { Slider } from "@/components/ui/slider";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Camera, Upload, X, Loader2, Plus, RotateCw, FileText, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -107,6 +111,7 @@ const IdMultiPageField = ({
 
   const [pages, setPages] = useState<PageItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Crop state for the page currently being added
   const [cropOpen, setCropOpen] = useState(false);
@@ -129,8 +134,21 @@ const IdMultiPageField = ({
   }, [pages]);
 
   const handleClose = (next: boolean) => {
-    if (!next && !busy && !uploading) reset();
-    onOpenChange(next);
+    if (next) { onOpenChange(true); return; }
+    if (busy || uploading) return;
+    // If user has captured pages but not saved, confirm discard.
+    if (pages.length > 0) {
+      setDiscardOpen(true);
+      return;
+    }
+    reset();
+    onOpenChange(false);
+  };
+
+  const confirmDiscard = () => {
+    setDiscardOpen(false);
+    reset();
+    onOpenChange(false);
   };
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
@@ -255,13 +273,18 @@ const IdMultiPageField = ({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md"
+          onPointerDownOutside={(e) => { if (pages.length > 0) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (pages.length > 0) e.preventDefault(); }}
+          onInteractOutside={(e) => { if (pages.length > 0) e.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle>{slotLabel}</DialogTitle>
             <DialogDescription className="text-xs">
               {mode === "single" && "Capture or upload a clear photo. You can crop it before saving."}
-              {mode === "front-back" && "Add the front, then the back of the card. Each page can be cropped."}
-              {mode === "pages" && `Add up to ${maxPages} pages of your policy. Each page can be cropped.`}
+              {mode === "front-back" && "Add the front, then the back of the card. Tap Save when done."}
+              {mode === "pages" && `Add up to ${maxPages} pages of your policy. Tap Save when done.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -327,13 +350,20 @@ const IdMultiPageField = ({
             onChange={(e) => { handlePicked(e.target.files?.[0] || null); e.target.value = ""; }}
           />
 
+          {mode !== "single" && pages.length > 0 && (
+            <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-[11px] text-foreground">
+              <strong>{pages.length} page{pages.length > 1 ? "s" : ""} captured but not saved.</strong> Tap <span className="font-semibold">Save</span> below to upload — closing this window will discard them.
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-2 flex-row">
             <Button type="button" variant="ghost" size="sm" disabled={busy || !!uploading}
               onClick={() => handleClose(false)}>
               Cancel
             </Button>
             {mode !== "single" && (
-              <Button type="button" size="sm" className="ml-auto"
+              <Button type="button" size="sm"
+                className={`ml-auto ${pages.length > 0 ? "animate-pulse" : ""}`}
                 disabled={busy || !!uploading || pages.length === 0}
                 onClick={() => handleSave()}>
                 {busy || uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
@@ -343,6 +373,27 @@ const IdMultiPageField = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Discard confirmation */}
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard {pages.length} captured page{pages.length > 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven't saved yet. Closing now will discard the pages you just captured. Tap "Keep editing" to return and Save.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDiscard}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Crop dialog */}
       <Dialog open={cropOpen} onOpenChange={(o) => { if (!o && !busy) { setCropOpen(false); setCropSrc(""); } }}>

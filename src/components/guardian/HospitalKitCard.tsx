@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { BriefcaseMedical, ChevronRight, Bell, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { SLOT_KEYS, resolveSlotRows } from "@/lib/hospitalKitSlots";
 
 interface Props {
   wardUserId: string;
   wardName: string;
 }
 
-const TOTAL_SLOTS = 5;
+const TOTAL_SLOTS = SLOT_KEYS.length;
 const SLOT_LABELS: Record<string, string> = {
   aadhaar: "Aadhaar",
   pan: "PAN",
@@ -30,11 +31,10 @@ const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
   const fetchCount = useCallback(async () => {
     const { data } = await supabase
       .from("medical_records")
-      .select("record_slot")
-      .eq("user_id", wardUserId)
-      .not("record_slot", "is", null);
-    const slots = Array.from(new Set((data || []).map((r: any) => r.record_slot).filter(Boolean)));
-    setFilledSlots(slots);
+      .select("id, record_slot, record_type, file_url, file_name")
+      .eq("user_id", wardUserId);
+    const resolved = resolveSlotRows((data || []) as any);
+    setFilledSlots(Object.keys(resolved));
     setLoading(false);
   }, [wardUserId]);
 

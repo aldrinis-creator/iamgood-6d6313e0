@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import { buildAdmissionKitPdf, type AdmissionKitDoc } from "@/lib/admissionKitPdf";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
+import { resolveSlotRows } from "@/lib/hospitalKitSlots";
 
 interface Props {
   wardUserId: string;
@@ -26,9 +27,10 @@ const SLOT_DEFS = [
 
 interface SlotRecord {
   id: string;
-  record_slot: string;
+  record_slot: string | null;
   file_url: string | null;
   file_name: string | null;
+  source: "slot" | "vault";
 }
 
 const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
@@ -48,11 +50,19 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     setLoading(true);
     const { data } = await supabase
       .from("medical_records")
-      .select("id, record_slot, file_url, file_name")
-      .eq("user_id", wardUserId)
-      .not("record_slot", "is", null);
+      .select("id, record_slot, record_type, file_url, file_name")
+      .eq("user_id", wardUserId);
+    const resolved = resolveSlotRows((data || []) as any);
     const map: Record<string, SlotRecord> = {};
-    (data || []).forEach((r: any) => { if (r.record_slot) map[r.record_slot] = r; });
+    Object.entries(resolved).forEach(([slot, { row, source }]) => {
+      map[slot] = {
+        id: row.id,
+        record_slot: row.record_slot ?? slot,
+        file_url: row.file_url,
+        file_name: row.file_name,
+        source,
+      };
+    });
     setRecords(map);
     setLoading(false);
   }, [wardUserId]);
@@ -247,6 +257,9 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
                     <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
                       <FileText className="w-3 h-3" /> {r.file_name}
                     </p>
+                  )}
+                  {r?.source === "vault" && (
+                    <p className="text-[10px] text-muted-foreground italic">linked from Medical Vault</p>
                   )}
                 </div>
                 {r ? (
