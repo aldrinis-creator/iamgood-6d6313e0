@@ -273,13 +273,18 @@ const IdMultiPageField = ({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md"
+          onPointerDownOutside={(e) => { if (pages.length > 0) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (pages.length > 0) e.preventDefault(); }}
+          onInteractOutside={(e) => { if (pages.length > 0) e.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle>{slotLabel}</DialogTitle>
             <DialogDescription className="text-xs">
               {mode === "single" && "Capture or upload a clear photo. You can crop it before saving."}
-              {mode === "front-back" && "Add the front, then the back of the card. Each page can be cropped."}
-              {mode === "pages" && `Add up to ${maxPages} pages of your policy. Each page can be cropped.`}
+              {mode === "front-back" && "Add the front, then the back of the card. Tap Save when done."}
+              {mode === "pages" && `Add up to ${maxPages} pages of your policy. Tap Save when done.`}
             </DialogDescription>
           </DialogHeader>
 
