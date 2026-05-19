@@ -47,17 +47,41 @@ const periodIcon: Record<TimePeriod, React.ReactNode> = {
 const slotKey = (slot: DoseSlot) =>
   `${slot.medication.id}_${slot.scheduledAt.getHours()}:${slot.scheduledAt.getMinutes()}`;
 
-const notifyGuardians = async (userId: string, medicationName: string, status: string, scheduledTime: string) => {
-  try {
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-      body: JSON.stringify({ user_id: userId, medication_name: medicationName, status, scheduled_time: scheduledTime }),
-    });
-  } catch {
-    // silent fail
+const notifyTimeoutRefs = new Map<string, NodeJS.Timeout>();
+const pendingNotifications = new Map<string, string[]>();
+
+const notifyGuardians = (userId: string, medicationName: string, status: string, scheduledTime: string) => {
+  const key = `${userId}_${status}_${scheduledTime}`;
+  
+  if (!pendingNotifications.has(key)) {
+    pendingNotifications.set(key, []);
   }
+  pendingNotifications.get(key)!.push(medicationName);
+  
+  if (notifyTimeoutRefs.has(key)) {
+    clearTimeout(notifyTimeoutRefs.get(key)!);
+  }
+  
+  const timeoutId = setTimeout(async () => {
+    const medNames = pendingNotifications.get(key) || [];
+    pendingNotifications.delete(key);
+    notifyTimeoutRefs.delete(key);
+    
+    if (medNames.length === 0) return;
+    
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ user_id: userId, medication_name: medNames.join(", "), status, scheduled_time: scheduledTime }),
+      });
+    } catch {
+      // silent fail
+    }
+  }, 2000);
+  
+  notifyTimeoutRefs.set(key, timeoutId);
 };
 
 const TodaySchedule = () => {

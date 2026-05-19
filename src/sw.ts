@@ -129,6 +129,7 @@ self.addEventListener("push", (event: PushEvent) => {
       medication_id: data.medication_id || null,
       log_id: data.log_id || null,
       user_id: data.user_id || null,
+      scheduled_time: data.scheduled_time || null,
     },
     // @ts-ignore
     vibrate: [200, 100, 200],
@@ -168,7 +169,7 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
               user_id: data.user_id,
               status: "taken",
               taken_at: new Date().toISOString(),
-              scheduled_at: new Date().toISOString(),
+              scheduled_at: data.scheduled_time || new Date().toISOString(),
             }),
           });
         } catch (err) {

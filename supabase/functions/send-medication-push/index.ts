@@ -202,10 +202,13 @@ serve(async (req) => {
     }
 
     // Group by user
-    const userMeds = new Map<string, Array<{ name: string; id: string }>>();
+    const userMeds = new Map<string, Array<{ name: string; id: string; scheduled_time: string }>>();
     for (const med of matchingMeds) {
+      // Find which valid time matched this medication
+      const matchedTime = med.schedule_times.find((t: string) => validTimes.includes(t)) || currentTimeStr;
+      
       const list = userMeds.get(med.user_id) || [];
-      list.push({ name: med.name, id: med.id });
+      list.push({ name: med.name, id: med.id, scheduled_time: matchedTime });
       userMeds.set(med.user_id, list);
     }
 
@@ -221,17 +224,23 @@ serve(async (req) => {
 
       if (!subs || subs.length === 0) continue;
 
+      const matchedTime = meds[0].scheduled_time; // Format: "HH:MM"
+      const [h, m] = matchedTime.split(":").map(Number);
+      const scheduleDate = new Date(now);
+      scheduleDate.setHours(h, m || 0, 0, 0);
+
       const medNames = meds.map(m => m.name);
       const payload = {
         title: "💊 Medication Reminder",
         body: medNames.length === 1
           ? `Time to take ${medNames[0]}`
           : `Time to take: ${medNames.join(", ")}`,
-        tag: `med-${currentHour}-${currentMinute}`,
+        tag: `med-${h}-${m}`,
         url: "/my-health",
         type: "medication",
         medication_id: meds[0].id,
         user_id: userId,
+        scheduled_time: scheduleDate.toISOString(),
       };
 
       for (const sub of subs) {
