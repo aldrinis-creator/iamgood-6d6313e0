@@ -23,6 +23,7 @@ import { differenceInYears, parse } from "date-fns";
 import PhoneInput from "@/components/PhoneInput";
 import PastMedicalHistory from "@/components/PastMedicalHistory";
 import IdInsuranceSection from "@/components/profile/IdInsuranceSection";
+import GuardianBlockedSection from "@/components/profile/GuardianBlockedSection";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
 
 const BMI_CATEGORIES = [
