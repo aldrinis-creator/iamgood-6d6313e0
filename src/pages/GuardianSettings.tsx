@@ -132,10 +132,39 @@ const GuardianSettings = () => {
     if (!session?.user?.id) return;
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: profileName.trim() })
+      .update({
+        full_name: profileName.trim(),
+        avatar_url: avatarUrl || null,
+        emergency_contact_name: ecName.trim() || null,
+        emergency_contact_phone: ecPhone.trim() || null,
+        emergency_contact_relation: ecRelation.trim() || null,
+      } as any)
       .eq("id", session.user.id);
     if (error) toast.error("Could not save profile");
     else toast.success("Profile updated");
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!session?.user?.id) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be under 2MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) {
+      toast.error("Upload failed");
+      setUploadingAvatar(false);
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    setAvatarUrl(pub.publicUrl);
+    setUploadingAvatar(false);
+    toast.success("Photo uploaded — tap Save Profile to keep it");
   };
 
   const togglePush = async () => {
