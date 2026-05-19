@@ -88,6 +88,10 @@ const GuardianSettings = () => {
     if (!session?.user?.id) return;
     setProfileName(profile?.full_name || "");
     setProfilePhone(profile?.phone || "");
+    setAvatarUrl((profile as any)?.avatar_url || "");
+    setEcName((profile as any)?.emergency_contact_name || "");
+    setEcPhone((profile as any)?.emergency_contact_phone || "");
+    setEcRelation((profile as any)?.emergency_contact_relation || "");
   }, [session?.user?.id, profile]);
 
   // Fetch wards I monitor
