@@ -69,6 +69,11 @@ const GuardianSettings = () => {
   const [loading, setLoading] = useState(true);
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [ecName, setEcName] = useState("");
+  const [ecPhone, setEcPhone] = useState("");
+  const [ecRelation, setEcRelation] = useState("");
   const { isSubscribed, supported, subscribe, unsubscribe } = usePushSubscription();
   const { plan } = useSubscription();
   const [quiet, setQuiet] = useState<QuietHours>(() => loadJson(QUIET_KEY, defaultQuiet));
@@ -83,6 +88,10 @@ const GuardianSettings = () => {
     if (!session?.user?.id) return;
     setProfileName(profile?.full_name || "");
     setProfilePhone(profile?.phone || "");
+    setAvatarUrl((profile as any)?.avatar_url || "");
+    setEcName((profile as any)?.emergency_contact_name || "");
+    setEcPhone((profile as any)?.emergency_contact_phone || "");
+    setEcRelation((profile as any)?.emergency_contact_relation || "");
   }, [session?.user?.id, profile]);
 
   // Fetch wards I monitor
@@ -123,10 +132,39 @@ const GuardianSettings = () => {
     if (!session?.user?.id) return;
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: profileName.trim() })
+      .update({
+        full_name: profileName.trim(),
+        avatar_url: avatarUrl || null,
+        emergency_contact_name: ecName.trim() || null,
+        emergency_contact_phone: ecPhone.trim() || null,
+        emergency_contact_relation: ecRelation.trim() || null,
+      } as any)
       .eq("id", session.user.id);
     if (error) toast.error("Could not save profile");
     else toast.success("Profile updated");
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!session?.user?.id) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be under 2MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) {
+      toast.error("Upload failed");
+      setUploadingAvatar(false);
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    setAvatarUrl(pub.publicUrl);
+    setUploadingAvatar(false);
+    toast.success("Photo uploaded — tap Save Profile to keep it");
   };
 
   const togglePush = async () => {
@@ -171,7 +209,29 @@ const GuardianSettings = () => {
         {activeTab === "profile" && (
           <Card>
             <CardHeader><CardTitle className="text-base">Your Profile</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center border">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <ShieldCheck className="w-7 h-7 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Profile photo</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingAvatar}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleAvatarUpload(f);
+                    }}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label>Full Name</Label>
                 <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
@@ -181,6 +241,28 @@ const GuardianSettings = () => {
                 <Input value={profilePhone} disabled />
                 <p className="text-xs text-muted-foreground">Phone is your login identifier and cannot be edited here.</p>
               </div>
+
+              <div className="pt-2 border-t space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold">Your Emergency Contact</h4>
+                  <p className="text-xs text-muted-foreground">One person to reach if something happens to you. Plain contact info — not encrypted.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={ecName} onChange={(e) => setEcName(e.target.value)} placeholder="e.g. Spouse, Sibling" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} placeholder="+91…" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Relation</Label>
+                    <Input value={ecRelation} onChange={(e) => setEcRelation(e.target.value)} placeholder="Spouse" />
+                  </div>
+                </div>
+              </div>
+
               <Button onClick={saveProfile} className="w-full">Save Profile</Button>
             </CardContent>
           </Card>

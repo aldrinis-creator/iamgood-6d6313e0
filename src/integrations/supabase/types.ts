@@ -1780,8 +1780,12 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           date_of_birth: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relation: string | null
           full_name: string | null
           gender: string | null
           height_m: number | null
@@ -1795,8 +1799,12 @@ export type Database = {
           welcome_sent_at: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           date_of_birth?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
           full_name?: string | null
           gender?: string | null
           height_m?: number | null
@@ -1810,8 +1818,12 @@ export type Database = {
           welcome_sent_at?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           date_of_birth?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
           full_name?: string | null
           gender?: string | null
           height_m?: number | null
