@@ -68,16 +68,25 @@ interface Medication {
 }
 
 const MyProfile = () => {
+  const { profile } = useAuth();
+  const isGuardian = profile?.role === "guardian";
+
   return (
     <AppLayout>
       <div className="p-4 pb-28">
         <div className="mb-4">
           <h1 className="text-xl font-bold text-foreground">My Profile</h1>
-          <p className="text-sm text-muted-foreground">Protected with military-grade encryption</p>
+          {!isGuardian && (
+            <p className="text-sm text-muted-foreground">Protected with military-grade encryption</p>
+          )}
         </div>
-        <VaultGate title="My Profile">
-          <ProfileContent />
-        </VaultGate>
+        {isGuardian ? (
+          <GuardianBlockedSection />
+        ) : (
+          <VaultGate title="My Profile">
+            <ProfileContent />
+          </VaultGate>
+        )}
       </div>
     </AppLayout>
   );
