@@ -69,6 +69,11 @@ const GuardianSettings = () => {
   const [loading, setLoading] = useState(true);
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [ecName, setEcName] = useState("");
+  const [ecPhone, setEcPhone] = useState("");
+  const [ecRelation, setEcRelation] = useState("");
   const { isSubscribed, supported, subscribe, unsubscribe } = usePushSubscription();
   const { plan } = useSubscription();
   const [quiet, setQuiet] = useState<QuietHours>(() => loadJson(QUIET_KEY, defaultQuiet));
