@@ -209,7 +209,29 @@ const GuardianSettings = () => {
         {activeTab === "profile" && (
           <Card>
             <CardHeader><CardTitle className="text-base">Your Profile</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center border">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <ShieldCheck className="w-7 h-7 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Profile photo</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingAvatar}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleAvatarUpload(f);
+                    }}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label>Full Name</Label>
                 <Input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
@@ -219,6 +241,28 @@ const GuardianSettings = () => {
                 <Input value={profilePhone} disabled />
                 <p className="text-xs text-muted-foreground">Phone is your login identifier and cannot be edited here.</p>
               </div>
+
+              <div className="pt-2 border-t space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold">Your Emergency Contact</h4>
+                  <p className="text-xs text-muted-foreground">One person to reach if something happens to you. Plain contact info — not encrypted.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={ecName} onChange={(e) => setEcName(e.target.value)} placeholder="e.g. Spouse, Sibling" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} placeholder="+91…" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Relation</Label>
+                    <Input value={ecRelation} onChange={(e) => setEcRelation(e.target.value)} placeholder="Spouse" />
+                  </div>
+                </div>
+              </div>
+
               <Button onClick={saveProfile} className="w-full">Save Profile</Button>
             </CardContent>
           </Card>
