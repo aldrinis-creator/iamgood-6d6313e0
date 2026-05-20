@@ -1,81 +1,99 @@
-## Goal
+## Why your AI credits are draining fast
 
-Make the Guardian account a lightweight monitor identity. Remove all ward-style health, ID, medication, and "my guardians" sections from a Guardian's profile, and clean up any existing data those sections may have written.
+Lovable AI bills **per request, weighted by model tier and input/output tokens**. Expensive models (Gemini **3.1-pro**, **2.5-pro**, GPT-5) cost many times more per call than `gemini-2.5-flash-lite`. So the bill is driven by: (a) how often calls fire, (b) which model each call uses, (c) how much context you send in.
 
-## Scope of change
+After scanning the project, three things stand out — one big leak, one model-tier issue, and a few smaller multipliers.
 
-### 1. Guardian My Profile — keep only
+---
 
-- Full name
-- Phone (login identifier, read-only)
-- Email (optional)
-- Profile photo / avatar
-- One personal emergency contact (name + phone + relation) — so the system knows who to call if the guardian themselves has an incident
-- Language preference (already lives in Guardian Settings)
+### 1. Biggest leak: `useAbnormalPatternCheck` fires far more than intended
 
-### 2. Remove from Guardian profile entirely
+`src/hooks/useAbnormalPatternCheck.ts` is wired into `AppLayout`, which wraps every authenticated page. It is *supposed* to run at most once per hour using `lastCheckRef`, but:
 
-- Body Metrics (height, weight, BMI, etc.)
-- Body & Health / vitals baselines
-- Past Medical History
-- ID & Insurance (Aadhaar, PAN, insurance cards, multi-page uploads)
-- Family Doctor
-- My Guardians (a guardian doesn't nominate sub-guardians)
-- Current Medications
-- AES-256-GCM client-side encryption + PIN gate (`VaultGate`, `encryption.ts` usage) — not needed for the minimal guardian fields
+- `lastCheckRef` is a `useRef` inside the hook → it **resets on every remount**.
+- `AppLayout` mounts/unmounts as the user navigates between Dashboard / Health / Vault / Settings / Map / Alerts etc.
+- It also re-fires on every tab focus (`visibilitychange`).
 
-### 3. Routing behaviour
+Result: a Lovable AI call to `detect-anomalous-patterns` runs on **every page navigation and every time the app comes to foreground**, for every signed-in user — not once per hour. For an active user this can easily be dozens of calls per session.
 
-When a guardian (role check via `useAuth` + `user_roles`) lands on `/my-profile` or any sub-route that renders one of the removed sections, show a friendly empty state:
+It uses `gemini-2.5-flash-lite` (cheap), but at this frequency the cheap model still adds up — and it runs for guardians too, who don't need it.
 
-> "This section isn't available for Guardian accounts. Your profile only needs basic contact details — manage them in Guardian Settings."
+**Fix:** persist the throttle in `localStorage` keyed by user_id, skip the run for guardian accounts, and drop the `visibilitychange` re-trigger (the interval is enough).
 
-with a CTA button → `/guardian-settings` (Profile tab). Do **not** silently redirect; the message clarifies why the section is missing.
+---
 
-### 4. Data cleanup (hard delete) for existing guardian rows
+### 2. Model tier: health-tools defaults to expensive Pro models
 
-For every account whose role in `user_roles` is `guardian` (and only those), delete rows from:
+In `supabase/functions/health-tools/index.ts`:
 
-- `health_profile`
-- `medical_history`
-- `encrypted_documents` (ID & insurance, family doctor cards, etc.)
-- `health_passport_scores`
-- `face_scans`
-- `activity_logs`, `meal_logs` (body metrics / nutrition)
-- `medications` table (current medications) and any related medication schedule/alarm rows
-- `guardians` rows where `user_id` = the guardian account (i.e. sub-guardians they nominated as if they were a ward) — but **NEVER** delete rows where `guardian_user_id` = the guardian account (those are their wardship links and must stay)
+```
+symptom_check        → gemini-3.1-pro-preview  (high effort)
+vitals_insights      → gemini-3.1-pro-preview  (high effort)
+doctor_report        → gemini-3.1-pro-preview  (medium)
+hospital_bill_analysis → gemini-3.1-pro-preview (high)
+```
 
-This will be a single migration with a `DELETE … WHERE user_id IN (SELECT user_id FROM user_roles WHERE role = 'guardian')`-style block per table, executed once.
+Gemini 3.1-pro is one of the most expensive options on the gateway, and `high effort` further multiplies cost. Every Symptom Checker chat turn, every Vitals AI insight tap, every Doctor Visit report, and every Hospital Bill analysis burns Pro-tier credits.
 
-### 5. Guardian Settings Profile tab
+**Fix options (you choose):**
 
-Extend the existing `GuardianSettings.tsx` Profile tab to also hold the avatar upload and the single personal emergency contact (new lightweight fields on `profiles` — `avatar_url` likely already exists; add `emergency_contact_name`, `emergency_contact_phone`, `emergency_contact_relation` to `profiles` if not present, plain text, no encryption).
+- Move `symptom_check`, `doctor_report`, `hospital_bill_analysis` to `gemini-3-flash-preview` (medium effort). Quality stays good for these structured tasks.
+- Keep `vitals_insights` on Pro only if you really want premium reasoning there; otherwise flash is fine.
+- For `symptom_check`, also consider sending only the last 6 messages of history instead of the entire chat (currently the full transcript is appended every turn — input tokens grow quadratically with conversation length).
 
-## Files to change
+---
 
-- `src/pages/MyProfile.tsx` — branch on role: guardians get the lightweight view (name, phone, email, avatar, personal emergency contact) and a link to Guardian Settings; everything else hidden.
-- `src/components/profile/IdInsuranceSection.tsx`, `IdMultiPageField.tsx`, `MyPersona.tsx`, `PastMedicalHistory.tsx`, `HealthPassport.tsx` (the personal one), `MedicationManager.tsx` mounts on profile — wrap in `if (role !== 'user') return <GuardianBlockedSection/>`.
-- `src/components/VaultGate.tsx` — skip entirely for guardian role (no PIN prompt on profile).
-- `src/pages/GuardianSettings.tsx` — add avatar uploader + emergency contact fields in Profile tab.
-- New tiny component `GuardianBlockedSection.tsx` for the "not available" empty state.
+### 3. Smaller multipliers
 
-## Technical details
+- **Voice Assistant (`voice-query`)**: each tap = 1 Lovable AI call (`gemini-2.5-flash`) + 1 ElevenLabs TTS call. Lovable side is cheap, but the full `gatherContext` JSON is shoved into the user prompt every time — trimming it would help input tokens.
+- `**nutrition-advisor` with image** uses `gemini-2.5-pro`. That's correct for vision but expensive — make sure photo meal logging isn't being triggered accidentally.
+- `**detect-anomalous-patterns**` also pulls 14 days of multiple tables into the prompt; large payload = more input tokens per call. Once #1 is fixed this matters less.
 
-- **Role detection**: use existing `useAuth().profile.role` (sourced from `user_roles`, never trust client storage).
-- **Migration**: schema-only ADD COLUMN for the three `profiles.emergency_contact_*` fields; the data purge runs via the insert/delete tool (data, not schema).
-- **RLS**: no policy changes needed — existing per-user policies cover the new columns.
-- **Encryption**: `encryption.ts` and `encrypted_documents` table stay in place for ward (`user`) accounts; only the guardian path stops writing to / reading from them.
-- **Memory**: add a new note `mem://features/guardian-profile-scope` ("Guardian profile is identity-only: name, phone, email, avatar, one personal emergency contact. No health/ID/meds/sub-guardians. No client-side encryption.") and update the Guardian Workflow / Guardian Settings memory entries to reference it.
+---
 
-## Out of scope
+### What is *not* the cause
 
-- Ward (`user` role) profile — unchanged.
-- Encryption/PIN system itself — kept for wards.
-- Auth flow, nominations, dashboard, alerts — unchanged.
+- No `pg_cron` job is invoking AI functions in the background.
+- Push notifications, missed-checkin checks, medication reminders, and email queue do **not** call Lovable AI.
+- ElevenLabs voice credits are billed separately by ElevenLabs and are not part of your Lovable AI balance.
 
-## Risks
+---
 
-- Hard delete is irreversible — only runs against rows owned by accounts whose role is `guardian`. The migration will be reviewed before approval.
-- If any guardian later gets converted to a ward (role change), they'll start fresh on health data — acceptable, that's effectively a new ward onboarding.
+## Proposed fix (one change set, all reversible)
 
-Approve and I'll execute: (a) schema migration for the three emergency-contact columns, (b) data purge migration, (c) UI changes, (d) memory update.
+**A. Fix the anomaly-check throttle (biggest impact)**
+
+- In `useAbnormalPatternCheck`: replace the in-memory `lastCheckRef` with `localStorage` key `anomaly_check_last_run_<userId>`, so the 1-hour gate survives navigation and reloads.
+- Skip the hook entirely for accounts with role `guardian` (guardians don't have personal health data anyway).
+- Remove the `visibilitychange` listener; rely on the 1-hour `setInterval` + the initial mount check.
+
+**B. Downshift expensive health-tools to flash**
+
+- Change in `supabase/functions/health-tools/index.ts`:
+  - `symptom_check`        → `gemini-3-flash-preview` (medium)
+  - `doctor_report`        → `gemini-3-flash-preview` (medium)
+  - `hospital_bill_analysis` → `gemini-3-flash-preview` (medium)
+- Leave `vitals_insights` on Pro (low frequency, premium feature) **or** move it too — your call.
+
+**C. Trim Symptom Checker history**
+
+- In `src/components/health-tools/SymptomChecker.tsx`, only send the last 6 messages to the edge function instead of the full transcript.
+
+**D. Optional: trim voice-query context payload**
+
+- In `voice-query`, drop fields like full `appointments_today.items` and `health_passport` raw breakdown unless the model needs them — send a smaller summarized object.
+
+### Expected outcome
+
+Step A alone should cut your daily AI credit consumption dramatically (this is almost certainly where most of the drain is coming from). Steps B and C reduce per-call cost on the heaviest features. Step D is polish.
+
+### Out of scope
+
+- I'm not touching auth, RLS, scheduling, or the voice-assistant UX.
+- ElevenLabs voice credits — those are a separate top-up at elevenlabs.io and not affected by these changes.
+
+Want me to implement A+B+C, or just A first?
+
+implement A+B+C
+
+&nbsp;

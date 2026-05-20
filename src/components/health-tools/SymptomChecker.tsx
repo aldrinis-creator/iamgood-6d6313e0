@@ -36,7 +36,9 @@ const SymptomChecker = () => {
     setSaved(false);
 
     try {
-      const history = [...messages, userMsg].map((m) => `${m.role}: ${m.content}`).join("\n");
+      // Cap conversation context to the last 6 turns to keep token cost bounded.
+      const recent = [...messages, userMsg].slice(-6);
+      const history = recent.map((m) => `${m.role}: ${m.content}`).join("\n");
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "symptom_check", payload: history },
       });

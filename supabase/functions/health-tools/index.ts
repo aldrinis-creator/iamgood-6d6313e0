@@ -310,13 +310,13 @@ If the document is not a bill or is unreadable, set verdict="insufficient_data" 
 };
 
 const taskConfig: Record<string, { model: string; effort?: string }> = {
-  symptom_check:     { model: "google/gemini-3.1-pro-preview", effort: "high" },
+  symptom_check:     { model: "google/gemini-3-flash-preview", effort: "medium" },
   vitals_insights:   { model: "google/gemini-3.1-pro-preview", effort: "high" },
-  doctor_report:     { model: "google/gemini-3.1-pro-preview", effort: "medium" },
+  doctor_report:     { model: "google/gemini-3-flash-preview", effort: "medium" },
   document_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
   medication_info:   { model: "google/gemini-3-flash-preview", effort: "medium" },
   prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  hospital_bill_analysis: { model: "google/gemini-3.1-pro-preview", effort: "high" },
+  hospital_bill_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
   banned_check:            { model: "google/gemini-2.5-flash-lite",  effort: "low" },
   face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
   urine_color_analysis:    { model: "google/gemini-2.5-flash",       effort: "low" },
