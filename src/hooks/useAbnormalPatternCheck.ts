@@ -1,22 +1,39 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const STORAGE_KEY = (uid: string) => `anomaly_check_last_run_${uid}`;
 
 export default function useAbnormalPatternCheck() {
   const { session } = useAuth();
-  const lastCheckRef = useRef(0);
+  const { role } = useApp();
 
   useEffect(() => {
     if (!session?.user?.id) return;
+    // Only ward accounts have health data worth scanning; guardians never need this.
+    if (role !== "user") return;
     const uid = session.user.id;
+
+    const getLastRun = (): number => {
+      try {
+        const v = localStorage.getItem(STORAGE_KEY(uid));
+        return v ? parseInt(v, 10) || 0 : 0;
+      } catch {
+        return 0;
+      }
+    };
+    const setLastRun = (ts: number) => {
+      try { localStorage.setItem(STORAGE_KEY(uid), String(ts)); } catch { /* ignore */ }
+    };
 
     const runCheck = async () => {
       const now = Date.now();
-      if (now - lastCheckRef.current < CHECK_INTERVAL_MS) return;
-      lastCheckRef.current = now;
+      if (now - getLastRun() < CHECK_INTERVAL_MS) return;
+      // Reserve the slot immediately so concurrent mounts don't double-fire.
+      setLastRun(now);
 
       try {
         const { data, error } = await supabase.functions.invoke("detect-anomalous-patterns", {
@@ -29,7 +46,6 @@ export default function useAbnormalPatternCheck() {
         }
 
         if (data?.anomalies_detected && data?.summary) {
-          // Create in-app notification (deduped)
           await supabase.rpc("insert_notification_deduped", {
             p_user_id: uid,
             p_title: "Health Pattern Alert",
@@ -37,7 +53,6 @@ export default function useAbnormalPatternCheck() {
             p_type: "anomaly",
           });
 
-          // Notify guardians if critical
           if (data.severity === "high") {
             const { data: guardians } = await supabase
               .from("guardians")
@@ -72,19 +87,12 @@ export default function useAbnormalPatternCheck() {
       }
     };
 
-    // Run on mount and on visibility change (app foreground)
+    // Run once on mount (gated by localStorage throttle, so navigation won't re-fire).
     runCheck();
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") runCheck();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-
     const interval = setInterval(runCheck, CHECK_INTERVAL_MS);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(interval);
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, role]);
 }
