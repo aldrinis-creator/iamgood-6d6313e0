@@ -97,7 +97,8 @@ const UserDashboard = () => {
     localStorage.setItem("hydration_banner_dismissed_date", today);
     setHydrationDismissed(true);
   };
-  const showHydrationBanner = settings.hydrationNudges && hydration?.level === "high_risk" && !hydrationDismissed;
+  const showHydrationBanner = settings.hydrationNudges && (hydration?.level === "high_risk" || hydration?.level === "reminder") && !hydrationDismissed;
+  const isHighRisk = hydration?.level === "high_risk";
 
   // Notify all guardians about mode change
   const notifyGuardians = useCallback(async (title: string, message: string) => {
@@ -268,17 +269,25 @@ const UserDashboard = () => {
 
         {/* Hydration High-Risk Banner */}
         {showHydrationBanner && (
-          <Card className="border-amber-500/40 bg-amber-500/10">
-            <CardContent className="p-3 flex items-center gap-3">
-              <Droplets className="w-5 h-5 text-amber-600 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">Hot &amp; humid today</p>
-                <p className="text-xs text-muted-foreground">
-                  {Math.round(hydration!.temp!)}°C / {Math.round(hydration!.humidity!)}% humidity. Sip water often.
-                </p>
+          <Card className={isHighRisk ? "border-orange-500/50 bg-orange-500/10" : "border-amber-500/40 bg-amber-500/10"}>
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${isHighRisk ? "bg-orange-500/20" : "bg-amber-500/20"}`}>
+                  <Droplets className={`w-8 h-8 ${isHighRisk ? "text-orange-600" : "text-amber-600"}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl font-bold mb-1">
+                    {isHighRisk ? "🥵 Hot & humid today" : "💧 Stay hydrated"}
+                  </h3>
+                  <p className="text-base text-foreground leading-relaxed">
+                    {isHighRisk
+                      ? `It's ${Math.round(hydration!.temp!)}°C with ${Math.round(hydration!.humidity!)}% humidity. Please sip water often.`
+                      : "It's humid today — drink a glass of water now."}
+                  </p>
+                </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={dismissHydrationBanner} aria-label="Dismiss">
-                <X className="w-4 h-4" />
+              <Button variant="outline" size="lg" className="w-full text-base" onClick={dismissHydrationBanner}>
+                Dismiss
               </Button>
             </CardContent>
           </Card>
