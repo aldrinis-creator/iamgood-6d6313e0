@@ -7,13 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Moon, Users, Globe, Shield, Crown, ShieldCheck, AlertCircle } from "lucide-react";
+import { Bell, Moon, Users, Globe, Shield, Crown, ShieldCheck, AlertCircle, FileLock2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import usePushSubscription from "@/hooks/usePushSubscription";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getGuardianLimit } from "@/lib/featureGating";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import VaultClaimCard from "@/components/vault/VaultClaimCard";
+import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
+import { formatDistanceToNow } from "date-fns";
 
 type Tab = "profile" | "wards" | "notifications" | "quiet" | "language" | "privacy";
 
