@@ -136,7 +136,7 @@ const useMedicationAlarms = () => {
 
           missedSentRef.current.add(missedKey);
 
-          const isVeryLate = diffMin > HARD_CUTOFF_MIN + 60; // > 2 hours
+          const isVeryLate = diffMin > HARD_CUTOFF_MIN + 5; // > 65 minutes late
 
           if (isVeryLate) {
             if (!alreadyMissedLog) {

@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     }
 
     const timeLabel = scheduled_time
-      ? new Date(scheduled_time).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
+      ? new Date(scheduled_time).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })
       : "";
 
     // Current IST timestamp
@@ -66,10 +66,10 @@ Deno.serve(async (req) => {
 
     if (isMissed && scheduled_time) {
       const scheduledDate = new Date(scheduled_time);
-      const isVeryLate = scheduledDate.getTime() < now.getTime() - (2 * 60 * 60 * 1000); // > 2 hours
+      const isVeryLate = scheduledDate.getTime() < now.getTime() - (65 * 60 * 1000); // > 65 minutes
       
       if (isVeryLate) {
-        console.log(`Medication alert is >2 hours late, skipping missed alert for ${user_id}`);
+        console.log(`Medication alert is >65 mins late, skipping missed alert for ${user_id}`);
         return new Response(JSON.stringify({ message: "Medication is very late, skipping missed alert" }), { headers: corsHeaders });
       }
 
