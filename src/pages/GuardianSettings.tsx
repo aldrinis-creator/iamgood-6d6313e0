@@ -291,7 +291,7 @@ const GuardianSettings = () => {
                 </div>
               )}
               {wards.map((w) => (
-                <div key={w.id} className="border rounded-lg p-3 space-y-1">
+                <div key={w.id} className="border rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-medium">{w.ward_name}</div>
                     {w.is_primary && (
@@ -300,6 +300,9 @@ const GuardianSettings = () => {
                   </div>
                   {w.relation && (
                     <div className="text-xs text-muted-foreground">Relation: {w.relation}</div>
+                  )}
+                  {w.is_primary && (
+                    <BereavementSection wardUserId={w.user_id} wardName={w.ward_name} />
                   )}
                 </div>
               ))}
