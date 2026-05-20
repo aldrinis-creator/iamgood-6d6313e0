@@ -1,4 +1,4 @@
-import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight, Droplets, X } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight, Droplets } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
 import VaultClaimCancelBanner from "@/components/vault/VaultClaimCancelBanner";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
