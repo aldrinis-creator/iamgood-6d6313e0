@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { useUserSettings } from "./useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-const NUDGE_THROTTLE_MS = 2 * 60 * 60 * 1000; // 2h
-const LS_LAST_NUDGE = "hydration_nudge_last_at";
 const LS_GUARDIAN_DATE = "hydration_guardian_alert_date";
 
 function istHourNow(): number {
@@ -49,17 +46,6 @@ export function useHydrationNudge(humidity?: number, temp?: number, userName?: s
 
     const hour = istHourNow();
     if (hour >= 22 || hour < 6) return; // quiet hours
-
-    // throttle toast
-    const lastStr = localStorage.getItem(LS_LAST_NUDGE);
-    const last = lastStr ? parseInt(lastStr, 10) : 0;
-    if (Date.now() - last >= NUDGE_THROTTLE_MS) {
-      const msg = lvl === "high_risk"
-        ? `🥵 Hot & humid (${Math.round(temp!)}°C / ${Math.round(humidity!)}%). Sip water often.`
-        : `💧 It's humid today — drink a glass of water.`;
-      toast(msg, { duration: 7000 });
-      localStorage.setItem(LS_LAST_NUDGE, String(Date.now()));
-    }
 
     // Guardian alert (high risk, once per day)
     if (lvl === "high_risk" && settings.hydrationAdvisoryToGuardian && session?.user?.id) {
