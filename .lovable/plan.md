@@ -1,38 +1,41 @@
-## Goal
-Replace the small hydration toast + tiny dashboard banner with a single **large, prominent banner with a Dismiss button**, shown for both "reminder" and "high_risk" hydration levels.
+## Bereavement / Vault Claim in Guardian Settings → Wards
 
-## Changes
+Brand and expose the Vault Nominee Claim flow as **"Bereavement / Vault Claim"**, placed inside `GuardianSettings.tsx` under the existing **Wards** tab, on each ward card where the guardian is Primary Guardian.
 
-### 1. `src/hooks/useHydrationNudge.ts`
-- Remove the `toast(...)` call entirely (it's redundant with the new banner).
-- Keep the `hydration-level` event dispatch (banner reads it) and keep the guardian advisory logic untouched.
-- Keep the 2h throttle for the *event-driven nudge* but always dispatch level so banner can render.
+### What changes
 
-### 2. `src/pages/UserDashboard.tsx`
-- Trigger banner when `hydration.level` is `"reminder"` OR `"high_risk"` (not just high_risk).
-- Enlarge the banner card:
-  - Bigger padding (`p-5`), larger droplet icon (`w-10 h-10`), heading at `text-lg`/`text-xl`, body at `text-base`.
-  - Color tint per level: amber for reminder, stronger orange/red tint for high_risk.
-  - Dynamic copy:
-    - reminder → "💧 Stay hydrated — drink a glass of water now."
-    - high_risk → "🥵 Hot & humid ({temp}°C / {humidity}%). Sip water often."
-  - Replace small `X` icon button with a **full-width "Dismiss" Button** (outline variant) below the text.
-- Daily dismiss persistence (`hydration_banner_dismissed_date`) stays the same — one dismiss covers the day.
+`**src/pages/GuardianSettings.tsx**`
 
-### 3. Out of scope
-- Guardian hydration advisory (unchanged).
-- Quiet hours / pauseMode gating (unchanged — banner respects `hydrationNudges` setting).
-- No new files, no DB changes, no audio.
+- Extend the wards fetch to also select `is_vault_nominee` (so we can show the correct sub-state).
+- Inside each ward row in the `activeTab === "wards"` block, when `w.is_primary === true`, render a new section titled **"Bereavement / Vault Claim"** with:
+  - A short, calm explainer: *"If the worst should happen, use this to begin the Vault Nominee Claim process and access {ward}'s essential records."*
+  - A primary outline button **"Open Bereavement / Vault Claim"** that opens the existing `VaultClaimCard` for that ward inside a `Dialog` (so we don't navigate away from Settings).
+  - A compact status line driven by `useVaultClaimStatus(w.user_id)`:
+    - `loading` → "Checking eligibility…"
+    - `!eligible` → muted note: *"Ward has not yet designated you as Vault Nominee. Ask them to enable this in their Vault settings."* (button disabled)
+    - `eligible && !claim` → "No claim filed."
+    - `eligible && claim` → badge showing claim.status (Initiated / Docs uploaded / 7-day window open / Released / Rejected / Cancelled) + relative time.
+- Non-primary wards: section is hidden entirely (per your spec).
 
-## Visual sketch
-```
-┌────────────────────────────────────────┐
-│  💧  Stay hydrated                     │
-│      It's humid today — drink a glass  │
-│      of water now.                     │
-│                                        │
-│  ┌──────────────────────────────────┐  │
-│  │           Dismiss                │  │
-│  └──────────────────────────────────┘  │
-└────────────────────────────────────────┘
-```
+`**src/components/vault/VaultClaimCard.tsx**` — no logic changes; reused as-is inside the Dialog. Verify it accepts being mounted with a `wardUserId` prop (or whichever prop it already uses on Guardian Services) and pass the same value.
+
+**Memory update** (`mem://features/guardian-dashboard.md`)
+
+- Add: "Bereavement / Vault Claim is also surfaced in Guardian Settings → Wards tab, per-ward, gated on `is_primary=true`. Eligibility to actually file still requires ward's `is_vault_nominee=true` (shown as disabled state with explainer)."
+
+### Open question (worth flagging)
+
+You said gate it on **Primary Guardian** (`is_primary`). The existing claim RPC eligibility is gated on a separate flag `is_vault_nominee` (set by the ward in their Vault). These can differ — a Primary Guardian isn't automatically the Vault Nominee.
+
+Two options:
+
+- **A. Show on Primary only** (your instruction). If they're Primary but not Vault Nominee, the button is disabled with the explainer above. *(planned default)*
+- **B. Show on Primary OR Vault Nominee** so a non-Primary nominee can still find it here.
+
+I'll go with **A** unless you say otherwise. Go with A
+
+### Out of scope
+
+- No DB / RLS changes.
+- Guardian Services tile and Guardian Dashboard slim strip stay as-is (this is an additional surface, not a move).
+- No new route or bottom-nav tab.
