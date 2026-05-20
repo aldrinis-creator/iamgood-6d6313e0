@@ -191,7 +191,12 @@ Rules:
     });
 
     if (aiResp.status === 429) return json({ error: "Voice assistant is busy. Please try again in a moment." }, 429);
-    if (aiResp.status === 402) return json({ error: "Voice assistant credits exhausted. Please contact support." }, 402);
+    if (aiResp.status === 402) {
+      // Return 200 with a friendly spoken answer so the UI degrades gracefully
+      // instead of throwing on the client. Audio is null → browser TTS fallback.
+      const msg = "The voice assistant is temporarily out of credits. Please ask your administrator to top up the AI balance.";
+      return json({ answer: msg, audio: null, degraded: "credits_exhausted" }, 200);
+    }
     if (!aiResp.ok) {
       const t = await aiResp.text();
       console.error("[voice-query] AI gateway error:", aiResp.status, t.slice(0, 500));
