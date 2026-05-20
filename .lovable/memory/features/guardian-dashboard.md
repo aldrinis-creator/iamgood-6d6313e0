@@ -24,3 +24,5 @@ Nutrition, Face Scan, Wellness tiles show placeholder text until wearable integr
 "Since Last Check-iN" label on the status card time display.
 
 Vault Nominee Access entry point: lives in Guardian Services as a calm "Available if the worst should happen." tile gated on `useVaultClaimStatus().eligible`. Resting CTA softened to "Initiate Vault Claim" (outline, not destructive). Wizard's destructive treatment is preserved inside the dialog. Shared hook: `src/components/vault/useVaultClaimStatus.ts`.
+
+Also surfaced in Guardian Settings → Wards tab, branded as "Bereavement / Vault Claim", rendered per-ward only when `is_primary=true`. Opens `VaultClaimCard` inside a Dialog. If Primary but not Vault Nominee (`is_vault_nominee=false`), the button is disabled with an explainer asking the ward to enable it. Eligibility for the actual claim RPC still requires `is_vault_nominee=true`.
