@@ -461,4 +461,62 @@ const GuardianSettings = () => {
   );
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  initiated: "Initiated",
+  docs_uploaded: "Documents uploaded",
+  user_window_open: "7-day window open",
+  released: "Released",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const BereavementSection = ({ wardUserId, wardName }: { wardUserId: string; wardName: string }) => {
+  const [open, setOpen] = useState(false);
+  const { loading, eligible, claim } = useVaultClaimStatus(wardUserId);
+
+  const statusLine = (() => {
+    if (loading) return "Checking eligibility…";
+    if (!eligible) return `${wardName} has not designated you as Vault Nominee. Ask them to enable this in their Vault.`;
+    if (!claim) return "No claim filed.";
+    const label = STATUS_LABELS[claim.status] || claim.status;
+    const when = formatDistanceToNow(new Date(claim.created_at), { addSuffix: true });
+    return `${label} · ${when}`;
+  })();
+
+  const isActive = !!claim && ACTIVE_CLAIM_STATUSES.includes(claim.status);
+
+  return (
+    <div className="mt-2 pt-3 border-t space-y-2">
+      <div className="flex items-center gap-2">
+        <FileLock2 className="w-4 h-4 text-primary" />
+        <div className="text-sm font-semibold">Bereavement / Vault Claim</div>
+        {isActive && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">In progress</Badge>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        If the worst should happen, use this to begin the Vault Nominee Claim process and access {wardName}'s essential records.
+      </p>
+      <div className="text-xs text-muted-foreground">{statusLine}</div>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={!eligible}
+        onClick={() => setOpen(true)}
+      >
+        Open Bereavement / Vault Claim
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bereavement / Vault Claim — {wardName}</DialogTitle>
+          </DialogHeader>
+          <VaultClaimCard wardUserId={wardUserId} wardName={wardName} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 export default GuardianSettings;
