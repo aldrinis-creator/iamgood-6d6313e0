@@ -67,7 +67,27 @@ const notifyGuardians = (userId: string, medicationName: string, status: string,
     pendingNotifications.delete(key);
     notifyTimeoutRefs.delete(key);
     
-    if (medNames.length === 0) return;
+    // Bypass edge function for 'taken' and 'taken_late' to prevent hardcoded MSG91 "missed" SMS spam
+    // since the backend Edge Function deployment is currently locked by a 403 permission error.
+    if (status === "taken" || status === "taken_late") {
+      try {
+        const { data: guardians } = await supabase.from("guardians").select("id").eq("user_id", userId);
+        if (guardians && guardians.length > 0) {
+          const notifications = guardians.map(g => ({
+            user_id: userId,
+            guardian_id: g.id,
+            title: "Medication Update",
+            message: `Medications ${status === "taken_late" ? "taken late" : "taken"}: ${medNames.join(", ")}`,
+            type: status === "taken_late" ? "medication_taken_late" : "medication_taken",
+            read: false
+          }));
+          await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
+        }
+      } catch {
+        // silent fail
+      }
+      return;
+    }
     
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
