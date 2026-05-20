@@ -149,10 +149,10 @@ Deno.serve(async (req) => {
 
     await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
 
-    // MSG91 WhatsApp notification for medication
+    // MSG91 WhatsApp notification for medication (Only for missed medications)
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
     const msg91MedTemplate = Deno.env.get("MSG91_MED_TEMPLATE_ID");
-    if (msg91AuthKey && msg91MedTemplate) {
+    if (msg91AuthKey && msg91MedTemplate && isMissed) {
       const recipientsRaw = eligibleGuardians
         .filter((g: any) => g.guardian_phone)
         .map((g: any) => {
