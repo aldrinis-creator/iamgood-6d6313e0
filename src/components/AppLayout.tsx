@@ -24,6 +24,8 @@ import SOSActiveBar from "@/components/SOSActiveBar";
 import useAbnormalPatternCheck from "@/hooks/useAbnormalPatternCheck";
 import useActivityHeartbeat from "@/hooks/useActivityHeartbeat";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import useMorningBriefing from "@/hooks/useMorningBriefing";
+import MorningBriefingOverlay from "@/components/MorningBriefingOverlay";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -33,6 +35,7 @@ const UserOnlyHooks = () => {
   useLocationSync();
   useAbnormalPatternCheck();
   useActivityHeartbeat();
+  useMorningBriefing();
   return null;
 };
 
@@ -122,6 +125,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && !loginInProgress && <BatteryWarning />}
         {!loginInProgress && <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />}
         {!loginInProgress && <ReminderOverlay />}
+        {role === "user" && !loginInProgress && <MorningBriefingOverlay />}
         {role === "user" && !loginInProgress && <GuardianPingOverlay />}
         {role === "guardian" && !loginInProgress && <UserPingOverlay />}
       </div>
