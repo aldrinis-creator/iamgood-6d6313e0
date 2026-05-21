@@ -72,10 +72,10 @@ const MorningBriefingOverlay = () => {
 
     try {
       await speak(speech);
-      // Wait 15 seconds after audio finishes
+      // Wait 30 seconds after audio finishes
       autoDismissRef.current = setTimeout(() => {
         dismiss();
-      }, 15000);
+      }, 30000);
     } catch {
       // Fallback if speak fails: wait 30 seconds
       autoDismissRef.current = setTimeout(() => {
@@ -160,12 +160,17 @@ const MorningBriefingOverlay = () => {
             We wish you a great day.
           </p>
 
-          <Button 
-            onClick={() => dismiss()} 
-            className="w-full h-14 text-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition-all active:scale-95"
-          >
-            Dismiss
-          </Button>
+          <div className="w-full space-y-2 mt-4">
+            <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">
+              This message will close automatically in 30 seconds, or you can tap Dismiss.
+            </p>
+            <Button 
+              onClick={() => dismiss()} 
+              className="w-full h-14 text-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition-all active:scale-95"
+            >
+              Dismiss
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
