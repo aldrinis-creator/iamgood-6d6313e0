@@ -1,41 +1,35 @@
-## Bereavement / Vault Claim in Guardian Settings → Wards
+# Symptom Checker not responding — root cause & fix
 
-Brand and expose the Vault Nominee Claim flow as **"Bereavement / Vault Claim"**, placed inside `GuardianSettings.tsx` under the existing **Wards** tab, on each ward card where the guardian is Primary Guardian.
+## Root cause
 
-### What changes
+Recent `health-tools` edge function calls are all returning **HTTP 402 — "AI credits exhausted. Please add funds."** (confirmed in edge logs for function id `2e6364bc…`, last 3 POSTs all 402).
 
-`**src/pages/GuardianSettings.tsx**`
+The function works correctly. The Lovable AI Gateway workspace credit balance is depleted, so Gemini calls are being rejected.
 
-- Extend the wards fetch to also select `is_vault_nominee` (so we can show the correct sub-state).
-- Inside each ward row in the `activeTab === "wards"` block, when `w.is_primary === true`, render a new section titled **"Bereavement / Vault Claim"** with:
-  - A short, calm explainer: *"If the worst should happen, use this to begin the Vault Nominee Claim process and access {ward}'s essential records."*
-  - A primary outline button **"Open Bereavement / Vault Claim"** that opens the existing `VaultClaimCard` for that ward inside a `Dialog` (so we don't navigate away from Settings).
-  - A compact status line driven by `useVaultClaimStatus(w.user_id)`:
-    - `loading` → "Checking eligibility…"
-    - `!eligible` → muted note: *"Ward has not yet designated you as Vault Nominee. Ask them to enable this in their Vault settings."* (button disabled)
-    - `eligible && !claim` → "No claim filed."
-    - `eligible && claim` → badge showing claim.status (Initiated / Docs uploaded / 7-day window open / Released / Rejected / Cancelled) + relative time.
-- Non-primary wards: section is hidden entirely (per your spec).
+A secondary issue masks this: `SymptomChecker.tsx` swallows the gateway's 402 message into a generic `"Failed to get response"` toast, so the user can't tell why nothing comes back.
 
-`**src/components/vault/VaultClaimCard.tsx**` — no logic changes; reused as-is inside the Dialog. Verify it accepts being mounted with a `wardUserId` prop (or whichever prop it already uses on Guardian Services) and pass the same value.
+## Fix — two parts
 
-**Memory update** (`mem://features/guardian-dashboard.md`)
+### 1. Top up Lovable AI credits (required, user action)
 
-- Add: "Bereavement / Vault Claim is also surfaced in Guardian Settings → Wards tab, per-ward, gated on `is_primary=true`. Eligibility to actually file still requires ward's `is_vault_nominee=true` (shown as disabled state with explainer)."
+Open **Workspace → Settings → Usage / AI Credits** and add credits (or upgrade plan). Once balance is restored, the Symptom Checker will respond immediately — no code change needed for that.
 
-### Open question (worth flagging)
+### 2. Surface real backend errors in the chat (code change)
 
-You said gate it on **Primary Guardian** (`is_primary`). The existing claim RPC eligibility is gated on a separate flag `is_vault_nominee` (set by the ward in their Vault). These can differ — a Primary Guardian isn't automatically the Vault Nominee.
+In `src/components/health-tools/SymptomChecker.tsx`, `send()`:
 
-Two options:
+- When `supabase.functions.invoke` returns an `error` (non-2xx like 402/429), read the JSON body from `error.context.response` (or fallback) and toast that message instead of the generic "Failed to get response".
+- Specifically map:
+  - 402 → "AI credits exhausted. Please top up in Workspace settings."
+  - 429 → "AI is busy, please try again in a moment."
+- Append an assistant message like *"⚠️ I couldn't respond: <reason>"* so the failure is visible inline, not just as a fleeting toast.
 
-- **A. Show on Primary only** (your instruction). If they're Primary but not Vault Nominee, the button is disabled with the explainer above. *(planned default)*
-- **B. Show on Primary OR Vault Nominee** so a non-Primary nominee can still find it here.
+No edge function, schema, or other component changes required.
 
-I'll go with **A** unless you say otherwise. Go with A
+## Verification
 
-### Out of scope
-
-- No DB / RLS changes.
-- Guardian Services tile and Guardian Dashboard slim strip stay as-is (this is an additional surface, not a move).
-- No new route or bottom-nav tab.
+After topping up credits:
+1. Open Health Tools → Symptom Checker.
+2. Send "Headache and fever".
+3. Expect a streamed Gemini response within ~3s and no toast.
+4. Check edge function logs — POSTs return 200.

@@ -42,11 +42,36 @@ const SymptomChecker = () => {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "symptom_check", payload: history },
       });
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
+
+      // Try to extract the server's error body even on non-2xx responses
+      let serverError: string | null = null;
+      let status: number | null = null;
+      if (error) {
+        status = (error as any)?.context?.response?.status ?? null;
+        try {
+          const body = await (error as any)?.context?.response?.json?.();
+          serverError = body?.error ?? null;
+        } catch { /* ignore */ }
+      }
+      if (!serverError && data?.error) serverError = data.error;
+
+      if (serverError || error) {
+        let friendly = serverError || "Failed to get response";
+        if (status === 402 || /credit/i.test(friendly)) {
+          friendly = "AI credits exhausted. Please top up in Workspace → Settings → Usage to continue.";
+        } else if (status === 429 || /rate.?limit/i.test(friendly)) {
+          friendly = "AI is busy right now. Please try again in a moment.";
+        }
+        toast.error(friendly);
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ I couldn't respond: ${friendly}` }]);
+        return;
+      }
+
       setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
-    } catch {
-      toast.error("Failed to get response");
+    } catch (e: any) {
+      const msg = e?.message || "Failed to get response";
+      toast.error(msg);
+      setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ I couldn't respond: ${msg}` }]);
     } finally {
       setLoading(false);
     }
