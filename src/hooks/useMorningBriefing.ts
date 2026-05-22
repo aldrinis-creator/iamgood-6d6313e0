@@ -42,11 +42,11 @@ export const useMorningBriefing = () => {
       // 1. Get Profile Name
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name")
+        .select("full_name")
         .eq("id", session.user.id)
         .single();
         
-      const userName = profile?.first_name || "User";
+      const userName = profile?.full_name?.split(" ")[0] || "User";
 
       // 2. Check for today's medications & refills
       const { data: meds } = await supabase
