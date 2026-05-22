@@ -3,7 +3,7 @@ import { useFallDetection } from "@/hooks/useFallDetection";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, X, MessageCircle, Phone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ensureAudioReady } from "@/lib/audioAlerts";
 
@@ -42,6 +42,18 @@ const FallDetectionOverlay = () => {
   const { session } = useAuth();
   const hasSentRef = useRef(false);
   const stopAlarmRef = useRef<(() => void) | null>(null);
+  const [offlineData, setOfflineData] = useState<{ msg: string, guardians: any[] } | null>(null);
+
+  const getSmsLink = useCallback(() => {
+    if (!offlineData) return "";
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const separator = isIOS ? '&' : '?';
+    const numbers = offlineData.guardians
+      .map(g => g.guardian_phone.replace(/[^0-9]/g, ""))
+      .filter(p => p.length >= 10)
+      .join(isIOS ? "," : ";");
+    return `sms:${numbers}${separator}body=${encodeURIComponent(offlineData.msg)}`;
+  }, [offlineData]);
 
   const sendFallAlerts = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -91,6 +103,11 @@ const FallDetectionOverlay = () => {
     }
     msg += "\n\n⚠️ A fall was detected. Please respond immediately!";
 
+    if (!navigator.onLine) {
+      setOfflineData({ msg, guardians });
+      return;
+    }
+
     try {
       const result = await triggerSOS({
         message: msg,
@@ -115,8 +132,12 @@ const FallDetectionOverlay = () => {
           }, i * 500);
         });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to send fall detection alerts:", e);
+      if (!navigator.onLine || String(e).includes("Failed to fetch") || String(e).includes("NetworkError")) {
+        setOfflineData({ msg, guardians });
+        return;
+      }
       guardians.forEach((g, i) => {
         const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
         if (cleanPhone.length < 10) return;
@@ -157,6 +178,12 @@ const FallDetectionOverlay = () => {
   }, [fallDetected]);
 
   useEffect(() => {
+    if (!fallDetected) {
+      setOfflineData(null);
+    }
+  }, [fallDetected]);
+
+  useEffect(() => {
     if (enabled && permissionState === "unknown") {
       requestPermission();
     }
@@ -167,6 +194,54 @@ const FallDetectionOverlay = () => {
   const progress = (countdown / 15) * 100;
   const confidencePercent = Math.round(fallConfidence * 100);
   const confidenceLabel = fallConfidence >= 0.8 ? "High" : fallConfidence >= 0.6 ? "Moderate" : "Low";
+
+  if (offlineData) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="flex flex-col items-center text-center space-y-6 pt-6 pb-2">
+          <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center animate-pulse">
+            <AlertCircle className="w-12 h-12 text-destructive" />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-destructive">No Internet</h2>
+            <p className="text-muted-foreground text-base px-4">
+              We couldn't reach the server to send your Fall Alert automatically. Alert your guardians using your phone's cellular network.
+            </p>
+          </div>
+
+          <div className="w-full space-y-3 pt-6">
+            <a href={getSmsLink()} onClick={() => cancelFallAlert()} className="block w-full">
+              <Button className="w-full h-20 text-xl font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-2xl rounded-2xl">
+                <MessageCircle className="w-8 h-8 mr-3" />
+                Send Offline SMS
+              </Button>
+            </a>
+            <p className="text-sm text-muted-foreground font-medium">
+              You must tap "Send" in the messaging app.
+            </p>
+          </div>
+
+          <div className="w-full pt-6">
+            <a href="tel:112" className="block w-full">
+              <Button variant="outline" className="w-full h-16 text-lg font-bold border-destructive/30 text-destructive hover:bg-destructive/10 rounded-xl">
+                <Phone className="w-6 h-6 mr-3" />
+                Call Emergency (112)
+              </Button>
+            </a>
+          </div>
+
+          <Button
+            onClick={cancelFallAlert}
+            variant="ghost"
+            className="mt-8 text-muted-foreground"
+          >
+            <X className="w-5 h-5 mr-2" /> I'm OK — Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-destructive/95 flex flex-col items-center justify-center text-destructive-foreground p-6 animate-in fade-in duration-300">

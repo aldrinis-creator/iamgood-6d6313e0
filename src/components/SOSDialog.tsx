@@ -64,6 +64,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const [isOfflineFallback, setIsOfflineFallback] = useState(false);
   const [deliverySummary, setDeliverySummary] = useState<{
     status: "success" | "partial" | "failed";
     title: string;
@@ -142,6 +143,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       setTimeLeft(10);
       setSent(false);
       setSending(false);
+      setIsOfflineFallback(false);
       setDeliverySummary(null);
     } else {
       countingRef.current = false;
@@ -197,6 +199,17 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     return `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(buildSOSMessage())}`;
   }, [buildSOSMessage]);
 
+  const getSmsLink = useCallback(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const separator = isIOS ? '&' : '?';
+    // Combine all guardian phones into a single string
+    const numbers = guardians
+      .map(g => g.guardian_phone.replace(/[^0-9]/g, ""))
+      .filter(p => p.length >= 10)
+      .join(isIOS ? "," : ";"); // iOS uses comma, Android usually uses semicolon
+    return `sms:${numbers}${separator}body=${encodeURIComponent(buildSOSMessage())}`;
+  }, [guardians, buildSOSMessage]);
+
   const sendAlerts = useCallback(async () => {
     if (hasSentRef.current) return;
     hasSentRef.current = true;
@@ -204,6 +217,12 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     vibrate([200, 100, 200, 100, 400]);
 
     const message = buildSOSMessage();
+
+    if (!navigator.onLine) {
+      setSending(false);
+      setIsOfflineFallback(true);
+      return;
+    }
 
     try {
       const result = await triggerSOS({
@@ -271,6 +290,12 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
       }
     } catch (e: any) {
       console.error("Failed to send SOS alerts:", e);
+      if (!navigator.onLine || String(e).includes("Failed to fetch") || String(e).includes("NetworkError")) {
+        setSending(false);
+        setIsOfflineFallback(true);
+        return;
+      }
+      
       toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
       setDeliverySummary({
         status: "failed",
@@ -742,6 +767,48 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
           <Button onClick={handleClose} variant="outline" className="w-full mt-4">
             Close
           </Button>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  if (isOfflineFallback) {
+    return (
+      <Sheet open={open} onOpenChange={handleClose}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
+          <div className="flex flex-col items-center text-center space-y-6 pt-6 pb-2">
+            <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center animate-pulse">
+              <AlertCircle className="w-10 h-10 text-destructive" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-destructive">No Internet Connection</h2>
+              <p className="text-muted-foreground text-sm px-4">
+                We couldn't reach the server to send your SOS automatically. You can still alert your guardians using your phone's standard SMS cellular network.
+              </p>
+            </div>
+
+            <div className="w-full space-y-3 pt-4">
+              <a href={getSmsLink()} onClick={() => setSent(true)} className="block w-full">
+                <Button className="w-full h-16 text-lg font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-xl">
+                  <MessageCircle className="w-6 h-6 mr-2" />
+                  Tap to Send Offline SMS
+                </Button>
+              </a>
+              <p className="text-[11px] text-muted-foreground">
+                This will open your messaging app. You must tap "Send" in the app to dispatch the message.
+              </p>
+            </div>
+
+            <div className="w-full pt-4">
+              <a href="tel:112" className="block w-full">
+                <Button variant="outline" className="w-full h-14 text-base font-semibold border-destructive/30 text-destructive hover:bg-destructive/10">
+                  <Phone className="w-5 h-5 mr-2" />
+                  Call Emergency (112)
+                </Button>
+              </a>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
     );
