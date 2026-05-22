@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useFallDetection } from "@/hooks/useFallDetection";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,32 +7,37 @@ import { AlertTriangle, X, MessageCircle, Phone, AlertCircle } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { ensureAudioReady } from "@/lib/audioAlerts";
 
-const playFallAlarm = (): (() => void) => {
+const playVoicePrompt = (userName: string): (() => void) => {
   let stopped = false;
-  let timeout: ReturnType<typeof setTimeout>;
-  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
-  const beep = () => {
-    if (stopped || ctx.state === "closed") return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "square";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.25);
-    timeout = setTimeout(beep, 600);
+  const speak = () => {
+    if (stopped || !window.speechSynthesis) return;
+    
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(
+      `${userName}, a fall has been detected. Are you okay? If you are okay, please cancel the SOS by tapping the Cancel SOS button on your phone.`
+    );
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onend = () => {
+      if (!stopped) {
+        setTimeout(speak, 1000);
+      }
+    };
+    
+    window.speechSynthesis.speak(utterance);
   };
 
-  beep();
+  speak();
 
   return () => {
     stopped = true;
-    clearTimeout(timeout);
-    ctx.close().catch(() => {});
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
   };
 };
 
@@ -40,6 +45,7 @@ const FallDetectionOverlay = () => {
   const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled, fallConfidence } = useFallDetection();
   const { triggerSOS } = useApp();
   const { session } = useAuth();
+  const [userName, setUserName] = useState("User");
   const hasSentRef = useRef(false);
   const stopAlarmRef = useRef<(() => void) | null>(null);
   const [offlineData, setOfflineData] = useState<{ msg: string, guardians: any[] } | null>(null);
@@ -54,6 +60,18 @@ const FallDetectionOverlay = () => {
       .join(isIOS ? "," : ";");
     return `sms:${numbers}${separator}body=${encodeURIComponent(offlineData.msg)}`;
   }, [offlineData]);
+
+  // Fetch user's first name early so the voice prompt can address them
+  useEffect(() => {
+    if (session?.user?.id) {
+      supabase.from("profiles").select("full_name").eq("id", session.user.id).maybeSingle()
+        .then(({ data }) => {
+          if (data?.full_name) {
+            setUserName(data.full_name.split(" ")[0]);
+          }
+        });
+    }
+  }, [session?.user?.id]);
 
   const sendFallAlerts = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -164,7 +182,7 @@ const FallDetectionOverlay = () => {
     if (fallDetected) {
       hasSentRef.current = false;
       ensureAudioReady().then(() => {
-        stopAlarmRef.current = playFallAlarm();
+        stopAlarmRef.current = playVoicePrompt(userName);
       });
       if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
     } else {
@@ -174,8 +192,8 @@ const FallDetectionOverlay = () => {
     return () => {
       stopAlarmRef.current?.();
       stopAlarmRef.current = null;
-    };
-  }, [fallDetected]);
+    }
+  }, [fallDetected, userName]);
 
   useEffect(() => {
     if (!fallDetected) {
@@ -287,7 +305,7 @@ const FallDetectionOverlay = () => {
         size="lg"
         className="bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90 border-none font-bold text-lg px-10 py-6"
       >
-        <X className="w-5 h-5 mr-2" /> I'm OK — Cancel
+        <X className="w-5 h-5 mr-2" /> Cancel SOS
       </Button>
     </div>
   );
