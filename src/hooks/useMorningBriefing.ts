@@ -42,11 +42,11 @@ export const useMorningBriefing = () => {
       // 1. Get Profile Name
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name")
+        .select("full_name")
         .eq("id", session.user.id)
         .single();
         
-      const userName = profile?.first_name || "User";
+      const userName = profile?.full_name?.split(" ")[0] || "User";
 
       // 2. Check for today's medications & refills
       const { data: meds } = await supabase
@@ -80,18 +80,19 @@ export const useMorningBriefing = () => {
       const hasCheckins = checkins && checkins.length > 0;
 
       // 4. Check for today's appointments
+      const todayDateStr = format(now, "yyyy-MM-dd");
       const { data: appointments } = await supabase
         .from("appointments")
-        .select("appointment_time")
+        .select("start_time")
         .eq("user_id", session.user.id)
-        .gte("appointment_time", todayStart.toISOString())
-        .lte("appointment_time", todayEnd.toISOString())
-        .order("appointment_time", { ascending: true });
+        .eq("start_date", todayDateStr)
+        .order("start_time", { ascending: true });
 
       const appointmentsList: string[] = [];
-      if (appointments && appointments.length > 0) {
-        // Just take the first one for the summary
-        const aptTime = new Date(appointments[0].appointment_time);
+      if (appointments && appointments.length > 0 && appointments[0].start_time) {
+        const [h, m] = String(appointments[0].start_time).split(":");
+        const aptTime = new Date();
+        aptTime.setHours(Number(h), Number(m), 0, 0);
         appointmentsList.push(format(aptTime, "h:mm a"));
       }
 
