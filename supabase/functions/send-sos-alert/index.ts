@@ -497,7 +497,7 @@ Deno.serve(async (req) => {
     if (msg91AuthKey && smsTemplateId && finalPhones.length) {
       const recipients = finalPhones.map((mobile) => ({
         mobiles: mobile,
-        name: userNameSafe,
+        user_name: userNameSafe,
         time: istTimestamp,
         location: locationStr.slice(0, 200),
         health: healthSummary,
