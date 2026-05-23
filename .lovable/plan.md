@@ -1,35 +1,30 @@
-# Symptom Checker not responding — root cause & fix
+## Standardize MSG91 templates to use `user_name`
 
-## Root cause
+Goal: Make every MSG91 Flow template use the same variable key — **`user_name`** — for the ward/patient's name. This simplifies template management in MSG91 and the codebase.
 
-Recent `health-tools` edge function calls are all returning **HTTP 402 — "AI credits exhausted. Please add funds."** (confirmed in edge logs for function id `2e6364bc…`, last 3 POSTs all 402).
+### Edge function changes
 
-The function works correctly. The Lovable AI Gateway workspace credit balance is depleted, so Gemini calls are being rejected.
+1. **`send-sos-alert`** (SMS path) — change recipients payload key from `name` → `user_name`.
+2. **`send-sos-alert`** (WhatsApp path) — change `body_1` → `user_name`.
+3. **`send-pharmacy-order`** — change `body_1` (patient_name) → `user_name`.
+4. **`send-ambulance-request`** — change `body_1` (patient_name) → `user_name`.
+5. Already correct (no change): `check-missed-checkins`, `notify-guardian-medication`, `send-guardian-invite`.
+6. `send-otp` — no name variable, untouched.
 
-A secondary issue masks this: `SymptomChecker.tsx` swallows the gateway's 402 message into a generic `"Failed to get response"` toast, so the user can't tell why nothing comes back.
+### MSG91 dashboard changes (user action)
 
-## Fix — two parts
+You'll need to update the variable name in each affected Flow template on MSG91:
+- `MSG91_SOS_SMS_TEMPLATE_ID` — rename `name` → `user_name`
+- `MSG91_SOS_TEMPLATE_ID` (WhatsApp) — rename `body_1` → `user_name`
+- `MSG91_PHARMACY_TEMPLATE_ID` — rename `body_1` → `user_name`
+- Ambulance WhatsApp template — rename `body_1` → `user_name`
 
-### 1. Top up Lovable AI credits (required, user action)
+The other templates (`MSG91_CHECKIN_TEMPLATE_ID`, `MSG91_MED_TEMPLATE_ID`, `MSG91_INVITE_TEMPLATE_ID`) already use `user_name` and don't need MSG91-side changes.
 
-Open **Workspace → Settings → Usage / AI Credits** and add credits (or upgrade plan). Once balance is restored, the Symptom Checker will respond immediately — no code change needed for that.
+### Coordination
 
-### 2. Surface real backend errors in the chat (code change)
+Edge function and template renames must happen together — if the code is deployed before MSG91 templates are updated, SMS will go out with blank names (and vice versa). Recommended order:
+1. Update MSG91 templates first (variable name only — template body stays identical).
+2. Then deploy the code changes.
 
-In `src/components/health-tools/SymptomChecker.tsx`, `send()`:
-
-- When `supabase.functions.invoke` returns an `error` (non-2xx like 402/429), read the JSON body from `error.context.response` (or fallback) and toast that message instead of the generic "Failed to get response".
-- Specifically map:
-  - 402 → "AI credits exhausted. Please top up in Workspace settings."
-  - 429 → "AI is busy, please try again in a moment."
-- Append an assistant message like *"⚠️ I couldn't respond: <reason>"* so the failure is visible inline, not just as a fleeting toast.
-
-No edge function, schema, or other component changes required.
-
-## Verification
-
-After topping up credits:
-1. Open Health Tools → Symptom Checker.
-2. Send "Headache and fever".
-3. Expect a streamed Gemini response within ~3s and no toast.
-4. Check edge function logs — POSTs return 200.
+Want me to proceed with the code changes now, or wait until you've updated MSG91 first?
