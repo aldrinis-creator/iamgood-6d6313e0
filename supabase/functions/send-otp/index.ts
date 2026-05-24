@@ -136,11 +136,6 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: "Verification failed" }, 500);
       }
 
-      if (!otpRow || otpRow.otp_code !== otp) {
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Invalid or expired OTP");
-        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
-      }
-
       const submittedHash = await sha256Hex(otp);
       if (!otpRow || otpRow.otp_code !== submittedHash) {
         await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Invalid or expired OTP");
