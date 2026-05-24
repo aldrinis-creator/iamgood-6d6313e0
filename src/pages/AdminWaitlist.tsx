@@ -38,6 +38,7 @@ const AdminWaitlist = () => {
 
   const invoke = useCallback(async (body: Record<string, unknown>, raw = false) => {
     const { data: { session } } = await supabase.auth.getSession();
+    const stepUp = sessionStorage.getItem("admin_step_up_token") || "";
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-waitlist`,
       {
@@ -46,6 +47,7 @@ const AdminWaitlist = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session?.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "x-admin-step-up": stepUp,
         },
         body: JSON.stringify(body),
       }
