@@ -92,36 +92,6 @@ const VaultClaimStatusStrip = ({ wardUserId }: { wardUserId: string }) => {
       }`}
     >
       <span className="flex items-center gap-2"><ShieldAlert className="w-3.5 h-3.5" />{label}</span>
-      {/* Admin Vault claim banners removed from dashboard */}
-
-      <Dialog open={!!missedEventAlert} onOpenChange={(open) => { if (!open) setMissedEventAlert(null); }}>
-        <DialogContent className="sm:max-w-md border-destructive">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive text-xl">
-              <ShieldAlert className="w-6 h-6" />
-              Missed {missedEventAlert?.type === 'check-in' ? 'Check-in' : 'Medication'} Alert!
-            </DialogTitle>
-            <DialogDescription className="text-base text-foreground pt-2">
-              <strong>{wardName}</strong> has not {missedEventAlert?.type === 'check-in' ? 'checked in' : 'taken their medication'} for the scheduled slot at <strong>{missedEventAlert?.scheduledFor && formatISTTime(new Date(missedEventAlert.scheduledFor))}</strong> (Over 1 hour ago).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-3 justify-end mt-4">
-            <Button variant="outline" onClick={() => setMissedEventAlert(null)}>
-              Dismiss
-            </Button>
-            <Button variant="default" className="bg-destructive hover:bg-destructive/90 text-white gap-2" onClick={() => {
-              window.location.href = `tel:${wardPhone}`;
-              setMissedEventAlert(null);
-            }}>
-              <Phone className="w-4 h-4" />
-              Call Ward Now
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            You can mute these voice alerts in Settings &gt; Alerts.
-          </p>
-        </DialogContent>
-      </Dialog>
     </button>
   );
 };
