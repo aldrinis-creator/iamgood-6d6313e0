@@ -42,6 +42,20 @@ Deno.serve(async (req) => {
     });
     if (!isAdmin) return json({ error: "Forbidden" }, 403);
 
+    // Step-up 2FA check
+    const stepUpToken = req.headers.get("x-admin-step-up") || "";
+    if (!stepUpToken) return json({ error: "Step-up required" }, 403);
+    const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stepUpToken));
+    const tokenHash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: stepRow } = await adminClient
+      .from("admin_step_up_tokens")
+      .select("id")
+      .eq("token_hash", tokenHash)
+      .eq("user_id", user.id)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!stepRow) return json({ error: "Invalid or expired step-up token" }, 403);
+
     const { action, ...payload } = await req.json();
 
     switch (action) {
