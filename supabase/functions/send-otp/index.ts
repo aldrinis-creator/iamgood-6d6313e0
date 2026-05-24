@@ -47,6 +47,11 @@ async function isRateLimited(admin: ReturnType<typeof getAdminClient>, phone: st
   return (count ?? 0) >= RATE_LIMIT_MAX;
 }
 
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function logOtpEvent(
   admin: ReturnType<typeof getAdminClient>,
   phone: string,
@@ -57,13 +62,15 @@ async function logOtpEvent(
   otpCode?: string,
   expiresAt?: string
 ) {
+  // Store only a SHA-256 hash of the OTP — never the plaintext code.
+  const hashed = otpCode ? await sha256Hex(otpCode) : null;
   const { error } = await admin.from("otp_events").insert({
     phone,
     action,
     request_id: requestId || null,
     status,
     failure_reason: failureReason || null,
-    otp_code: otpCode || null,
+    otp_code: hashed,
     expires_at: expiresAt || null,
   });
   if (error) console.error("[send-otp] Failed to log event:", error.message);
