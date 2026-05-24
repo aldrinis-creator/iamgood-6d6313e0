@@ -141,7 +141,13 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
       }
 
-      // Mark as verified and nullify the OTP code
+      const submittedHash = await sha256Hex(otp);
+      if (!otpRow || otpRow.otp_code !== submittedHash) {
+        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Invalid or expired OTP");
+        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
+      }
+
+      // Mark as verified and nullify the OTP hash
       await admin.from("otp_events").update({ verified: true, status: "verified", otp_code: null }).eq("id", otpRow.id);
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
 
