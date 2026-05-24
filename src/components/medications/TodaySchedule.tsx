@@ -90,11 +90,8 @@ const notifyGuardians = (userId: string, medicationName: string, status: string,
     }
     
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ user_id: userId, medication_name: medNames.join(", "), status, scheduled_time: scheduledTime }),
+      await supabase.functions.invoke("notify-guardian-medication", {
+        body: { user_id: userId, medication_name: medNames.join(", "), status, scheduled_time: scheduledTime },
       });
     } catch {
       // silent fail

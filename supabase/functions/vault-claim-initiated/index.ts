@@ -12,6 +12,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return reject("unauthorized", "Authentication required");
+    }
+    const _uc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: _u, error: _e } = await _uc.auth.getUser();
+    if (_e || !_u?.user) {
+      return reject("unauthorized", "Authentication required");
+    }
+    const callerId = _u.user.id;
+
     const { claim_id } = await req.json();
     if (!claim_id) return reject("claim_not_found", "claim_id required");
 
@@ -26,6 +37,22 @@ Deno.serve(async (req) => {
       .eq("id", claim_id)
       .single();
     if (claimErr || !claim) return reject("claim_not_found", "Claim record was lost");
+
+    // Caller must be the filing guardian on this claim
+    if (claim.guardian_user_id && claim.guardian_user_id !== callerId) {
+      return reject("forbidden", "Not your claim");
+    }
+    if (!claim.guardian_user_id) {
+      // fallback: check guardians table by guardian_id
+      const { data: gRow } = await supa
+        .from("guardians")
+        .select("guardian_user_id")
+        .eq("id", claim.guardian_id)
+        .maybeSingle();
+      if (!gRow || gRow.guardian_user_id !== callerId) {
+        return reject("forbidden", "Not your claim");
+      }
+    }
 
     const userId = claim.user_id;
 

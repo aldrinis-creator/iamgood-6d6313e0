@@ -147,8 +147,10 @@ const AdminVaultClaims = () => {
     }
     setBusyId(releaseId);
     try {
+      const stepUp = sessionStorage.getItem("admin_step_up_token") || "";
       const { error } = await supabase.functions.invoke("vault-release-claim", {
         body: { claim_id: releaseId, release_notes: releaseNotes.trim() },
+        headers: { "x-admin-step-up": stepUp },
       });
       if (error) throw error;
       toast.success("Released — nominee notified");

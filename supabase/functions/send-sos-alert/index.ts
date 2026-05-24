@@ -155,7 +155,32 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Auth check: caller must be the user themselves OR an accepted guardian of the user.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const callerId = userData.user.id;
     const supabase = createClient(supabaseUrl, serviceKey);
+    if (callerId !== user_id) {
+      const { data: guardianRow } = await supabase
+        .from("guardians")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("guardian_user_id", callerId)
+        .eq("status", "accepted")
+        .maybeSingle();
+      if (!guardianRow) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     // Resolve the latest active SOS event for this user — used to attach delivery attempts.
     let activeSosId: string | null = null;

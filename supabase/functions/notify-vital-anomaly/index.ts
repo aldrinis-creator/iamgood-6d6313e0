@@ -64,6 +64,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const _supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const _anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const _userClient = createClient(_supabaseUrl, _anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: _userData, error: _userErr } = await _userClient.auth.getUser();
+    if (_userErr || !_userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { user_id, heart_rate, spo2, stress_score, source } = await req.json();
 
     if (!user_id) {
@@ -71,6 +83,9 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    if (user_id !== _userData.user.id) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Check for anomalies

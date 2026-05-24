@@ -9,11 +9,8 @@ import { formatISTDateTime } from "@/lib/istTime";
 
 const notifyGuardiansMissed = async (userId: string, medNames: string[], scheduledTimes: string[]) => {
   try {
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    await fetch(`https://${projectId}.supabase.co/functions/v1/notify-guardian-medication`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-      body: JSON.stringify({ user_id: userId, medication_name: medNames.join(", "), status: "missed", scheduled_time: scheduledTimes[0] }),
+    await supabase.functions.invoke("notify-guardian-medication", {
+      body: { user_id: userId, medication_name: medNames.join(", "), status: "missed", scheduled_time: scheduledTimes[0] },
     });
   } catch {
     // best-effort
