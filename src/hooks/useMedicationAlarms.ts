@@ -7,15 +7,6 @@ import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged, clearReminderAcknowledgement } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 
-const notifyGuardiansMissed = async (userId: string, medNames: string[], scheduledTimes: string[]) => {
-  try {
-    await supabase.functions.invoke("notify-guardian-medication", {
-      body: { user_id: userId, medication_name: medNames.join(", "), status: "missed", scheduled_time: scheduledTimes[0] },
-    });
-  } catch {
-    // best-effort
-  }
-};
 
 const PRE_ALERT_MIN = 5; // browser notification 5 min before
 const POPUP_DELAY_MIN = 5; // first popup 5 min after scheduled time
@@ -114,7 +105,7 @@ const useMedicationAlarms = () => {
           popupSlots.get(timeStr)!.push(med.name);
         }
 
-        // --- Final escalation (T+60): log missed + guardian notify ---
+        // --- Final escalation (T+60): log missed only (no realtime SMS) ---
         if (diffMin >= HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           const alreadyTaken = logs.some((l) => {
             const logDate = new Date(l.scheduled_at ?? "");
@@ -133,21 +124,17 @@ const useMedicationAlarms = () => {
 
           missedSentRef.current.add(missedKey);
 
-          const isVeryLate = diffMin > HARD_CUTOFF_MIN + 5; // > 65 minutes late
-
-          if (isVeryLate) {
-            if (!alreadyMissedLog) {
-              if (!silentMissedSlots.has(timeStr)) silentMissedSlots.set(timeStr, []);
-              silentMissedSlots.get(timeStr)!.push({ id: med.id, scheduledAt });
-            }
-          } else {
+          if (!alreadyMissedLog) {
+            if (!silentMissedSlots.has(timeStr)) silentMissedSlots.set(timeStr, []);
+            silentMissedSlots.get(timeStr)!.push({ id: med.id, scheduledAt });
+          }
+          
+          // Also track for local voice reminder (once at T+60) if not already very late
+          const isVeryLate = diffMin > HARD_CUTOFF_MIN + 5;
+          if (!isVeryLate) {
             if (!finalSlots.has(timeStr)) finalSlots.set(timeStr, { names: [], medsToLog: [] });
             const slot = finalSlots.get(timeStr)!;
             slot.names.push(med.name);
-
-            if (!alreadyMissedLog) {
-              slot.medsToLog.push({ id: med.id, scheduledAt });
-            }
           }
         }
       }
@@ -209,28 +196,13 @@ const useMedicationAlarms = () => {
       }
     }
 
-    // --- Final escalation (batched) ---
+    // --- Final escalation (Local Voice Reminder at T+60) ---
     for (const [timeStr, { names, medsToLog }] of finalSlots) {
-      for (const { id, scheduledAt } of medsToLog) {
-        await supabase.from("medication_logs").insert({
-          medication_id: id,
-          user_id: session.user.id,
-          scheduled_at: scheduledAt.toISOString(),
-          status: "missed",
-        });
-      }
-
-      if (medsToLog.length > 0) {
+      if (names.length > 0) {
         const combined = names.join(", ");
         playVoiceReminder(`[${ts}] You have not taken your medication after ${MAX_POPUPS} reminders: ${combined}. Please take your tablets now.`);
         playChime();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-
-        notifyGuardiansMissed(
-          session.user.id,
-          names,
-          medsToLog.map((ml) => ml.scheduledAt.toISOString())
-        );
       }
     }
 

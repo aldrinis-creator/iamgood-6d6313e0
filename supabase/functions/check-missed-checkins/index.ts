@@ -133,8 +133,7 @@ Deno.serve(async (req) => {
     // before the server escalates to guardians.
     const graceMs = 60 * 60 * 1000;
     const graceCutoff = new Date(now.getTime() - graceMs);
-    const veryLateMs = 120 * 60 * 1000; // 2 hours
-    const veryLateCutoff = new Date(now.getTime() - veryLateMs);
+    const veryLateCutoff = new Date(now.getTime() - 60 * 60 * 1000);
 
     // Compute today's IST boundaries (UTC+5:30) to prevent previous-day spillover
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
@@ -310,10 +309,8 @@ Deno.serve(async (req) => {
       }
 
       const isVeryLate = scheduledDate.getTime() < veryLateCutoff.getTime();
-      if (isVeryLate) {
-        console.log(`Check-in ${checkIn.id} is >2 hours late, marked as missed silently without SMS`);
-        continue;
-      }
+      // We no longer abort notifications based on isVeryLate because we want emails/pushes to still go out,
+      // but we will no longer send real-time SMS (MSG91).
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -444,32 +441,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        // MSG91 WhatsApp notification — dedup: only send if this is the first notification batch
-        const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-        const msg91CheckinTemplate = Deno.env.get("MSG91_CHECKIN_TEMPLATE_ID");
-        if (msg91AuthKey && msg91CheckinTemplate && !dedupError) {
-          const recipients = guardians
-            .filter((g: any) => g.guardian_phone)
-            .map((g: any) => {
-              const clean = g.guardian_phone.replace(/[^0-9]/g, "");
-              const mobile = clean.startsWith("91") ? clean : `91${clean}`;
-              return { mobiles: mobile, user_name: userName, message };
-            });
-
-          if (recipients.length > 0) {
-            try {
-              await fetch("https://control.msg91.com/api/v5/flow", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
-                body: JSON.stringify({ template_id: msg91CheckinTemplate, short_url: "0", recipients }),
-              });
-            } catch (e) {
-              console.error("MSG91 checkin alert error:", e);
-            }
-          }
-        }
-      }
-    }
+        // MSG91 WhatsApp/SMS real-time notification has been REMOVED here.
+        // SMS notifications are now handled by the consolidated batched cron job.
 
     console.log(`Created ${notificationsCreated} notifications, sent ${emailsSent} emails, ${pushesSent} pushes`);
 
