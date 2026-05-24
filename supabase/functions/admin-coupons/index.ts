@@ -48,6 +48,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Step-up 2FA check
+    const stepUpToken = req.headers.get("x-admin-step-up") || "";
+    if (!stepUpToken) {
+      return new Response(JSON.stringify({ error: "Step-up required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stepUpToken));
+    const tokenHash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: stepRow } = await adminClient
+      .from("admin_step_up_tokens")
+      .select("id")
+      .eq("token_hash", tokenHash)
+      .eq("user_id", user.id)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!stepRow) {
+      return new Response(JSON.stringify({ error: "Invalid or expired step-up token" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+
     const { action, ...payload } = await req.json();
 
     let result;
