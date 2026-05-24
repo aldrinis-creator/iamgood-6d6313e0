@@ -92,7 +92,36 @@ const VaultClaimStatusStrip = ({ wardUserId }: { wardUserId: string }) => {
       }`}
     >
       <span className="flex items-center gap-2"><ShieldAlert className="w-3.5 h-3.5" />{label}</span>
-      <ChevronRight className="w-3.5 h-3.5" />
+      {/* Admin Vault claim banners removed from dashboard */}
+
+      <Dialog open={!!missedEventAlert} onOpenChange={(open) => { if (!open) setMissedEventAlert(null); }}>
+        <DialogContent className="sm:max-w-md border-destructive">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive text-xl">
+              <ShieldAlert className="w-6 h-6" />
+              Missed {missedEventAlert?.type === 'check-in' ? 'Check-in' : 'Medication'} Alert!
+            </DialogTitle>
+            <DialogDescription className="text-base text-foreground pt-2">
+              <strong>{wardName}</strong> has not {missedEventAlert?.type === 'check-in' ? 'checked in' : 'taken their medication'} for the scheduled slot at <strong>{missedEventAlert?.scheduledFor && formatISTTime(new Date(missedEventAlert.scheduledFor))}</strong> (Over 1 hour ago).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 justify-end mt-4">
+            <Button variant="outline" onClick={() => setMissedEventAlert(null)}>
+              Dismiss
+            </Button>
+            <Button variant="default" className="bg-destructive hover:bg-destructive/90 text-white gap-2" onClick={() => {
+              window.location.href = `tel:${wardPhone}`;
+              setMissedEventAlert(null);
+            }}>
+              <Phone className="w-4 h-4" />
+              Call Ward Now
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            You can mute these voice alerts in Settings &gt; Alerts.
+          </p>
+        </DialogContent>
+      </Dialog>
     </button>
   );
 };
@@ -242,6 +271,8 @@ const GuardianDashboard = () => {
   const { settings } = useUserSettings();
   const { toast } = useToast();
   const [showAmbulance, setShowAmbulance] = useState(false);
+  const [batteryAlertShown, setBatteryAlertShown] = useState(false);
+  const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("User");
@@ -258,7 +289,6 @@ const GuardianDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [wardBattery, setWardBattery] = useState<number | null>(null);
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
-  const [batteryAlertShown, setBatteryAlertShown] = useState(false);
   const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
   const [wardLastActive, setWardLastActive] = useState<string | null>(null);
 
@@ -290,8 +320,46 @@ const GuardianDashboard = () => {
         supabase.from("notifications").update({ read: true }).eq("id", n.id).then(() => {});
       });
       setNotifications(processed);
+      setTodayCheckIns((data as any[]) || []);
     }
   }, [session?.user?.id, selectedWard]);
+
+  const fetchMissedEvents = useCallback(async () => {
+    if (!wardUserId) return;
+    const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [ciRes, medRes] = await Promise.all([
+      supabase.from("check_ins").select("id, scheduled_at")
+        .eq("user_id", wardUserId).eq("status", "missed")
+        .lte("scheduled_at", oneHourAgo).gte("scheduled_at", todayStart.toISOString()),
+      supabase.from("medication_logs").select("id, scheduled_at")
+        .eq("user_id", wardUserId).eq("status", "missed")
+        .lte("scheduled_at", oneHourAgo).gte("scheduled_at", todayStart.toISOString())
+    ]);
+
+    const missedItems: { id: string, type: "check-in" | "medication", scheduledFor: string }[] = [];
+    if (ciRes.data) ciRes.data.forEach(ci => missedItems.push({ id: `ci-${ci.id}`, type: "check-in", scheduledFor: ci.scheduled_at }));
+    if (medRes.data) medRes.data.forEach(m => missedItems.push({ id: `med-${m.id}`, type: "medication", scheduledFor: m.scheduled_at }));
+
+    const unalerted = missedItems.find(item => !alertedNotifIds.current.has(item.id));
+    if (unalerted) {
+      setMissedEventAlert(unalerted);
+      alertedNotifIds.current.add(unalerted.id);
+      if (settings.guardianVoiceAlerts !== false) {
+        playVoiceReminder(`Attention Guardian. ${wardName} has missed a scheduled ${unalerted.type} for over an hour. Please check on them.`);
+      }
+    }
+  }, [wardUserId, wardName, settings.guardianVoiceAlerts]);
+
+  useEffect(() => {
+    if (wardUserId) {
+      fetchMissedEvents();
+      const interval = setInterval(fetchMissedEvents, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [wardUserId, fetchMissedEvents]);
 
   const fetchWardCheckIns = useCallback(async () => {
     if (!session?.user?.id) return;
