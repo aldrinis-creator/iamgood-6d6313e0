@@ -32,6 +32,20 @@ Deno.serve(async (req) => {
       .from("user_roles").select("role").eq("user_id", adminUserId).eq("role", "admin").maybeSingle();
     if (!roleRow) return json({ error: "forbidden" }, 403);
 
+    // Step-up 2FA check
+    const stepUpToken = req.headers.get("x-admin-step-up") || "";
+    if (!stepUpToken) return json({ error: "Step-up required" }, 403);
+    const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stepUpToken));
+    const tokenHash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: stepRow } = await supa
+      .from("admin_step_up_tokens")
+      .select("id")
+      .eq("token_hash", tokenHash)
+      .eq("user_id", adminUserId)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!stepRow) return json({ error: "Invalid or expired step-up token" }, 403);
+
     const { claim_id } = await req.json();
     if (!claim_id) return json({ error: "claim_id required" }, 400);
 
