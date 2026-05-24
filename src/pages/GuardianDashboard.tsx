@@ -341,7 +341,20 @@ const GuardianDashboard = () => {
 
     const missedItems: { id: string, type: "check-in" | "medication", scheduledFor: string }[] = [];
     if (ciRes.data) ciRes.data.forEach(ci => missedItems.push({ id: `ci-${ci.id}`, type: "check-in", scheduledFor: ci.scheduled_at }));
-    if (medRes.data) medRes.data.forEach(m => missedItems.push({ id: `med-${m.id}`, type: "medication", scheduledFor: m.scheduled_at }));
+    
+    if (medRes.data) {
+      const medGroups = new Map<string, any[]>();
+      medRes.data.forEach(m => {
+        const d = new Date(m.scheduled_at);
+        d.setSeconds(0, 0); // Round to minute
+        const timeKey = d.getTime().toString();
+        if (!medGroups.has(timeKey)) medGroups.set(timeKey, []);
+        medGroups.get(timeKey)!.push(m.id);
+      });
+      medGroups.forEach((ids, timeKey) => {
+        missedItems.push({ id: `med-grp-${timeKey}`, type: "medication", scheduledFor: new Date(Number(timeKey)).toISOString() });
+      });
+    }
 
     const unalerted = missedItems.find(item => !alertedNotifIds.current.has(item.id));
     if (unalerted) {
