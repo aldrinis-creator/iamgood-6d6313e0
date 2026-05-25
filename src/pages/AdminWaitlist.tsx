@@ -128,13 +128,6 @@ const AdminWaitlist = () => {
   return (
     <AdminLayout title="Premium Plus Waitlist">
       <div className="p-4 max-w-5xl mx-auto space-y-4">
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Email delivery requires domain setup</AlertTitle>
-          <AlertDescription>
-            Notifications will be queued, but they will only deliver once the email sender domain is configured and DNS verified.
-          </AlertDescription>
-        </Alert>
 
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
