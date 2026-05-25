@@ -1,37 +1,65 @@
-## Schedule `send-consolidated-alerts` every 4 hours
+# Build `join-waitlist` public endpoint
 
-Set up a `pg_cron` + `pg_net` job that calls the `send-consolidated-alerts` edge function at minute 0 of every 4th hour (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC).
+A hardened public edge function that futurewave.in (or any external site) can POST to, so Pre-register submissions can no longer silently break.
 
-### Steps
+## Endpoint
 
-1. Ensure extensions `pg_cron` and `pg_net` are enabled in the database.
-2. Insert (not migrate) the cron schedule using the SQL you provided — schedules contain the project URL + anon key and must not be in migrations (so remixes don't inherit them).
-3. Verify the job appears in `cron.job` and that the first run logs a 200 in `net._http_response`.
+```
+POST https://magnrdegcegxdtgapyez.supabase.co/functions/v1/join-waitlist
+Content-Type: application/json
 
-### SQL to run
-
-```sql
-SELECT cron.schedule(
-  'invoke-consolidated-alerts',
-  '0 */4 * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://magnrdegcegxdtgapyez.supabase.co/functions/v1/send-consolidated-alerts',
-    headers:='{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZ25yZGVnY2VneGR0Z2FweWV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTI5MTYsImV4cCI6MjA4OTQyODkxNn0.GEsHJs4uD-UVrdlgepE6nbjZBmjDICGZ4sR6a3zMv48"}'::jsonb,
-    body:='{}'::jsonb
-  ) AS request_id;
-  $$
-);
+{
+  "email": "user@example.com",
+  "full_name": "Optional Name",
+  "phone": "+91...",
+  "source": "web-landing-page"   // optional, defaults to web-landing-page
+}
 ```
 
-### Note on timing
+No anon key, no Authorization header required from the client.
 
-Cron runs in **UTC**, not IST. `0 */4 * * *` fires at 05:30, 09:30, 13:30, 17:30, 21:30, 01:30 IST. If you need IST-aligned slots (e.g. 08:00/12:00/16:00/20:00 IST), tell me and I'll adjust the cron expression.  
-Yes, we need IST-aligned slots of 8am, 12pm, 4pm and 8pm.
+## Responses
 
-### Note on auth
+- `200 { ok: true, alreadyJoined: false }` — new signup
+- `200 { ok: true, alreadyJoined: true }` — email already on list (idempotent)
+- `400 { error: "..." }` — invalid payload (Zod field errors)
+- `429 { error: "Too many requests" }` — rate-limit hit
+- `500 { error: "..." }` — server error
 
-The job uses the anon key. If `send-consolidated-alerts` validates JWT / requires service-role, the call will 401 — say the word and I'll switch to the service role key (kept server-side in the cron definition only).  
-Yes. switch to service role.
+## Function behavior
 
-&nbsp;
+1. CORS: `Access-Control-Allow-Origin: *`, handle OPTIONS preflight.
+2. Validate body with Zod:
+   - `email`: required, valid email, ≤255 chars
+   - `full_name`: optional, ≤120 chars
+   - `phone`: optional, ≤20 chars
+   - `source`: optional, ≤60 chars, default `web-landing-page`
+3. Light in-memory rate limit (5 requests / IP / minute) using `x-forwarded-for`.
+4. Insert into `premium_plus_waitlist` using **service role key** (bypasses RLS). On unique-email conflict → return `alreadyJoined: true`.
+5. Fire-and-forget call to `send-transactional-email` with template `premium-plus-waitlist-confirmation` and `idempotencyKey = pp-waitlist-<email>` so the user gets the existing branded confirmation email.
+6. Log failures with `console.error` (visible in edge function logs).
+
+## Config
+
+- `supabase/config.toml`: add block for `join-waitlist` with `verify_jwt = false` (public endpoint).
+- Uses existing secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — nothing new needed.
+
+## No other changes
+
+- `premium_plus_waitlist` table, RLS, and the admin Pre-register tab stay exactly as they are.
+- Existing in-app `/subscription` signup path is untouched.
+- Existing `admin-waitlist` function is untouched.
+
+## What you need to do on futurewave.in
+
+After deploy, change the Pre-register form's submit handler to a single fetch:
+
+```js
+await fetch("https://magnrdegcegxdtgapyez.supabase.co/functions/v1/join-waitlist", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email, full_name, phone })
+});
+```
+
+No Supabase SDK, no anon key, no table name in client code — so the form can't silently break again if keys rotate or schema changes.
