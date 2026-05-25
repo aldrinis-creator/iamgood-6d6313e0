@@ -51,3 +51,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.sos-delivery-webhook]
     verify_jwt = false
+  [functions.join-waitlist]
+    verify_jwt = false
