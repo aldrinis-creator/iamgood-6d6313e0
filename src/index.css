@@ -34,6 +34,9 @@
     --sos: 0 84% 60%;
     --sos-foreground: 0 0% 100%;
 
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 213 53% 23%;
