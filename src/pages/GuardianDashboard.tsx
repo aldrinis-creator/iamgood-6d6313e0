@@ -473,6 +473,64 @@ const GuardianDashboard = () => {
     return () => clearInterval(pollId);
   }, [wardUserId, fetchWardSettings]);
 
+  // Tick "now" every 60s so inactivity thresholds update smoothly, plus a
+  // 10-min hard refresh of ward profile + settings as a belt-and-braces
+  // fallback if Realtime is paused. Also re-fetch on tab becoming visible.
+  useEffect(() => {
+    if (!wardUserId) return;
+    const tick = setInterval(() => setNowTick(Date.now()), 60_000);
+    const hardRefresh = async () => {
+      const { data: wp } = await supabase
+        .from("profiles")
+        .select("last_active_at")
+        .eq("id", wardUserId)
+        .single();
+      if ((wp as any)?.last_active_at) setWardLastActive((wp as any).last_active_at);
+      fetchWardSettings(wardUserId);
+      setNowTick(Date.now());
+    };
+    const refreshId = setInterval(hardRefresh, 10 * 60_000);
+    const onVis = () => { if (document.visibilityState === "visible") hardRefresh(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(tick);
+      clearInterval(refreshId);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [wardUserId, fetchWardSettings]);
+
+  // Reset dismissed popup when switching wards
+  useEffect(() => {
+    setInactivityPopupDismissed(false);
+  }, [wardUserId]);
+
+  // Inactivity computation (suppressed during sleep / checked-out)
+  const inactivityMin = wardLastActive
+    ? Math.floor((nowTick - new Date(wardLastActive).getTime()) / 60_000)
+    : 0;
+  const inactivitySuppressed =
+    wardPauseMode === "sleep" ||
+    (wardPauseMode === "checked-out" &&
+      (!wardPauseDetails.endsAt || new Date(wardPauseDetails.endsAt).getTime() > nowTick));
+  const showInactivity = !!wardLastActive && !inactivitySuppressed;
+  const inactivityTileClass = !showInactivity
+    ? "bg-muted"
+    : inactivityMin >= 45
+      ? "bg-destructive/15 text-destructive animate-flash-red"
+      : inactivityMin >= 30
+        ? "bg-destructive/15 text-destructive"
+        : inactivityMin >= 15
+          ? "bg-warning/15 text-warning"
+          : "bg-muted";
+
+  // Auto-reset the dismiss flag when the ward becomes active again
+  useEffect(() => {
+    if (inactivityMin < 60 && inactivityPopupDismissed) {
+      setInactivityPopupDismissed(false);
+    }
+  }, [inactivityMin, inactivityPopupDismissed]);
+
+
   // Battery low visual indicator only – no audio alert
 
   // Realtime subscriptions
