@@ -33,6 +33,7 @@ import WardPicker from "@/components/WardPicker";
 import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
 import HospitalKitCard from "@/components/guardian/HospitalKitCard";
+import WardInactivityPopup from "@/components/WardInactivityPopup";
 
 interface Notification {
   id: string;
