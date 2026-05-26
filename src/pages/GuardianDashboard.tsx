@@ -1178,6 +1178,11 @@ const GuardianDashboard = () => {
           </CollapsibleSection>
         )}
       </div>
+      <WardInactivityPopup
+        open={showInactivity && inactivityMin >= 60 && !inactivityPopupDismissed}
+        wardName={wardName}
+        onDismiss={() => setInactivityPopupDismissed(true)}
+      />
     </AppLayout>
   );
 };
