@@ -84,6 +84,9 @@
     --sos: 0 84% 60%;
     --sos-foreground: 0 0% 100%;
 
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
     --border: 213 32% 20%;
     --input: 213 32% 20%;
     --ring: 213 27% 84%;
