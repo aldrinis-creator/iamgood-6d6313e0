@@ -932,14 +932,16 @@ const GuardianDashboard = () => {
                     : "—"}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-muted">
-                <Smartphone className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+              <div className={`p-2 rounded-lg transition-colors ${inactivityTileClass}`}>
+                <Smartphone className={`w-4 h-4 mx-auto mb-1 ${showInactivity && inactivityMin >= 15 ? "" : "text-muted-foreground"}`} />
                 <p className="text-sm font-semibold">
                   {wardLastActive
                     ? formatDistanceToNow(new Date(wardLastActive), { addSuffix: true })
                     : "N/A"}
                 </p>
-                <p className="text-[10px] text-muted-foreground">Last Active</p>
+                <p className={`text-[10px] ${showInactivity && inactivityMin >= 15 ? "opacity-80" : "text-muted-foreground"}`}>
+                  Last Active{inactivitySuppressed ? " (paused)" : ""}
+                </p>
               </div>
             </div>
           </CardContent>
