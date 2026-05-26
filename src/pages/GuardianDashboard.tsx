@@ -33,6 +33,7 @@ import WardPicker from "@/components/WardPicker";
 import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
 import HospitalKitCard from "@/components/guardian/HospitalKitCard";
+import WardInactivityPopup from "@/components/WardInactivityPopup";
 
 interface Notification {
   id: string;
@@ -261,6 +262,8 @@ const GuardianDashboard = () => {
   const [batteryUpdatedAt, setBatteryUpdatedAt] = useState<string | null>(null);
   const [wardSafeZones, setWardSafeZones] = useState<SafeZone[]>([]);
   const [wardLastActive, setWardLastActive] = useState<string | null>(null);
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  const [inactivityPopupDismissed, setInactivityPopupDismissed] = useState(false);
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
@@ -469,6 +472,64 @@ const GuardianDashboard = () => {
     const pollId = setInterval(() => fetchWardSettings(wardUserId), 120_000);
     return () => clearInterval(pollId);
   }, [wardUserId, fetchWardSettings]);
+
+  // Tick "now" every 60s so inactivity thresholds update smoothly, plus a
+  // 10-min hard refresh of ward profile + settings as a belt-and-braces
+  // fallback if Realtime is paused. Also re-fetch on tab becoming visible.
+  useEffect(() => {
+    if (!wardUserId) return;
+    const tick = setInterval(() => setNowTick(Date.now()), 60_000);
+    const hardRefresh = async () => {
+      const { data: wp } = await supabase
+        .from("profiles")
+        .select("last_active_at")
+        .eq("id", wardUserId)
+        .single();
+      if ((wp as any)?.last_active_at) setWardLastActive((wp as any).last_active_at);
+      fetchWardSettings(wardUserId);
+      setNowTick(Date.now());
+    };
+    const refreshId = setInterval(hardRefresh, 10 * 60_000);
+    const onVis = () => { if (document.visibilityState === "visible") hardRefresh(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(tick);
+      clearInterval(refreshId);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [wardUserId, fetchWardSettings]);
+
+  // Reset dismissed popup when switching wards
+  useEffect(() => {
+    setInactivityPopupDismissed(false);
+  }, [wardUserId]);
+
+  // Inactivity computation (suppressed during sleep / checked-out)
+  const inactivityMin = wardLastActive
+    ? Math.floor((nowTick - new Date(wardLastActive).getTime()) / 60_000)
+    : 0;
+  const inactivitySuppressed =
+    wardPauseMode === "sleep" ||
+    (wardPauseMode === "checked-out" &&
+      (!wardPauseDetails.endsAt || new Date(wardPauseDetails.endsAt).getTime() > nowTick));
+  const showInactivity = !!wardLastActive && !inactivitySuppressed;
+  const inactivityTileClass = !showInactivity
+    ? "bg-muted"
+    : inactivityMin >= 45
+      ? "bg-destructive/15 text-destructive animate-flash-red"
+      : inactivityMin >= 30
+        ? "bg-destructive/15 text-destructive"
+        : inactivityMin >= 15
+          ? "bg-warning/15 text-warning"
+          : "bg-muted";
+
+  // Auto-reset the dismiss flag when the ward becomes active again
+  useEffect(() => {
+    if (inactivityMin < 60 && inactivityPopupDismissed) {
+      setInactivityPopupDismissed(false);
+    }
+  }, [inactivityMin, inactivityPopupDismissed]);
+
 
   // Battery low visual indicator only – no audio alert
 
@@ -871,14 +932,16 @@ const GuardianDashboard = () => {
                     : "—"}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-muted">
-                <Smartphone className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+              <div className={`p-2 rounded-lg transition-colors ${inactivityTileClass}`}>
+                <Smartphone className={`w-4 h-4 mx-auto mb-1 ${showInactivity && inactivityMin >= 15 ? "" : "text-muted-foreground"}`} />
                 <p className="text-sm font-semibold">
                   {wardLastActive
                     ? formatDistanceToNow(new Date(wardLastActive), { addSuffix: true })
                     : "N/A"}
                 </p>
-                <p className="text-[10px] text-muted-foreground">Last Active</p>
+                <p className={`text-[10px] ${showInactivity && inactivityMin >= 15 ? "opacity-80" : "text-muted-foreground"}`}>
+                  Last Active{inactivitySuppressed ? " (paused)" : ""}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -1115,6 +1178,11 @@ const GuardianDashboard = () => {
           </CollapsibleSection>
         )}
       </div>
+      <WardInactivityPopup
+        open={showInactivity && inactivityMin >= 60 && !inactivityPopupDismissed}
+        wardName={wardName}
+        onDismiss={() => setInactivityPopupDismissed(true)}
+      />
     </AppLayout>
   );
 };

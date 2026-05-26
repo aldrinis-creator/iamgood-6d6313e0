@@ -1,65 +1,69 @@
-# Build `join-waitlist` public endpoint
+## Goal
 
-A hardened public edge function that futurewave.in (or any external site) can POST to, so Pre-register submissions can no longer silently break.
+Make the Guardian dashboard's **Last Active** tile a true inactivity monitor for the ward, with escalating visual urgency and a 1-hour popup — suppressed while the ward is asleep or checked out.
 
-## Endpoint
+## Behavior
 
-```
-POST https://magnrdegcegxdtgapyez.supabase.co/functions/v1/join-waitlist
-Content-Type: application/json
+Thresholds based on `now - ward.last_active_at`:
 
-{
-  "email": "user@example.com",
-  "full_name": "Optional Name",
-  "phone": "+91...",
-  "source": "web-landing-page"   // optional, defaults to web-landing-page
-}
-```
 
-No anon key, no Authorization header required from the client.
+| Inactivity | Tile state                                  |
+| ---------- | ------------------------------------------- |
+| < 15 min   | Normal (muted)                              |
+| ≥ 15 min   | Amber background + amber text               |
+| ≥ 30 min   | Red background + red text                   |
+| ≥ 45 min   | Red background, **pulsing/flash** animation |
+| ≥ 60 min   | Red + flash **and** one-time modal popup    |
 
-## Responses
 
-- `200 { ok: true, alreadyJoined: false }` — new signup
-- `200 { ok: true, alreadyJoined: true }` — email already on list (idempotent)
-- `400 { error: "..." }` — invalid payload (Zod field errors)
-- `429 { error: "Too many requests" }` — rate-limit hit
-- `500 { error: "..." }` — server error
+Popup copy:
 
-## Function behavior
+> "Hello! We have not had any active signal from your Ward **{wardName}** for the past one hour. Please check on them."
+> [Dismiss]
 
-1. CORS: `Access-Control-Allow-Origin: *`, handle OPTIONS preflight.
-2. Validate body with Zod:
-   - `email`: required, valid email, ≤255 chars
-   - `full_name`: optional, ≤120 chars
-   - `phone`: optional, ≤20 chars
-   - `source`: optional, ≤60 chars, default `web-landing-page`
-3. Light in-memory rate limit (5 requests / IP / minute) using `x-forwarded-for`.
-4. Insert into `premium_plus_waitlist` using **service role key** (bypasses RLS). On unique-email conflict → return `alreadyJoined: true`.
-5. Fire-and-forget call to `send-transactional-email` with template `premium-plus-waitlist-confirmation` and `idempotencyKey = pp-waitlist-<email>` so the user gets the existing branded confirmation email.
-6. Log failures with `console.error` (visible in edge function logs).
+Rules:
 
-## Config
+- Auto-refresh every **10 min** (re-evaluate `now - last_active_at`; the value itself already streams in via Realtime, but we also re-tick the clock).
+- Suppression: do **not** color-escalate or show the popup if the ward is currently in **Sleep window** or **Checked Out**.
+- Dismiss = hides popup for that ward + that inactivity episode. If the ward becomes active again and later crosses 60 min anew, the popup can show again.
+- Popup is per-ward (switching wards in `WardPicker` re-evaluates).
 
-- `supabase/config.toml`: add block for `join-waitlist` with `verify_jwt = false` (public endpoint).
-- Uses existing secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — nothing new needed.
+## Implementation
 
-## No other changes
+1. **New component** `src/components/WardInactivityPopup.tsx` — modal using existing `Dialog` + design tokens, single Dismiss button.
+2. **Edit `src/pages/GuardianDashboard.tsx**` (around lines 874–882, the Last Active tile):
+  - Add a `nowTick` state updated every 60 s via `setInterval` (cheap; lets thresholds advance smoothly). A separate 10-min interval re-fetches `last_active_at` from `profiles` as a belt-and-braces refresh in case Realtime is paused.
+  - Derive `inactivityMin = (nowTick - new Date(wardLastActive)) / 60000`.
+  - Derive `suppressed` = ward is sleeping or checked out (see step 3).
+  - Compute tile classes:
+    - `≥30`: `bg-destructive/15 text-destructive`
+    - `≥15`: `bg-warning/15 text-warning` (amber semantic token)
+    - `≥45`: add `animate-pulse` (or a new `animate-flash` keyframe in `index.css` if a stronger flash is wanted)
+  - When `inactivityMin ≥ 60 && !suppressed && !dismissedForEpisode`, render `<WardInactivityPopup wardName ... />`.
+  - Reset `dismissedForEpisode` whenever `inactivityMin` drops below 60 (ward came back).
+3. **Ward pause/sleep awareness** (suppression source):
+  - `user_settings` is currently RLS-scoped to the owning user, so the guardian can't read the ward's `pauseMode` / `sleepSchedule` directly.
+  - Add a new SECURITY DEFINER RPC `get_ward_pause_state(ward_id uuid)` that returns `{ pause_mode, sleep_start, sleep_end, check_out_ends_at }` only if the caller is an **accepted** guardian for that ward. Call it on dashboard mount and every 10 min.
+  - Locally compute: `suppressed = pause_mode === 'checked-out' (and not expired) || (sleepMode enabled && now ∈ sleep window, IST)`.
+  - All time math in **IST** per project standard.
+4. **Amber token check**: project already uses `bg-warning` / `text-warning` (see offline banner in `AppLayout`). Reuse — no new tokens needed. Red uses `destructive`.
+5. **No changes** to `useActivityHeartbeat` — the underlying signal is already correct.
 
-- `premium_plus_waitlist` table, RLS, and the admin Pre-register tab stay exactly as they are.
-- Existing in-app `/subscription` signup path is untouched.
-- Existing `admin-waitlist` function is untouched.
+## Edge cases
 
-## What you need to do on futurewave.in
+- `last_active_at` null → show "N/A", no escalation, no popup.
+- Ward switch via WardPicker → reset `dismissedForEpisode` and `nowTick` evaluation.
+- Guardian role only — logic stays inside `GuardianDashboard`, no impact on user app.
+- Tab backgrounded > 10 min → on `visibilitychange → visible`, force a refresh + re-evaluate.
 
-After deploy, change the Pre-register form's submit handler to a single fetch:
+## Open question for you
 
-```js
-await fetch("https://magnrdegcegxdtgapyez.supabase.co/functions/v1/join-waitlist", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email, full_name, phone })
-});
-```
+For the **flash at ≥45 min**, do you want:
 
-No Supabase SDK, no anon key, no table name in client code — so the form can't silently break again if keys rotate or schema changes.
+- (a) a soft `animate-pulse` (subtle, already in Tailwind), or
+- (b) a harder red on/off flash (new keyframe, more attention-grabbing)?
+
+Default I'll go with **(b)** since the intent is escalation, unless you say otherwise.  
+go with (b)
+
+&nbsp;

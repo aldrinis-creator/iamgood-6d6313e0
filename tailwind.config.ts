@@ -39,6 +39,10 @@ export default {
           DEFAULT: "hsl(var(--sos))",
           foreground: "hsl(var(--sos-foreground))",
         },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
@@ -80,10 +84,15 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "flash-red": {
+          "0%, 100%": { backgroundColor: "hsl(var(--destructive) / 0.15)" },
+          "50%": { backgroundColor: "hsl(var(--destructive) / 0.55)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "flash-red": "flash-red 1s ease-in-out infinite",
       },
     },
   },
