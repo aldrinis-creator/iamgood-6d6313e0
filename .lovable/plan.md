@@ -1,69 +1,71 @@
 ## Goal
 
-Make the Guardian dashboard's **Last Active** tile a true inactivity monitor for the ward, with escalating visual urgency and a 1-hour popup — suppressed while the ward is asleep or checked out.
+Bring `src/data/faqData.ts` (User FAQ) and `src/data/guardianFaqData.ts` (Guardian FAQ) fully up-to-date with the features built since the last refresh (FAQ_VERSION `2026-05-11` / GUARDIAN_FAQ_VERSION `2026-05-15`). Add new Q&As for net-new features and revise existing answers where behaviour has changed.
 
-## Behavior
+Both files will get a bumped version stamp (e.g. `2026-05-27`) and last-updated comment so the in-app "Download Guide" footer and the version badge reflect the refresh.
 
-Thresholds based on `now - ward.last_active_at`:
+## Guardian FAQ (`guardianFaqData.ts`)
 
+**New sections / entries**
 
-| Inactivity | Tile state                                  |
-| ---------- | ------------------------------------------- |
-| < 15 min   | Normal (muted)                              |
-| ≥ 15 min   | Amber background + amber text               |
-| ≥ 30 min   | Red background + red text                   |
-| ≥ 45 min   | Red background, **pulsing/flash** animation |
-| ≥ 60 min   | Red + flash **and** one-time modal popup    |
+1. **Last Active Monitor (NEW)** — explain the escalating tile:
+   - <15 min normal, ≥15 amber, ≥30 red, ≥45 red + flashing, ≥60 popup.
+   - Auto-refreshes every 10 min, also on tab focus.
+   - Suppressed while ward is in Sleep window or Checked Out (Vacation).
+   - Popup is one-time per inactivity episode; resets when ward becomes active.
+2. **Medication adherence alerts** — clarify the T+60–75 min guardian alert window and that simultaneous doses are batched into a single alert.
+3. **Refill visibility** — guardian can see medications running low and nudge the ward; refill orders require Doctor/Hospital details and can sync with Jan Aushadhi alternatives.
+4. **Notifications inbox** — auto-cleanup after 48 h; dedup so the same alert isn't repeated; you can mark as read.
+5. **Push notifications** — server-side cron checks every 1 min so alerts fire even if the ward's phone is asleep.
+6. **Coupons / promos** — wards can apply a coupon at checkout; guardians don't pay.
+7. **Subscriptions redirect** — clarify wards pay via futurewave.in/pay (Razorpay), confirmation syncs back.
+8. **Guardian Profile scope** — your profile is identity-only (name, phone, avatar, emergency contact). No health, ID, meds or sub-guardians on the guardian side.
+9. **Login suppression** — no alert chimes or overlays will fire while you're mid-login (prevents jump-scares on first open).
 
+**Revisions to existing entries**
 
-Popup copy:
+- **Ward limits** — restate: hard cap 3 wards regardless of the ward's plan.
+- **Reading the Dashboard** — add "Last Active tile" bullet alongside Health Score and Today's Appointments.
+- **Responding to Alerts** — expand the alert types list to include the new Inactivity (1 h) popup.
+- **Account → "stop being someone's Guardian"** — keep one-way revocation, restate clearly.
 
-> "Hello! We have not had any active signal from your Ward **{wardName}** for the past one hour. Please check on them."
-> [Dismiss]
+## User FAQ (`faqData.ts`)
 
-Rules:
+**New sections / entries**
 
-- Auto-refresh every **10 min** (re-evaluate `now - last_active_at`; the value itself already streams in via Realtime, but we also re-tick the clock).
-- Suppression: do **not** color-escalate or show the popup if the ward is currently in **Sleep window** or **Checked Out**.
-- Dismiss = hides popup for that ward + that inactivity episode. If the ward becomes active again and later crosses 60 min anew, the popup can show again.
-- Popup is per-ward (switching wards in `WardPicker` re-evaluates).
+1. **Guardian inactivity monitor (informational)** — let the user know guardians get an escalating tile + 1 h popup if their phone shows no activity, and that Sleep Mode + Check-Out automatically suppress those alerts.
+2. **Coupon codes** — how to apply at checkout, single-use per account, validated server-side.
+3. **Subscription checkout** — Basic ₹99/mo, Pro ₹199/mo; payment opens futurewave.in/pay (Razorpay); confirmation returns to the app.
+4. **Freemium plan limits** — Free 1 guardian, Basic 3, Pro 5; AI-heavy tools gated to higher tiers.
+5. **Phone-first login** — phone+OTP is the primary login; email is optional/placeholder; OTPs are 6-digit and one-time.
+6. **Push notifications (refresh)** — server cron now fires alerts every minute; works even when the app is closed.
+7. **Notifications inbox** — entries auto-cleanup after 48 h; dedup logic prevents repeats.
+8. **Offline SOS** — if you trigger SOS while offline, the service worker queues and retries it once back online; your Emergency Profile is also cached offline.
+9. **Auto Sleep Mode** — added entry confirming Sleep Mode also suppresses guardian-side inactivity escalation and check-in chimes.
+
+**Revisions to existing entries**
+
+- **Medication Tracker** — refill ordering now requires a Doctor or Hospital reference; Jan Aushadhi cart sync is built in; simultaneous reminders are batched into one alert + chime.
+- **Medical Documents / Vault** — viewing uses 1-hour signed URLs; diagnosis records auto-link to attached scans.
+- **Emergency Profile** — public profile uses a secure token RPC and is cached by the service worker for offline use.
+- **Subscription & Pricing** — replace with the current tier list (Free / Basic ₹99 / Pro ₹199) and Premium Plus details already on the page; remove stale "2 guardians on Basic" copy.
+- **Account & Login** — phone-first; verification email is optional; OTPs are self-managed (no email magic link).
+- **Settings persistence** — note that changes auto-save with a short debounce and flush on sign-out / app close.
+- **Battery monitoring** — confirm 30 % / 10 % thresholds and that guardian only receives a battery alert during an active journey (already correct — just align wording with the memory).
 
 ## Implementation
 
-1. **New component** `src/components/WardInactivityPopup.tsx` — modal using existing `Dialog` + design tokens, single Dismiss button.
-2. **Edit `src/pages/GuardianDashboard.tsx**` (around lines 874–882, the Last Active tile):
-  - Add a `nowTick` state updated every 60 s via `setInterval` (cheap; lets thresholds advance smoothly). A separate 10-min interval re-fetches `last_active_at` from `profiles` as a belt-and-braces refresh in case Realtime is paused.
-  - Derive `inactivityMin = (nowTick - new Date(wardLastActive)) / 60000`.
-  - Derive `suppressed` = ward is sleeping or checked out (see step 3).
-  - Compute tile classes:
-    - `≥30`: `bg-destructive/15 text-destructive`
-    - `≥15`: `bg-warning/15 text-warning` (amber semantic token)
-    - `≥45`: add `animate-pulse` (or a new `animate-flash` keyframe in `index.css` if a stronger flash is wanted)
-  - When `inactivityMin ≥ 60 && !suppressed && !dismissedForEpisode`, render `<WardInactivityPopup wardName ... />`.
-  - Reset `dismissedForEpisode` whenever `inactivityMin` drops below 60 (ward came back).
-3. **Ward pause/sleep awareness** (suppression source):
-  - `user_settings` is currently RLS-scoped to the owning user, so the guardian can't read the ward's `pauseMode` / `sleepSchedule` directly.
-  - Add a new SECURITY DEFINER RPC `get_ward_pause_state(ward_id uuid)` that returns `{ pause_mode, sleep_start, sleep_end, check_out_ends_at }` only if the caller is an **accepted** guardian for that ward. Call it on dashboard mount and every 10 min.
-  - Locally compute: `suppressed = pause_mode === 'checked-out' (and not expired) || (sleepMode enabled && now ∈ sleep window, IST)`.
-  - All time math in **IST** per project standard.
-4. **Amber token check**: project already uses `bg-warning` / `text-warning` (see offline banner in `AppLayout`). Reuse — no new tokens needed. Red uses `destructive`.
-5. **No changes** to `useActivityHeartbeat` — the underlying signal is already correct.
+- Edit `src/data/faqData.ts`:
+  - Bump `FAQ_VERSION = "2026-05-27"` and the header comment.
+  - Add new sections (Guardian Inactivity Info, Coupons, Phone-first Login, Offline SOS, etc.) and revise the entries listed above in place.
+- Edit `src/data/guardianFaqData.ts`:
+  - Bump `GUARDIAN_FAQ_VERSION = "2026-05-27"` and the header comment.
+  - Insert the new "Last Active Monitor" section near the top of "Reading the Dashboard"; add the other new sections (Medication Alerts, Refills, Notifications Inbox, Push, Coupons, Subscriptions, Profile Scope, Login Suppression); revise the listed existing entries.
+- No component changes needed — `Help.tsx` and `GuardianHelp.tsx` already read these files and render the new sections / version stamps automatically.
+- No DB or backend changes.
 
-## Edge cases
+## Out of scope
 
-- `last_active_at` null → show "N/A", no escalation, no popup.
-- Ward switch via WardPicker → reset `dismissedForEpisode` and `nowTick` evaluation.
-- Guardian role only — logic stays inside `GuardianDashboard`, no impact on user app.
-- Tab backgrounded > 10 min → on `visibilitychange → visible`, force a refresh + re-evaluate.
-
-## Open question for you
-
-For the **flash at ≥45 min**, do you want:
-
-- (a) a soft `animate-pulse` (subtle, already in Tailwind), or
-- (b) a harder red on/off flash (new keyframe, more attention-grabbing)?
-
-Default I'll go with **(b)** since the intent is escalation, unless you say otherwise.  
-go with (b)
-
-&nbsp;
+- Translating new copy into the 9 supported languages (translation pass can follow separately).
+- Restructuring section ordering beyond inserting the new sections in sensible places.
+- Any UI changes to the Help pages themselves.
