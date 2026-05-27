@@ -1,5 +1,5 @@
 // FAQ data — update this file whenever FAQs change.
-// Last updated: 2026-05-11
+// Last updated: 2026-05-27
 
 export interface FaqItem {
   question: string;
@@ -12,7 +12,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-05-11";
+export const FAQ_VERSION = "2026-05-27";
 
 export const faqSections: FaqSection[] = [
   {
@@ -743,19 +743,19 @@ export const faqSections: FaqSection[] = [
     items: [
       {
         question: "How do I sign up for Check-iN?",
-        answer: "Visit the registration page and choose your role (User or Guardian). Fill in your details, verify your phone number via OTP, and optionally nominate guardians. A verification email will be sent to your registered email address."
+        answer: "Check-iN is phone-first: enter your full name and mobile number, verify with a 6-digit OTP, and pick your role (User or Guardian). Email is optional — if you don't add one we create a placeholder address for your account."
       },
       {
-        question: "Can I sign in with my phone number?",
-        answer: "Yes! On the login page, switch to the 'Phone' tab and enter your registered phone number. You'll receive a one-time password (OTP) via SMS to sign in."
+        question: "How do I log in?",
+        answer: "Enter your registered phone number and tap 'Send OTP'. You'll receive a 6-digit one-time password via SMS (and WhatsApp where supported). OTPs are self-managed and expire after a few minutes."
       },
       {
-        question: "I forgot my password — how do I reset it?",
-        answer: "On the login page, tap 'Forgot Password?' and enter your email address. You'll receive a password reset link via email. Click the link to set a new password."
+        question: "Why don't I see chimes or popups during login?",
+        answer: "While the login/OTP flow is in progress, the app intentionally suppresses all alerts, audio chimes and overlays so nothing jumps in front of the auth screen. Everything resumes normally once you finish signing in."
       },
       {
-        question: "I didn't receive the verification email — what do I do?",
-        answer: "On the login page, try signing in with your credentials. If your email isn't verified yet, a 'Resend Verification Email' option will appear. Check your spam/junk folder as well."
+        question: "I didn't receive my OTP — what should I do?",
+        answer: "Wait for the resend timer, then tap 'Resend OTP'. Check your mobile signal and ensure your phone number is correct (with country code +91). If it still doesn't arrive, contact checkin_support@futurewave.in."
       },
     ],
   },
@@ -843,11 +843,19 @@ export const faqSections: FaqSection[] = [
     items: [
       {
         question: "What subscription plans are available?",
-        answer: "Check-iN offers two plans: Basic at ₹99/month (core safety features, 2 guardians, basic health tools) and Pro at ₹199/month (all features, up to 5 guardians, advanced AI tools, priority support)."
+        answer: "Three tiers: Free (1 guardian, core safety), Basic ₹99/month or ₹999/year (up to 3 guardians, full check-in + medication tools), and Pro ₹199/month or ₹1,999/year (up to 5 guardians, all AI health tools, priority support). Premium Plus (₹9,999/yr) bundles the Smart Ring."
       },
       {
-        question: "Is there a free trial?",
-        answer: "Check-iN's core safety features are available to try. Visit the Subscription page from the menu to view detailed plan comparisons and upgrade options."
+        question: "How does checkout work?",
+        answer: "From the Subscription page, choose a plan and you'll be redirected to futurewave.in/pay (Razorpay) to complete payment securely. After payment, the confirmation syncs back automatically and your plan is upgraded within seconds."
+      },
+      {
+        question: "Can I use a coupon code?",
+        answer: "Yes! Enter your coupon at checkout. Codes are validated server-side, are usually single-use per account, and apply an immediate discount on the Razorpay page before payment."
+      },
+      {
+        question: "What are the per-tier guardian limits?",
+        answer: "Free: 1 guardian. Basic: 3 guardians. Pro: 5 guardians. Advanced AI tools (Quick Visual Checks, Doctor Visit Report, Tele-Consult analysis) are gated to higher tiers."
       },
     ],
   },
