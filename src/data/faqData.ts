@@ -1135,4 +1135,60 @@ export const faqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "Guardian Inactivity Monitor",
+    icon: "shield",
+    items: [
+      {
+        question: "What does my guardian see if I don't use my phone for a while?",
+        answer: "On the Guardian Dashboard, your 'Last Active' tile escalates as inactivity grows: amber at 15 min, red at 30 min, flashing red at 45 min, and a popup at 60 min asking them to check on you. It auto-refreshes every 10 minutes.",
+      },
+      {
+        question: "Will this fire while I'm sleeping or on vacation?",
+        answer: "No. Sleep Mode and Check-Out (Vacation Mode) automatically suppress the escalation — no colour change, no flashing, no 1-hour popup. Normal monitoring resumes when you wake up or end Check-Out.",
+      },
+    ],
+  },
+  {
+    title: "Notifications Inbox & Push",
+    icon: "bell",
+    items: [
+      {
+        question: "Where can I see past alerts?",
+        answer: "The bell icon in the header opens your Notifications inbox. Every alert (check-ins, medication, SOS, geofence, low battery, fall) is mirrored here. Entries auto-clean after 48 hours.",
+      },
+      {
+        question: "Why don't I get duplicate alerts for the same thing?",
+        answer: "Notifications are de-duplicated server-side, so repeated triggers for the same event collapse into a single inbox entry and a single push.",
+      },
+      {
+        question: "Do push notifications work when the app is closed?",
+        answer: "Yes. Check-iN registers a service worker with Web Push. A 1-minute server-side cron evaluates pending alerts, so even with the app closed, the push reaches your lock screen.",
+      },
+    ],
+  },
+  {
+    title: "Offline Reliability",
+    icon: "wifi-off",
+    items: [
+      {
+        question: "What happens if I press SOS while offline?",
+        answer: "The service worker queues your SOS payload locally and retries automatically the moment connectivity returns — so the alert is never lost.",
+      },
+      {
+        question: "Can my Emergency Profile be viewed offline?",
+        answer: "Yes. Your public Emergency Profile page is cached by the service worker, so first-responders can open the shared link even with patchy network.",
+      },
+    ],
+  },
+  {
+    title: "Settings Auto-Save",
+    icon: "save",
+    items: [
+      {
+        question: "Do I need to tap 'Save' after changing settings?",
+        answer: "No — settings save automatically with a short debounce (about half a second after your last edit). Pending changes are also flushed when you sign out or close the app, so nothing is lost.",
+      },
+    ],
+  },
 ];
