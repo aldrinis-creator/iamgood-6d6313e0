@@ -1,9 +1,9 @@
 // Guardian-facing FAQ data — separate from Ward FAQ.
-// Last updated: 2026-05-11
+// Last updated: 2026-05-27
 
 import type { FaqSection } from "./faqData";
 
-export const GUARDIAN_FAQ_VERSION = "2026-05-15";
+export const GUARDIAN_FAQ_VERSION = "2026-05-27";
 
 export const guardianFaqSections: FaqSection[] = [
   {
@@ -51,12 +51,28 @@ export const guardianFaqSections: FaqSection[] = [
         answer: "It is a 0–100 daily score across 7 categories (vitals, activity, sleep, nutrition, medication adherence, mental wellness, hydration). Tap the ring to see category breakdowns."
       },
       {
+        question: "What is the 'Last Active' tile?",
+        answer: "It shows how long it has been since your Ward last interacted with their phone (any tap, scroll or app action sends a quiet heartbeat). The tile escalates automatically: under 15 min it stays neutral, ≥15 min turns amber, ≥30 min turns red, ≥45 min starts flashing red, and at ≥60 min a popup appears asking you to check on them. The tile auto-refreshes every 10 minutes and whenever you return to the tab."
+      },
+      {
+        question: "When is the inactivity escalation suppressed?",
+        answer: "Automatically — whenever the Ward is inside their Sleep window or has Checked Out (Vacation Mode). No colour escalation, no flashing, and no 1-hour popup will fire during those periods. Normal monitoring resumes when they wake or end their Check-Out."
+      },
+      {
+        question: "Will the 1-hour inactivity popup show again if I dismiss it?",
+        answer: "Dismiss hides it for that inactivity episode only. If your Ward becomes active again and later crosses 60 minutes of inactivity afresh, the popup can reappear. It is also per-Ward — switching Wards in the Ward Picker re-evaluates."
+      },
+      {
         question: "What is the Today's Appointments strip?",
         answer: "It shows the Ward's upcoming appointments for the day so you can prepare or accompany them."
       },
       {
         question: "Why does my Ward's app chime but mine doesn't?",
         answer: "Local audio alerts (check-in chimes, low-battery beeps, distress tones) are restricted to the Ward's device. As a Guardian you receive push notifications and on-screen alerts instead."
+      },
+      {
+        question: "Why didn't any alerts fire while I was logging in?",
+        answer: "While the login/OTP flow is in progress, all alerts, chimes and overlays are intentionally suppressed so nothing jumps in front of the auth screen. Normal alerting resumes the moment you finish signing in."
       },
     ],
   },
@@ -84,15 +100,41 @@ export const guardianFaqSections: FaqSection[] = [
     items: [
       {
         question: "What types of alerts will I receive?",
-        answer: "SOS (highest priority), Missed Check-In, Low Battery (Ward's phone), Medication Missed, Geofence Exit (Safe Zones), Journey Deviation, and Fall Detected."
+        answer: "SOS (highest priority), Missed Check-In, Inactivity (≥60 min of no app activity, suppressed during Sleep/Check-Out), Low Battery (Ward's phone), Medication Missed, Geofence Exit (Safe Zones), Journey Deviation, and Fall Detected."
       },
       {
         question: "What should I do when an SOS arrives?",
         answer: "Call the Ward immediately. The active SOS banner shows their last known location and a one-tap 'Open in Maps' link. If unreachable, contact emergency services (112 in India) or the Ward's other guardians."
       },
       {
+        question: "How quickly are missed medication alerts sent to me?",
+        answer: "The Ward gets reminders from the scheduled time (T+0) through T+50 min. If they still haven't logged the dose, you are alerted between roughly T+60 and T+75 min so you can nudge them. After a 1-hour cutoff the dose is marked missed in the adherence report."
+      },
+      {
+        question: "Why did I get only one alert for several medications?",
+        answer: "Medications scheduled at the same time are intentionally consolidated into a single overlay and a single audio alert on the Ward's side, and a single push to you — to avoid alert fatigue."
+      },
+      {
         question: "Can I cancel a false-alarm SOS?",
         answer: "Only the Ward can resolve their own SOS event. You will see the resolution status sync in real-time once they tap 'I'm Safe'."
+      },
+    ],
+  },
+  {
+    title: "Notifications & Push",
+    icon: "bell",
+    items: [
+      {
+        question: "How does the Notifications inbox work?",
+        answer: "Every alert (SOS, missed check-in, inactivity, geofence, medication, low battery, fall) is mirrored into your in-app Notifications inbox. You can mark items as read; entries auto-clean after 48 hours so the inbox doesn't grow stale."
+      },
+      {
+        question: "Why don't I see duplicate alerts for the same event?",
+        answer: "Notifications are de-duplicated server-side — repeated triggers for the same SOS, missed check-in or inactivity episode collapse into a single entry."
+      },
+      {
+        question: "How do push notifications reach me when the app is closed?",
+        answer: "Check-iN registers a service worker with Web Push (VAPID). A 1-minute server-side cron evaluates pending alerts, so even if your phone is asleep or the browser is closed, the push fires and lands on your lock screen."
       },
     ],
   },
@@ -139,6 +181,20 @@ export const guardianFaqSections: FaqSection[] = [
     ],
   },
   {
+    title: "Medication Refills",
+    icon: "pill",
+    items: [
+      {
+        question: "Can I see when my Ward is running low on medication?",
+        answer: "Yes — the Guardian Dashboard surfaces low-stock medications (under the Ward's chosen threshold, default 5 pills). You can send a Nudge prompting them to refill."
+      },
+      {
+        question: "Can I place a refill order on my Ward's behalf?",
+        answer: "Refill orders are placed from the Ward's app, but require a Doctor or Hospital reference attached to the prescription. Jan Aushadhi generic alternatives are synced into the order cart automatically when available."
+      },
+    ],
+  },
+  {
     title: "Your Settings",
     icon: "settings",
     items: [
@@ -149,6 +205,28 @@ export const guardianFaqSections: FaqSection[] = [
       {
         question: "Which channels do I receive alerts on?",
         answer: "Push (browser/app), email and WhatsApp. Toggle each channel in Settings → Notifications."
+      },
+      {
+        question: "What's in my Guardian profile?",
+        answer: "Identity only — your name, phone, avatar and emergency contact. Guardians do not have a health record, ID/insurance vault, medications list or sub-guardians in their own profile. All of that lives on the Ward's side."
+      },
+    ],
+  },
+  {
+    title: "Subscriptions & Coupons",
+    icon: "crown",
+    items: [
+      {
+        question: "Do I pay for being a Guardian?",
+        answer: "No. Guardian access is fully covered by your Ward's subscription. You only pay if you also use Check-iN as a Ward yourself."
+      },
+      {
+        question: "Where does my Ward pay for their plan?",
+        answer: "Checkout opens futurewave.in/pay (Razorpay). After successful payment the confirmation syncs back to the app within seconds — you'll see the updated plan reflected in their Ward profile."
+      },
+      {
+        question: "Can my Ward use a coupon code?",
+        answer: "Yes. Coupons are validated server-side at checkout, typically single-use per account, and apply an immediate discount on the Razorpay page."
       },
     ],
   },
