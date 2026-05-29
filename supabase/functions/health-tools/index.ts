@@ -311,20 +311,20 @@ If the document is not a bill or is unreadable, set verdict="insufficient_data" 
 };
 
 const taskConfig: Record<string, { model: string }> = {
-  symptom_check:     { model: "google/gemini-1.5-pro" },
-  vitals_insights:   { model: "google/gemini-1.5-pro" },
-  doctor_report:     { model: "google/gemini-1.5-flash" },
-  document_analysis: { model: "google/gemini-1.5-pro" },
-  medication_info:   { model: "google/gemini-1.5-flash" },
-  prescription_scan: { model: "google/gemini-1.5-pro" },
-  hospital_bill_analysis: { model: "google/gemini-1.5-pro" },
-  banned_check:            { model: "google/gemini-1.5-flash" },
-  face_analysis:           { model: "google/gemini-1.5-flash" },
-  urine_color_analysis:    { model: "google/gemini-1.5-flash" },
-  urine_dipstick_analysis: { model: "google/gemini-1.5-flash" },
-  pill_identification:     { model: "google/gemini-1.5-flash" },
-  tongue_analysis:         { model: "google/gemini-1.5-flash" },
-  wellness_voice_checkin:  { model: "google/gemini-1.5-flash" },
+  symptom_check:     { model: "google/gemini-2.5-pro" },
+  vitals_insights:   { model: "google/gemini-2.5-pro" },
+  doctor_report:     { model: "google/gemini-2.5-flash" },
+  document_analysis: { model: "google/gemini-2.5-pro" },
+  medication_info:   { model: "google/gemini-2.5-flash" },
+  prescription_scan: { model: "google/gemini-2.5-pro" },
+  hospital_bill_analysis: { model: "google/gemini-2.5-pro" },
+  banned_check:            { model: "google/gemini-2.5-flash" },
+  face_analysis:           { model: "google/gemini-2.5-flash" },
+  urine_color_analysis:    { model: "google/gemini-2.5-flash" },
+  urine_dipstick_analysis: { model: "google/gemini-2.5-flash" },
+  pill_identification:     { model: "google/gemini-2.5-flash" },
+  tongue_analysis:         { model: "google/gemini-2.5-flash" },
+  wellness_voice_checkin:  { model: "google/gemini-2.5-flash" },
 };
 
 serve(async (req) => {
@@ -371,9 +371,11 @@ serve(async (req) => {
     const singleImage: string | null = (typeof payload === "object" && typeof payload?.image === "string") ? payload.image : null;
     const hasVision = imagesArray || singleImage;
 
+    console.log(`[health-tools] type=${type} images=${imagesArray?.length ?? (singleImage ? 1 : 0)} payloadKind=${typeof payload}`);
+
     if (hasVision) {
-      // Vision mode: Use gemini-1.5-pro for complex/multi-image, gemini-1.5-flash for single simple image
-      model = imagesArray && imagesArray.length > 1 ? "google/gemini-1.5-pro" : "google/gemini-1.5-flash";
+      // Vision mode: pro for multi-image / complex tasks, flash for single-image quick tasks
+      model = imagesArray && imagesArray.length > 1 ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 
       let visionPrompt = "Please read and analyze this image.";
       if (type === "prescription_scan") {
