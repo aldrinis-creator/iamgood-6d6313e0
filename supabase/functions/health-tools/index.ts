@@ -311,20 +311,20 @@ If the document is not a bill or is unreadable, set verdict="insufficient_data" 
 };
 
 const taskConfig: Record<string, { model: string }> = {
-  symptom_check:     { model: "gpt-4o" },
-  vitals_insights:   { model: "gpt-4o" },
-  doctor_report:     { model: "gpt-4o-mini" },
-  document_analysis: { model: "gpt-4o" },
-  medication_info:   { model: "gpt-4o-mini" },
-  prescription_scan: { model: "gpt-4o" },
-  hospital_bill_analysis: { model: "gpt-4o" },
-  banned_check:            { model: "gpt-4o-mini" },
-  face_analysis:           { model: "gpt-4o" },
-  urine_color_analysis:    { model: "gpt-4o-mini" },
-  urine_dipstick_analysis: { model: "gpt-4o" },
-  pill_identification:     { model: "gpt-4o" },
-  tongue_analysis:         { model: "gpt-4o" },
-  wellness_voice_checkin:  { model: "gpt-4o-mini" },
+  symptom_check:     { model: "google/gemini-1.5-pro" },
+  vitals_insights:   { model: "google/gemini-1.5-pro" },
+  doctor_report:     { model: "google/gemini-1.5-flash" },
+  document_analysis: { model: "google/gemini-1.5-pro" },
+  medication_info:   { model: "google/gemini-1.5-flash" },
+  prescription_scan: { model: "google/gemini-1.5-pro" },
+  hospital_bill_analysis: { model: "google/gemini-1.5-pro" },
+  banned_check:            { model: "google/gemini-1.5-flash" },
+  face_analysis:           { model: "google/gemini-1.5-flash" },
+  urine_color_analysis:    { model: "google/gemini-1.5-flash" },
+  urine_dipstick_analysis: { model: "google/gemini-1.5-flash" },
+  pill_identification:     { model: "google/gemini-1.5-flash" },
+  tongue_analysis:         { model: "google/gemini-1.5-flash" },
+  wellness_voice_checkin:  { model: "google/gemini-1.5-flash" },
 };
 
 serve(async (req) => {
@@ -367,8 +367,8 @@ serve(async (req) => {
     const hasVision = imagesArray || singleImage;
 
     if (hasVision) {
-      // Vision mode: Use gpt-4o for tasks requiring image analysis
-      model = "gpt-4o";
+      // Vision mode: Use gemini-1.5-pro for complex/multi-image, gemini-1.5-flash for single simple image
+      model = imagesArray && imagesArray.length > 1 ? "google/gemini-1.5-pro" : "google/gemini-1.5-flash";
 
       let visionPrompt = "Please read and analyze this image.";
       if (type === "prescription_scan") {
