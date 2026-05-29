@@ -346,12 +346,17 @@ serve(async (req) => {
     }
     const { type, payload } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY is missing in Supabase Edge Function Secrets. The AI features cannot run without it." }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const systemPrompt = systemPrompts[type];
     if (!systemPrompt) {
       return new Response(JSON.stringify({ error: `Unknown type: ${type}` }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -448,22 +453,16 @@ serve(async (req) => {
 
     if (!response.ok) {
       const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const text = await response.text();
       console.error("AI gateway error:", status, text);
-      return new Response(JSON.stringify({ error: "AI service error" }), {
-        status: 500,
+      
+      let errorMsg = `AI service error (${status}): ${text.substring(0, 50)}`;
+      if (status === 429) errorMsg = "Rate limited. Please try again in a moment.";
+      if (status === 402) errorMsg = "AI credits exhausted. Please add funds via Lovable.";
+      if (status === 404) errorMsg = "Model not found. The AI Gateway rejected the model name.";
+      
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -477,7 +476,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("health-tools error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
