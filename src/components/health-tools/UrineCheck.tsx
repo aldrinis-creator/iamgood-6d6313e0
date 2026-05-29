@@ -133,12 +133,16 @@ const UrineCheck = () => {
     setLoading(true);
     try {
       const type = mode === "color" ? "urine_color_analysis" : "urine_dipstick_analysis";
-      const { data, error } = await supabase.functions.invoke("health-tools", {
+      const result = await supabase.functions.invoke("health-tools", {
         body: { type, payload: { image: imageBase64 } },
       });
-      if (error) throw error;
+      const { data, error } = result;
+      if (error) {
+        toast.error(`Invoke error: ${error.message || "Unknown"}`);
+        return;
+      }
       if (data?.error) {
-        toast.error(data.error);
+        toast.error(`API error: ${data.error}`);
         return;
       }
       const raw = (data?.response || "").trim().replace(/^```json\s*/i, "").replace(/```$/, "");
@@ -147,7 +151,7 @@ const UrineCheck = () => {
       else setDipstickResult(parsed);
     } catch (err: any) {
       console.error("Urine analysis error:", err);
-      toast.error("Analysis failed. Please try a clearer photo.");
+      toast.error(err?.message === "timeout" ? "Analysis timed out. Try again." : `Analysis failed: ${err?.message || "Unknown error"}`);
     } finally {
       setLoading(false);
     }

@@ -274,8 +274,14 @@ const HospitalBillAnalyzer = () => {
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 120000)),
       ]);
       const { data, error } = result;
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
+      if (error) {
+        toast.error(`Invoke error: ${error.message || "Unknown"}`);
+        return;
+      }
+      if (data?.error) { 
+        toast.error(`API error: ${data.error}`); 
+        return; 
+      }
 
       const text: string = data.response || "";
       setRawResponse(text);
@@ -287,7 +293,7 @@ const HospitalBillAnalyzer = () => {
         toast.error("Could not parse the analysis. Please try again.");
       }
     } catch (err: any) {
-      toast.error(err?.message === "timeout" ? "Analysis timed out. Try fewer/smaller pages." : "Analysis failed");
+      toast.error(err?.message === "timeout" ? "Analysis timed out. Try fewer/smaller pages." : `Analysis failed: ${err?.message || "Unknown error"}`);
     } finally {
       setLoading(false);
     }

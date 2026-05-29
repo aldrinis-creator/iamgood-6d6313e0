@@ -43,15 +43,21 @@ const BannedMedications = () => {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "banned_check", payload: q },
       });
-      if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
+      if (error) {
+        toast.error(`Invoke error: ${error.message || "Unknown"}`);
+        return;
+      }
+      if (data?.error) { 
+        toast.error(`API error: ${data.error}`); 
+        return; 
+      }
       try {
         setResult(JSON.parse(data.response));
       } catch {
         setResult({ status: "unknown", details: data.response });
       }
-    } catch {
-      toast.error("Check failed");
+    } catch (err: any) {
+      toast.error(err?.message === "timeout" ? "Scan timed out." : `Scan failed: ${err?.message || "Unknown error"}`);
     } finally {
       setLoading(false);
     }
