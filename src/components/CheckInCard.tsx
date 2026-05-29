@@ -73,6 +73,7 @@ const CheckInCard = () => {
   const { userName, pauseMode } = useApp();
   const { session } = useAuth();
   const [checkedIn, setCheckedIn] = useState(false);
+  const [checkedInStatus, setCheckedInStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentCheckInId, setCurrentCheckInId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState("");
@@ -119,7 +120,8 @@ const CheckInCard = () => {
     if (existing && existing.length > 0) {
       const checkIn = existing[0];
       setCurrentCheckInId(checkIn.id);
-      setCheckedIn(checkIn.status === "responded");
+      setCheckedIn(checkIn.status === "responded" || checkIn.status === "late");
+      setCheckedInStatus(checkIn.status);
     } else {
       // Create a pending check-in for this window using upsert to avoid duplicates
       const { data: created, error: insertError } = await supabase
@@ -152,11 +154,13 @@ const CheckInCard = () => {
           .single();
         if (refetched) {
           setCurrentCheckInId(refetched.id);
-          setCheckedIn(refetched.status === "responded");
+          setCheckedIn(refetched.status === "responded" || refetched.status === "late");
+          setCheckedInStatus(refetched.status);
           return;
         }
       }
       setCheckedIn(false);
+      setCheckedInStatus(null);
     }
   }, [session?.user?.id]);
 
@@ -260,6 +264,7 @@ const CheckInCard = () => {
           sw.sync.register("checkin-sync");
         };
         setCheckedIn(true);
+        setCheckedInStatus("responded");
         toast.success("Check-in saved offline. Will sync when reconnected.");
         import("canvas-confetti").then((module) => {
           const confetti = module.default;
@@ -299,24 +304,36 @@ const CheckInCard = () => {
       }
     }
 
-    // Update ALL pending check-ins for this user + scheduled_at to responded
+    // Check if the current scheduled window was already missed
+    const { data: existing } = await supabase
+      .from("check_ins")
+      .select("status")
+      .eq("user_id", session.user.id)
+      .eq("scheduled_at", scheduledAt.toISOString())
+      .maybeSingle();
+      
+    const isLate = existing?.status === "missed";
+    const newStatus = isLate ? "late" : "responded";
+
+    // Update ALL pending or missed check-ins for this user + scheduled_at
     const { error } = await supabase
       .from("check_ins")
       .update({
-        status: "responded",
+        status: newStatus,
         response: "ok",
         responded_at: new Date().toISOString(),
       })
       .eq("user_id", session.user.id)
       .eq("scheduled_at", scheduledAt.toISOString())
-      .eq("status", "pending");
+      .in("status", ["pending", "missed"]);
 
     if (error) {
       console.error("Failed to check in:", error);
       toast.error("Check-in failed. Please try again.");
     } else {
       setCheckedIn(true);
-      toast.success("Check-in recorded! Your guardians have been notified.");
+      setCheckedInStatus(newStatus);
+      toast.success(isLate ? "Late Check-in recorded! Guardians notified." : "Check-in recorded! Your guardians have been notified.");
       import("canvas-confetti").then((module) => {
         const confetti = module.default;
         confetti({
@@ -419,12 +436,16 @@ const CheckInCard = () => {
             <div
               className="relative w-32 h-32 mx-auto flex items-center justify-center"
               style={{
-                background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
+                background: checkedInStatus === "late"
+                  ? 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(38 92% 50% / 0.15) 60%, transparent 80%)'
+                  : 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-20 h-20 text-success fill-current" />
+              <Heart className={`w-20 h-20 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
             </div>
-            <p className="text-accessible font-semibold text-success">✓ Checked In!</p>
+            <p className={`text-accessible font-semibold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
+              {checkedInStatus === "late" ? "✓ Checked In (Late)" : "✓ Checked In!"}
+            </p>
             <p className="text-sm text-muted-foreground">
               Next Check-iN: {nextLabel}
             </p>
@@ -442,6 +463,9 @@ const CheckInCard = () => {
             let icon = "";
             if (status === "responded") {
               badgeClass = "bg-success/15 text-success border border-success/30";
+              icon = "✓ ";
+            } else if (status === "late") {
+              badgeClass = "bg-amber-500/15 text-amber-600 border border-amber-500/30";
               icon = "✓ ";
             } else if (status === "missed") {
               badgeClass = "bg-destructive/15 text-destructive border border-destructive/30";

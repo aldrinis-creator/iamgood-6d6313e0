@@ -706,6 +706,7 @@ const GuardianDashboard = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "ok": case "responded": return "Checked In";
+      case "late": return "Checked In (Late)";
       case "missed": return "Missed";
       case "pending": return "Pending";
       default: return status;
@@ -1010,11 +1011,12 @@ const GuardianDashboard = () => {
                   <span className="text-sm">{formatCheckInTime(ci.scheduled_at)}</span>
                   <span className={`text-xs px-2 py-1 rounded-full ${
                     ci.status === "ok" || ci.status === "responded" ? "bg-success/10 text-success" :
+                    ci.status === "late" ? "bg-amber-500/10 text-amber-600 font-medium" :
                     ci.status === "missed" ? "bg-destructive/10 text-destructive font-semibold" :
                     "bg-muted text-muted-foreground"
                   }`}>
                     {getStatusLabel(ci.status)}
-                    {(ci.status === "ok" || ci.status === "responded") && ci.responded_at && (
+                    {(ci.status === "ok" || ci.status === "responded" || ci.status === "late") && ci.responded_at && (
                       <span className="ml-1 opacity-75">· {formatISTTime(ci.responded_at)}</span>
                     )}
                   </span>
