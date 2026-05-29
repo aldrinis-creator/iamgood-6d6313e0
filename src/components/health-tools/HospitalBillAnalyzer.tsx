@@ -50,7 +50,7 @@ const fmtINR = (n: number | null | undefined) =>
   typeof n === "number" ? `₹${n.toLocaleString("en-IN")}` : "—";
 
 const MAX_PAGES = 8;
-const MAX_DIMENSION = 1600;
+const MAX_DIMENSION = 1280;
 
 async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; previewUrl: string; blob: Blob }> {
   return new Promise((resolve, reject) => {
@@ -65,11 +65,11 @@ async function downscaleImageToBase64(file: File): Promise<{ dataUrl: string; pr
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
         canvas.toBlob((blob) => {
           if (!blob) return reject(new Error("blob fail"));
           resolve({ dataUrl, previewUrl: URL.createObjectURL(blob), blob });
-        }, "image/jpeg", 0.8);
+        }, "image/jpeg", 0.75);
       };
       img.onerror = reject;
       img.src = reader.result as string;
@@ -246,6 +246,7 @@ const HospitalBillAnalyzer = () => {
     setLoading(true);
     setReport(null);
     setRawResponse("");
+    const uploadedTempPaths: string[] = [];
     try {
       let calculatedDays: number | undefined;
       if (admissionDate && dischargeDate) {
@@ -273,7 +274,26 @@ const HospitalBillAnalyzer = () => {
         const content = extractedText.substring(0, MAX_TEXT_LENGTH);
         payload = `${ctxLines || "(no extra context)"}\n\nBill content:\n${content}`;
       } else {
-        payload = { images: pages.map(p => p.base64), context };
+        // Upload each page to Storage and pass signed URLs — keeps request body tiny
+        // and avoids Supabase's ~6 MB function-invocation limit.
+        if (!user) { toast.error("Please log in to analyze"); return; }
+        const ts = Date.now();
+        const signedUrls: string[] = [];
+        for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          const path = `${user.id}/_tmp/bill-${ts}-${i}.jpg`;
+          const { error: upErr } = await supabase.storage
+            .from("medical-documents")
+            .upload(path, p.blob, { contentType: "image/jpeg", upsert: true });
+          if (upErr) throw new Error(`Upload failed for page ${i + 1}: ${upErr.message}`);
+          uploadedTempPaths.push(path);
+          const { data: signed, error: signErr } = await supabase.storage
+            .from("medical-documents")
+            .createSignedUrl(path, 600);
+          if (signErr || !signed?.signedUrl) throw new Error(`Could not sign page ${i + 1}`);
+          signedUrls.push(signed.signedUrl);
+        }
+        payload = { images: signedUrls, context };
       }
 
       const result = await Promise.race([
@@ -284,12 +304,17 @@ const HospitalBillAnalyzer = () => {
       ]);
       const { data, error } = result;
       if (error) {
-        toast.error(`Invoke error: ${error.message || "Unknown"}`);
+        const status = (error as any)?.context?.status;
+        const statusText = (error as any)?.context?.statusText;
+        let bodyText = "";
+        try { bodyText = await (error as any)?.context?.text?.(); } catch {}
+        console.error("[HospitalBillAnalyzer] invoke error:", { status, statusText, bodyText, error });
+        toast.error(`Invoke error${status ? ` (${status})` : ""}: ${error.message || statusText || "Unknown"}`);
         return;
       }
-      if (data?.error) { 
-        toast.error(`API error: ${data.error}`); 
-        return; 
+      if (data?.error) {
+        toast.error(`API error: ${data.error}`);
+        return;
       }
 
       const text: string = data.response || "";
@@ -305,6 +330,10 @@ const HospitalBillAnalyzer = () => {
       toast.error(err?.message === "timeout" ? "Analysis timed out. Try fewer/smaller pages." : `Analysis failed: ${err?.message || "Unknown error"}`);
     } finally {
       setLoading(false);
+      // Best-effort cleanup of temp uploads
+      if (uploadedTempPaths.length) {
+        supabase.storage.from("medical-documents").remove(uploadedTempPaths).catch(() => {});
+      }
     }
   };
 
