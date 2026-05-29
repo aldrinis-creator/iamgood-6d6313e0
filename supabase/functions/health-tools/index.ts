@@ -310,21 +310,21 @@ Respond ONLY with this JSON — NO markdown, NO code fences:
 If the document is not a bill or is unreadable, set verdict="insufficient_data" and leave arrays empty.`,
 };
 
-const taskConfig: Record<string, { model: string; effort?: string }> = {
-  symptom_check:     { model: "google/gemini-3-flash-preview", effort: "medium" },
-  vitals_insights:   { model: "google/gemini-3.1-pro-preview", effort: "high" },
-  doctor_report:     { model: "google/gemini-3-flash-preview", effort: "medium" },
-  document_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  medication_info:   { model: "google/gemini-3-flash-preview", effort: "medium" },
-  prescription_scan: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  hospital_bill_analysis: { model: "google/gemini-3-flash-preview", effort: "medium" },
-  banned_check:            { model: "google/gemini-2.5-flash-lite",  effort: "low" },
-  face_analysis:           { model: "google/gemini-2.5-flash",       effort: "low" },
-  urine_color_analysis:    { model: "google/gemini-2.5-flash",       effort: "low" },
-  urine_dipstick_analysis: { model: "google/gemini-2.5-flash",       effort: "medium" },
-  pill_identification:     { model: "google/gemini-2.5-flash",       effort: "medium" },
-  tongue_analysis:         { model: "google/gemini-2.5-flash",       effort: "low" },
-  wellness_voice_checkin:  { model: "google/gemini-2.5-flash",       effort: "low" },
+const taskConfig: Record<string, { model: string }> = {
+  symptom_check:     { model: "gpt-4o" },
+  vitals_insights:   { model: "gpt-4o" },
+  doctor_report:     { model: "gpt-4o-mini" },
+  document_analysis: { model: "gpt-4o" },
+  medication_info:   { model: "gpt-4o-mini" },
+  prescription_scan: { model: "gpt-4o" },
+  hospital_bill_analysis: { model: "gpt-4o" },
+  banned_check:            { model: "gpt-4o-mini" },
+  face_analysis:           { model: "gpt-4o" },
+  urine_color_analysis:    { model: "gpt-4o-mini" },
+  urine_dipstick_analysis: { model: "gpt-4o" },
+  pill_identification:     { model: "gpt-4o" },
+  tongue_analysis:         { model: "gpt-4o" },
+  wellness_voice_checkin:  { model: "gpt-4o-mini" },
 };
 
 serve(async (req) => {
@@ -367,8 +367,8 @@ serve(async (req) => {
     const hasVision = imagesArray || singleImage;
 
     if (hasVision) {
-      // Vision mode: gemini-2.5-flash for single image, gemini-2.5-pro for multi-page
-      model = imagesArray && imagesArray.length > 1 ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+      // Vision mode: Use gpt-4o for tasks requiring image analysis
+      model = "gpt-4o";
 
       let visionPrompt = "Please read and analyze this image.";
       if (type === "prescription_scan") {
@@ -436,9 +436,6 @@ serve(async (req) => {
     }
 
     const requestBody: any = { model, messages };
-    if (config.effort) {
-      requestBody.reasoning = { effort: config.effort };
-    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
