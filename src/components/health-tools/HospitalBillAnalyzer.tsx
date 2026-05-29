@@ -99,8 +99,8 @@ const HospitalBillAnalyzer = () => {
 
   const [hospitalName, setHospitalName] = useState("");
   const [city, setCity] = useState("");
-  const [billDate, setBillDate] = useState("");
-  const [admissionDays, setAdmissionDays] = useState("");
+  const [admissionDate, setAdmissionDate] = useState("");
+  const [dischargeDate, setDischargeDate] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -247,11 +247,20 @@ const HospitalBillAnalyzer = () => {
     setReport(null);
     setRawResponse("");
     try {
+      let calculatedDays: number | undefined;
+      if (admissionDate && dischargeDate) {
+        const start = new Date(admissionDate);
+        const end = new Date(dischargeDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          calculatedDays = Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      }
+
       const context = {
         hospital_name: hospitalName.trim() || undefined,
         city: city.trim() || undefined,
-        bill_date: billDate || undefined,
-        admission_days: admissionDays ? Number(admissionDays) : undefined,
+        bill_date: dischargeDate || admissionDate || undefined,
+        admission_days: calculatedDays,
       };
       let payload: any;
       if (extractedText) {
@@ -383,7 +392,7 @@ const HospitalBillAnalyzer = () => {
         description: (md + extraNote).substring(0, 50000),
         file_name: fileName,
         file_url: fileUrl,
-        record_date: billDate || new Date().toISOString().split("T")[0],
+        record_date: dischargeDate || admissionDate || new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
       setSaved(true);
@@ -724,8 +733,14 @@ const HospitalBillAnalyzer = () => {
           <div className="grid grid-cols-2 gap-2 pt-2">
             <Input placeholder="Hospital (optional)" value={hospitalName} onChange={(e) => setHospitalName(e.target.value.substring(0, 80))} />
             <Input placeholder="City (optional)" value={city} onChange={(e) => setCity(e.target.value.substring(0, 50))} />
-            <Input type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
-            <Input type="number" min={0} max={365} placeholder="Admission days" value={admissionDays} onChange={(e) => setAdmissionDays(e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground ml-1">Admission Date</label>
+              <Input type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground ml-1">Discharge Date</label>
+              <Input type="date" value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
+            </div>
           </div>
 
           <Button onClick={analyze} disabled={loading || extracting || (pages.length === 0 && !extractedText && originalDocFiles.length === 0)} className="w-full">
