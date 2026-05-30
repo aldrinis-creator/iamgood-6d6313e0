@@ -45,11 +45,6 @@ const healthToolsSubItems = [
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
 ];
 
-const visualChecksSubItems = [
-  { icon: TestTube, label: "Urine Analysis", desc: "Photo-based urine colour & dipstick screening" },
-  { icon: Smile, label: "Tongue Analysis", desc: "Tongue colour, coating & surface insights" },
-  { icon: ScanFace, label: "Face Scan Analysis", desc: "Heart rate & stress via camera PPG" },
-];
 
 const wellnessHubSubItems = [
   { icon: Activity, label: "Activity", desc: "Steps, exercise & daily movement" },
