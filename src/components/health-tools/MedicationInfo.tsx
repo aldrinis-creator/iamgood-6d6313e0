@@ -245,16 +245,90 @@ const MedicationInfo = () => {
           {result && (
             <div className="space-y-2">
               <Card><CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown>{result}</ReactMarkdown></CardContent></Card>
+
+              {refsLoading && (
+                <Card className="border-primary/20">
+                  <CardContent className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching verified sources (FDA & RxNorm)...
+                  </CardContent>
+                </Card>
+              )}
+
+              {refs && (refs.rxnorm || refs.fda) && (
+                <Card className="border-success/30 bg-success/5">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-success" />
+                      <h4 className="text-sm font-semibold">Verified Sources</h4>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">FDA · NIH</span>
+                    </div>
+
+                    {refs.rxnorm && (
+                      <div className="text-xs">
+                        <span className="font-medium">RxNorm:</span> {refs.rxnorm.name}{" "}
+                        <span className="text-muted-foreground">(RxCUI {refs.rxnorm.rxcui})</span>
+                      </div>
+                    )}
+
+                    {refs.fda && (
+                      <div className="space-y-1.5 text-xs">
+                        {refs.fda.brand_name && <div><span className="font-medium">Brand:</span> {refs.fda.brand_name}</div>}
+                        {refs.fda.generic_name && <div><span className="font-medium">Generic:</span> {refs.fda.generic_name}</div>}
+                        {refs.fda.manufacturer && <div><span className="font-medium">Manufacturer:</span> {refs.fda.manufacturer}</div>}
+                      </div>
+                    )}
+
+                    {refs.fda && FDA_SECTIONS.map(({ key, label }) => {
+                      const val = refs.fda?.[key];
+                      if (!val) return null;
+                      const truncated = val.length > 600;
+                      return (
+                        <Collapsible key={key}>
+                          <CollapsibleTrigger className="w-full flex items-center justify-between text-left text-xs font-semibold py-1.5 px-2 rounded bg-background/60 hover:bg-background">
+                            <span>{label}</span>
+                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <p className="text-xs text-muted-foreground whitespace-pre-wrap p-2">
+                              {truncated ? val.slice(0, 600) + "…" : val}
+                            </p>
+                            {truncated && (
+                              <details className="px-2 pb-2">
+                                <summary className="text-[11px] text-primary cursor-pointer">Read more</summary>
+                                <p className="text-xs text-muted-foreground whitespace-pre-wrap mt-1">{val}</p>
+                              </details>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+
+                    <div className="pt-2 border-t border-success/20 text-[10px] text-muted-foreground space-y-1">
+                      {formatEffectiveDate(refs.fda?.effective_time) && (
+                        <p>FDA label effective: {formatEffectiveDate(refs.fda?.effective_time)}</p>
+                      )}
+                      <p className="flex items-center gap-1">
+                        Sources: <a href={refs.sources.fda_url} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-0.5">openFDA <ExternalLink className="w-2.5 h-2.5" /></a>
+                        {" · "}
+                        <a href={refs.sources.rxnorm_url} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-0.5">NLM RxNorm <ExternalLink className="w-2.5 h-2.5" /></a>
+                      </p>
+                      <p className="italic">FDA labeling reflects US drug approvals. For India-specific approval/ban status, see the Banned List tab.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <ReportShareButtons
                 title="Medication Info Report"
                 subtitle={`Drug: ${query}`}
-                content={result}
+                content={result + (refs ? refsToMarkdown(refs) : "")}
                 category="Health Report"
               />
               <SaveButton saving={savingSearch} saved={savedSearch} onClick={saveSearchToVault} />
             </div>
           )}
         </TabsContent>
+
 
         <TabsContent value="banned" className="space-y-3">
           <div className="flex gap-2">
