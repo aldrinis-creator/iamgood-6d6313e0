@@ -1,103 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Heart, Droplets, Flame, AlertTriangle, Pill, ChevronDown, ChevronUp, ShieldAlert } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Phone, ChevronDown, ChevronUp, ShieldAlert, Search, WifiOff, Wifi, Printer } from "lucide-react";
+import { firstAidGuides, type FirstAidGuide } from "@/data/firstAidGuides";
+import { printReport } from "@/lib/reportPdf";
 
-interface Guide {
-  title: string;
-  icon: typeof Heart;
-  color: string;
-  steps: string[];
-}
-
-const guides: Guide[] = [
-  {
-    title: "CPR",
-    icon: Heart,
-    color: "text-destructive bg-destructive/10",
-    steps: [
-      "Check if the person is responsive — tap shoulders and shout.",
-      "Call 112 or ask someone nearby to call.",
-      "Place the heel of one hand on the center of the chest, interlock fingers.",
-      "Push hard and fast — 5-6 cm deep, 100-120 compressions per minute.",
-      "After 30 compressions, give 2 rescue breaths (tilt head, lift chin).",
-      "Continue 30:2 cycle until help arrives or the person responds.",
-    ],
-  },
-  {
-    title: "Severe Bleeding",
-    icon: Droplets,
-    color: "text-destructive bg-destructive/10",
-    steps: [
-      "Apply firm direct pressure with a clean cloth or bandage.",
-      "Keep pressing — do NOT remove the cloth even if blood soaks through.",
-      "Elevate the injured limb above heart level if possible.",
-      "If bleeding doesn't stop, apply pressure to the nearest pressure point.",
-      "Call 112 for severe or uncontrolled bleeding.",
-      "Keep the person warm and calm until help arrives.",
-    ],
-  },
-  {
-    title: "Burns",
-    icon: Flame,
-    color: "text-orange-500 bg-orange-500/10",
-    steps: [
-      "Cool the burn under running cold water for at least 20 minutes.",
-      "Remove jewellery or clothing near the burn (not if stuck to skin).",
-      "Cover with a clean, non-fluffy material (cling film works well).",
-      "Do NOT apply ice, butter, toothpaste, or creams.",
-      "For chemical burns, remove contaminated clothing and rinse with water.",
-      "Seek medical help for burns larger than a palm or on face/joints/hands.",
-    ],
-  },
-  {
-    title: "Allergic Reaction",
-    icon: AlertTriangle,
-    color: "text-yellow-600 bg-yellow-600/10",
-    steps: [
-      "Identify and remove the allergen if possible.",
-      "If the person has an EpiPen, help them use it on the outer thigh.",
-      "Call 112 if there are signs of anaphylaxis (swelling, difficulty breathing).",
-      "Help the person sit upright if breathing is difficult.",
-      "If they become unconscious, place in recovery position.",
-      "Give antihistamine tablets if available and they can swallow.",
-    ],
-  },
-  {
-    title: "Heart Attack",
-    icon: Heart,
-    color: "text-destructive bg-destructive/10",
-    steps: [
-      "Call 112 immediately — every minute counts.",
-      "Help the person sit in a comfortable position (W-position on floor).",
-      "Give 300mg Aspirin to chew (if not allergic).",
-      "If they have GTN spray/tablet prescribed, help them take it.",
-      "Loosen tight clothing around neck and chest.",
-      "Be ready to start CPR if they become unresponsive.",
-    ],
-  },
-  {
-    title: "Poisoning",
-    icon: Pill,
-    color: "text-purple-500 bg-purple-500/10",
-    steps: [
-      "Call the Poison Helpline: 1800-11-6117 (AIIMS).",
-      "Try to identify what was consumed, how much, and when.",
-      "Do NOT make the person vomit unless instructed by medical professionals.",
-      "If the poison is on the skin, remove contaminated clothing and wash.",
-      "If inhaled, move to fresh air immediately.",
-      "Save any containers, labels, or vomit samples for medical team.",
-    ],
-  },
-];
+const guideToMarkdown = (g: FirstAidGuide) => {
+  const steps = g.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
+  const call = g.whenToCall112.map((s) => `- ${s}`).join("\n");
+  const dont = g.doNot.map((s) => `- ${s}`).join("\n");
+  return `## Steps\n\n${steps}\n\n## When to call 112\n\n${call}\n\n## Do NOT\n\n${dont}`;
+};
 
 const EmergencyFirstAid = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return firstAidGuides;
+    return firstAidGuides.filter(
+      (g) => g.title.toLowerCase().includes(q) || g.steps.some((s) => s.toLowerCase().includes(q)),
+    );
+  }, [query]);
 
   return (
     <div className="space-y-4">
       {/* Emergency Banner */}
-      <Card className="border-destructive/30 bg-destructive/5">
+      <Card className="border-destructive/30 bg-destructive/5 sticky top-0 z-10">
         <CardContent className="p-4 flex items-center gap-3">
           <ShieldAlert className="w-8 h-8 text-destructive shrink-0" />
           <div className="flex-1">
@@ -110,22 +53,50 @@ const EmergencyFirstAid = () => {
         </CardContent>
       </Card>
 
-      {/* Guides Grid */}
+      {/* Offline indicator + search */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search guides (e.g. choking, burns)..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium shrink-0 ${
+            online ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+          {online ? "Available offline ✓" : "Cached"}
+        </div>
+      </div>
+
+      {/* Guides */}
       <div className="space-y-2">
-        {guides.map((guide) => (
-          <Card key={guide.title} className="overflow-hidden">
+        {filtered.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-6">No guides match "{query}".</p>
+        )}
+        {filtered.map((guide) => (
+          <Card key={guide.id} className="overflow-hidden">
             <button
               className="w-full p-3 flex items-center gap-3 text-left"
-              onClick={() => setExpanded(expanded === guide.title ? null : guide.title)}
+              onClick={() => setExpanded(expanded === guide.id ? null : guide.id)}
             >
               <div className={`w-10 h-10 rounded-full ${guide.color} flex items-center justify-center shrink-0`}>
                 <guide.icon className="w-5 h-5" />
               </div>
               <span className="text-sm font-medium flex-1">{guide.title}</span>
-              {expanded === guide.title ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              {expanded === guide.id ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
             </button>
-            {expanded === guide.title && (
-              <CardContent className="px-4 pb-4 pt-0">
+            {expanded === guide.id && (
+              <CardContent className="px-4 pb-4 pt-0 space-y-3">
                 <ol className="space-y-2">
                   {guide.steps.map((step, i) => (
                     <li key={i} className="flex gap-2 text-sm">
@@ -136,6 +107,56 @@ const EmergencyFirstAid = () => {
                     </li>
                   ))}
                 </ol>
+
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-xs font-semibold text-destructive mb-1.5">When to call 112</p>
+                  <ul className="space-y-1">
+                    {guide.whenToCall112.map((s, i) => (
+                      <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                        <span className="text-destructive">•</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+                  <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-500 mb-1.5">Do NOT</p>
+                  <ul className="space-y-1">
+                    {guide.doNot.map((s, i) => (
+                      <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                        <span className="text-yellow-600">•</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 gap-1.5"
+                    onClick={() =>
+                      printReport({
+                        title: guide.title,
+                        subtitle: "First Aid Guide",
+                        category: "Emergency Reference",
+                        content: guideToMarkdown(guide),
+                        date: new Date().toLocaleDateString("en-IN"),
+                      })
+                    }
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Save as PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 gap-1.5 bg-destructive hover:bg-destructive/90"
+                    onClick={() => window.open("tel:112")}
+                  >
+                    <Phone className="w-3.5 h-3.5" /> Call 112
+                  </Button>
+                </div>
               </CardContent>
             )}
           </Card>

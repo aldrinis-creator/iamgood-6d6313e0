@@ -3,12 +3,50 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, AlertTriangle, Loader2, Info, Save, Check } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, AlertTriangle, Loader2, Info, Save, Check, ShieldCheck, ChevronDown, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
+
+interface DrugRefs {
+  rxnorm: { rxcui: string; name: string } | null;
+  fda: Record<string, string> | null;
+  sources: { rxnorm_url: string; fda_url: string };
+}
+
+const FDA_SECTIONS: { key: string; label: string }[] = [
+  { key: "indications_and_usage", label: "Indications & Usage" },
+  { key: "dosage_and_administration", label: "Dosage & Administration" },
+  { key: "warnings", label: "Warnings" },
+  { key: "adverse_reactions", label: "Adverse Reactions" },
+  { key: "contraindications", label: "Contraindications" },
+];
+
+const formatEffectiveDate = (raw?: string) => {
+  if (!raw || raw.length < 8) return null;
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+};
+
+const refsToMarkdown = (refs: DrugRefs): string => {
+  const parts: string[] = ["\n\n---\n\n## Verified Sources\n"];
+  if (refs.rxnorm) parts.push(`**RxNorm:** ${refs.rxnorm.name} (RxCUI ${refs.rxnorm.rxcui})\n`);
+  if (refs.fda) {
+    if (refs.fda.brand_name) parts.push(`**Brand:** ${refs.fda.brand_name}`);
+    if (refs.fda.generic_name) parts.push(`**Generic:** ${refs.fda.generic_name}`);
+    if (refs.fda.manufacturer) parts.push(`**Manufacturer:** ${refs.fda.manufacturer}`);
+    FDA_SECTIONS.forEach(({ key, label }) => {
+      if (refs.fda![key]) parts.push(`\n### ${label} (FDA)\n${refs.fda![key]}`);
+    });
+    const eff = formatEffectiveDate(refs.fda.effective_time);
+    if (eff) parts.push(`\n_FDA label effective: ${eff}_`);
+  }
+  parts.push(`\n\nSources: openFDA, NLM RxNorm`);
+  return parts.join("\n");
+};
+
 
 const commonSearches = ["Paracetamol", "Metformin", "Amoxicillin", "Omeprazole", "Cetirizine", "Azithromycin"];
 
@@ -24,13 +62,24 @@ const MedicationInfo = () => {
   const [savedSearch, setSavedSearch] = useState(false);
   const [savingBanned, setSavingBanned] = useState(false);
   const [savedBanned, setSavedBanned] = useState(false);
+  const [refs, setRefs] = useState<DrugRefs | null>(null);
+  const [refsLoading, setRefsLoading] = useState(false);
 
   const searchMedication = async (name?: string) => {
     const q = name || query;
     if (!q.trim()) return;
     setLoading(true);
     setResult("");
+    setRefs(null);
     setSavedSearch(false);
+    setRefsLoading(true);
+    // Fire references in parallel
+    supabase.functions
+      .invoke("drug-references", { body: { drug: q.trim() } })
+      .then(({ data, error }) => {
+        if (!error && data && (data.rxnorm || data.fda)) setRefs(data as DrugRefs);
+      })
+      .finally(() => setRefsLoading(false));
     try {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "medication_info", payload: q },
@@ -74,11 +123,12 @@ const MedicationInfo = () => {
     if (!session?.user?.id) { toast.error("Please log in to save"); return; }
     setSavingSearch(true);
     try {
+      const description = (result + (refs ? refsToMarkdown(refs) : "")).substring(0, 50000);
       const { error } = await supabase.from("medical_records").insert({
         user_id: session.user.id,
         title: `Medication Info — ${query} — ${new Date().toLocaleDateString("en-IN")}`,
         record_type: "AI Analysis",
-        description: result.substring(0, 50000),
+        description,
         record_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
@@ -195,16 +245,90 @@ const MedicationInfo = () => {
           {result && (
             <div className="space-y-2">
               <Card><CardContent className="p-4 prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown>{result}</ReactMarkdown></CardContent></Card>
+
+              {refsLoading && (
+                <Card className="border-primary/20">
+                  <CardContent className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching verified sources (FDA & RxNorm)...
+                  </CardContent>
+                </Card>
+              )}
+
+              {refs && (refs.rxnorm || refs.fda) && (
+                <Card className="border-success/30 bg-success/5">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-success" />
+                      <h4 className="text-sm font-semibold">Verified Sources</h4>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">FDA · NIH</span>
+                    </div>
+
+                    {refs.rxnorm && (
+                      <div className="text-xs">
+                        <span className="font-medium">RxNorm:</span> {refs.rxnorm.name}{" "}
+                        <span className="text-muted-foreground">(RxCUI {refs.rxnorm.rxcui})</span>
+                      </div>
+                    )}
+
+                    {refs.fda && (
+                      <div className="space-y-1.5 text-xs">
+                        {refs.fda.brand_name && <div><span className="font-medium">Brand:</span> {refs.fda.brand_name}</div>}
+                        {refs.fda.generic_name && <div><span className="font-medium">Generic:</span> {refs.fda.generic_name}</div>}
+                        {refs.fda.manufacturer && <div><span className="font-medium">Manufacturer:</span> {refs.fda.manufacturer}</div>}
+                      </div>
+                    )}
+
+                    {refs.fda && FDA_SECTIONS.map(({ key, label }) => {
+                      const val = refs.fda?.[key];
+                      if (!val) return null;
+                      const truncated = val.length > 600;
+                      return (
+                        <Collapsible key={key}>
+                          <CollapsibleTrigger className="w-full flex items-center justify-between text-left text-xs font-semibold py-1.5 px-2 rounded bg-background/60 hover:bg-background">
+                            <span>{label}</span>
+                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <p className="text-xs text-muted-foreground whitespace-pre-wrap p-2">
+                              {truncated ? val.slice(0, 600) + "…" : val}
+                            </p>
+                            {truncated && (
+                              <details className="px-2 pb-2">
+                                <summary className="text-[11px] text-primary cursor-pointer">Read more</summary>
+                                <p className="text-xs text-muted-foreground whitespace-pre-wrap mt-1">{val}</p>
+                              </details>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+
+                    <div className="pt-2 border-t border-success/20 text-[10px] text-muted-foreground space-y-1">
+                      {formatEffectiveDate(refs.fda?.effective_time) && (
+                        <p>FDA label effective: {formatEffectiveDate(refs.fda?.effective_time)}</p>
+                      )}
+                      <p className="flex items-center gap-1">
+                        Sources: <a href={refs.sources.fda_url} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-0.5">openFDA <ExternalLink className="w-2.5 h-2.5" /></a>
+                        {" · "}
+                        <a href={refs.sources.rxnorm_url} target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-0.5">NLM RxNorm <ExternalLink className="w-2.5 h-2.5" /></a>
+                      </p>
+                      <p className="italic">FDA labeling reflects US drug approvals. For India-specific approval/ban status, see the Banned List tab.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <ReportShareButtons
                 title="Medication Info Report"
                 subtitle={`Drug: ${query}`}
-                content={result}
+                content={result + (refs ? refsToMarkdown(refs) : "")}
                 category="Health Report"
               />
               <SaveButton saving={savingSearch} saved={savedSearch} onClick={saveSearchToVault} />
             </div>
           )}
         </TabsContent>
+
 
         <TabsContent value="banned" className="space-y-3">
           <div className="flex gap-2">

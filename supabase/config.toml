@@ -7,6 +7,8 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.health-tools]
     verify_jwt = false
+  [functions.drug-references]
+    verify_jwt = false
   [functions.msg91-send]
     verify_jwt = false
   [functions.notify-guardian-medication]
