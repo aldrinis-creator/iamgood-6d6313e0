@@ -123,11 +123,12 @@ const MedicationInfo = () => {
     if (!session?.user?.id) { toast.error("Please log in to save"); return; }
     setSavingSearch(true);
     try {
+      const description = (result + (refs ? refsToMarkdown(refs) : "")).substring(0, 50000);
       const { error } = await supabase.from("medical_records").insert({
         user_id: session.user.id,
         title: `Medication Info — ${query} — ${new Date().toLocaleDateString("en-IN")}`,
         record_type: "AI Analysis",
-        description: result.substring(0, 50000),
+        description,
         record_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
