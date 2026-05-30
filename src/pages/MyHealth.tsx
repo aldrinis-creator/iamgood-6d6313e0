@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Eye, Receipt } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Receipt } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +30,6 @@ const healthTools = [
   { icon: Pill, label: "Tablets", color: "bg-primary/10 text-primary" },
   { icon: Stethoscope, label: "Health Tools", color: "bg-success/10 text-success" },
   { icon: Ambulance, label: "Ambulance", color: "bg-sos/10 text-sos" },
-  { icon: Eye, label: "Quick Visual Checks", color: "bg-success/10 text-success" },
   { icon: HeartPulse, label: "Wellness Hub", color: "bg-primary/10 text-primary" },
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
@@ -46,15 +45,10 @@ const healthToolsSubItems = [
   { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
 ];
 
-const visualChecksSubItems = [
-  { icon: TestTube, label: "Urine Analysis", desc: "Photo-based urine colour & dipstick screening" },
-  { icon: Smile, label: "Tongue Analysis", desc: "Tongue colour, coating & surface insights" },
-  { icon: ScanFace, label: "Face Scan Analysis", desc: "Heart rate & stress via camera PPG" },
-];
 
 const wellnessHubSubItems = [
   { icon: Activity, label: "Activity", desc: "Steps, exercise & daily movement" },
-  { icon: HeartPulse, label: "Wellness", desc: "Mood, sleep & mindfulness tracking" },
+  { icon: HeartPulse, label: "Mindfulness", desc: "Mood, sleep & mindfulness tracking" },
   { icon: Apple, label: "Nutrition", desc: "Meal logging & AI nutrition advice" },
 ];
 
@@ -71,7 +65,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Tongue Analysis": TongueAnalysis,
   "Face Scan Analysis": FaceScan,
   "Activity": ActivityTracker,
-  "Wellness": WellnessTracker,
+  "Mindfulness": WellnessTracker,
   "Nutrition": NutritionAdvisor,
 };
 
@@ -87,11 +81,10 @@ const toolComponents: Record<string, React.FC> = {
   "Emergency First Aid": EmergencyFirstAid,
 };
 
-const HUB_TOOLS = ["Health Tools", "Quick Visual Checks", "Wellness Hub"];
+const HUB_TOOLS = ["Health Tools", "Wellness Hub"];
 
 const hubConfig: Record<string, { items: typeof healthToolsSubItems }> = {
   "Health Tools": { items: healthToolsSubItems },
-  "Quick Visual Checks": { items: visualChecksSubItems },
   "Wellness Hub": { items: wellnessHubSubItems },
 };
 
