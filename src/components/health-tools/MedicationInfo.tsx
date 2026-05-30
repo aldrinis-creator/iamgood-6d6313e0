@@ -3,12 +3,50 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, AlertTriangle, Loader2, Info, Save, Check } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, AlertTriangle, Loader2, Info, Save, Check, ShieldCheck, ChevronDown, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
+
+interface DrugRefs {
+  rxnorm: { rxcui: string; name: string } | null;
+  fda: Record<string, string> | null;
+  sources: { rxnorm_url: string; fda_url: string };
+}
+
+const FDA_SECTIONS: { key: string; label: string }[] = [
+  { key: "indications_and_usage", label: "Indications & Usage" },
+  { key: "dosage_and_administration", label: "Dosage & Administration" },
+  { key: "warnings", label: "Warnings" },
+  { key: "adverse_reactions", label: "Adverse Reactions" },
+  { key: "contraindications", label: "Contraindications" },
+];
+
+const formatEffectiveDate = (raw?: string) => {
+  if (!raw || raw.length < 8) return null;
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+};
+
+const refsToMarkdown = (refs: DrugRefs): string => {
+  const parts: string[] = ["\n\n---\n\n## Verified Sources\n"];
+  if (refs.rxnorm) parts.push(`**RxNorm:** ${refs.rxnorm.name} (RxCUI ${refs.rxnorm.rxcui})\n`);
+  if (refs.fda) {
+    if (refs.fda.brand_name) parts.push(`**Brand:** ${refs.fda.brand_name}`);
+    if (refs.fda.generic_name) parts.push(`**Generic:** ${refs.fda.generic_name}`);
+    if (refs.fda.manufacturer) parts.push(`**Manufacturer:** ${refs.fda.manufacturer}`);
+    FDA_SECTIONS.forEach(({ key, label }) => {
+      if (refs.fda![key]) parts.push(`\n### ${label} (FDA)\n${refs.fda![key]}`);
+    });
+    const eff = formatEffectiveDate(refs.fda.effective_time);
+    if (eff) parts.push(`\n_FDA label effective: ${eff}_`);
+  }
+  parts.push(`\n\nSources: openFDA, NLM RxNorm`);
+  return parts.join("\n");
+};
+
 
 const commonSearches = ["Paracetamol", "Metformin", "Amoxicillin", "Omeprazole", "Cetirizine", "Azithromycin"];
 
