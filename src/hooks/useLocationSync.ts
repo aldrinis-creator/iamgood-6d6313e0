@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { haversineDistance } from "@/lib/haversine";
 
-const ZONE_ALERT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 const NORMAL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 const SOS_INTERVAL_MS = 30 * 1000; // 30 sec
 const SOS_FAST_CAP_MS = 15 * 60 * 1000; // 15 min hard cap on accelerated cadence
@@ -25,7 +24,6 @@ export default function useLocationSync() {
   const { settings } = useUserSettings();
   const { emergencyMode } = useApp();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const lastZoneAlertRef = useRef<string | null>(null);
   const sosStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -74,14 +72,19 @@ export default function useLocationSync() {
         );
 
         if (isInsideAny) {
-          lastZoneAlertRef.current = null;
+          localStorage.setItem("isInsideSafeZone", "true");
           return;
         }
 
-        if (lastZoneAlertRef.current) {
-          const elapsed = Date.now() - new Date(lastZoneAlertRef.current).getTime();
-          if (elapsed < ZONE_ALERT_COOLDOWN_MS) return;
+        const wasInside = localStorage.getItem("isInsideSafeZone") !== "false";
+        
+        if (!wasInside) {
+          // Already outside, do not send duplicate alerts
+          return;
         }
+
+        // Mark as outside so we don't alert again until they return to a safe zone
+        localStorage.setItem("isInsideSafeZone", "false");
 
         const { data: activeJourney } = await supabase
           .from("journeys")
@@ -133,7 +136,6 @@ export default function useLocationSync() {
         await supabase.rpc("insert_notifications_deduped", {
           p_notifications: notifications,
         });
-        lastZoneAlertRef.current = new Date().toISOString();
       } catch {
         // Silently ignore errors in background check
       }
