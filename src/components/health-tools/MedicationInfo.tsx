@@ -62,13 +62,24 @@ const MedicationInfo = () => {
   const [savedSearch, setSavedSearch] = useState(false);
   const [savingBanned, setSavingBanned] = useState(false);
   const [savedBanned, setSavedBanned] = useState(false);
+  const [refs, setRefs] = useState<DrugRefs | null>(null);
+  const [refsLoading, setRefsLoading] = useState(false);
 
   const searchMedication = async (name?: string) => {
     const q = name || query;
     if (!q.trim()) return;
     setLoading(true);
     setResult("");
+    setRefs(null);
     setSavedSearch(false);
+    setRefsLoading(true);
+    // Fire references in parallel
+    supabase.functions
+      .invoke("drug-references", { body: { drug: q.trim() } })
+      .then(({ data, error }) => {
+        if (!error && data && (data.rxnorm || data.fda)) setRefs(data as DrugRefs);
+      })
+      .finally(() => setRefsLoading(false));
     try {
       const { data, error } = await supabase.functions.invoke("health-tools", {
         body: { type: "medication_info", payload: q },
