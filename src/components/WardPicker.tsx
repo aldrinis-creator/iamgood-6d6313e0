@@ -15,7 +15,13 @@ const WardPicker = () => {
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
-      <Users className="w-4 h-4 text-primary shrink-0" />
+      {selectedWard?.avatarUrl ? (
+        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 shadow-sm border border-border">
+          <img src={selectedWard.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <Users className="w-4 h-4 text-primary shrink-0" />
+      )}
       <Select
         value={selectedWard?.userId || ""}
         onValueChange={(uid) => {
@@ -29,7 +35,14 @@ const WardPicker = () => {
         <SelectContent>
           {wards.map((w) => (
             <SelectItem key={w.userId} value={w.userId}>
-              {w.name}
+              <div className="flex items-center gap-2">
+                {w.avatarUrl ? (
+                  <img src={w.avatarUrl} className="w-4 h-4 rounded-full object-cover" alt="" />
+                ) : (
+                  <Users className="w-3 h-3 text-muted-foreground" />
+                )}
+                {w.name}
+              </div>
             </SelectItem>
           ))}
         </SelectContent>

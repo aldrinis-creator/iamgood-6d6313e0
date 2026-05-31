@@ -15,6 +15,7 @@ import { buildLetterheadHtml } from "@/lib/reportPdf";
 interface SOSDialogProps {
   open: boolean;
   onClose: () => void;
+  isPracticeMode?: boolean;
 }
 
 interface MedicalInfo {
@@ -51,7 +52,7 @@ interface MedHistoryEntry {
   doctor_name: string | null;
 }
 
-const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
+const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) => {
   const { session } = useAuth();
   const { triggerSOS, cancelSOS } = useApp();
 
@@ -164,7 +165,7 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
 
   const buildSOSMessage = useCallback(() => {
     const healthData = (window as any).__sosHealthData;
-    let msg = `🚨 SOS ALERT from ${userName}!`;
+    let msg = isPracticeMode ? `🧪 PRACTICE SOS ALERT from ${userName}!` : `🚨 SOS ALERT from ${userName}!`;
     if (userPhone) msg += `\n📞 Phone: ${userPhone}`;
     if (userDob) msg += `\n🎂 Age: ${Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} years`;
     if (location) {
@@ -217,6 +218,19 @@ const SOSDialog = ({ open, onClose }: SOSDialogProps) => {
     vibrate([200, 100, 200, 100, 400]);
 
     const message = buildSOSMessage();
+
+    if (isPracticeMode) {
+      setSending(false);
+      setSent(true);
+      toast.success("Practice SOS complete! No real alerts were sent.");
+      setDeliverySummary({
+        status: "success",
+        title: "Practice Mode Complete",
+        detail: "This was a test run. Your guardians were NOT notified and emergency services were NOT contacted.",
+        selfTargetedPhones: [],
+      });
+      return;
+    }
 
     if (!navigator.onLine) {
       setSending(false);
@@ -451,7 +465,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 <div className={`w-16 h-16 rounded-full ${ringClass} flex items-center justify-center mx-auto`}>
                   <Icon className={`w-8 h-8 ${iconClass}`} />
                 </div>
-                <h2 className={`text-xl font-bold ${isFailed ? "text-destructive" : "text-foreground"}`}>{title}</h2>
+                <h2 className={`text-xl font-bold ${isFailed ? "text-destructive" : "text-foreground"}`}>{isPracticeMode ? "Practice Complete" : title}</h2>
                 <p className="text-muted-foreground text-sm whitespace-pre-line">{detail}</p>
                 {isFailed && (
                   <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-left">
@@ -816,8 +830,13 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto pb-10">
-        <SheetHeader className="text-left pb-2">
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
+          {isPracticeMode && (
+            <div className="bg-warning/20 text-warning-foreground text-xs font-bold p-2 text-center uppercase tracking-widest rounded-t-2xl">
+              PRACTICE MODE ACTIVE — No alerts will be sent
+            </div>
+          )}
+          <SheetHeader className="text-center pt-2 pb-2">
           <SheetTitle className="text-xl font-bold text-sos flex items-center gap-2">
             🚨 Emergency SOS Active
           </SheetTitle>

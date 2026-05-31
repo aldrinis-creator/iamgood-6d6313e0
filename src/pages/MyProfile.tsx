@@ -181,6 +181,8 @@ const ProfileContent = () => {
   const [gender, setGender] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [heightM, setHeightM] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Family Doctor
   const [doctorName, setDoctorName] = useState("");
@@ -258,6 +260,7 @@ const ProfileContent = () => {
       setGender((profile as any).gender || "");
       setWeightKg((profile as any).weight_kg?.toString() || "");
       setHeightM((profile as any).height_m?.toString() || "");
+      setAvatarUrl((profile as any).avatar_url || "");
     }
     loadData();
   }, [profile, loadData]);
@@ -280,6 +283,7 @@ const ProfileContent = () => {
         gender: gender || null,
         weight_kg: weightKg ? parseFloat(weightKg) : null,
         height_m: heightM ? parseFloat(heightM) : null,
+        avatar_url: avatarUrl || null,
       } as any).eq("id", userId),
       supabase.from("health_profile").upsert({
         user_id: userId,
@@ -311,6 +315,29 @@ const ProfileContent = () => {
       setEditing(false);
       await refreshProfile();
     }
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!userId) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be under 2MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${userId}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) {
+      toast.error("Upload failed");
+      setUploadingAvatar(false);
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    setAvatarUrl(pub.publicUrl);
+    setUploadingAvatar(false);
+    toast.success("Photo uploaded — tap Save to keep it");
   };
 
   const addChip = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
@@ -522,6 +549,28 @@ const ProfileContent = () => {
         <CardContent className="space-y-3">
           {editing ? (
             <>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center border">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-7 h-7 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Profile photo</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingAvatar}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleAvatarUpload(f);
+                    }}
+                    className="text-xs"
+                  />
+                </div>
+              </div>
               <div><Label>Full Name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="text-base" /></div>
               <div><Label>Date of Birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="text-base" /></div>
               <div><Label>Mobile Number</Label><PhoneInput value={phone} onChange={setPhone} /></div>
@@ -539,6 +588,15 @@ const ProfileContent = () => {
             </>
           ) : (
             <div className="space-y-2 text-sm">
+              <div className="flex justify-center mb-4">
+                <div className="w-20 h-20 rounded-full bg-muted overflow-hidden flex items-center justify-center border shadow-sm">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-10 h-10 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
               <InfoRow label="Full Name" value={fullName} />
               <InfoRow label="Date of Birth" value={dob ? `${dob} (${age} yrs)` : "—"} />
               <InfoRow label="Mobile" value={phone} />

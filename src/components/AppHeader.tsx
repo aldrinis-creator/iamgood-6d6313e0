@@ -10,8 +10,9 @@ import { getISTHour } from "@/lib/istTime";
 
 const AppHeader = () => {
   const { userName, role } = useApp();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const navigate = useNavigate();
+  const avatarUrl = (profile as any)?.avatar_url;
 
   const getGreeting = () => {
     const hour = getISTHour();
@@ -37,8 +38,12 @@ const AppHeader = () => {
           <AQIWidget role={role} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                <User className="w-4 h-4" />
+              <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center overflow-hidden border border-primary-foreground/30 shadow-sm">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

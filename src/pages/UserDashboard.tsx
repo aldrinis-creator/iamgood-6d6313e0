@@ -1,4 +1,4 @@
-import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight, Droplets } from "lucide-react";
+import { Moon, Sun, DoorOpen, Navigation, CalendarDays, Pill, ChevronRight, Droplets, AlertTriangle } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
 import VaultClaimCancelBanner from "@/components/vault/VaultClaimCancelBanner";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
@@ -22,6 +22,7 @@ import OnboardingWizard from "@/components/OnboardingWizard";
 import VoiceQueryButton from "@/components/VoiceQueryButton";
 import AudioUnlocker from "@/components/AudioUnlocker";
 import { formatISTTime } from "@/lib/istTime";
+import SOSDialog from "@/components/SOSDialog";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
   { mode: "active", icon: Sun, label: "Active", description: "Check-iNs running" },
@@ -73,6 +74,7 @@ const UserDashboard = () => {
 
   const [showSleepDialog, setShowSleepDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
+  const [showPracticeDialog, setShowPracticeDialog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("onboarding_complete");
   });
@@ -296,6 +298,20 @@ const UserDashboard = () => {
         {/* Check-In Card */}
         <CheckInCard />
 
+        {/* Practice SOS */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-sos/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-sos" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm text-foreground">Practice SOS Mode</h3>
+              <p className="text-xs text-muted-foreground">Test the alarm safely without notifying anyone</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </CardContent>
+        </Card>
+
         {/* Map My Journey */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>
           <CardContent className="p-4 flex items-center gap-3">
@@ -368,6 +384,8 @@ const UserDashboard = () => {
         currentConfig={settings.checkOutConfig}
         onSave={handleCheckOutSave}
       />
+      
+      <SOSDialog open={showPracticeDialog} onClose={() => setShowPracticeDialog(false)} isPracticeMode={true} />
 
       {showOnboarding && (
         <OnboardingWizard

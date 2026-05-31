@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Ward {
   userId: string;
   name: string;
+  avatarUrl: string | null;
 }
 
 interface GuardianWardContextType {
@@ -52,12 +53,12 @@ export const GuardianWardProvider = ({ children }: { children: ReactNode }) => {
     const userIds = data.map((g) => g.user_id);
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, full_name")
+      .select("id, full_name, avatar_url")
       .in("id", userIds);
 
     const wardList: Ward[] = userIds.map((uid) => {
       const profile = profiles?.find((p) => p.id === uid);
-      return { userId: uid, name: profile?.full_name || "User" };
+      return { userId: uid, name: profile?.full_name || "User", avatarUrl: (profile as any)?.avatar_url || null };
     });
 
     setWards(wardList);

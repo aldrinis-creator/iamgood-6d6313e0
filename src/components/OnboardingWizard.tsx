@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill } from "lucide-react";
+import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import PhoneInput from "@/components/PhoneInput";
@@ -17,6 +17,7 @@ interface OnboardingWizardProps {
 
 const STEPS = [
   { icon: Heart, title: "Welcome to Check-iN", color: "text-primary" },
+  { icon: MapPin, title: "Location Access", color: "text-blue-500" },
   { icon: UserPlus, title: "Add Your First Guardian", color: "text-success" },
   { icon: Clock, title: "Set Check-In Times", color: "text-warning" },
   { icon: Pill, title: "Add a Medication", color: "text-primary" },
@@ -53,16 +54,16 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const userName = profile?.full_name || "there";
 
   const handleNext = async () => {
-    if (step === 2) {
+    if (step === 3) {
       // Save selected check-in preset to user_settings
       await saveCheckInTimes();
     }
-    if (step < 4) setStep(step + 1);
+    if (step < 5) setStep(step + 1);
     else handleFinish();
   };
 
   const handleSkip = () => {
-    if (step < 4) setStep(step + 1);
+    if (step < 5) setStep(step + 1);
     else handleFinish();
   };
 
@@ -196,8 +197,41 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
           </div>
         )}
 
-        {/* Step 1: Add Guardian */}
+        {/* Step 1: Location Access */}
         {step === 1 && (
+          <div className="space-y-4 text-center">
+            <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 text-left">
+              <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-500" /> Why we need your location
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                If you ever press the SOS button, we instantly send your exact GPS location to your Guardians so they can find you immediately. 
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-2 font-medium text-foreground">
+                When prompted, please tap "Allow While Using App" or "Allow All The Time".
+              </p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    () => { toast.success("Location enabled!"); handleNext(); },
+                    () => { toast.error("Location denied. SOS won't include your position."); handleNext(); }
+                  );
+                } else {
+                  handleNext();
+                }
+              }}>
+                <MapPin className="w-4 h-4 mr-1" /> Enable Location
+              </Button>
+              <Button variant="ghost" className="flex-1" onClick={handleSkip}>Skip</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Add Guardian */}
+        {step === 2 && (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">
               Add someone who will receive your safety alerts.
@@ -227,8 +261,8 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
           </div>
         )}
 
-        {/* Step 2: Check-In Times */}
-        {step === 2 && (
+        {/* Step 3: Check-In Times */}
+        {step === 3 && (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">
               Choose when you'd like to check in with your guardians.
@@ -261,8 +295,8 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
           </div>
         )}
 
-        {/* Step 3: Medication */}
-        {step === 3 && (
+        {/* Step 4: Medication */}
+        {step === 4 && (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">
               Add your most important daily medication. You can add more later.
@@ -284,8 +318,8 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
           </div>
         )}
 
-        {/* Step 4: Emergency Profile */}
-        {step === 4 && (
+        {/* Step 5: Emergency Profile */}
+        {step === 5 && (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">
               This info helps first responders in an emergency.
