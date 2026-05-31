@@ -18,27 +18,39 @@ const getCheckInWindowStart = (hour: number, date: Date = new Date()) => {
 
 const getCurrentWindow = () => {
   const now = new Date();
-  const hours = now.getHours();
-  // Find the current or most recent check-in window
-  for (let i = CHECK_IN_HOURS.length - 1; i >= 0; i--) {
-    if (hours >= CHECK_IN_HOURS[i]) {
-      return CHECK_IN_HOURS[i];
+  const nowMs = now.getTime();
+  
+  for (const h of CHECK_IN_HOURS) {
+    const earlyStart = getCheckInWindowStart(h);
+    earlyStart.setMinutes(earlyStart.getMinutes() - 30);
+    
+    const windowStart = getCheckInWindowStart(h);
+    const nextHourIndex = CHECK_IN_HOURS.indexOf(h) + 1;
+    let windowEnd = new Date(windowStart);
+    if (nextHourIndex < CHECK_IN_HOURS.length) {
+      windowEnd = getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex]);
+      windowEnd.setMinutes(windowEnd.getMinutes() - 30);
+    } else {
+      windowEnd.setHours(23, 59, 59, 999);
+    }
+    
+    if (nowMs >= earlyStart.getTime() && nowMs < windowEnd.getTime()) {
+      return h;
     }
   }
-  return null; // Before first check-in of the day
+  return null;
 };
 
 const getNextCheckInTime = () => {
   const now = new Date();
-  const hours = now.getHours();
+  const nowMs = now.getTime();
   for (const h of CHECK_IN_HOURS) {
-    if (hours < h) {
-      const next = new Date(now);
-      next.setHours(h, 0, 0, 0);
-      return next;
+    const earlyStart = getCheckInWindowStart(h);
+    earlyStart.setMinutes(earlyStart.getMinutes() - 30);
+    if (nowMs < earlyStart.getTime()) {
+      return getCheckInWindowStart(h);
     }
   }
-  // Next is tomorrow 7AM
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(7, 0, 0, 0);
@@ -101,6 +113,11 @@ const CheckInCard = () => {
     const windowEnd = nextHourIndex < CHECK_IN_HOURS.length
       ? getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex])
       : (() => { const d = new Date(windowStart); d.setHours(23, 59, 59, 999); return d; })();
+      
+    // Apply 30 min early cutoff for the *end* of the query, so it doesn't bleed into the next slot's early window
+    if (nextHourIndex < CHECK_IN_HOURS.length) {
+      windowEnd.setMinutes(windowEnd.getMinutes() - 30);
+    }
 
     // Check if a check-in already exists for this window
     const { data: existing, error } = await supabase
@@ -191,6 +208,14 @@ const CheckInCard = () => {
   }, [session?.user?.id]);
 
   const prevWindowRef = useRef<number | null>(undefined);
+  const lastVoiceCheckInId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (currentCheckInId && !checkedIn && pauseMode === "active" && lastVoiceCheckInId.current !== currentCheckInId) {
+      lastVoiceCheckInId.current = currentCheckInId;
+      playVoiceReminder(`Hey ${userName || 'there'}, it's time to Check in and let your people know you are well. Have a nice day!`);
+    }
+  }, [currentCheckInId, checkedIn, pauseMode, userName]);
 
   useEffect(() => {
     loadCurrentCheckIn();
