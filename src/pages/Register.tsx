@@ -517,7 +517,7 @@ const Register = () => {
                 <Heart className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-foreground text-base">I need protection</p>
+                <p className="font-semibold text-foreground text-base">Personal Safety</p>
                 <p className="text-sm text-muted-foreground">Set up check-ins & nominate guardians</p>
               </div>
             </button>
