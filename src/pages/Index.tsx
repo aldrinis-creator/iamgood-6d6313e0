@@ -30,22 +30,34 @@ const Index = () => {
           </div>
           <h1 className="text-4xl font-bold">Check-iN</h1>
           <p className="text-lg opacity-90">
-            Your AI-Powered Personal Emergency Response System
+            The Personal Safety Network for Seniors & Guardians
           </p>
         </div>
 
-        <div className="space-y-3 text-left">
-          {[
-            { icon: "💓", text: "Scheduled safety check-ins with auto-alerts" },
-            { icon: "🚨", text: "One-tap SOS with live location sharing" },
-            { icon: "🛡️", text: "Guardian dashboard with real-time tracking" },
-            { icon: "🏥", text: "Medical vault & priority ambulance" },
-          ].map((f) => (
-            <div key={f.text} className="flex items-center gap-3 bg-primary-foreground/10 rounded-lg p-3">
-              <span className="text-xl">{f.icon}</span>
-              <span className="text-sm">{f.text}</span>
+        <div className="space-y-4 text-left">
+          <div className="bg-primary-foreground/10 rounded-xl p-4 border border-primary-foreground/20">
+            <div className="flex items-center gap-2 mb-2 text-success-foreground">
+              <Heart className="w-5 h-5 fill-current" />
+              <h3 className="font-semibold text-lg">For Seniors</h3>
             </div>
-          ))}
+            <ul className="text-sm space-y-2 opacity-90">
+              <li>• Scheduled safety check-ins</li>
+              <li>• One-tap SOS & live location sharing</li>
+              <li>• Medical vault & priority ambulance</li>
+            </ul>
+          </div>
+
+          <div className="bg-primary-foreground/10 rounded-xl p-4 border border-primary-foreground/20">
+            <div className="flex items-center gap-2 mb-2 text-blue-200">
+              <Shield className="w-5 h-5" />
+              <h3 className="font-semibold text-lg">For Guardians</h3>
+            </div>
+            <ul className="text-sm space-y-2 opacity-90">
+              <li>• Real-time ward tracking dashboard</li>
+              <li>• Missed check-in & geofence alerts</li>
+              <li>• Instant SOS emergency notifications</li>
+            </ul>
+          </div>
         </div>
 
         <div className="space-y-3 pt-4">
