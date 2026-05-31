@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Heart, Clock } from "lucide-react";
-import { playChime, playVoiceReminder } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -208,14 +207,6 @@ const CheckInCard = () => {
   }, [session?.user?.id]);
 
   const prevWindowRef = useRef<number | null>(undefined);
-  const lastVoiceCheckInId = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (currentCheckInId && !checkedIn && pauseMode === "active" && lastVoiceCheckInId.current !== currentCheckInId) {
-      lastVoiceCheckInId.current = currentCheckInId;
-      playVoiceReminder(`Hey ${userName || 'there'}, it's time to Check in and let your people know you are well. Have a nice day!`);
-    }
-  }, [currentCheckInId, checkedIn, pauseMode, userName]);
 
   useEffect(() => {
     loadCurrentCheckIn();
@@ -285,7 +276,7 @@ const CheckInCard = () => {
             queued_at: Date.now()
           });
           const sw = await navigator.serviceWorker.ready;
-          // @ts-ignore
+          // @ts-expect-error: service worker sync type is not standard in lib.dom
           sw.sync.register("checkin-sync");
         };
         setCheckedIn(true);

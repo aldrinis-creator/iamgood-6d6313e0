@@ -27,7 +27,7 @@ const useCheckInAudio = () => {
   const firedRef = useRef<Set<string>>(new Set());
   const { settings } = useUserSettings();
   const { session } = useAuth();
-  const { pauseMode, loginInProgress } = useApp();
+  const { pauseMode, loginInProgress, userName } = useApp();
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
 
@@ -99,6 +99,17 @@ const useCheckInAudio = () => {
         }
       }
 
+      // --- T-0: Initial alarm (voice reminder & chime) exactly at scheduled time ---
+      const dueKey = `checkin-due-${dateKey}-${h}`;
+      if (diffMin >= 0 && diffMin < POPUP_DELAY_MIN && !firedRef.current.has(dueKey)) {
+        const responded = await isCheckInResponded(h, now);
+        if (!responded) {
+          firedRef.current.add(dueKey);
+          const msg = `Hey ${userName || 'there'}, it's time to Check in and let your people know you are well. Have a nice day!`;
+          fireAlert(msg);
+        }
+      }
+
       // --- T+5 / T+15 / T+25: Popup overlays 1/3, 2/3, 3/3 ---
       if (diffMin >= POPUP_DELAY_MIN && !missedSentRef.current.has(missedKey)) {
         const responded = await isCheckInResponded(h, now);
@@ -164,7 +175,7 @@ const useCheckInAudio = () => {
     postGraceRef.current.forEach((_, k) => {
       if (!k.includes(dateKey)) postGraceRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded, session?.user?.id, loginInProgress]);
+  }, [pauseMode, fireAlert, isCheckInResponded, loginInProgress, userName]);
 
   useEffect(() => {
     check();
