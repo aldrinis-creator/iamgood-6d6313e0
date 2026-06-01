@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search, Crown } from "lucide-react";
+import { HelpCircle, Mail, Settings as SettingsIcon, Shield, FileText, Download, Heart, Moon, CalendarDays, Users, ShieldCheck, AlertTriangle, CalendarClock, User, Bell, Pill, Utensils, Trophy, ScanLine, Watch, Dumbbell, Lock, Stethoscope, Building2, Ambulance, FileText as FileTextIcon, Rocket, Globe, BookOpen, AlertCircle, ShieldAlert, LogOut, Search, Crown, ChevronRight } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { faqSections, FAQ_VERSION } from "@/data/faqData";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import SeoMeta from "@/components/SeoMeta";
+import SOSDialog from "@/components/SOSDialog";
 
 const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="w-5 h-5 text-destructive" />,
@@ -49,6 +50,7 @@ const Help = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [showPracticeDialog, setShowPracticeDialog] = useState(false);
 
   useEffect(() => {
     const t = searchParams.get("tab") as HelpTab | null;
@@ -179,6 +181,20 @@ const Help = () => {
                   <span className="w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs font-bold shrink-0">!</span>
                   <p><strong className="text-foreground">SOS Anytime:</strong> Press the SOS button for immediate emergency alert with live location sharing.</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Practice / Retest SOS Card */}
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-sos/20 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-sos" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-foreground">Practice / Retest SOS</h3>
+                  <p className="text-xs text-muted-foreground">Test the emergency alert system safely without notifying anyone</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               </CardContent>
             </Card>
 
@@ -317,6 +333,7 @@ const Help = () => {
             Log Out
           </Button>
         </div>
+        <SOSDialog open={showPracticeDialog} onClose={() => setShowPracticeDialog(false)} isPracticeMode={true} />
       </div>
     </AppLayout>
   );

@@ -71,6 +71,8 @@ const UserDashboard = () => {
   const { settings, updateSetting } = useUserSettings();
 
   const { session } = useAuth();
+  const signupDateStr = session?.user?.created_at;
+  const isNewUser = signupDateStr ? (Date.now() - new Date(signupDateStr).getTime()) < 30 * 24 * 60 * 60 * 1000 : true;
 
   const [showSleepDialog, setShowSleepDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
@@ -299,18 +301,20 @@ const UserDashboard = () => {
         <CheckInCard />
 
         {/* Practice SOS */}
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-sos/20 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-sos" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm text-foreground">Practice SOS Mode</h3>
-              <p className="text-xs text-muted-foreground">Test the alarm safely without notifying anyone</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-          </CardContent>
-        </Card>
+        {isNewUser && (
+          <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-sos/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-sos" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-foreground">Practice SOS Mode</h3>
+                <p className="text-xs text-muted-foreground">Test the alarm safely without notifying anyone</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Map My Journey */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>
