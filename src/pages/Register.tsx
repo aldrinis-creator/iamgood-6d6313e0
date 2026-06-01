@@ -518,7 +518,7 @@ const Register = () => {
               </div>
               <div>
                 <p className="font-semibold text-foreground text-base">To protect myself</p>
-                <p className="text-sm text-muted-foreground">Set up daily check-ins & invite guardians</p>
+                <p className="text-sm text-muted-foreground">Set up daily check-ins & invite guardians who will help me in an emergency</p>
               </div>
             </button>
             <button
