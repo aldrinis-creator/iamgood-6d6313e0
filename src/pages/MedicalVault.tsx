@@ -8,8 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Eye, EyeOff, FileText, Shield, Heart, User, Upload, Trash2, Download,
-  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer, Share2, Save, Pill, AlertTriangle
+  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer, Share2, Save, Pill, AlertTriangle, ChevronDown
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -102,6 +106,70 @@ const FREQUENCIES: Record<string, string> = {
   twice_daily: "Twice daily",
   three_daily: "3× daily",
   as_needed: "As needed",
+};
+
+interface ParsedDescription {
+  originalText: string | null;
+  aiAnalysisText: string;
+}
+
+const parseDescription = (desc: string): ParsedDescription => {
+  const originalMarker = "═══ ORIGINAL DOCUMENT ═══";
+  const aiMarker = "═══ AI ANALYSIS ═══";
+
+  if (desc.includes(originalMarker) && desc.includes(aiMarker)) {
+    const origIndex = desc.indexOf(originalMarker) + originalMarker.length;
+    const aiIndex = desc.indexOf(aiMarker);
+    const originalText = desc.substring(origIndex, aiIndex).trim();
+    const aiAnalysisText = desc.substring(aiIndex + aiMarker.length).trim();
+    return { originalText, aiAnalysisText };
+  }
+
+  return { originalText: null, aiAnalysisText: desc.trim() };
+};
+
+const RenderRecordDescription = ({ description }: { description: string }) => {
+  const { originalText, aiAnalysisText } = parseDescription(description);
+  const visual = tryParseVisualReport(aiAnalysisText);
+
+  return (
+    <div className="space-y-4">
+      {/* Original Document Section (Collapsible) */}
+      {originalText && (
+        <Collapsible className="border border-border rounded-xl overflow-hidden bg-muted/10">
+          <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/20 hover:bg-muted/30 transition-colors text-xs font-semibold">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <FileText className="w-3.5 h-3.5" />
+              Original Document Content
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="p-3 border-t border-border bg-background">
+            <ScrollArea className="max-h-[150px] w-full">
+              <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 leading-relaxed">
+                {originalText}
+              </pre>
+            </ScrollArea>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* AI Analysis / Notes Section */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+          <FileText className="w-3.5 h-3.5 text-primary" />
+          Analysis & Notes
+        </p>
+        {visual ? (
+          <VisualHealthReport report={visual} />
+        ) : (
+          <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/30 rounded-xl p-4 border border-border/50">
+            <ReactMarkdown>{aiAnalysisText}</ReactMarkdown>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const MedicalVaultContent = () => {
@@ -1052,12 +1120,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
 
               {/* Description */}
               {viewRecord.description && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">📝 Notes</p>
-                  <p className="text-sm whitespace-pre-wrap break-words bg-muted/50 rounded-lg p-3">
-                    {viewRecord.description}
-                  </p>
-                </div>
+                <RenderRecordDescription description={viewRecord.description} />
               )}
 
               {/* Attachment */}
