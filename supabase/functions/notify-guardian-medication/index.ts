@@ -163,33 +163,10 @@ Deno.serve(async (req) => {
 
     await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
 
-    // MSG91 WhatsApp notification for medication (Only for missed medications)
-    const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
-    const msg91MedTemplate = Deno.env.get("MSG91_MED_TEMPLATE_ID");
-    if (msg91AuthKey && msg91MedTemplate && isMissed) {
-      const recipientsRaw = eligibleGuardians
-        .filter((g: any) => g.guardian_phone)
-        .map((g: any) => {
-          const clean = g.guardian_phone.replace(/[^0-9]/g, "");
-          const mobile = clean.startsWith("91") ? clean : `91${clean}`;
-          return { mobiles: mobile, user_name: userName, medication_name, status: statusLabel, message };
-        });
+    // MSG91 WhatsApp/SMS for missed medications is now handled exclusively
+    // by the T+60m cron in `check-missed-medications` to guarantee a single
+    // consolidated message per scheduled-hour slot. Intentionally removed here.
 
-      // Deduplicate by phone number to prevent multiple SMS to the same number
-      const recipients = [...new Map(recipientsRaw.map((r: any) => [r.mobiles, r])).values()];
-
-      if (recipients.length > 0) {
-        try {
-          await fetch("https://control.msg91.com/api/v5/flow", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", authkey: msg91AuthKey },
-            body: JSON.stringify({ template_id: msg91MedTemplate, short_url: "0", recipients }),
-          });
-        } catch (e) {
-          console.error("MSG91 medication alert error:", e);
-        }
-      }
-    }
 
     // Send push notifications to guardian devices
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
