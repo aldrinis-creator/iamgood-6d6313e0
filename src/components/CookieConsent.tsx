@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 
 interface CookieConsentProps {
   forceShow?: boolean;
@@ -32,7 +33,7 @@ const CookieConsent: React.FC<CookieConsentProps> = ({ forceShow = false, onClos
           <Cookie className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
             We use cookies to improve your experience. By continuing, you agree to our use of cookies. Read our{" "}
-            <Link to="/privacy-policy" className="underline text-primary hover:text-primary/80">Privacy Policy</Link> and{" "}
+            <a href={PRIVACY_POLICY_PDF_URL} target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80">Privacy Policy</a> and{" "}
             <Link to="/terms-of-service" className="underline text-primary hover:text-primary/80">Terms of Service</Link>.
           </p>
         </div>

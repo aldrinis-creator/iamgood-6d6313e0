@@ -12,6 +12,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
@@ -92,12 +93,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p>Not a substitute for professional medical advice.</p>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <Link
-                to="/privacy-policy"
+              <a
+                href={PRIVACY_POLICY_PDF_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
               >
                 Privacy Policy
-              </Link>
+              </a>
               <span className="text-muted-foreground">·</span>
               <Link
                 to="/terms-of-service"

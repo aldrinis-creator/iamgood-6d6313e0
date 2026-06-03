@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import SeoMeta from "@/components/SeoMeta";
 import SOSDialog from "@/components/SOSDialog";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 
 const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="w-5 h-5 text-destructive" />,
@@ -277,32 +278,15 @@ const Help = () => {
         {activeTab === "privacy" && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-foreground">Privacy Policy</h2>
-            <p className="text-xs text-muted-foreground">
-              Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
+            <p className="text-sm text-muted-foreground">
+              Our full Privacy Policy is maintained as a PDF document, covering DPDP Act 2023 and GDPR compliance, data retention, your rights, and Grievance Officer contact details.
             </p>
-            {[
-              { heading: "1. About This Policy", content: "This Privacy Policy explains how Check-iN, operated by Future Wave, collects, uses, stores, and protects your personal data. It complies with India's Digital Personal Data Protection Act, 2023 ('DPDP Act'), the IT (SPDI) Rules, 2011, and the EU GDPR for users in the EEA and UK." },
-              { heading: "2. Our Role as Data Fiduciary / Controller", content: "Future Wave is the Data Fiduciary under the DPDP Act and Data Controller under GDPR. Our Data Processors — Lovable Cloud (backend & storage), MSG91 (SMS/OTP/WhatsApp), and Razorpay (payments) — act only on our documented instructions under data-protection contracts." },
-              { heading: "3. Information We Collect", content: "Identity & contact data (name, phone, optional email, date of birth, profile photo, guardian and emergency contacts); health data (medications, vitals, check-ins, vault documents, face/tongue/urine scan outputs); location data (SOS, Map My Journey, Safe Zones); device & usage data (device, OS, app version, battery, push tokens, IP, logs)." },
-              { heading: "4. Sensitive Personal Data", content: "Your health, biometric and precise location data qualify as Sensitive Personal Data under Indian SPDI Rules and Special Category Data under GDPR Article 9. We process them only with your explicit consent and apply enhanced safeguards." },
-              { heading: "5. Purpose & Legal Basis", content: "We process your data to deliver check-ins, medication reminders, guardian SOS alerts, AI health insights you request, subscription management and account security. Legal bases: your explicit consent (DPDP §6; GDPR Art. 6(1)(a), 9(2)(a)), contract performance (Art. 6(1)(b)), and protection of vital interests in emergencies (Art. 6(1)(d), 9(2)(c))." },
-              { heading: "6. How We Use Your Data", content: "Used solely to operate Check-iN. We do not sell your personal data, do not use it for advertising or behavioural profiling, and do not train third-party AI models on your health records." },
-              { heading: "7. Data Sharing", content: "Shared only with: (i) the guardians you nominate; (ii) emergency responders you contact via SOS; (iii) our Data Processors strictly to deliver the service. All bound by confidentiality and data-protection contracts aligned with DPDP and GDPR." },
-              { heading: "8. Data Storage & Location", content: "All personal data is hosted on servers located within India. We do not transfer your personal data outside India. For EEA/UK users, any incidental access from India relies on appropriate safeguards including Standard Contractual Clauses under GDPR Art. 46." },
-              { heading: "9. Data Security", content: "TLS encryption in transit, encryption at rest, Row-Level Security, time-limited signed URLs for vault documents, OTP-based authentication, role-based access controls, and regular security reviews." },
-              { heading: "10. Data Retention", content: "We retain your data while your account is active. After deletion or consent withdrawal, we erase your personal data within 90 days, except where retention is legally required (e.g., financial records). Anonymised, aggregated data may be retained for analytics." },
-              { heading: "11. Your Rights as Data Principal / Data Subject", content: "Under DPDP §§11–14 and GDPR Articles 15–22 you may access, correct, erase, restrict, object to or port your data, nominate another person, and complain to the Data Protection Board of India or your local EEA/UK supervisory authority. Contact our Grievance Officer (Section 15) — we respond within 30 days." },
-              { heading: "12. Withdrawing Consent", content: "Withdraw consent any time via Settings → Account or by contacting our Grievance Officer. Withdrawal does not affect lawfulness of prior processing. Note: withdrawal disables core safety features such as SOS, guardian alerts and medication reminders." },
-              { heading: "13. Cookies & Local Storage", content: "We use cookies and local storage to keep you signed in, remember preferences and understand usage. Manage them via Cookie Settings in the app footer." },
-              { heading: "14. Children's Data", content: "Check-iN is intended for adults aged 18 and over. We do not knowingly collect children's data. If you believe a child has provided data, contact the Grievance Officer and we will delete it promptly." },
-              { heading: "15. Grievance Officer & Data Protection Contact", content: "Per DPDP §8(9): Aldrin Alphonso, Future Wave. Phone: +91 70458 68482. Email: checkin_support@futurewave.in. Also acts as point of contact for GDPR queries from EEA/UK users. Acknowledgement within 7 days; resolution within 30 days." },
-              { heading: "16. Changes to This Policy", content: "Material changes will be notified in-app and, where required, by email. The 'Last updated' date above indicates the latest revision. Questions: checkin_support@futurewave.in." },
-            ].map((s) => (
-              <section key={s.heading} className="space-y-1">
-                <h3 className="text-base font-semibold text-foreground">{s.heading}</h3>
-                <p className="text-sm text-muted-foreground">{s.content}</p>
-              </section>
-            ))}
+            <Button asChild className="w-full gap-2">
+              <a href={PRIVACY_POLICY_PDF_URL} target="_blank" rel="noopener noreferrer">
+                <Download className="w-4 h-4" />
+                Download Privacy Policy (PDF)
+              </a>
+            </Button>
           </div>
         )}
 
