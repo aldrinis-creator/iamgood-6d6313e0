@@ -1,4 +1,4 @@
-package app.lovable.c08453f9a77243a6ab7c53dcaa1d84f2;
+package com.futurewave.checkin;
 
 import com.getcapacitor.BridgeActivity;
 
