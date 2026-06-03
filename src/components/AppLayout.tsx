@@ -12,6 +12,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import CookieConsent from "@/components/CookieConsent";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";

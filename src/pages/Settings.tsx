@@ -254,7 +254,9 @@ const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: a
             </div>
           )}
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => navigate("/privacy-policy")}>View Privacy Policy</Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={PRIVACY_POLICY_PDF_URL} target="_blank" rel="noopener noreferrer">View Privacy Policy</a>
+            </Button>
             <Button variant="outline" size="sm">Manage Cookie Preferences</Button>
           </div>
         </CardContent>
@@ -269,7 +271,7 @@ const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: a
           <p className="text-xs text-muted-foreground">
             Exercise your rights under GDPR (EU) and India's DPDP Act 2023. All requests are processed within 30 days.
           </p>
-          <a href="/privacy-policy" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
+          <a href={PRIVACY_POLICY_PDF_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
             View your rights in our Privacy Policy ↗
           </a>
         </CardHeader>
