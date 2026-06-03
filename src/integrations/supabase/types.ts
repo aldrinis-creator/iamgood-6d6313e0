@@ -1395,6 +1395,7 @@ export type Database = {
           status: string
           taken_at: string | null
           user_id: string
+          whatsapp_alerted_at: string | null
         }
         Insert: {
           created_at?: string
@@ -1404,6 +1405,7 @@ export type Database = {
           status?: string
           taken_at?: string | null
           user_id: string
+          whatsapp_alerted_at?: string | null
         }
         Update: {
           created_at?: string
@@ -1413,6 +1415,7 @@ export type Database = {
           status?: string
           taken_at?: string | null
           user_id?: string
+          whatsapp_alerted_at?: string | null
         }
         Relationships: [
           {

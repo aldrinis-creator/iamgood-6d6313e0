@@ -5,6 +5,8 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.check-missed-checkins]
     verify_jwt = false
+  [functions.check-missed-medications]
+    verify_jwt = false
   [functions.health-tools]
     verify_jwt = false
   [functions.drug-references]

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsAppTemplate, normalizeIndianPhone } from "../_shared/msg91Whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -441,10 +442,45 @@ Deno.serve(async (req) => {
           }
         }
 
-        // MSG91 WhatsApp/SMS real-time notification has been REMOVED here.
-        // SMS notifications are now handled by the consolidated batched cron job.
+        // ── ONE-SHOT WhatsApp alerts (user + guardians) at T+60min ──
+        try {
+          const { data: userProfile } = await supabase
+            .from("profiles")
+            .select("phone")
+            .eq("id", checkIn.user_id)
+            .maybeSingle();
+          const userPhone = normalizeIndianPhone(userProfile?.phone);
+          if (userPhone) {
+            await sendWhatsAppTemplate({
+              templateName: "user_missed_checkin",
+              languageCode: "en_GB",
+              recipients: [{ to: [userPhone], components: { body_1: timeStr } }],
+            });
+          }
+
+          const guardianPhones = Array.from(new Set(
+            guardians
+              .map((g) => normalizeIndianPhone(g.guardian_phone))
+              .filter((p): p is string => !!p),
+          ));
+          if (guardianPhones.length > 0) {
+            await sendWhatsAppTemplate({
+              templateName: "guardian_missed_checkin",
+              languageCode: "en_US",
+              recipients: guardianPhones.map((p) => ({
+                to: [p],
+                components: { body_1: userName, body_2: timeStr },
+              })),
+            });
+          }
+        } catch (waErr) {
+          console.error("WhatsApp missed check-in send error:", waErr);
+        }
+      }
+    }
 
     console.log(`Created ${notificationsCreated} notifications, sent ${emailsSent} emails, ${pushesSent} pushes`);
+
 
     return new Response(
       JSON.stringify({
