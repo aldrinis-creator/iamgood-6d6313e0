@@ -1,47 +1,41 @@
 ## Goal
 
-Rewrite the Privacy Policy to be fully compliant with India's Digital Personal Data Protection Act, 2023 (DPDP Act), using the inputs you provided.
+Make every "Privacy Policy" link in the app open the latest Privacy Policy as a PDF, sourced from your Google Doc, instead of the in-app `/privacy-policy` page.
 
-## Inputs captured
+## External URL used
 
-- **Grievance Officer:** Aldrin Alphonso — +91 70458 68482 — [checkin_support@futurewave.in](mailto:checkin_support@futurewave.in)
-- **Cross-border transfer:** None (all data stored within India)
-- **Retention:** 90 days after account deletion
-- **Children's data:** Not applicable (app is not intended for users under 18)
+The Google Doc ID is `1Rp2aUGX1MF-p3w9vVD5_rzXPMzt6ChpM`. We'll use Google Docs' built-in PDF export endpoint (no Drive/Docs connector needed — works for any "Anyone with the link" doc):
+
+```
+https://docs.google.com/document/d/1Rp2aUGX1MF-p3w9vVD5_rzXPMzt6ChpM/export?format=pdf
+```
+
+This downloads/opens the PDF directly. **You must set the doc sharing to "Anyone with the link → Viewer"** in Google Docs for it to work for end users — otherwise they'll see a sign-in screen.
 
 ## Files to update
 
-1. `src/pages/PrivacyPolicy.tsx` — replace the `sections` array with the full DPDP-compliant content.
-2. `src/pages/Help.tsx` — replace the inline Privacy section (the array inside the `activeTab === "privacy"` block) with the same content so both views stay in sync.
+1. **`src/components/AppLayout.tsx`** (line 96) — footer "Privacy Policy" link → change `<Link to="/privacy-policy">` to `<a href="…export?format=pdf" target="_blank" rel="noopener noreferrer">`.
+2. **`src/components/CookieConsent.tsx`** (line 35) — cookie banner Privacy Policy link → same swap.
+3. **`src/pages/Settings.tsx`** (lines 257, 272) — two links ("View Privacy Policy" button + "View your rights…" link) → both point to the external PDF.
+4. **`src/pages/Help.tsx`** — the Privacy tab currently renders 16 inline sections. Replace with a short notice + a single "Download Privacy Policy (PDF)" button that opens the external URL. Removes ~30 lines of duplicated policy text.
+5. **`src/pages/PrivacyPolicy.tsx`** — convert to a lightweight redirect page: on mount, `window.location.replace(externalUrl)` and show a "Opening Privacy Policy…" fallback with a manual link. This keeps the `/privacy-policy` route working (in case the URL is shared/bookmarked, in emails, or hit by crawlers) but immediately hands users the PDF.
+6. **`src/App.tsx`** — no change; route stays mapped to the (now-redirecting) `PrivacyPolicy` page.
 
-No new files, no schema/backend changes, no route changes.
+## Centralisation
 
-## New section structure (16 sections)
+Add a small constant in `src/lib/utils.ts` (or a new `src/lib/legal.ts`):
+```ts
+export const PRIVACY_POLICY_PDF_URL =
+  "https://docs.google.com/document/d/1Rp2aUGX1MF-p3w9vVD5_rzXPMzt6ChpM/export?format=pdf";
+```
+All five call sites import from this constant so future updates are one-line.
 
-1. **About This Policy & DPDP Act 2023 Compliance** — Check-iN by Future Wave; complies with DPDP Act 2023 and IT Rules 2011 (SPDI).
-2. **Our Role as Data Fiduciary** — Future Wave is the Data Fiduciary; processors (Lovable Cloud, MSG91, Razorpay) act as Data Processors under contract.
-3. **Information We Collect** — identity (name, phone), health (medications, vitals, vault documents, face/tongue/urine scans), location (SOS, journeys, geofencing), guardian/nominee details, device & usage data.
-4. **Sensitive Personal Data** — explicit classification of health, biometric and location data as sensitive; handled with enhanced safeguards.
-5. **Purpose & Legal Basis** — purposes (emergency response, medication reminders, guardian alerts, health insights); legal basis is your consent at registration and feature opt-in.
-6. **How We Use Your Data** — operational uses; no sale to third parties; no advertising profiling.
-7. **Data Sharing** — guardians you nominate, emergency services on SOS, processors (Lovable Cloud, MSG91 for SMS/WhatsApp/OTP, Razorpay for payments) — all under DPDP-aligned contracts.
-8. **Data Storage & Location** — all personal data stored on servers located within India; no cross-border transfers.
-9. **Data Security** — encryption in transit (TLS) and at rest, Row-Level Security, signed URLs for vault, OTP-based auth, role-based access.
-10. **Data Retention** — active account: retained while account is active; after deletion request: erased within **90 days** except where law requires longer retention (e.g., financial/transaction records).
-11. **Your Rights as Data Principal (DPDP §11–14)** — right to access, correction, erasure, grievance redressal, nomination (in case of death/incapacity), and withdrawal of consent.
-12. **Withdrawing Consent** — how to withdraw via Settings → Account, and consequences (loss of emergency features).
-13. **Cookies & Local Storage** — session, preferences, analytics; managed via in-app Cookie Settings.
-14. **Children's Data** — service is not intended for users under 18; no knowing collection of children's data.
-15. **Grievance Officer (DPDP §8(9))** — Aldrin Alphonso, +91 70458 68482, [checkin_support@futurewave.in](mailto:checkin_support@futurewave.in); response within 30 days.
-16. **Changes to This Policy & Contact** — material changes notified in-app; contact Future Wave at [checkin_support@futurewave.in](mailto:checkin_support@futurewave.in).
+## SEO note
 
-## SEO
-
-Keep existing `SeoMeta` ("DPDP Act compliant" already in description). No change.
+The standalone `/privacy-policy` page currently has `SeoMeta` for crawlers. After the redirect change, crawlers will still index the route but the visible content will be a "Opening…" stub. That's acceptable since the canonical policy now lives in the Google Doc PDF. If you want stronger SEO, we can keep the in-app HTML version visible for crawlers and only show the download button to users — let me know and I'll adjust.
 
 ## Out of scope
 
-- No changes to Terms of Service, registration consent checkboxes, account deletion flow, or backend retention jobs. (Happy to follow up with: an explicit "I consent" checkbox at signup, a Settings → Account "Delete my data" action, and a scheduled 90-day purge job — say the word.)  
-  
-Can this also include GDPR compliance?
-  &nbsp;
+- The pre-generated `CheckiN-Privacy-Policy.pdf` artifact stays as-is; the app will not use it (the Google Doc export is the live source of truth).
+- No backend, RLS, or auth changes.
+- `TermsOfService.tsx` is untouched (it only mentions "Privacy Policy" in body text, no link).
