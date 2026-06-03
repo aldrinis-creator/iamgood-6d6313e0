@@ -92,12 +92,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <p>Not a substitute for professional medical advice.</p>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <Link
-                to="/privacy-policy"
+              <a
+                href={PRIVACY_POLICY_PDF_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
               >
                 Privacy Policy
-              </Link>
+              </a>
               <span className="text-muted-foreground">·</span>
               <Link
                 to="/terms-of-service"
