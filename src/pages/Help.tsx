@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import SeoMeta from "@/components/SeoMeta";
 import SOSDialog from "@/components/SOSDialog";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 
 const iconMap: Record<string, React.ReactNode> = {
   heart: <Heart className="w-5 h-5 text-destructive" />,

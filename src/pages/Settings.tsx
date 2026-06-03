@@ -18,6 +18,7 @@ import SafeZoneEditor from "@/components/SafeZoneEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 import { useNavigate } from "react-router-dom";
 import PhoneInput from "@/components/PhoneInput";
 import usePushSubscription from "@/hooks/usePushSubscription";
