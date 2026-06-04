@@ -519,6 +519,7 @@ const Register = () => {
               <div>
                 <p className="font-semibold text-foreground text-base">To protect myself</p>
                 <p className="text-sm text-muted-foreground">Set up daily check-ins & invite guardians who will help me in an emergency</p>
+                <p className="text-sm font-bold italic text-foreground mt-1">(Seniors and Lone dwellers click this box)</p>
               </div>
             </button>
             <button
@@ -532,6 +533,7 @@ const Register = () => {
               <div>
                 <p className="font-semibold text-foreground text-base">To protect someone else</p>
                 <p className="text-sm text-muted-foreground">Monitor a user as their Guardian</p>
+                <p className="text-sm font-bold italic text-foreground mt-1">(Guardians / Family members of Seniors and Lone dwellers click this box)</p>
               </div>
             </button>
           </div>
