@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -35,18 +35,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginInProgress, setLoginInProgress] = useState(false);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    if (lastFetchedUserIdRef.current === userId) return;
+    lastFetchedUserIdRef.current = userId;
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
+    if (error) {
+      lastFetchedUserIdRef.current = null;
+    }
     setProfile(data);
   };
 
   const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
+    if (user) {
+      lastFetchedUserIdRef.current = null;
+      await fetchProfile(user.id);
+    }
   };
 
   useEffect(() => {
@@ -113,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, 0);
         } else {
           setProfile(null);
+          lastFetchedUserIdRef.current = null;
           setLoginInProgress(false);
         }
         setLoading(false);
@@ -162,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem("admin_step_up_token");
     await supabase.auth.signOut();
     setProfile(null);
+    lastFetchedUserIdRef.current = null;
   };
 
   const resetPassword = async (email: string) => {
