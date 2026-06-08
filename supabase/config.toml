@@ -57,3 +57,6 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.join-waitlist]
     verify_jwt = false
+  [functions.send-weekly-reports]
+    verify_jwt = false
+
