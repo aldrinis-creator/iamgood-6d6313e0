@@ -22,7 +22,7 @@ export const useMorningBriefing = () => {
     // Only trigger between 9:00 AM and 1:00 PM (13:00)
     if (hours < 9 || hours >= 13) return;
 
-    const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const storageKey = 'lastBriefingDate';
     
     if (localStorage.getItem(storageKey) === dateKey) {

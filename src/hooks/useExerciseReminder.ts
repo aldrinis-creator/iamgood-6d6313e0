@@ -27,7 +27,7 @@ const useExerciseReminder = () => {
     if (!settings.exerciseReminder) return;
 
     const now = new Date();
-    const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     for (const h of EXERCISE_HOURS) {
       const scheduledAt = new Date(now);

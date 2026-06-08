@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { haversineDistance } from "@/lib/haversine";
+import { useQueryClient } from "@tanstack/react-query";
 
 const NORMAL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 const SOS_INTERVAL_MS = 30 * 1000; // 30 sec
@@ -23,6 +24,7 @@ export default function useLocationSync() {
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { emergencyMode } = useApp();
+  const queryClient = useQueryClient();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const sosStartedAtRef = useRef<number | null>(null);
 
@@ -52,6 +54,7 @@ export default function useLocationSync() {
               } as any,
               { onConflict: "user_id" }
             );
+          queryClient.setQueryData(["user_settings", userId], rest);
         }
       })();
       return;
@@ -146,22 +149,38 @@ export default function useLocationSync() {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
+          
+          // Fetch the latest settings from the database first to prevent overwriting
+          // other settings updated on other tabs/devices while GPS was resolving.
           supabase
             .from("user_settings" as any)
-            .upsert(
-              {
-                user_id: userId,
-                settings: {
-                  ...settings,
-                  lastLocation: { lat: latitude, lng: longitude },
-                  lastLocationAt: new Date().toISOString(),
-                },
-                updated_at: new Date().toISOString(),
-              } as any,
-              { onConflict: "user_id" }
-            )
-            .then(() => {
-              checkSafeZones(latitude, longitude);
+            .select("settings")
+            .eq("user_id", userId)
+            .maybeSingle()
+            .then(({ data }) => {
+              const currentSettings = (data as any)?.settings || {};
+              const updatedSettings = {
+                ...currentSettings,
+                lastLocation: { lat: latitude, lng: longitude },
+                lastLocationAt: new Date().toISOString(),
+              };
+
+              supabase
+                .from("user_settings" as any)
+                .upsert(
+                  {
+                    user_id: userId,
+                    settings: updatedSettings,
+                    updated_at: new Date().toISOString(),
+                  } as any,
+                  { onConflict: "user_id" }
+                )
+                .then(() => {
+                  // Keep local React Query cache in sync to prevent local settings
+                  // updates from writing stale locations back to the database.
+                  queryClient.setQueryData(["user_settings", userId], updatedSettings);
+                  checkSafeZones(latitude, longitude);
+                });
             });
         },
         () => {},

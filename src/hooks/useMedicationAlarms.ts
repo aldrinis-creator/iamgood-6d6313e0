@@ -28,7 +28,7 @@ const useMedicationAlarms = () => {
     if (!session?.user?.id) return;
 
     const now = new Date();
-    const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const { data: meds } = await supabase
       .from("medications")

@@ -71,7 +71,7 @@ const useCheckInAudio = () => {
     if (pauseMode !== "active") return;
     if (loginInProgress) return;
     const now = new Date();
-    const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     for (const h of CHECK_IN_HOURS) {
       const scheduledAt = new Date(now);
