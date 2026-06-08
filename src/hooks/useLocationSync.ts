@@ -27,10 +27,14 @@ export default function useLocationSync() {
   const queryClient = useQueryClient();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const sosStartedAtRef = useRef<number | null>(null);
+  const wasInsideRef = useRef<boolean>(true);
 
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
+
+    // Reset safety zone state for the current active user sync session
+    wasInsideRef.current = true;
 
     // If sharing is OFF, wipe any previously stored lastLocation so the
     // Guardian app can't keep displaying a stale dot, then stop.
@@ -75,11 +79,11 @@ export default function useLocationSync() {
         );
 
         if (isInsideAny) {
-          localStorage.setItem("isInsideSafeZone", "true");
+          wasInsideRef.current = true;
           return;
         }
 
-        const wasInside = localStorage.getItem("isInsideSafeZone") !== "false";
+        const wasInside = wasInsideRef.current;
         
         if (!wasInside) {
           // Already outside, do not send duplicate alerts
@@ -87,7 +91,7 @@ export default function useLocationSync() {
         }
 
         // Mark as outside so we don't alert again until they return to a safe zone
-        localStorage.setItem("isInsideSafeZone", "false");
+        wasInsideRef.current = false;
 
         const { data: activeJourney } = await supabase
           .from("journeys")
