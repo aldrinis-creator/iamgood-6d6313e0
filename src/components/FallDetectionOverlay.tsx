@@ -49,6 +49,13 @@ const FallDetectionOverlay = () => {
   const hasSentRef = useRef(false);
   const stopAlarmRef = useRef<(() => void) | null>(null);
   const [offlineData, setOfflineData] = useState<{ msg: string, guardians: any[] } | null>(null);
+  const isCancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    isCancelledRef.current = true;
+    cancelFallAlert();
+  }, [cancelFallAlert]);
+
 
   const getSmsLink = useCallback(() => {
     if (!offlineData) return "";
@@ -77,12 +84,16 @@ const FallDetectionOverlay = () => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
 
+    if (isCancelledRef.current) return;
+
     const [profileRes, hpRes, gRes, npRes] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, date_of_birth").eq("id", uid).maybeSingle(),
       supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, current_medications, family_doctor_name, family_doctor_phone").eq("user_id", uid).maybeSingle(),
       supabase.from("guardians").select("guardian_name, guardian_phone, guardian_email, relation").eq("user_id", uid).eq("status", "accepted"),
       supabase.from("nutrition_personas").select("blood_group, allergies, medical_conditions").eq("user_id", uid).maybeSingle(),
     ]);
+
+    if (isCancelledRef.current) return;
 
     const userName = profileRes.data?.full_name || "User";
     const phone = profileRes.data?.phone || "";
@@ -108,8 +119,11 @@ const FallDetectionOverlay = () => {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
       });
+      if (isCancelledRef.current) return;
       msg += `\n📍 Location: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
     } catch {}
+
+    if (isCancelledRef.current) return;
 
     if (hp?.blood_group) msg += `\n🩸 Blood Type: ${hp.blood_group}`;
     if (hp?.allergies?.length) msg += `\n⚠️ Allergies: ${hp.allergies.join(", ")}`;
@@ -121,12 +135,15 @@ const FallDetectionOverlay = () => {
     }
     msg += "\n\n⚠️ A fall was detected. Please respond immediately!";
 
+    if (isCancelledRef.current) return;
+
     if (!navigator.onLine) {
       setOfflineData({ msg, guardians });
       return;
     }
 
     try {
+      if (isCancelledRef.current) return;
       const result = await triggerSOS({
         message: msg,
         doctorName: hp?.family_doctor_name || null,
@@ -140,18 +157,21 @@ const FallDetectionOverlay = () => {
       // had valid recipients. Skip when recipientCount=0 (invalid/self-target).
       const hasRecipients = (delivery?.recipientCount ?? 0) > 0;
       if (result.invokeError || (hasRecipients && !whatsappOk && !smsOk)) {
+        if (isCancelledRef.current) return;
         guardians.forEach((g, i) => {
           const cleanPhone = g.guardian_phone.replace(/[^0-9]/g, "");
           if (cleanPhone.length < 10) return;
           const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
           if (phoneWithCode === "917045868482") return; // skip self-targeted
           setTimeout(() => {
+            if (isCancelledRef.current) return;
             window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
           }, i * 500);
         });
       }
     } catch (e: any) {
       console.error("Failed to send fall detection alerts:", e);
+      if (isCancelledRef.current) return;
       if (!navigator.onLine || String(e).includes("Failed to fetch") || String(e).includes("NetworkError")) {
         setOfflineData({ msg, guardians });
         return;
@@ -162,6 +182,7 @@ const FallDetectionOverlay = () => {
         const phoneWithCode = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
         if (phoneWithCode === "917045868482") return;
         setTimeout(() => {
+          if (isCancelledRef.current) return;
           window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, "_blank");
         }, i * 500);
       });
@@ -180,6 +201,7 @@ const FallDetectionOverlay = () => {
   // Start/stop alarm sound when fall is detected/dismissed
   useEffect(() => {
     if (fallDetected) {
+      isCancelledRef.current = false;
       hasSentRef.current = false;
       ensureAudioReady().then(() => {
         stopAlarmRef.current = playVoicePrompt(userName);
@@ -229,7 +251,7 @@ const FallDetectionOverlay = () => {
           </div>
 
           <div className="w-full space-y-3 pt-6">
-            <a href={getSmsLink()} onClick={() => cancelFallAlert()} className="block w-full">
+            <a href={getSmsLink()} onClick={() => handleCancel()} className="block w-full">
               <Button className="w-full h-20 text-xl font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-2xl rounded-2xl">
                 <MessageCircle className="w-8 h-8 mr-3" />
                 Send Offline SMS
@@ -250,7 +272,7 @@ const FallDetectionOverlay = () => {
           </div>
 
           <Button
-            onClick={cancelFallAlert}
+            onClick={handleCancel}
             variant="ghost"
             className="mt-8 text-muted-foreground"
           >
@@ -300,7 +322,7 @@ const FallDetectionOverlay = () => {
       </p>
 
       <Button
-        onClick={cancelFallAlert}
+        onClick={handleCancel}
         variant="outline"
         size="lg"
         className="bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90 border-none font-bold text-lg px-10 py-6"

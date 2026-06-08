@@ -304,7 +304,7 @@ export function useFallDetection() {
     fallDetected,
     countdown,
     cancelFallAlert,
-    countdownExpired: fallDetected && countdown === 0,
+    countdownExpired: fallDetected && countdown === 0 && !cancelledRef.current,
     enabled,
     permissionState,
     requestPermission,
