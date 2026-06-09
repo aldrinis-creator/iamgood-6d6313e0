@@ -279,17 +279,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cancelSOS = useCallback(async () => {
     setEmergencyMode(false);
 
-    if (activeSosId) {
-      const { error } = await supabase
-        .from("sos_events")
-        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-        .eq("id", activeSosId);
+    if (!activeSosId) return;
 
-      if (error) {
-        console.error("Failed to cancel SOS event:", error);
-      }
-      setActiveSosId(null);
+    const { error } = await supabase
+      .from("sos_events")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .eq("id", activeSosId);
+
+    if (error) {
+      console.error("Failed to cancel SOS event:", error);
     }
+    setActiveSosId(null);
 
     // Notify guardians that user is safe
     if (session?.user?.id) {

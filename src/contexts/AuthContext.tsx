@@ -59,12 +59,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let profileFetchedByListener = false;
+
     // Set up auth listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          profileFetchedByListener = true;
           setLoginInProgress(true);
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
@@ -132,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
+      if (session?.user && !profileFetchedByListener) {
         fetchProfile(session.user.id);
       }
       setLoading(false);

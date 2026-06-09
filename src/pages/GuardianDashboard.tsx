@@ -265,6 +265,14 @@ const GuardianDashboard = () => {
   const [nowTick, setNowTick] = useState<number>(Date.now());
   const [inactivityPopupDismissed, setInactivityPopupDismissed] = useState(false);
 
+  useEffect(() => {
+    if (!wardUserId) return;
+    const key = `inactivity_dismissed_at_${wardUserId}`;
+    const dismissedAt = sessionStorage.getItem(key);
+    const recentlyDismissed = dismissedAt && (Date.now() - Number(dismissedAt) < 10 * 60 * 1000); // 10 min
+    setInactivityPopupDismissed(!!recentlyDismissed);
+  }, [wardUserId, nowTick]);
+
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
   const missedCheckInCount = useRef(0);
@@ -525,10 +533,11 @@ const GuardianDashboard = () => {
 
   // Auto-reset the dismiss flag when the ward becomes active again
   useEffect(() => {
-    if (inactivityMin < 60 && inactivityPopupDismissed) {
+    if (inactivityMin < 60 && inactivityPopupDismissed && wardUserId) {
       setInactivityPopupDismissed(false);
+      sessionStorage.removeItem(`inactivity_dismissed_at_${wardUserId}`);
     }
-  }, [inactivityMin, inactivityPopupDismissed]);
+  }, [inactivityMin, inactivityPopupDismissed, wardUserId]);
 
 
   // Battery low visual indicator only – no audio alert
@@ -579,7 +588,27 @@ const GuardianDashboard = () => {
 
       const sosChannel = supabase
         .channel("ward-sos-rt")
-        .on("postgres_changes", { event: "*", schema: "public", table: "sos_events", filter: `user_id=eq.${wardUserId}` }, () => fetchWardCheckIns())
+        .on("postgres_changes", { event: "*", schema: "public", table: "sos_events", filter: `user_id=eq.${wardUserId}` }, (payload: any) => {
+          fetchWardCheckIns();
+          
+          const newSos = payload?.new;
+          if (newSos && newSos.status === "active") {
+            // Check if we already alerted for this SOS event to avoid double-alerts on status updates
+            const alertKey = `sos-alerted-${newSos.id}`;
+            if (!alertedNotifIds.current.has(alertKey)) {
+              alertedNotifIds.current.add(alertKey);
+              
+              // Play voice reminder and chime
+              playVoiceReminder(`SOS alert! Your ward ${wardName} needs help immediately.`);
+              playChime();
+              
+              // Vibrate
+              if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+              }
+            }
+          }
+        })
         .subscribe();
       channels.push(sosChannel);
 
@@ -1183,7 +1212,12 @@ const GuardianDashboard = () => {
       <WardInactivityPopup
         open={showInactivity && inactivityMin >= 60 && !inactivityPopupDismissed}
         wardName={wardName}
-        onDismiss={() => setInactivityPopupDismissed(true)}
+        onDismiss={() => {
+          setInactivityPopupDismissed(true);
+          if (wardUserId) {
+            sessionStorage.setItem(`inactivity_dismissed_at_${wardUserId}`, Date.now().toString());
+          }
+        }}
       />
     </AppLayout>
   );

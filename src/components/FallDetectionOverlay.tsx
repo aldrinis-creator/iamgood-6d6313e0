@@ -42,7 +42,7 @@ const playVoicePrompt = (userName: string): (() => void) => {
 };
 
 const FallDetectionOverlay = () => {
-  const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled, fallConfidence } = useFallDetection();
+  const { fallDetected, countdown, cancelFallAlert, countdownExpired, permissionState, requestPermission, enabled, fallConfidence, cancelledRef } = useFallDetection();
   const { triggerSOS } = useApp();
   const { session } = useAuth();
   const [userName, setUserName] = useState("User");
@@ -190,13 +190,13 @@ const FallDetectionOverlay = () => {
   }, [session?.user?.id, fallConfidence, triggerSOS]);
 
   useEffect(() => {
-    if (countdownExpired && !hasSentRef.current) {
+    if (countdownExpired && !hasSentRef.current && !cancelledRef?.current) {
       hasSentRef.current = true;
       // sendFallAlerts() calls triggerSOS() internally with the rich fall message.
       sendFallAlerts();
       cancelFallAlert();
     }
-  }, [countdownExpired, sendFallAlerts, cancelFallAlert]);
+  }, [countdownExpired, sendFallAlerts, cancelFallAlert, cancelledRef]);
 
   // Start/stop alarm sound when fall is detected/dismissed
   useEffect(() => {

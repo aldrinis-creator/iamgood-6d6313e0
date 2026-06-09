@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
-const SENSITIVITY_MAP: Record<string, { freeFall: number; impact: number }> = {
-  high: { freeFall: 6, impact: 18 },
-  medium: { freeFall: 5, impact: 25 },
-  low: { freeFall: 3, impact: 35 },
+const SENSITIVITY_MAP: Record<string, { freeFall: number; impact: number; confidence: number }> = {
+  high: { freeFall: 6, impact: 18, confidence: 0.65 },
+  medium: { freeFall: 5, impact: 25, confidence: 0.72 },
+  low: { freeFall: 3, impact: 35, confidence: 0.82 },
+  elder_safe: { freeFall: 4, impact: 28, confidence: 0.78 },
 };
 
 const FREE_FALL_TO_IMPACT_WINDOW = 800; // ms
@@ -253,7 +254,7 @@ export function useFallDetection() {
           const postSamples = postImpactRef.current;
           const confidence = analyzeFallSignature(preSamples, postSamples, thresholds);
 
-          if (confidence >= CONFIDENCE_TRIGGER) {
+          if (confidence >= thresholds.confidence) {
             triggerFallAlert(confidence);
           }
 
@@ -309,5 +310,6 @@ export function useFallDetection() {
     permissionState,
     requestPermission,
     fallConfidence,
+    cancelledRef,
   };
 }

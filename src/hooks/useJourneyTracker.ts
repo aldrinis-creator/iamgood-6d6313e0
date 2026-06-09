@@ -205,8 +205,15 @@ export function useJourneyTracker() {
           saveLocationUpdate(lat, lng);
         }
       },
-      (err) => console.error("Geolocation error:", err),
-      { enableHighAccuracy: true, maximumAge: 10000 }
+      (err) => {
+        console.error("GPS lost during journey:", err);
+        notifyGuardians(
+          "⚠️ GPS Signal Lost",
+          "Location tracking paused — GPS unavailable on user device.",
+          "journey"
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
 
     return () => {
@@ -226,14 +233,21 @@ export function useJourneyTracker() {
 
     const intervalMs = settings.journeyCheckInFrequency * 60 * 1000;
 
-    checkInTimer.current = setInterval(() => {
+    const elapsed = Date.now() - new Date(activeJourney.started_at).getTime();
+    const nextFireIn = Math.max(0, intervalMs - (elapsed % intervalMs));
+
+    const initialTimer = setTimeout(() => {
       setShowCheckIn(true);
-    }, intervalMs);
+      checkInTimer.current = setInterval(() => {
+        setShowCheckIn(true);
+      }, intervalMs);
+    }, nextFireIn);
 
     return () => {
+      clearTimeout(initialTimer);
       if (checkInTimer.current) clearInterval(checkInTimer.current);
     };
-  }, [activeJourney?.id, activeJourney?.status, settings.journeyCheckInFrequency]);
+  }, [activeJourney?.id, activeJourney?.started_at, activeJourney?.status, settings.journeyCheckInFrequency]);
 
   // Feature 1: Low-battery guardian alert (one-shot per journey)
   useEffect(() => {

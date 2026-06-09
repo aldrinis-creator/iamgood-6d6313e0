@@ -27,18 +27,19 @@ export default function useLocationSync() {
   const queryClient = useQueryClient();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const sosStartedAtRef = useRef<number | null>(null);
-  const wasInsideRef = useRef<boolean>(true);
+  const wasInsideRef = useRef<boolean>(localStorage.getItem('isInsideSafeZone') !== 'false');
 
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
 
-    // Reset safety zone state for the current active user sync session
-    wasInsideRef.current = true;
+    // Reset safety zone state for the current active user sync session using persistent localStorage state
+    wasInsideRef.current = localStorage.getItem('isInsideSafeZone') !== 'false';
 
     // If sharing is OFF, wipe any previously stored lastLocation so the
     // Guardian app can't keep displaying a stale dot, then stop.
-    if (!settings.shareLocation) {
+    // However, during active SOS, we bypass this to ensure coordinates are saved.
+    if (!settings.shareLocation && !emergencyMode) {
       (async () => {
         const { data } = await supabase
           .from("user_settings" as any)
@@ -80,6 +81,7 @@ export default function useLocationSync() {
 
         if (isInsideAny) {
           wasInsideRef.current = true;
+          localStorage.removeItem('isInsideSafeZone');
           return;
         }
 
@@ -92,6 +94,7 @@ export default function useLocationSync() {
 
         // Mark as outside so we don't alert again until they return to a safe zone
         wasInsideRef.current = false;
+        localStorage.setItem('isInsideSafeZone', 'false');
 
         const { data: activeJourney } = await supabase
           .from("journeys")

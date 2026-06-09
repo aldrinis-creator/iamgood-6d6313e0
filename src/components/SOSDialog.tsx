@@ -54,7 +54,7 @@ interface MedHistoryEntry {
 
 const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) => {
   const { session } = useAuth();
-  const { triggerSOS, cancelSOS } = useApp();
+  const { triggerSOS, cancelSOS, activeSosId } = useApp();
 
   const [medical, setMedical] = useState<MedicalInfo>({
     bloodGroup: null, allergies: [], conditions: [], medications: [], doctorName: null,
@@ -78,10 +78,23 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
   const [userDob, setUserDob] = useState("");
   const [userGender, setUserGender] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'acquiring' | 'secured' | 'failed'>('idle');
+  const [healthData, setHealthData] = useState<{ activity: any; wellness: any } | null>(null);
   const [emergencyToken, setEmergencyToken] = useState<string | null>(null);
   const [medicalHistory, setMedicalHistory] = useState<MedHistoryEntry[]>([]);
   const countingRef = useRef(true);
   const hasSentRef = useRef(false);
+
+  const sentRef = useRef(false);
+  const activeSosIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    sentRef.current = sent;
+  }, [sent]);
+
+  useEffect(() => {
+    activeSosIdRef.current = activeSosId;
+  }, [activeSosId]);
 
   const fetchData = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -122,17 +135,60 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
     setMedicalHistory((historyRes.data ?? []) as MedHistoryEntry[]);
 
     // Store latest health data for the SOS message
-    (window as any).__sosHealthData = {
+    setHealthData({
       activity: activityRes.data,
       wellness: wellnessRes.data,
-    };
+    });
 
     if (navigator.geolocation) {
+      setGpsStatus('acquiring');
       navigator.geolocation.getCurrentPosition(
-        (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => setLocation(null),
-        { timeout: 5000 }
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setLocation({ lat, lng });
+          setGpsStatus('secured');
+
+          // If SOS has already been sent, patch the DB and send a follow-up WhatsApp/SMS
+          if (sentRef.current && activeSosIdRef.current) {
+            console.log("GPS resolved late. Patching SOS event:", activeSosIdRef.current);
+            await supabase
+              .from('sos_events')
+              .update({ latitude: lat, longitude: lng })
+              .eq('id', activeSosIdRef.current);
+
+            // Send follow-up details to guardians
+            const currentUserName = profileRes.data?.full_name || "User";
+            const updateMessage = `📍 UPDATE: Live location secured for ${currentUserName}: https://maps.google.com/?q=${lat},${lng}`;
+            
+            const { data: guardianRows } = await supabase
+              .from("guardians")
+              .select("guardian_email, guardian_phone")
+              .eq("user_id", uid)
+              .eq("status", "accepted");
+
+            const guardian_emails = (guardianRows ?? []).map((g: any) => g.guardian_email).filter(Boolean);
+            const guardian_phones = (guardianRows ?? []).map((g: any) => g.guardian_phone).filter(Boolean);
+
+            await supabase.functions.invoke("send-sos-alert", {
+              body: {
+                user_id: uid,
+                message: updateMessage,
+                guardian_emails,
+                guardian_phones,
+                user_name: currentUserName,
+              },
+            });
+          }
+        },
+        () => {
+          setLocation(null);
+          setGpsStatus('failed');
+        },
+        { timeout: 15000, enableHighAccuracy: true }
       );
+    } else {
+      setGpsStatus('failed');
     }
   }, [session?.user?.id]);
 
@@ -164,7 +220,6 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
   };
 
   const buildSOSMessage = useCallback(() => {
-    const healthData = (window as any).__sosHealthData;
     let msg = isPracticeMode ? `🧪 PRACTICE SOS ALERT from ${userName}!` : `🚨 SOS ALERT from ${userName}!`;
     if (userPhone) msg += `\n📞 Phone: ${userPhone}`;
     if (userDob) msg += `\n🎂 Age: ${Math.floor((Date.now() - new Date(userDob).getTime()) / 31557600000)} years`;
@@ -192,7 +247,7 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
     }
     msg += "\n\n⚠️ Please respond immediately!";
     return msg;
-  }, [userName, userPhone, userDob, location, medical]);
+  }, [userName, userPhone, userDob, location, medical, isPracticeMode, healthData]);
 
   const getWhatsAppLink = useCallback((phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, "");
@@ -852,6 +907,21 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
             <p className="text-sm text-muted-foreground mt-1">
               {sending ? "Sending alerts..." : "Sending SOS to all guardians & doctor"}
             </p>
+            {gpsStatus === 'acquiring' && (
+              <Badge variant="outline" className="mt-2 border-warning text-warning animate-pulse flex items-center gap-1 mx-auto w-fit">
+                <Loader2 className="w-3 h-3 animate-spin" /> 📍 Getting location...
+              </Badge>
+            )}
+            {gpsStatus === 'secured' && (
+              <Badge variant="outline" className="mt-2 border-success text-success flex items-center gap-1 mx-auto w-fit">
+                📍 Location secured
+              </Badge>
+            )}
+            {gpsStatus === 'failed' && (
+              <Badge variant="outline" className="mt-2 border-destructive text-destructive flex items-center gap-1 mx-auto w-fit">
+                📍 Location unavailable — sending without coordinates
+              </Badge>
+            )}
           </div>
           <Progress value={((10 - timeLeft) / 10) * 100} className="h-2 [&>div]:bg-sos" />
           <Button
@@ -880,7 +950,17 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
         <div className="mt-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">What will be shared:</h3>
           <div className="space-y-2 text-sm">
-            <InfoRow icon={<MapPin className="w-4 h-4 text-success" />} label="Live Location" value={location ? "✓ Captured" : "Acquiring..."} />
+            <InfoRow 
+              icon={<MapPin className="w-4 h-4 text-success" />} 
+              label="Live Location" 
+              value={
+                gpsStatus === 'secured' 
+                  ? "✓ Captured" 
+                  : gpsStatus === 'acquiring' 
+                    ? "Acquiring..." 
+                    : "Unavailable"
+              } 
+            />
             <InfoRow icon={<Droplets className="w-4 h-4 text-sos" />} label="Blood Type" value={medical.bloodGroup || "Not set"} />
             <InfoRow icon={<AlertCircle className="w-4 h-4 text-destructive/70" />} label="Allergies" value={medical.allergies.length > 0 ? medical.allergies.join(", ") : "None"} />
             <InfoRow icon={<Pill className="w-4 h-4 text-primary" />} label="Conditions & Meds" value={[...medical.conditions, ...medical.medications].join(", ") || "None"} />
