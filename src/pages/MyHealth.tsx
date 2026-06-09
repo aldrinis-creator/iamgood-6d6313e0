@@ -120,6 +120,8 @@ const MyHealth = () => {
   const handleToolClick = (label: string) => {
     if (label === "Vault") {
       gate("Vault", () => navigate("/medical-vault"));
+    } else if (label === "Financial Healthcare") {
+      navigate("/financial-health");
     } else {
       gate(label, () => setSelectedTool(label));
     }
