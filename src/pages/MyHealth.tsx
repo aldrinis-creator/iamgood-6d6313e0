@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Receipt } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Receipt, Wallet } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +34,7 @@ const healthTools = [
   { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
   { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
+  { icon: Wallet, label: "Financial Healthcare", color: "bg-success/10 text-success" },
 ];
 
 const healthToolsSubItems = [
@@ -119,6 +120,8 @@ const MyHealth = () => {
   const handleToolClick = (label: string) => {
     if (label === "Vault") {
       gate("Vault", () => navigate("/medical-vault"));
+    } else if (label === "Financial Healthcare") {
+      navigate("/financial-health");
     } else {
       gate(label, () => setSelectedTool(label));
     }

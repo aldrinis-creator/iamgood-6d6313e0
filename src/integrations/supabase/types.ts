@@ -989,6 +989,57 @@ export type Database = {
         }
         Relationships: []
       }
+      healthcare_expenses: {
+        Row: {
+          ai_extracted: Json | null
+          amount: number
+          bill_image_path: string | null
+          category: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at: string
+          created_by: string
+          currency: string
+          expense_date: string
+          id: string
+          merchant: string | null
+          notes: string | null
+          source: Database["public"]["Enums"]["healthcare_expense_source"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_extracted?: Json | null
+          amount: number
+          bill_image_path?: string | null
+          category?: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at?: string
+          created_by: string
+          currency?: string
+          expense_date?: string
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["healthcare_expense_source"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_extracted?: Json | null
+          amount?: number
+          bill_image_path?: string | null
+          category?: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at?: string
+          created_by?: string
+          currency?: string
+          expense_date?: string
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["healthcare_expense_source"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       jan_aushadhi_products: {
         Row: {
           category: string | null
@@ -2659,6 +2710,7 @@ export type Database = {
         Args: { p_notifications: Json }
         Returns: undefined
       }
+      is_accepted_guardian_of: { Args: { _user_id: string }; Returns: boolean }
       link_guardian_user_id: { Args: never; Returns: undefined }
       lookup_emergency_token: {
         Args: { _token: string }
@@ -2703,6 +2755,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "guardian"
+      healthcare_expense_category:
+        | "medication"
+        | "doctor_fees"
+        | "insurance"
+        | "diagnostics"
+        | "equipment_caregiving"
+        | "other"
+      healthcare_expense_source: "manual" | "voice" | "bill_scan"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2831,6 +2891,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user", "guardian"],
+      healthcare_expense_category: [
+        "medication",
+        "doctor_fees",
+        "insurance",
+        "diagnostics",
+        "equipment_caregiving",
+        "other",
+      ],
+      healthcare_expense_source: ["manual", "voice", "bill_scan"],
     },
   },
 } as const
