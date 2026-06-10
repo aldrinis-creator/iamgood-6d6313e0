@@ -121,7 +121,7 @@ const MyHealth = () => {
     if (label === "Vault") {
       gate("Vault", () => navigate("/medical-vault"));
     } else if (label === "Financial Healthcare") {
-      navigate("/financial-health");
+      gate("Financial Healthcare", () => navigate("/financial-health"));
     } else {
       gate(label, () => setSelectedTool(label));
     }
