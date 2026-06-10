@@ -28,6 +28,9 @@ export const FEATURE_TIERS: Record<string, PlanTier> = {
   "Vitals": "premium",
   "Geofencing": "premium",
   "PDF Export": "premium",
+
+  // Premium Plus tier
+  "Financial Healthcare": "premium-plus",
 };
 
 export const FEATURE_DESCRIPTIONS: Record<string, string> = {
