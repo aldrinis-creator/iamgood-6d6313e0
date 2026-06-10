@@ -80,6 +80,16 @@ const FinancialHealth = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const { plan, loading: planLoading } = useSubscription();
+
+  useEffect(() => {
+    if (planLoading) return;
+    if (!canAccessFeature(plan, "Financial Healthcare")) {
+      toast.info("Financial Healthcare is a Premium Plus feature");
+      navigate("/subscription", { replace: true });
+    }
+  }, [plan, planLoading, navigate]);
+
 
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
