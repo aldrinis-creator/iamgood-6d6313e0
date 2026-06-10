@@ -21,6 +21,8 @@ import AppLayout from "@/components/AppLayout";
 import ReportShareButtons from "@/components/ReportShareButtons";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import { canAccessFeature } from "@/lib/featureGating";
 import {
   ALL_CATEGORIES, CATEGORY_BAR_HSL, CATEGORY_COLOR, CATEGORY_LABEL,
   COMMON_CURRENCIES, ExpenseCategory, formatMoney,
