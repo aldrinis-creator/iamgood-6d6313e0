@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Phone, ChevronDown, ChevronUp, ShieldAlert, Search, WifiOff, Wifi, Printer } from "lucide-react";
+import { Phone, ChevronDown, ChevronUp, ShieldAlert, Search, WifiOff, Wifi, Printer, Droplet, ChevronRight } from "lucide-react";
 import { firstAidGuides, type FirstAidGuide } from "@/data/firstAidGuides";
 import { printReport } from "@/lib/reportPdf";
 
