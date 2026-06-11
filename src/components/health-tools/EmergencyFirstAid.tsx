@@ -55,6 +55,23 @@ const EmergencyFirstAid = () => {
         </CardContent>
       </Card>
 
+      {/* Need Blood? — geo-localized blood bank directory */}
+      <button
+        type="button"
+        onClick={() => navigate("/blood-banks")}
+        className="w-full rounded-lg bg-red-600 hover:bg-red-700 text-white p-4 flex items-center gap-3 shadow-sm transition-colors text-left"
+      >
+        <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+          <Droplet className="w-5 h-5 fill-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold">Need Blood?</p>
+          <p className="text-xs text-white/85">Find the nearest blood banks & call instantly</p>
+        </div>
+        <ChevronRight className="w-5 h-5 shrink-0" />
+      </button>
+
+
       {/* Offline indicator + search */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
