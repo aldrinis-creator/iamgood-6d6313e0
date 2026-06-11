@@ -126,10 +126,10 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
         <h2 className="text-lg font-semibold text-foreground">Verify your phone</h2>
         <p className="text-sm text-muted-foreground mt-1">
           {sendState === "sending" && "Sending code…"}
-          {sendState === "sent" && <>Enter the 6-digit code sent to <strong>{phone}</strong></>}
-          {sendState === "failed" && "Couldn't deliver SMS. Try resend below."}
+          {sendState === "sent" && <>Enter the 6-digit code sent to <strong>{phone}</strong> via SMS and WhatsApp</>}
+          {sendState === "failed" && "Couldn't deliver code. Try resend below."}
           {sendState === "rate_limited" && "Too many attempts. Wait 10 minutes."}
-          {sendState === "idle" && <>Enter the 6-digit code sent to <strong>{phone}</strong></>}
+          {sendState === "idle" && <>Enter the 6-digit code sent to <strong>{phone}</strong> via SMS and WhatsApp</>}
         </p>
       </div>
 
