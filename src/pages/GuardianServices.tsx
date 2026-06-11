@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart, ShieldCheck } from "lucide-react";
+import { Ambulance, Calendar, Pill, Lock, Stethoscope, FileText, Heart, ShieldCheck, Droplet } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +13,7 @@ import VaultClaimCard from "@/components/vault/VaultClaimCard";
 import { useVaultClaimStatus } from "@/components/vault/useVaultClaimStatus";
 
 const GuardianServices = () => {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const { selectedWard } = useGuardianWard();
   const wardUserId = selectedWard?.userId || null;
@@ -71,6 +73,14 @@ const GuardianServices = () => {
       color: "text-primary",
       action: () => setShowApptDialog(true),
       available: !!wardUserId,
+    },
+    {
+      icon: Droplet,
+      title: "Need Blood?",
+      desc: `Find nearest blood banks for ${wardName}`,
+      color: "text-red-600",
+      action: () => navigate("/blood-banks"),
+      available: true,
     },
   ];
 

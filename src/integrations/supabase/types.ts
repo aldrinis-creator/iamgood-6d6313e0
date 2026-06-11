@@ -398,6 +398,60 @@ export type Database = {
         }
         Relationships: []
       }
+      blood_banks: {
+        Row: {
+          address: string | null
+          category: string | null
+          created_at: string
+          district: string | null
+          email: string | null
+          geocode_status: string
+          geocoded_at: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          phone: string | null
+          source_sno: number | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          geocode_status?: string
+          geocoded_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          phone?: string | null
+          source_sno?: number | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          geocode_status?: string
+          geocoded_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          phone?: string | null
+          source_sno?: number | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       care_journal: {
         Row: {
           created_at: string
@@ -1835,6 +1889,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          blood_group: string | null
           created_at: string
           date_of_birth: string | null
           emergency_contact_name: string | null
@@ -1854,6 +1909,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
           emergency_contact_name?: string | null
@@ -1873,6 +1929,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
           emergency_contact_name?: string | null

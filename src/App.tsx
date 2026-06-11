@@ -35,6 +35,7 @@ const GuardianMessages = lazy(() => import("./pages/GuardianMessages"));
 const GuardianAppointments = lazy(() => import("./pages/GuardianAppointments"));
 const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
 const FinancialHealth = lazy(() => import("./pages/FinancialHealth"));
+const BloodBanks = lazy(() => import("./pages/BloodBanks"));
 
 // Lazy-loaded heavy / rarely-used routes
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="/help" element={<HelpRouter />} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
+                <Route path="/blood-banks" element={<ProtectedRoute><GuardianWardProvider><BloodBanks /></GuardianWardProvider></ProtectedRoute>} />
                 {/* Public routes */}
                 <Route path="/e/:token" element={<EmergencyProfile />} />
                 <Route path="/j/:token" element={<PublicJourneyView />} />
