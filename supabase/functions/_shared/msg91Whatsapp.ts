@@ -12,6 +12,8 @@ export type WaComponents = {
   body_1?: string;
   body_2?: string;
   body_3?: string;
+  /** URL button variable (e.g. OTP code for copy-code button templates). */
+  button_1_url?: string;
 };
 
 export type WaRecipient = {
