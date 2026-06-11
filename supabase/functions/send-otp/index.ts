@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
       ? sendWhatsAppTemplate({
           templateName: waTemplate,
           languageCode: waLanguage,
-          recipients: [{ to: [phone], components: { body_1: otpCode } }],
+          recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
         })
       : Promise.resolve({ ok: false, status: 0, body: { skipped: "no template" } });
 
