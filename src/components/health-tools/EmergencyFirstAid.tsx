@@ -15,6 +15,7 @@ const guideToMarkdown = (g: FirstAidGuide) => {
 };
 
 const EmergencyFirstAid = () => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
