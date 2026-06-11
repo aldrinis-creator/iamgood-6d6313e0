@@ -198,8 +198,8 @@ Deno.serve(async (req) => {
       recipients: [{ mobiles: phone, var1: otpCode }],
     };
 
-    const waTemplate = Deno.env.get("MSG91_WA_OTP_TEMPLATE_NAME");
-    const waLanguage = Deno.env.get("MSG91_WA_OTP_LANGUAGE") ?? "en_US";
+    const waTemplate = Deno.env.get("MSG91_WA_OTP_TEMPLATE_NAME") ?? "otp";
+    const waLanguage = Deno.env.get("MSG91_WA_OTP_LANGUAGE") ?? "en";
 
     console.log(`[send-otp] Dispatching SMS + WhatsApp for phone=${phone} (wa=${!!waTemplate})`);
 
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
       ? sendWhatsAppTemplate({
           templateName: waTemplate,
           languageCode: waLanguage,
-          recipients: [{ to: [phone], components: { body_1: otpCode } }],
+          recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
         })
       : Promise.resolve({ ok: false, status: 0, body: { skipped: "no template" } });
 
