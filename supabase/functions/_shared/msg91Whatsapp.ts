@@ -53,10 +53,11 @@ export async function sendWhatsAppTemplate(opts: {
   }
 
   const componentsToObject = (c: WaComponents) => {
-    const out: Record<string, { type: "text"; value: string }> = {};
+    const out: Record<string, any> = {};
     if (c.body_1 !== undefined) out.body_1 = { type: "text", value: c.body_1 };
     if (c.body_2 !== undefined) out.body_2 = { type: "text", value: c.body_2 };
     if (c.body_3 !== undefined) out.body_3 = { type: "text", value: c.body_3 };
+    if (c.button_1_url !== undefined) out.button_1 = { subtype: "url", type: "text", value: c.button_1_url };
     return out;
   };
 
