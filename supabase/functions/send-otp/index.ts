@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { sendWhatsAppTemplate } from "../_shared/msg91Whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -191,14 +192,18 @@ Deno.serve(async (req) => {
     const otpCode = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 
-    // Send via MSG91 Flow API
+    // Send via MSG91 Flow API (SMS) + WhatsApp in parallel
     const flowPayload = {
       template_id: templateId,
       recipients: [{ mobiles: phone, var1: otpCode }],
     };
 
-    console.log(`[send-otp] Calling MSG91 Flow API for phone=${phone}`);
-    const res = await fetch(FLOW_URL, {
+    const waTemplate = Deno.env.get("MSG91_WA_OTP_TEMPLATE_NAME");
+    const waLanguage = Deno.env.get("MSG91_WA_OTP_LANGUAGE") ?? "en_US";
+
+    console.log(`[send-otp] Dispatching SMS + WhatsApp for phone=${phone} (wa=${!!waTemplate})`);
+
+    const smsPromise = fetch(FLOW_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -206,33 +211,84 @@ Deno.serve(async (req) => {
         accept: "application/json",
       },
       body: JSON.stringify(flowPayload),
+    }).then(async (res) => {
+      const text = await res.text();
+      let parsed: any;
+      try { parsed = JSON.parse(text); } catch { parsed = { type: "error", message: text }; }
+      return { status: res.status, text, result: parsed };
     });
 
-    const resultText = await res.text();
-    console.log(`[send-otp] MSG91 Flow response (${res.status}):`, resultText);
+    const waPromise = waTemplate
+      ? sendWhatsAppTemplate({
+          templateName: waTemplate,
+          languageCode: waLanguage,
+          recipients: [{ to: [phone], components: { body_1: otpCode } }],
+        })
+      : Promise.resolve({ ok: false, status: 0, body: { skipped: "no template" } });
 
-    let result: any;
-    try { result = JSON.parse(resultText); } catch { result = { type: "error", message: resultText }; }
+    const [smsSettled, waSettled] = await Promise.allSettled([smsPromise, waPromise]);
 
-    const success = result.type === "success";
-    const requestId = result.request_id || null;
+    // ── SMS result ──
+    let smsSuccess = false;
+    let smsRequestId: string | null = null;
+    let smsErrorMsg: string | undefined;
+    let smsRaw: any = null;
+    if (smsSettled.status === "fulfilled") {
+      smsRaw = smsSettled.value.result;
+      smsSuccess = smsRaw?.type === "success";
+      smsRequestId = smsRaw?.request_id || null;
+      if (!smsSuccess) smsErrorMsg = smsRaw?.message || smsSettled.value.text;
+      console.log(`[send-otp] SMS (${smsSettled.value.status}):`, smsSettled.value.text);
+    } else {
+      smsErrorMsg = String(smsSettled.reason);
+      console.error("[send-otp] SMS threw:", smsSettled.reason);
+    }
 
+    // ── WhatsApp result ──
+    let waSuccess = false;
+    let waStatus: "sent" | "failed" | "skipped" = "skipped";
+    let waErrorMsg: string | undefined;
+    if (!waTemplate) {
+      waStatus = "skipped";
+    } else if (waSettled.status === "fulfilled") {
+      waSuccess = waSettled.value.ok;
+      waStatus = waSuccess ? "sent" : "failed";
+      if (!waSuccess) waErrorMsg = JSON.stringify(waSettled.value.body);
+    } else {
+      waStatus = "failed";
+      waErrorMsg = String(waSettled.reason);
+    }
+
+    // Persist OTP hash + log per-channel
     await logOtpEvent(
       admin,
       phone,
       action,
-      requestId,
-      success ? "sent" : "failed",
-      success ? undefined : (result.message || resultText),
-      success ? otpCode : undefined,
-      success ? expiresAt : undefined
+      smsRequestId || undefined,
+      smsSuccess ? "sent" : "failed",
+      smsSuccess ? undefined : smsErrorMsg,
+      (smsSuccess || waSuccess) ? otpCode : undefined,
+      (smsSuccess || waSuccess) ? expiresAt : undefined,
     );
 
-    if (!success) {
-      return jsonResponse({ success: false, result, error: result.message || "SMS delivery failed" }, 400);
+    if (waTemplate) {
+      await logOtpEvent(
+        admin,
+        phone,
+        `${action}_wa`,
+        undefined,
+        waSuccess ? "sent" : "failed",
+        waSuccess ? undefined : waErrorMsg,
+      );
     }
 
-    return jsonResponse({ success: true, result });
+    const channels = { sms: smsSuccess ? "sent" : "failed", whatsapp: waStatus };
+
+    if (!smsSuccess && !waSuccess) {
+      return jsonResponse({ success: false, channels, error: smsErrorMsg || waErrorMsg || "OTP delivery failed" }, 400);
+    }
+
+    return jsonResponse({ success: true, channels, result: smsRaw });
   } catch (err) {
     console.error("[send-otp] Unhandled error:", err);
     return jsonResponse({ error: String(err) }, 500);
