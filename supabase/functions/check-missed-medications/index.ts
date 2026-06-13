@@ -34,6 +34,71 @@ Deno.serve(async (req) => {
     const todayStartUTC = new Date(istMidnight.getTime() - istOffsetMs);
     const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
 
+    // ── Server-side medication missed pre-population ──
+    // Get all active medications
+    const { data: activeMeds, error: medError } = await supabase
+      .from("medications")
+      .select("id, user_id, name, schedule_times")
+      .eq("alarm_enabled", true);
+
+    if (medError) {
+      console.error("Error fetching medications for pre-population:", medError);
+    } else if (activeMeds && activeMeds.length > 0) {
+      // Get all existing logs for today
+      const { data: existingLogs, error: logsError } = await supabase
+        .from("medication_logs")
+        .select("medication_id, scheduled_at")
+        .gte("scheduled_at", todayStartUTC.toISOString())
+        .lte("scheduled_at", todayEndUTC.toISOString());
+
+      if (logsError) {
+        console.error("Error fetching medication logs for pre-population:", logsError);
+      } else {
+        const existingLogsMap = new Set<string>();
+        if (existingLogs) {
+          for (const log of existingLogs) {
+            const d = new Date(log.scheduled_at);
+            const key = `${log.medication_id}-${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}-${d.getUTCMinutes()}`;
+            existingLogsMap.add(key);
+          }
+        }
+
+        const logsToInsert = [];
+        for (const med of activeMeds) {
+          for (const timeStr of med.schedule_times) {
+            const [h, m] = timeStr.split(":").map(Number);
+            const slotIST = new Date(istMidnight);
+            slotIST.setUTCHours(h, m || 0, 0, 0);
+            const slotUTC = new Date(slotIST.getTime() - istOffsetMs);
+
+            if (slotUTC < graceCutoff) {
+              const key = `${med.id}-${slotUTC.getUTCFullYear()}-${slotUTC.getUTCMonth()}-${slotUTC.getUTCDate()}-${slotUTC.getUTCHours()}-${slotUTC.getUTCMinutes()}`;
+              if (!existingLogsMap.has(key)) {
+                logsToInsert.push({
+                  medication_id: med.id,
+                  user_id: med.user_id,
+                  scheduled_at: slotUTC.toISOString(),
+                  status: "missed",
+                });
+                existingLogsMap.add(key);
+              }
+            }
+          }
+        }
+
+        if (logsToInsert.length > 0) {
+          const { error: insertErr } = await supabase
+            .from("medication_logs")
+            .insert(logsToInsert);
+          if (insertErr) {
+            console.error("Error inserting missed medication logs on server side:", insertErr);
+          } else {
+            console.log(`Successfully logged ${logsToInsert.length} missed medications on server side`);
+          }
+        }
+      }
+    }
+
     const { data: logs, error } = await supabase
       .from("medication_logs")
       .select("id, user_id, scheduled_at, medication:medications(name)")

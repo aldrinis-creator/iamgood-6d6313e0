@@ -130,9 +130,8 @@ Deno.serve(async (req) => {
     const vapidSubject = "mailto:alerts@check-in.app";
 
     const now = new Date();
-    // 60-minute grace: users get a full hour (with 3 client-side reminders)
-    // before the server escalates to guardians.
-    const graceMs = 60 * 60 * 1000;
+    // 35-minute grace: matches T+35 escalation
+    const graceMs = 35 * 60 * 1000;
     const graceCutoff = new Date(now.getTime() - graceMs);
     const veryLateCutoff = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -143,6 +142,52 @@ Deno.serve(async (req) => {
     istMidnight.setUTCHours(0, 0, 0, 0);
     const todayStartUTC = new Date(istMidnight.getTime() - istOffsetMs); // IST 00:00 in UTC
     const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000 - 1); // IST 23:59:59.999 in UTC
+
+    // ── Server-side check-in pre-population ──
+    // Get all users with 'user' role
+    const { data: userRoles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "user");
+
+    if (rolesError) {
+      console.error("Error fetching user roles for pre-population:", rolesError);
+    } else if (userRoles && userRoles.length > 0) {
+      // Find which slots today have passed the grace period
+      const checkInSlotsToVerify = [];
+      for (const h of [7, 12, 19]) {
+        const slotIST = new Date(istMidnight);
+        slotIST.setUTCHours(h, 0, 0, 0);
+        const slotUTC = new Date(slotIST.getTime() - istOffsetMs);
+        if (slotUTC < graceCutoff) {
+          checkInSlotsToVerify.push(slotUTC);
+        }
+      }
+
+      if (checkInSlotsToVerify.length > 0) {
+        const rowsToUpsert = [];
+        for (const uRole of userRoles) {
+          for (const slot of checkInSlotsToVerify) {
+            rowsToUpsert.push({
+              user_id: uRole.user_id,
+              scheduled_at: slot.toISOString(),
+              status: "pending",
+            });
+          }
+        }
+
+        if (rowsToUpsert.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("check_ins")
+            .upsert(rowsToUpsert, { onConflict: "user_id,scheduled_at", ignoreDuplicates: true });
+          if (upsertError) {
+            console.error("Error upserting server-side pending check-ins:", upsertError);
+          } else {
+            console.log(`Successfully pre-populated ${rowsToUpsert.length} server-side pending check-ins`);
+          }
+        }
+      }
+    }
 
     const { data: pendingCheckIns, error: fetchError } = await supabase
       .from("check_ins")
