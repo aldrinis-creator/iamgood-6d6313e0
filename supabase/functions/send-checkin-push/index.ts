@@ -96,6 +96,15 @@ async function sendPushNotification(
   });
 }
 
+// Three reminder waves, anchored to scheduled_at.
+// Cron runs every minute, so each wave uses a 1-minute window to fire once.
+type Wave = { key: "due" | "t10" | "t30"; title: string; body: string; offsetMin: number };
+const WAVES: Wave[] = [
+  { key: "due", offsetMin: 0,  title: "✅ Check-iN Reminder",        body: "Time to check in! Let your guardians know you're okay." },
+  { key: "t10", offsetMin: 10, title: "⏰ Check-iN still pending",   body: "You haven't checked in yet. Tap to let us know you're okay." },
+  { key: "t30", offsetMin: 30, title: "⚠️ Final Check-iN reminder",  body: "Please check in now — your guardians will be alerted soon." },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -112,98 +121,107 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const now = new Date();
-    const fiveMinLater = new Date(now.getTime() + 5 * 60 * 1000);
+    let totalSent = 0;
+    const waveCounts: Record<string, number> = {};
 
-    // Find pending check-ins due within the next 5 minutes
-    const { data: checkIns, error: ciErr } = await supabase
-      .from("check_ins")
-      .select("id, user_id, scheduled_at")
-      .eq("status", "pending")
-      .gte("scheduled_at", now.toISOString())
-      .lte("scheduled_at", fiveMinLater.toISOString());
+    for (const wave of WAVES) {
+      // Window: scheduled_at in [now - (offsetMin+1)min, now - offsetMin min)
+      // For "due" (offset 0): scheduled_at in [now - 1min, now) — fires the minute it's due.
+      const upper = new Date(now.getTime() - wave.offsetMin * 60 * 1000);
+      const lower = new Date(upper.getTime() - 60 * 1000);
 
-    if (ciErr) {
-      console.error("Error fetching check-ins:", ciErr);
-      return new Response(JSON.stringify({ error: ciErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      const { data: checkIns, error: ciErr } = await supabase
+        .from("check_ins")
+        .select("id, user_id, scheduled_at")
+        .eq("status", "pending")
+        .gte("scheduled_at", lower.toISOString())
+        .lt("scheduled_at", upper.toISOString());
 
-    if (!checkIns || checkIns.length === 0) {
-      return new Response(JSON.stringify({ message: "No check-ins due", sent: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      if (ciErr) {
+        console.error(`[${wave.key}] fetch error:`, ciErr);
+        continue;
+      }
+      if (!checkIns || checkIns.length === 0) {
+        waveCounts[wave.key] = 0;
+        continue;
+      }
 
-    // Get unique user IDs
-    const userIds = [...new Set(checkIns.map((ci: any) => ci.user_id))];
+      const userIds = [...new Set(checkIns.map((ci: any) => ci.user_id))];
 
-    // Filter out users who are paused
-    const { data: settingsData } = await supabase
-      .from("user_settings")
-      .select("user_id, settings")
-      .in("user_id", userIds);
+      // Honor pause / checked-out state
+      const { data: settingsData } = await supabase
+        .from("user_settings")
+        .select("user_id, settings")
+        .in("user_id", userIds);
 
-    const activeUserIds = new Set(userIds);
-    if (settingsData) {
+      const activeUserIds = new Set(userIds);
       const nowMs = now.getTime();
-      for (const row of settingsData) {
-        const settings = row.settings as any;
-        if (settings?.pauseMode && settings.pauseMode !== "active") {
-          let isPaused = true;
-          if (settings.pauseMode === "checked-out" && settings.checkOutConfig) {
-            const expiryStr = settings.checkOutConfig.endsAt || settings.checkOutConfig.endDate;
-            if (expiryStr) {
-              const expiryMs = new Date(expiryStr).getTime();
-              if (expiryMs && expiryMs < nowMs) {
-                isPaused = false;
+      if (settingsData) {
+        for (const row of settingsData) {
+          const settings = row.settings as any;
+          if (settings?.pauseMode && settings.pauseMode !== "active") {
+            let isPaused = true;
+            if (settings.pauseMode === "checked-out" && settings.checkOutConfig) {
+              const expiryStr = settings.checkOutConfig.endsAt || settings.checkOutConfig.endDate;
+              if (expiryStr) {
+                const expiryMs = new Date(expiryStr).getTime();
+                if (expiryMs && expiryMs < nowMs) isPaused = false;
               }
             }
+            if (isPaused) activeUserIds.delete(row.user_id);
           }
-          if (isPaused) activeUserIds.delete(row.user_id);
+          // Respect per-user checkInPush opt-out
+          if (settings?.checkInPush === false) activeUserIds.delete(row.user_id);
         }
       }
-    }
 
-    let sentCount = 0;
+      let waveSent = 0;
+      for (const userId of activeUserIds) {
+        const { data: subs } = await supabase
+          .from("push_subscriptions")
+          .select("endpoint, p256dh, auth")
+          .eq("user_id", userId);
 
-    for (const userId of activeUserIds) {
-      const { data: subs } = await supabase
-        .from("push_subscriptions")
-        .select("endpoint, p256dh, auth")
-        .eq("user_id", userId);
+        if (!subs || subs.length === 0) continue;
 
-      if (!subs || subs.length === 0) continue;
+        const ci = checkIns.find((c: any) => c.user_id === userId);
+        const tag = `checkin-${wave.key}-${ci?.id ?? userId}`;
 
-      const payload = {
-        title: "✅ Check-iN Reminder",
-        body: "Time to check in! Let your guardians know you're okay.",
-        tag: `checkin-${now.getHours()}`,
-        url: "/dashboard",
-        type: "checkin",
-        user_id: userId,
-      };
+        const payload = {
+          title: wave.title,
+          body: wave.body,
+          tag,
+          url: "/dashboard",
+          type: "checkin",
+          wave: wave.key,
+          user_id: userId,
+          requireInteraction: wave.key !== "due",
+        };
 
-      for (const sub of subs) {
-        try {
-          const res = await sendPushNotification(sub, payload, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT);
-          if (res.status === 201 || res.status === 200) {
-            sentCount++;
-          } else if (res.status === 410 || res.status === 404) {
-            await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
-          } else {
-            console.error(`Push failed: ${res.status} ${await res.text()}`);
+        for (const sub of subs) {
+          try {
+            const res = await sendPushNotification(sub, payload, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT);
+            if (res.status === 201 || res.status === 200) {
+              waveSent++;
+            } else if (res.status === 410 || res.status === 404) {
+              await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+            } else {
+              console.error(`[${wave.key}] push failed: ${res.status} ${await res.text()}`);
+            }
+          } catch (err) {
+            console.error(`[${wave.key}] push error:`, err);
           }
-        } catch (err) {
-          console.error("Push error:", err);
         }
       }
+
+      waveCounts[wave.key] = waveSent;
+      totalSent += waveSent;
     }
 
-    return new Response(JSON.stringify({ message: "Done", sent: sentCount }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ message: "Done", sent: totalSent, waves: waveCounts }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
     console.error("Error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
