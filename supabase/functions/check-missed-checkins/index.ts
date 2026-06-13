@@ -144,15 +144,28 @@ Deno.serve(async (req) => {
     const todayEndUTC = new Date(todayStartUTC.getTime() + 24 * 60 * 60 * 1000 - 1); // IST 23:59:59.999 in UTC
 
     // ── Server-side check-in pre-population ──
-    // Get all users with 'user' role
-    const { data: userRoles, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .eq("role", "user");
+    // Get all users with 'user' role from both profiles and user_roles
+    const [profilesRes, rolesRes] = await Promise.all([
+      supabase.from("profiles").select("id").eq("role", "user"),
+      supabase.from("user_roles").select("user_id").eq("role", "user"),
+    ]);
 
-    if (rolesError) {
-      console.error("Error fetching user roles for pre-population:", rolesError);
-    } else if (userRoles && userRoles.length > 0) {
+    const userIdsSet = new Set<string>();
+    if (profilesRes.data) {
+      profilesRes.data.forEach((p: any) => userIdsSet.add(p.id));
+    }
+    if (rolesRes.data) {
+      rolesRes.data.forEach((r: any) => userIdsSet.add(r.user_id));
+    }
+
+    if (profilesRes.error) {
+      console.error("Error fetching profiles for pre-population:", profilesRes.error);
+    }
+    if (rolesRes.error) {
+      console.error("Error fetching user roles for pre-population:", rolesRes.error);
+    }
+
+    if (userIdsSet.size > 0) {
       // Find which slots today have passed the grace period
       const checkInSlotsToVerify = [];
       for (const h of [7, 12, 19]) {
@@ -166,10 +179,10 @@ Deno.serve(async (req) => {
 
       if (checkInSlotsToVerify.length > 0) {
         const rowsToUpsert = [];
-        for (const uRole of userRoles) {
+        for (const uId of userIdsSet) {
           for (const slot of checkInSlotsToVerify) {
             rowsToUpsert.push({
-              user_id: uRole.user_id,
+              user_id: uId,
               scheduled_at: slot.toISOString(),
               status: "pending",
             });
