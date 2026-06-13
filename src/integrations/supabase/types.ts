@@ -398,6 +398,60 @@ export type Database = {
         }
         Relationships: []
       }
+      blood_banks: {
+        Row: {
+          address: string | null
+          category: string | null
+          created_at: string
+          district: string | null
+          email: string | null
+          geocode_status: string
+          geocoded_at: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          phone: string | null
+          source_sno: number | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          category?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          geocode_status?: string
+          geocoded_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          phone?: string | null
+          source_sno?: number | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          category?: string | null
+          created_at?: string
+          district?: string | null
+          email?: string | null
+          geocode_status?: string
+          geocoded_at?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          phone?: string | null
+          source_sno?: number | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       care_journal: {
         Row: {
           created_at: string
@@ -984,6 +1038,57 @@ export type Database = {
           family_doctor_name?: string | null
           family_doctor_phone?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      healthcare_expenses: {
+        Row: {
+          ai_extracted: Json | null
+          amount: number
+          bill_image_path: string | null
+          category: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at: string
+          created_by: string
+          currency: string
+          expense_date: string
+          id: string
+          merchant: string | null
+          notes: string | null
+          source: Database["public"]["Enums"]["healthcare_expense_source"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_extracted?: Json | null
+          amount: number
+          bill_image_path?: string | null
+          category?: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at?: string
+          created_by: string
+          currency?: string
+          expense_date?: string
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["healthcare_expense_source"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_extracted?: Json | null
+          amount?: number
+          bill_image_path?: string | null
+          category?: Database["public"]["Enums"]["healthcare_expense_category"]
+          created_at?: string
+          created_by?: string
+          currency?: string
+          expense_date?: string
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          source?: Database["public"]["Enums"]["healthcare_expense_source"]
           updated_at?: string
           user_id?: string
         }
@@ -1784,6 +1889,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          blood_group: string | null
           created_at: string
           date_of_birth: string | null
           emergency_contact_name: string | null
@@ -1803,6 +1909,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
           emergency_contact_name?: string | null
@@ -1822,6 +1929,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
           emergency_contact_name?: string | null
@@ -2659,6 +2767,7 @@ export type Database = {
         Args: { p_notifications: Json }
         Returns: undefined
       }
+      is_accepted_guardian_of: { Args: { _user_id: string }; Returns: boolean }
       link_guardian_user_id: { Args: never; Returns: undefined }
       lookup_emergency_token: {
         Args: { _token: string }
@@ -2703,6 +2812,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "guardian"
+      healthcare_expense_category:
+        | "medication"
+        | "doctor_fees"
+        | "insurance"
+        | "diagnostics"
+        | "equipment_caregiving"
+        | "other"
+      healthcare_expense_source: "manual" | "voice" | "bill_scan"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2831,6 +2948,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user", "guardian"],
+      healthcare_expense_category: [
+        "medication",
+        "doctor_fees",
+        "insurance",
+        "diagnostics",
+        "equipment_caregiving",
+        "other",
+      ],
+      healthcare_expense_source: ["manual", "voice", "bill_scan"],
     },
   },
 } as const

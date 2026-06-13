@@ -28,6 +28,9 @@ export const FEATURE_TIERS: Record<string, PlanTier> = {
   "Vitals": "premium",
   "Geofencing": "premium",
   "PDF Export": "premium",
+
+  // Premium Plus tier
+  "Financial Healthcare": "premium-plus",
 };
 
 export const FEATURE_DESCRIPTIONS: Record<string, string> = {
@@ -48,6 +51,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   "Services": "Access nearby health services and facilities.",
   "Geofencing": "Set geofence alerts for route deviation monitoring during journeys.",
   "PDF Export": "Export and share health reports as PDF documents.",
+  "Financial Healthcare": "Track healthcare expenses with voice notes, AI bill scanning, and shareable PDF reports.",
   "Guardian Limit": "Add more guardians to your safety network.",
 };
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Phone, ChevronDown, ChevronUp, ShieldAlert, Search, WifiOff, Wifi, Printer } from "lucide-react";
+import { Phone, ChevronDown, ChevronUp, ShieldAlert, Search, WifiOff, Wifi, Printer, Droplet, ChevronRight } from "lucide-react";
 import { firstAidGuides, type FirstAidGuide } from "@/data/firstAidGuides";
 import { printReport } from "@/lib/reportPdf";
 
@@ -14,6 +15,7 @@ const guideToMarkdown = (g: FirstAidGuide) => {
 };
 
 const EmergencyFirstAid = () => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
@@ -52,6 +54,23 @@ const EmergencyFirstAid = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Need Blood? — geo-localized blood bank directory */}
+      <button
+        type="button"
+        onClick={() => navigate("/blood-banks")}
+        className="w-full rounded-lg bg-red-600 hover:bg-red-700 text-white p-4 flex items-center gap-3 shadow-sm transition-colors text-left"
+      >
+        <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+          <Droplet className="w-5 h-5 fill-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-bold">Need Blood?</p>
+          <p className="text-xs text-white/85">Find the nearest blood banks & call instantly</p>
+        </div>
+        <ChevronRight className="w-5 h-5 shrink-0" />
+      </button>
+
 
       {/* Offline indicator + search */}
       <div className="flex items-center gap-2">

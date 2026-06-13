@@ -34,6 +34,8 @@ const EmergencyProfile = lazy(() => import("./pages/EmergencyProfile"));
 const GuardianMessages = lazy(() => import("./pages/GuardianMessages"));
 const GuardianAppointments = lazy(() => import("./pages/GuardianAppointments"));
 const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
+const FinancialHealth = lazy(() => import("./pages/FinancialHealth"));
+const BloodBanks = lazy(() => import("./pages/BloodBanks"));
 
 // Lazy-loaded heavy / rarely-used routes
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -89,6 +91,7 @@ const App = () => (
                 {/* User-only routes */}
                 <Route path="/dashboard" element={<UserRoute><UserDashboard /></UserRoute>} />
                 <Route path="/my-health" element={<UserRoute><MyHealth /></UserRoute>} />
+                <Route path="/financial-health" element={<UserRoute><FinancialHealth /></UserRoute>} />
                 <Route path="/medical-vault" element={<UserRoute><MedicalVault /></UserRoute>} />
                 <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />
                 <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />
@@ -110,6 +113,7 @@ const App = () => (
                 <Route path="/help" element={<HelpRouter />} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
+                <Route path="/blood-banks" element={<ProtectedRoute><GuardianWardProvider><BloodBanks /></GuardianWardProvider></ProtectedRoute>} />
                 {/* Public routes */}
                 <Route path="/e/:token" element={<EmergencyProfile />} />
                 <Route path="/j/:token" element={<PublicJourneyView />} />
