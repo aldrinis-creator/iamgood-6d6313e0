@@ -332,7 +332,7 @@ const CheckInCard = () => {
     const newStatus = isLate ? "late" : "responded";
 
     // Update ALL pending or missed check-ins for this user + scheduled_at
-    const { error } = await supabase
+    let updateResult = await supabase
       .from("check_ins")
       .update({
         status: newStatus,
@@ -343,12 +343,34 @@ const CheckInCard = () => {
       .eq("scheduled_at", scheduledAt.toISOString())
       .in("status", ["pending", "missed"]);
 
+    let error = updateResult.error;
+    let finalStatus = newStatus;
+
+    // Fallback: If DB check constraint doesn't allow 'late', use 'responded' and add a note
+    if (error && newStatus === "late") {
+      console.warn("Failed to update status to 'late', falling back to 'responded':", error);
+      const fallbackResult = await supabase
+        .from("check_ins")
+        .update({
+          status: "responded",
+          response: "ok",
+          notes: "Late check-in",
+          responded_at: new Date().toISOString(),
+        })
+        .eq("user_id", session.user.id)
+        .eq("scheduled_at", scheduledAt.toISOString())
+        .in("status", ["pending", "missed"]);
+      
+      error = fallbackResult.error;
+      finalStatus = "responded";
+    }
+
     if (error) {
       console.error("Failed to check in:", error);
       toast.error("Check-in failed. Please try again.");
     } else {
       setCheckedIn(true);
-      setCheckedInStatus(newStatus);
+      setCheckedInStatus(finalStatus);
       toast.success(isLate ? "Late Check-in recorded! Guardians notified." : "Check-in recorded! Your guardians have been notified.");
       import("canvas-confetti").then((module) => {
         const confetti = module.default;
