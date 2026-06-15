@@ -21,7 +21,30 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Auth: accept cron (service-role bearer) OR a valid user JWT (client escalation fallback)
+    const authHeader = req.headers.get("Authorization") || "";
+    const isCron = authHeader === `Bearer ${serviceRoleKey}`;
+    if (!isCron) {
+      const token = authHeader.replace(/^Bearer\s+/i, "");
+      if (!token) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
+      const { data: userData, error: userErr } = await authClient.auth.getUser(token);
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
 
     const now = new Date();
     const graceCutoff = new Date(now.getTime() - 60 * 60 * 1000); // T+60m
