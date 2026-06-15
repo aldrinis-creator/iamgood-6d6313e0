@@ -31,7 +31,21 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Require an authenticated user to prevent coupon code enumeration
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) {
+      return jsonRes({ error: "Unauthorized" }, 401);
+    }
+    const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
+    const { data: userData, error: userErr } = await authClient.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return jsonRes({ error: "Unauthorized" }, 401);
+    }
+
     const { code, plan_type, billing_cycle } = await req.json();
+
 
     if (!code || !plan_type || !billing_cycle) {
       return jsonRes({ valid: false, reason: "Missing required fields" }, 400);
