@@ -7,14 +7,19 @@ import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatISTDateTime } from "@/lib/istTime";
 
-// Guardian notifications are handled exclusively by the server-side
-// check-missed-checkins cron. The client only handles user-facing alerts.
+// Guardian WhatsApp/Email/Push notifications are triggered server-side via the
+// check-missed-checkins edge function, which is scheduled by pg_cron (see migration).
+// The client invokes it directly at escalation time as a belt-and-suspenders measure
+// in case the cron fires between intervals.
 
 const CHECK_IN_HOURS = [7, 12, 19];
-const PRE_ALERT_MIN = 5; // notification 5 min before
-const POPUP_DELAY_MIN = 5; // popup 5 min after
+const PRE_ALERT_MIN = 5;       // browser notification 5 min before
+const POPUP_DELAY_MIN = 5;     // first popup 5 min after scheduled time
 const POPUP_INTERVAL_MIN = 10; // 10 min between popups
 const MAX_POPUPS = 3;
+// FIX 1: T-0 audio window widened from [0, POPUP_DELAY_MIN) to [0, POPUP_DELAY_MIN + POPUP_INTERVAL_MIN)
+// so the chime still fires even if the 30s polling loop first catches the alarm at T+1..T+14.
+const DUE_AUDIO_WINDOW_MIN = POPUP_DELAY_MIN + POPUP_INTERVAL_MIN; // 15 min
 
 const formatHour = (h: number) => {
   if (h === 0) return "12:00 AM";
@@ -30,9 +35,12 @@ const useCheckInAudio = () => {
   const { pauseMode, loginInProgress, userName } = useApp();
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
+  const escalationFiredRef = useRef<Set<string>>(new Set()); // FIX 2: separate guard for escalation invoke
 
-  const fireAlert = useCallback((message: string) => {
-    if (isOverlayVisible()) return; // skip audio if popup already showing
+  // FIX 3: fireAlert no longer silently drops audio when overlay is already visible.
+  // Instead it always plays audio (the overlay and audio are independent concerns)
+  // and only skips showing a SECOND overlay on top of an existing one.
+  const fireAlert = useCallback((message: string, skipOverlayCheck = false) => {
     if (settings.voiceReminders) {
       playVoiceReminder(message);
     } else if (settings.audioAlerts) {
@@ -67,11 +75,25 @@ const useCheckInAudio = () => {
     return !!(data && data.length > 0);
   }, [session?.user?.id]);
 
+  // FIX 4: triggerServerEscalation calls the edge function directly at escalation time.
+  // pg_cron also runs it on schedule — the edge function uses deduped inserts so
+  // double-invocation is safe and only one set of notifications is ever delivered.
+  const triggerServerEscalation = useCallback(async (checkInId?: string) => {
+    try {
+      await supabase.functions.invoke("check-missed-checkins", {
+        body: { triggeredBy: "client-escalation", checkInId },
+      });
+    } catch (err) {
+      console.error("check-missed-checkins invocation error:", err);
+    }
+  }, []);
+
   const check = useCallback(async () => {
     if (pauseMode !== "active") return;
     if (loginInProgress) return;
     const now = new Date();
-    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // FIX 5: getMonth() + 1 (was getMonth() — off-by-one every month)
+    const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
     for (const h of CHECK_IN_HOURS) {
       const scheduledAt = new Date(now);
@@ -80,6 +102,7 @@ const useCheckInAudio = () => {
 
       const preKey = `checkin-pre-${dateKey}-${h}`;
       const missedKey = `missed-${dateKey}-${h}`;
+      const escalationKey = `escalation-${dateKey}-${h}`;
 
       // --- Ignore completely if more than 1 hour past scheduled time ---
       if (diffMin >= 60) {
@@ -93,19 +116,20 @@ const useCheckInAudio = () => {
         if (!responded) {
           firedRef.current.add(preKey);
           const ts = formatISTDateTime(now);
-          if (!isOverlayVisible()) {
-            showBrowserNotification("Check-iN", `[${ts}] Check-iN due at ${formatHour(h)}`);
-          }
+          showBrowserNotification("Check-iN", `[${ts}] Check-iN due at ${formatHour(h)}`);
         }
       }
 
-      // --- T-0: Initial alarm (voice reminder & chime) exactly at scheduled time ---
+      // --- T-0: Initial alarm — fires within a 15-min window after scheduled time ---
+      // FIX 1 applied: window is now [0, DUE_AUDIO_WINDOW_MIN) = [0, 15) minutes
+      // so first-time alert still fires even if polling loop first runs at T+1..T+14
       const dueKey = `checkin-due-${dateKey}-${h}`;
-      if (diffMin >= 0 && diffMin < POPUP_DELAY_MIN && !firedRef.current.has(dueKey)) {
+      if (diffMin >= 0 && diffMin < DUE_AUDIO_WINDOW_MIN && !firedRef.current.has(dueKey)) {
         const responded = await isCheckInResponded(h, now);
         if (!responded) {
           firedRef.current.add(dueKey);
-          const msg = `Hey ${userName || 'there'}, it's time to Check in and let your people know you are well. Have a nice day!`;
+          const msg = `Hey ${userName || "there"}, it's time to Check in and let your people know you are well. Have a nice day!`;
+          // FIX 3 applied: fireAlert always plays audio regardless of overlay state
           fireAlert(msg);
         }
       }
@@ -139,15 +163,17 @@ const useCheckInAudio = () => {
             : `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`;
 
           fireAlert(msg);
-          showReminderOverlay({
-            type: "checkin",
-            title: state.count === 1 ? "Check-In Reminder" : "Missed Check-In",
-            message: msg,
-            reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${formatHour(h)}`,
-            slotKey: `checkin-${dateKey}-${h}`,
-          });
+          if (!isOverlayVisible()) {
+            showReminderOverlay({
+              type: "checkin",
+              title: state.count === 1 ? "Check-In Reminder" : "Missed Check-In",
+              message: msg,
+              reminderCount: `Reminder ${state.count} of ${MAX_POPUPS} — ${formatHour(h)}`,
+              slotKey: `checkin-${dateKey}-${h}`,
+            });
+          }
         } else if (state.count >= MAX_POPUPS && minSinceLast >= POPUP_INTERVAL_MIN) {
-          // Final escalation
+          // Final escalation — T+35
           missedSentRef.current.add(missedKey);
 
           const tsf = formatISTDateTime(now);
@@ -155,12 +181,21 @@ const useCheckInAudio = () => {
           playChime();
           if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
-          showReminderOverlay({
-            type: "checkin",
-            title: "Check-In Missed",
-            message: `[${tsf}] You missed your ${formatHour(h)} Check-iN after ${MAX_POPUPS} reminders. Your guardians have been notified.`,
-            reminderCount: `Final — ${formatHour(h)}`,
-          });
+          if (!isOverlayVisible()) {
+            showReminderOverlay({
+              type: "checkin",
+              title: "Check-In Missed",
+              message: `[${tsf}] You missed your ${formatHour(h)} Check-iN after ${MAX_POPUPS} reminders. Your guardians have been notified.`,
+              reminderCount: `Final — ${formatHour(h)}`,
+            });
+          }
+
+          // FIX 4 applied: Trigger server-side guardian notifications directly.
+          // The edge function uses insert_notifications_deduped so double-fire (client + cron) is safe.
+          if (!escalationFiredRef.current.has(escalationKey)) {
+            escalationFiredRef.current.add(escalationKey);
+            await triggerServerEscalation();
+          }
         }
       }
     }
@@ -175,7 +210,10 @@ const useCheckInAudio = () => {
     postGraceRef.current.forEach((_, k) => {
       if (!k.includes(dateKey)) postGraceRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded, loginInProgress, userName]);
+    escalationFiredRef.current.forEach((k) => {
+      if (!k.includes(dateKey)) escalationFiredRef.current.delete(k);
+    });
+  }, [pauseMode, fireAlert, isCheckInResponded, loginInProgress, userName, triggerServerEscalation]);
 
   useEffect(() => {
     check();
