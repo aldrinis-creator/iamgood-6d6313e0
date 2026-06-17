@@ -77,12 +77,11 @@ const useAppointmentAlarms = () => {
 
           const ts = formatISTDateTime(now);
           const message = `[${ts}] ${appt.title} starts in ${leadMin} minutes`;
+          const spoken = `Appointment reminder. ${appt.title} starts in ${leadMin} minutes.`;
 
           if (!isOverlayVisible()) {
-            if (settings.voiceReminders) {
-              playVoiceReminder(message);
-            } else if (settings.audioAlerts) {
-              playChime();
+            if (settings.audioAlerts) {
+              playLoudAlertSequence(spoken);
             }
             showBrowserNotification("Appointment Reminder", message);
           }
