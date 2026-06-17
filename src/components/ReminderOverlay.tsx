@@ -144,8 +144,8 @@ const ReminderOverlay = () => {
     const until = supp.get(key);
     if (until && until > Date.now()) return;
 
-    const count = (showCountRef.current.get(key) || 0) + 1;
-    showCountRef.current.set(key, count);
+    const count = (showCounts.get(key) || 0) + 1;
+    showCounts.set(key, count);
 
     if (count > MAX_SHOWS) {
       // Escalation
@@ -157,7 +157,7 @@ const ReminderOverlay = () => {
       } else {
         toast.info("Maximum reminders reached. Please take action.");
       }
-      showCountRef.current.delete(key);
+      showCounts.delete(key);
       return;
     }
 
@@ -198,7 +198,7 @@ const ReminderOverlay = () => {
     // Schedule next repeat if under max shows
     if (reminder) {
       const key = getReminderKey(reminder);
-      const count = showCountRef.current.get(key) || 1;
+      const count = showCounts.get(key) || 1;
       if (count < MAX_SHOWS) {
         scheduleRepeat(reminder);
       }
@@ -236,7 +236,7 @@ const ReminderOverlay = () => {
     : "View Medications";
 
   const key = getReminderKey(reminder);
-  const currentShow = showCountRef.current.get(key) || 1;
+  const currentShow = showCounts.get(key) || 1;
 
   return (
     <div
