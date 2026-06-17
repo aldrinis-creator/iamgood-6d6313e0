@@ -90,7 +90,18 @@ const useCheckInAudio = () => {
     }
   }, []);
 
+  const tryFireAudio = useCallback((key: string, msg: string) => {
+    const n = audioFiredRef.current.get(key) || 0;
+    if (n >= MAX_POPUPS) return false;
+    audioFiredRef.current.set(key, n + 1);
+    fireAlert(msg);
+    return true;
+  }, [fireAlert]);
+
   const check = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    try {
     if (pauseMode !== "active") return;
     if (loginInProgress) return;
     const now = new Date();
