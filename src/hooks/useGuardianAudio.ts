@@ -1,9 +1,9 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import { supabase as sb } from "@/integrations/supabase/client";
 import { playLoudAlertSequence } from "@/lib/audioAlerts";
 import { formatISTTime } from "@/lib/istTime";
 import {
