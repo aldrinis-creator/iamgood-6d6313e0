@@ -121,7 +121,7 @@ export default function useLocationSync() {
 
         const { data: guardians } = await supabase
           .from("guardians")
-          .select("guardian_user_id")
+          .select("guardian_user_id, guardian_phone")
           .eq("user_id", userId)
           .eq("status", "accepted")
           .not("guardian_user_id", "is", null);
@@ -146,6 +146,30 @@ export default function useLocationSync() {
         await supabase.rpc("insert_notifications_deduped", {
           p_notifications: notifications,
         });
+
+        // Fire WhatsApp alert to guardians (best-effort, non-blocking)
+        try {
+          const phones = Array.from(
+            new Set(
+              filteredGuardians
+                .map((g: any) => (g.guardian_phone || "").toString().trim())
+                .filter((p: string) => p.length > 0)
+            )
+          );
+          if (phones.length > 0) {
+            await supabase.functions.invoke("msg91-whatsapp-safezone", {
+              body: {
+                wardName: userName,
+                zoneName: nearest.name,
+                occurredAt: new Date().toISOString(),
+                phones,
+              },
+            });
+          }
+        } catch (e) {
+          console.error("safe_zone WhatsApp invoke failed", e);
+        }
+
       } catch {
         // Silently ignore errors in background check
       }
