@@ -193,6 +193,81 @@ export const playChime = async () => {
   osc3.stop(now + 1.0);
 };
 
+// Loud, attention-grabbing alert: 3 chime bursts at high gain, then a voice line.
+// Used for explicit user-set reminders (appointments at their selected alert time).
+export const playLoudAlertSequence = async (message?: string) => {
+  await ensureAudioReady();
+  const ctx = getAudioContext();
+
+  if (ctx.state !== "running") {
+    // Fallback path: multiple beeps
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => playFallbackBeep(), i * 600);
+    }
+    if (message && "speechSynthesis" in window) {
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(message);
+          u.volume = 1.0;
+          u.rate = 0.95;
+          window.speechSynthesis.speak(u);
+        } catch {
+          // ignore
+        }
+      }, 4 * 600 + 200);
+    }
+    return;
+  }
+
+  const playBurst = (startOffset: number) => {
+    const now = ctx.currentTime + startOffset;
+    const tones = [
+      { freq: 880, t: 0.0, dur: 0.35 },
+      { freq: 988, t: 0.18, dur: 0.4 },
+      { freq: 1175, t: 0.36, dur: 0.5 },
+    ];
+    for (const tone of tones) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = tone.freq;
+      gain.gain.setValueAtTime(0.9, now + tone.t);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + tone.t + tone.dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + tone.t);
+      osc.stop(now + tone.t + tone.dur);
+    }
+  };
+
+  // 3 bursts ~1.2s apart
+  playBurst(0);
+  playBurst(1.2);
+  playBurst(2.4);
+
+  if (message && "speechSynthesis" in window) {
+    const speakAt = 3.7 * 1000;
+    setTimeout(() => {
+      try {
+        window.speechSynthesis.cancel();
+        const silent = new SpeechSynthesisUtterance("");
+        silent.volume = 0;
+        window.speechSynthesis.speak(silent);
+        const u = new SpeechSynthesisUtterance(message);
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        u.volume = 1.0;
+        window.speechSynthesis.speak(u);
+      } catch {
+        // ignore
+      }
+    }, speakAt);
+  } else {
+    // No speech available — add a 4th burst
+    playBurst(3.6);
+  }
+};
+
 export const speak = async (message: string): Promise<void> => {
   await ensureAudioReady();
   if (!("speechSynthesis" in window)) return;
