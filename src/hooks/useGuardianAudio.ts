@@ -1,9 +1,8 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { useGuardianWard } from "@/contexts/GuardianWardContext";
 import { playLoudAlertSequence } from "@/lib/audioAlerts";
 import { formatISTTime } from "@/lib/istTime";
 import {
@@ -11,6 +10,8 @@ import {
   hideGuardianMissedAlarm,
   MissedCheckinItem,
 } from "@/components/GuardianMissedAlarmOverlay";
+
+interface WardLite { userId: string; name: string }
 
 const POLL_MS = 60_000;
 const LOOP_MS = 12_000;
@@ -43,11 +44,41 @@ const useGuardianAudio = () => {
   const { session } = useAuth();
   const { role, loginInProgress } = useApp();
   const { settings } = useUserSettings();
-  const { wards } = useGuardianWard();
+  const [wards, setWards] = useState<WardLite[]>([]);
 
   const loopRef = useRef<number | null>(null);
   const pollRef = useRef<number | null>(null);
   const activeRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (role !== "guardian" || !session?.user?.id) {
+      setWards([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("guardians")
+        .select("user_id")
+        .eq("guardian_user_id", session.user.id)
+        .eq("status", "accepted");
+      if (!data || data.length === 0) {
+        if (!cancelled) setWards([]);
+        return;
+      }
+      const ids = data.map((g: any) => g.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      if (cancelled) return;
+      setWards(ids.map((uid) => ({
+        userId: uid,
+        name: (profiles?.find((p: any) => p.id === uid) as any)?.full_name || "Your ward",
+      })));
+    })();
+    return () => { cancelled = true; };
+  }, [role, session?.user?.id]);
 
   const stopLoop = useCallback(() => {
     if (loopRef.current !== null) {
