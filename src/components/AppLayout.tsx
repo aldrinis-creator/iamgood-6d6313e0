@@ -27,6 +27,8 @@ import useActivityHeartbeat from "@/hooks/useActivityHeartbeat";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import useMorningBriefing from "@/hooks/useMorningBriefing";
 import MorningBriefingOverlay from "@/components/MorningBriefingOverlay";
+import useGuardianAudio from "@/hooks/useGuardianAudio";
+import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -37,6 +39,11 @@ const UserOnlyHooks = () => {
   useAbnormalPatternCheck();
   useActivityHeartbeat();
   useMorningBriefing();
+  return null;
+};
+
+const GuardianOnlyHooks = () => {
+  useGuardianAudio();
   return null;
 };
 
@@ -71,6 +78,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-background">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg">
         {role === "user" && !loginInProgress && <UserOnlyHooks />}
+        {role === "guardian" && !loginInProgress && <GuardianOnlyHooks />}
         {offline && (
           <div className="bg-warning text-warning-foreground text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
             <WifiOff className="w-3.5 h-3.5" /> You're offline — SOS will queue and send when reconnected
@@ -131,6 +139,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && !loginInProgress && <MorningBriefingOverlay />}
         {role === "user" && !loginInProgress && <GuardianPingOverlay />}
         {role === "guardian" && !loginInProgress && <UserPingOverlay />}
+        {role === "guardian" && !loginInProgress && <GuardianMissedAlarmOverlay />}
       </div>
     </div>
   );

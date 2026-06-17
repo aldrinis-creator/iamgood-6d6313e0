@@ -608,6 +608,16 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.guardianVoiceAlerts} onCheckedChange={(v) => updateSetting("guardianVoiceAlerts", v)} />
                 </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                    <div>
+                      <p className="text-sm font-medium">Persistent Missed Check-iN Alarm</p>
+                      <p className="text-xs text-muted-foreground">Loud repeating alarm (even on silent) when your ward misses a check-iN past the hour. Tap Dismiss to stop.</p>
+                    </div>
+                  </div>
+                  <Switch checked={settings.guardianPersistentMissedAlarm} onCheckedChange={(v) => updateSetting("guardianPersistentMissedAlarm", v)} />
+                </div>
               </CardContent>
             </Card>
 
