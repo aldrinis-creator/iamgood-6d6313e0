@@ -96,7 +96,7 @@ const useGuardianAudio = () => {
       const first = items.find((item) =>
         canFireCheckInAudio(getCheckInAudioKey("guardian", item.id, new Date(item.scheduledAt)), MAX_AUDIO_ALERTS)
       );
-      if (!first) return;
+      if (!first) return false;
       const msg = `Attention Guardian. ${first.wardName} has missed their ${formatISTTime(new Date(first.scheduledAt))} Check-iN. Please check on them.`;
       playLoudAlertSequence(msg);
       if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
