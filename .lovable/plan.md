@@ -1,69 +1,47 @@
-## Persistent Guardian Audio Alarm for Missed Check-iNs
+## Why the overlay always says "Reminder 1 of 3"
 
-Today guardians get a single voice line via `GuardianDashboard.fetchMissedEvents` when a ward's check-in goes >1h missed. We'll add a **persistent, loud, looping alarm** that fires whenever the app opens/foregrounds and finds an unresolved missed check-in still inside the alert window, and keeps repeating until the guardian taps **Dismiss**.
+The overlay (`src/components/ReminderOverlay.tsx`) renders **two counters**:
 
-### 1. New setting: `guardianPersistentMissedAlarm`
+1. `reminder.reminderCount` — passed in by the source hook (e.g. `useMedicationAlarms`, `useCheckInAudio`) using its own authoritative `state.count` (1 → 2 → 3, persisted in `postGraceRef`).
+2. `Reminder {currentShow} of {MAX_SHOWS}` — the overlay's *own* counter, read from `showCountRef` (a `useRef(new Map())` local to the `ReminderOverlay` component instance).
 
-In `src/hooks/useUserSettings.ts`:
-- Add field `guardianPersistentMissedAlarm: boolean` to `UserSettings`.
-- Default to `true` in `DEFAULTS`.
+The second counter resets to 1 every time the `ReminderOverlay` component re-mounts. That happens in `AppLayout.tsx`:
 
-In `src/pages/Settings.tsx` (Guardian Voice Alerts card, ~line 600):
-- Add a new toggle row directly below `guardianVoiceAlerts`:
-  - Label: "Persistent Missed Check-iN Alarm"
-  - Description: "Loud repeating alarm (even on silent) when your ward misses a check-iN past the hour. Tap Dismiss to stop."
-  - Bound to `settings.guardianPersistentMissedAlarm`.
+```tsx
+{!loginInProgress && <ReminderOverlay />}
+```
 
-### 2. New hook: `src/hooks/useGuardianAudio.ts`
+Anything that flips `loginInProgress`, or any parent re-mount (route swaps that re-evaluate `AppLayout`'s tree, `GuardianOnlyHooks` / `UserOnlyHooks` branch swaps, etc.) tears down `ReminderOverlay`, wiping `showCountRef`. The next fire comes in fresh → `currentShow` = 1 again. Meanwhile the hook's `postGraceRef` lives in a long-lived hook, so its count is the real one.
 
-Responsibilities:
-- Run only when `role === "guardian"` and `!loginInProgress` and `settings.guardianPersistentMissedAlarm !== false`.
-- Get accepted wards from `useGuardianWard().wards`.
-- **Scan on mount, on `visibilitychange → visible`, and every 60s** for unresolved missed check-ins across all wards:
-  ```ts
-  supabase.from("check_ins")
-    .select("id, user_id, scheduled_at, status")
-    .in("user_id", wardUserIds)
-    .eq("status", "missed")
-    .gte("scheduled_at", todayStartIST)
-    .lte("scheduled_at", nowMinus1hISO)   // past the hour
-  ```
-  Exclude any check-in whose id is in a `localStorage` dismissed set (key: `guardian_dismissed_missed_checkins`, scoped per IST day, auto-cleared at midnight IST).
-- If at least one unresolved missed check-in exists, **start the alarm loop**:
-  - Use a shared looping function similar to `playLoudAlertSequence` (3-burst high-gain chime ~880/988/1175Hz at gain ~0.9) followed by a spoken line: "Attention Guardian. {wardName} has missed their {hh:mm} Check-iN. Please check on them."
-  - Repeat the full sequence every ~12s while unresolved.
-  - Trigger vibration `[400,200,400,200,400]` each cycle (best-effort; silent phones still hear audio via WebAudio which bypasses media-volume mute on most browsers — same approach as user-side check-in alarm).
-- Show a single **persistent overlay** (new lightweight `GuardianMissedAlarmOverlay` rendered from `AppLayout`) containing:
-  - Title "Missed Check-iN — {wardName}"
-  - Message: time + how long ago
-  - List of all currently unresolved missed check-ins (id + ward + time)
-  - One **Dismiss** button (primary, large). Tapping it:
-    1. Stops the audio loop and clears the repeat interval.
-    2. Adds every currently-flagged check-in id to the dismissed set in localStorage.
-    3. Hides the overlay.
-- The loop also stops automatically if a re-poll returns zero unresolved items (e.g. ward checked in late, status flipped to `responded`).
+Net effect: the bottom line ("Reminder 1 of 3 · Auto-closes in 10s") is stuck at 1, while the line above it (from `reminder.reminderCount`, e.g. "Reminder 2 of 3 — 08:00") is correct.
 
-### 3. Wire into `AppLayout.tsx`
+## Fix
 
-- Add `useGuardianAudio()` inside a new `GuardianOnlyHooks` component, mounted when `role === "guardian" && !loginInProgress`.
-- Render `<GuardianMissedAlarmOverlay />` alongside other overlays when `role === "guardian" && !loginInProgress`.
+Make the overlay's counter authoritative and persistent, and stop showing a second, conflicting line.
 
-### 4. Interaction with existing logic
+### Changes — `src/components/ReminderOverlay.tsx` only
 
-- The current one-shot `fetchMissedEvents` voice line in `GuardianDashboard.tsx` stays gated on `settings.guardianVoiceAlerts` and continues to work for the dashboard-page mini popup. The new hook is global (runs on every guardian page) and handles the persistent loop independently.
-- Audio respects: `loginInProgress=false`, `settings.guardianPersistentMissedAlarm=true`. It is **independent of `audioAlerts`/`voiceReminders`** (which are user-side settings) — guardians have their own toggle.
-- No DB schema changes, no edge function changes.
+1. **Promote `showCountRef` to module scope** so it survives re-mounts:
+   ```ts
+   const showCounts = new Map<string, number>();
+   ```
+   Replace all `showCountRef.current` reads/writes with `showCounts`. Drop the `useRef` for it.
 
-### Files
+2. **Render a single counter line.** Prefer the hook-supplied label when present, otherwise fall back to the internal count:
+   ```tsx
+   <p className="text-sm text-muted-foreground">
+     {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
+     {" · Auto-closes in 10s"}
+   </p>
+   ```
+   Remove the separate `{reminder.reminderCount && (...)}` block so we never render two counters.
 
-- `src/hooks/useUserSettings.ts` — add field + default
-- `src/pages/Settings.tsx` — add toggle row
-- `src/hooks/useGuardianAudio.ts` — **new**
-- `src/components/GuardianMissedAlarmOverlay.tsx` — **new** (simple full-width banner with Dismiss button; imperative `show/hide` API similar to `ReminderOverlay`)
-- `src/components/AppLayout.tsx` — mount hook + overlay for guardians
+3. **Clear the count on acknowledged dismiss** (`dismiss(true)`), so a future, un-suppressed fire for the same slot starts from 1 cleanly:
+   ```ts
+   if (acknowledged && reminder) {
+     showCounts.delete(getReminderKey(reminder));
+     ...
+   }
+   ```
 
-### Out of scope
-
-- No new DB tables or migrations.
-- No changes to ward-side check-in flow or `check-missed-checkins` edge function.
-- No medication-missed audio loop (this plan only covers check-iNs as requested).
+No changes to hooks, no changes to audio/voice logic, no DB/edge-function work. Counters across all reminder types (check-in, medication, appointment, exercise) will now reflect the true Nth reminder.
