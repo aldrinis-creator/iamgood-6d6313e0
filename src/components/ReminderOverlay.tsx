@@ -110,6 +110,7 @@ const ReminderOverlay = () => {
 
     if (acknowledged && reminder) {
       const key = getReminderKey(reminder);
+      showCounts.delete(key);
       const ack = loadAckSet();
       ack.add(key);
       saveAckSet(ack);
