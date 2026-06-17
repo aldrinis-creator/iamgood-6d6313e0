@@ -92,13 +92,16 @@ const MAX_SHOWS = 3;
 const getReminderKey = (data: ReminderData) =>
   data.slotKey || `${data.type}:${data.title}:${data.message}`;
 
+// Module-scoped so the counter survives ReminderOverlay re-mounts
+// (AppLayout tears it down whenever loginInProgress or role branches change).
+const showCounts = new Map<string, number>();
+
 const ReminderOverlay = () => {
   const navigate = useNavigate();
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout>>();
   const repeatTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const showCountRef = useRef<Map<string, number>>(new Map());
 
   const dismiss = useCallback((acknowledged: boolean = false) => {
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
