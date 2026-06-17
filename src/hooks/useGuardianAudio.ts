@@ -5,6 +5,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { playLoudAlertSequence } from "@/lib/audioAlerts";
 import { formatISTTime } from "@/lib/istTime";
+import { canFireCheckInAudio, getCheckInAudioKey, MAX_AUDIO_ALERTS } from "@/lib/checkInAudioLimiter";
 import {
   showGuardianMissedAlarm,
   hideGuardianMissedAlarm,
@@ -91,16 +92,24 @@ const useGuardianAudio = () => {
   const startLoop = useCallback((items: MissedCheckinItem[]) => {
     if (loopRef.current !== null) return;
     activeRef.current = true;
-    const fire = () => {
-      const first = items[0];
-      if (!first) return;
+    const fire = (): boolean => {
+      const first = items.find((item) =>
+        canFireCheckInAudio(getCheckInAudioKey("guardian", item.id, new Date(item.scheduledAt)), MAX_AUDIO_ALERTS)
+      );
+      if (!first) return false;
       const msg = `Attention Guardian. ${first.wardName} has missed their ${formatISTTime(new Date(first.scheduledAt))} Check-iN. Please check on them.`;
       playLoudAlertSequence(msg);
       if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+      return true;
     };
-    fire();
-    loopRef.current = window.setInterval(fire, LOOP_MS);
-  }, []);
+    if (!fire()) {
+      activeRef.current = false;
+      return;
+    }
+    loopRef.current = window.setInterval(() => {
+      if (!fire()) stopLoop();
+    }, LOOP_MS);
+  }, [stopLoop]);
 
   const scan = useCallback(async () => {
     if (role !== "guardian") return;
