@@ -72,17 +72,21 @@ const useAppointmentAlarms = () => {
 
         // At alert time: popup overlay
         const slotKey = `appt-${dateKey}-${appt.id}-${alert.key}`;
-        if (diffMin >= 0 && diffMin < 3 && !firedRef.current.has(popupKey) && !isReminderAcknowledged(slotKey)) {
+        if (diffMin >= 0 && diffMin < 15 && !firedRef.current.has(popupKey) && !isReminderAcknowledged(slotKey)) {
           firedRef.current.add(popupKey);
 
           const ts = formatISTDateTime(now);
           const message = `[${ts}] ${appt.title} starts in ${leadMin} minutes`;
           const spoken = `Appointment reminder. ${appt.title} starts in ${leadMin} minutes.`;
 
+          // Play audio REGARDLESS of overlay visibility
+          if (settings.voiceReminders) {
+            playVoiceReminder(message);
+          } else if (settings.audioAlerts) {
+            playLoudAlertSequence(spoken);
+          }
+
           if (!isOverlayVisible()) {
-            if (settings.audioAlerts) {
-              playLoudAlertSequence(spoken);
-            }
             showBrowserNotification("Appointment Reminder", message);
           }
 
