@@ -259,15 +259,12 @@ const ReminderOverlay = () => {
           <p className="text-xl text-foreground leading-relaxed">
             {reminder.message}
           </p>
-          {reminder.reminderCount && (
-            <p className="text-lg text-muted-foreground font-medium">
-              {reminder.reminderCount}
-            </p>
-          )}
           <p className="text-sm text-muted-foreground">
-            Reminder {currentShow} of {MAX_SHOWS} · Auto-closes in 10s
+            {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
+            {" · Auto-closes in 10s"}
           </p>
         </div>
+
 
         {/* Action Button */}
         <button
