@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatISTDateTime } from "@/lib/istTime";
+import { canFireCheckInAudio, getCheckInAudioKey, MAX_AUDIO_ALERTS } from "@/lib/checkInAudioLimiter";
 
 // Guardian WhatsApp/Email/Push notifications are triggered server-side via the
 // check-missed-checkins edge function, which is scheduled by pg_cron (see migration).
@@ -16,7 +17,7 @@ const CHECK_IN_HOURS = [7, 12, 19];
 const PRE_ALERT_MIN = 5;       // browser notification 5 min before
 const POPUP_DELAY_MIN = 5;     // first popup 5 min after scheduled time
 const POPUP_INTERVAL_MIN = 10; // 10 min between popups
-const MAX_POPUPS = 3;
+const MAX_POPUPS = MAX_AUDIO_ALERTS;
 // FIX 1: T-0 audio window widened from [0, POPUP_DELAY_MIN) to [0, POPUP_DELAY_MIN + POPUP_INTERVAL_MIN)
 // so the chime still fires even if the 30s polling loop first catches the alarm at T+1..T+14.
 const DUE_AUDIO_WINDOW_MIN = POPUP_DELAY_MIN + POPUP_INTERVAL_MIN; // 15 min
@@ -36,7 +37,6 @@ const useCheckInAudio = () => {
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
   const escalationFiredRef = useRef<Set<string>>(new Set()); // FIX 2: separate guard for escalation invoke
-  const audioFiredRef = useRef<Map<string, number>>(new Map()); // hard cap: max MAX_POPUPS audio cues per slot
   const runningRef = useRef<boolean>(false); // re-entry guard against concurrent check() invocations
 
   // FIX 3: fireAlert no longer silently drops audio when overlay is already visible.
@@ -91,9 +91,7 @@ const useCheckInAudio = () => {
   }, []);
 
   const tryFireAudio = useCallback((key: string, msg: string) => {
-    const n = audioFiredRef.current.get(key) || 0;
-    if (n >= MAX_POPUPS) return false;
-    audioFiredRef.current.set(key, n + 1);
+    if (!canFireCheckInAudio(key, MAX_POPUPS)) return false;
     fireAlert(msg);
     return true;
   }, [fireAlert]);
@@ -116,6 +114,7 @@ const useCheckInAudio = () => {
       const preKey = `checkin-pre-${dateKey}-${h}`;
       const missedKey = `missed-${dateKey}-${h}`;
       const escalationKey = `escalation-${dateKey}-${h}`;
+      const audioKey = getCheckInAudioKey("user", session?.user?.id || "unknown", scheduledAt);
 
       // --- Ignore completely if more than 1 hour past scheduled time ---
       if (diffMin >= 60) {
@@ -142,8 +141,7 @@ const useCheckInAudio = () => {
         if (!responded) {
           firedRef.current.add(dueKey);
           const msg = `Hey ${userName || "there"}, it's time to Check in and let your people know you are well. Have a nice day!`;
-          // FIX 3 applied: fireAlert always plays audio regardless of overlay state
-          fireAlert(msg);
+          tryFireAudio(audioKey, msg);
         }
       }
 
@@ -175,7 +173,7 @@ const useCheckInAudio = () => {
             ? `[${ts}] You haven't checked in yet. Please tap below to let us know you're okay.`
             : `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`;
 
-          tryFireAudio(missedKey, msg);
+          tryFireAudio(audioKey, msg);
           if (!isOverlayVisible()) {
             showReminderOverlay({
               type: "checkin",
@@ -222,9 +220,6 @@ const useCheckInAudio = () => {
     });
     escalationFiredRef.current.forEach((k) => {
       if (!k.includes(dateKey)) escalationFiredRef.current.delete(k);
-    });
-    audioFiredRef.current.forEach((_, k) => {
-      if (!k.includes(dateKey)) audioFiredRef.current.delete(k);
     });
     } finally {
       runningRef.current = false;
