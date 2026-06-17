@@ -36,6 +36,8 @@ const useCheckInAudio = () => {
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
   const escalationFiredRef = useRef<Set<string>>(new Set()); // FIX 2: separate guard for escalation invoke
+  const audioFiredRef = useRef<Map<string, number>>(new Map()); // hard cap: max MAX_POPUPS audio cues per slot
+  const runningRef = useRef<boolean>(false); // re-entry guard against concurrent check() invocations
 
   // FIX 3: fireAlert no longer silently drops audio when overlay is already visible.
   // Instead it always plays audio (the overlay and audio are independent concerns)
@@ -88,7 +90,18 @@ const useCheckInAudio = () => {
     }
   }, []);
 
+  const tryFireAudio = useCallback((key: string, msg: string) => {
+    const n = audioFiredRef.current.get(key) || 0;
+    if (n >= MAX_POPUPS) return false;
+    audioFiredRef.current.set(key, n + 1);
+    fireAlert(msg);
+    return true;
+  }, [fireAlert]);
+
   const check = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    try {
     if (pauseMode !== "active") return;
     if (loginInProgress) return;
     const now = new Date();
@@ -162,7 +175,7 @@ const useCheckInAudio = () => {
             ? `[${ts}] You haven't checked in yet. Please tap below to let us know you're okay.`
             : `[${ts}] You missed your ${formatHour(h)} Check-iN. Please check in now.`;
 
-          fireAlert(msg);
+          tryFireAudio(missedKey, msg);
           if (!isOverlayVisible()) {
             showReminderOverlay({
               type: "checkin",
@@ -173,13 +186,10 @@ const useCheckInAudio = () => {
             });
           }
         } else if (state.count >= MAX_POPUPS && minSinceLast >= POPUP_INTERVAL_MIN) {
-          // Final escalation — T+35
+          // Final escalation — T+35: NO audio (hard cap at MAX_POPUPS), overlay + server only
           missedSentRef.current.add(missedKey);
 
           const tsf = formatISTDateTime(now);
-          playVoiceReminder(`[${tsf}] You have not checked in after ${MAX_POPUPS} reminders. Your guardians are being notified.`);
-          playChime();
-          if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
 
           if (!isOverlayVisible()) {
             showReminderOverlay({
@@ -213,7 +223,13 @@ const useCheckInAudio = () => {
     escalationFiredRef.current.forEach((k) => {
       if (!k.includes(dateKey)) escalationFiredRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded, loginInProgress, userName, triggerServerEscalation]);
+    audioFiredRef.current.forEach((_, k) => {
+      if (!k.includes(dateKey)) audioFiredRef.current.delete(k);
+    });
+    } finally {
+      runningRef.current = false;
+    }
+  }, [pauseMode, fireAlert, tryFireAudio, isCheckInResponded, loginInProgress, userName, triggerServerEscalation]);
 
   useEffect(() => {
     check();
