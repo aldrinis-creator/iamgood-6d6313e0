@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { playChime, playVoiceReminder, showBrowserNotification } from "@/lib/audioAlerts";
+import { playChime, playVoiceReminder, playLoudAlertSequence, showBrowserNotification } from "@/lib/audioAlerts";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged } from "@/components/ReminderOverlay";
@@ -77,12 +77,11 @@ const useAppointmentAlarms = () => {
 
           const ts = formatISTDateTime(now);
           const message = `[${ts}] ${appt.title} starts in ${leadMin} minutes`;
+          const spoken = `Appointment reminder. ${appt.title} starts in ${leadMin} minutes.`;
 
           if (!isOverlayVisible()) {
-            if (settings.voiceReminders) {
-              playVoiceReminder(message);
-            } else if (settings.audioAlerts) {
-              playChime();
+            if (settings.audioAlerts) {
+              playLoudAlertSequence(spoken);
             }
             showBrowserNotification("Appointment Reminder", message);
           }
