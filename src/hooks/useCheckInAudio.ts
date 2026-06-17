@@ -36,6 +36,8 @@ const useCheckInAudio = () => {
   const postGraceRef = useRef<Map<string, { count: number; lastFiredAt: number }>>(new Map());
   const missedSentRef = useRef<Set<string>>(new Set());
   const escalationFiredRef = useRef<Set<string>>(new Set()); // FIX 2: separate guard for escalation invoke
+  const audioFiredRef = useRef<Map<string, number>>(new Map()); // hard cap: max MAX_POPUPS audio cues per slot
+  const runningRef = useRef<boolean>(false); // re-entry guard against concurrent check() invocations
 
   // FIX 3: fireAlert no longer silently drops audio when overlay is already visible.
   // Instead it always plays audio (the overlay and audio are independent concerns)
