@@ -92,13 +92,16 @@ const MAX_SHOWS = 3;
 const getReminderKey = (data: ReminderData) =>
   data.slotKey || `${data.type}:${data.title}:${data.message}`;
 
+// Module-scoped so the counter survives ReminderOverlay re-mounts
+// (AppLayout tears it down whenever loginInProgress or role branches change).
+const showCounts = new Map<string, number>();
+
 const ReminderOverlay = () => {
   const navigate = useNavigate();
   const [reminder, setReminder] = useState<ReminderData | null>(null);
   const [visible, setVisible] = useState(false);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout>>();
   const repeatTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const showCountRef = useRef<Map<string, number>>(new Map());
 
   const dismiss = useCallback((acknowledged: boolean = false) => {
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
@@ -107,6 +110,7 @@ const ReminderOverlay = () => {
 
     if (acknowledged && reminder) {
       const key = getReminderKey(reminder);
+      showCounts.delete(key);
       const ack = loadAckSet();
       ack.add(key);
       saveAckSet(ack);
@@ -141,8 +145,8 @@ const ReminderOverlay = () => {
     const until = supp.get(key);
     if (until && until > Date.now()) return;
 
-    const count = (showCountRef.current.get(key) || 0) + 1;
-    showCountRef.current.set(key, count);
+    const count = (showCounts.get(key) || 0) + 1;
+    showCounts.set(key, count);
 
     if (count > MAX_SHOWS) {
       // Escalation
@@ -154,7 +158,7 @@ const ReminderOverlay = () => {
       } else {
         toast.info("Maximum reminders reached. Please take action.");
       }
-      showCountRef.current.delete(key);
+      showCounts.delete(key);
       return;
     }
 
@@ -195,7 +199,7 @@ const ReminderOverlay = () => {
     // Schedule next repeat if under max shows
     if (reminder) {
       const key = getReminderKey(reminder);
-      const count = showCountRef.current.get(key) || 1;
+      const count = showCounts.get(key) || 1;
       if (count < MAX_SHOWS) {
         scheduleRepeat(reminder);
       }
@@ -233,7 +237,7 @@ const ReminderOverlay = () => {
     : "View Medications";
 
   const key = getReminderKey(reminder);
-  const currentShow = showCountRef.current.get(key) || 1;
+  const currentShow = showCounts.get(key) || 1;
 
   return (
     <div
@@ -255,15 +259,12 @@ const ReminderOverlay = () => {
           <p className="text-xl text-foreground leading-relaxed">
             {reminder.message}
           </p>
-          {reminder.reminderCount && (
-            <p className="text-lg text-muted-foreground font-medium">
-              {reminder.reminderCount}
-            </p>
-          )}
           <p className="text-sm text-muted-foreground">
-            Reminder {currentShow} of {MAX_SHOWS} · Auto-closes in 10s
+            {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
+            {" · Auto-closes in 10s"}
           </p>
         </div>
+
 
         {/* Action Button */}
         <button
