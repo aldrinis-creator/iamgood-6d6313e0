@@ -223,7 +223,13 @@ const useCheckInAudio = () => {
     escalationFiredRef.current.forEach((k) => {
       if (!k.includes(dateKey)) escalationFiredRef.current.delete(k);
     });
-  }, [pauseMode, fireAlert, isCheckInResponded, loginInProgress, userName, triggerServerEscalation]);
+    audioFiredRef.current.forEach((_, k) => {
+      if (!k.includes(dateKey)) audioFiredRef.current.delete(k);
+    });
+    } finally {
+      runningRef.current = false;
+    }
+  }, [pauseMode, fireAlert, tryFireAudio, isCheckInResponded, loginInProgress, userName, triggerServerEscalation]);
 
   useEffect(() => {
     check();
