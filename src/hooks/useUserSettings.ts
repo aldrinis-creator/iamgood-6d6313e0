@@ -83,6 +83,7 @@ export interface UserSettings {
   hasSurgeries: boolean;
   // Guardian-specific
   guardianVoiceAlerts: boolean;
+  guardianPersistentMissedAlarm: boolean;
   // Journey Tracking
   journeyCheckInFrequency: number | null;
   journeyTrackingGuardians: string[];
@@ -149,6 +150,7 @@ const DEFAULTS: UserSettings = {
   hasHospitalizations: false,
   hasSurgeries: false,
   guardianVoiceAlerts: true,
+  guardianPersistentMissedAlarm: true,
   journeyCheckInFrequency: 15,
   journeyTrackingGuardians: [],
   locationSharingGuardianIds: [],
