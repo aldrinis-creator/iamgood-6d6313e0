@@ -80,10 +80,78 @@ export default function useLocationSync() {
         );
 
         if (isInsideAny) {
+          const wasOutside = wasInsideRef.current === false;
           wasInsideRef.current = true;
           localStorage.removeItem('isInsideSafeZone');
+
+          if (wasOutside) {
+            // Returned to a safe zone — notify guardians (best-effort)
+            try {
+              const nearest = (zones as any[]).reduce((prev, curr) => {
+                const prevDist = haversineDistance(latitude, longitude, prev.lat, prev.lng);
+                const currDist = haversineDistance(latitude, longitude, curr.lat, curr.lng);
+                return currDist < prevDist ? curr : prev;
+              });
+
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", userId)
+                .maybeSingle();
+              const userName = profile?.full_name || "Your ward";
+
+              const { data: guardians } = await supabase
+                .from("guardians")
+                .select("guardian_user_id, guardian_phone")
+                .eq("user_id", userId)
+                .eq("status", "accepted")
+                .not("guardian_user_id", "is", null);
+
+              if (guardians && guardians.length > 0) {
+                const selectedIds = settings.locationSharingGuardianIds;
+                const filteredGuardians = selectedIds && selectedIds.length > 0
+                  ? guardians.filter((g) => selectedIds.includes(g.guardian_user_id!))
+                  : guardians;
+
+                if (filteredGuardians.length > 0) {
+                  const notifications = filteredGuardians.map((g) => ({
+                    user_id: g.guardian_user_id!,
+                    title: "✅ Back in Safe Zone",
+                    message: `${userName} has returned to the "${nearest.name}" safe zone area.`,
+                    type: "zone_return",
+                    read: false,
+                  }));
+
+                  await supabase.rpc("insert_notifications_deduped", {
+                    p_notifications: notifications,
+                  });
+
+                  const phones = Array.from(
+                    new Set(
+                      filteredGuardians
+                        .map((g: any) => (g.guardian_phone || "").toString().trim())
+                        .filter((p: string) => p.length > 0)
+                    )
+                  );
+                  if (phones.length > 0) {
+                    await supabase.functions.invoke("msg91-whatsapp-safezone-return", {
+                      body: {
+                        wardName: userName,
+                        zoneName: nearest.name,
+                        occurredAt: new Date().toISOString(),
+                        phones,
+                      },
+                    });
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("safe_zone_return WhatsApp invoke failed", e);
+            }
+          }
           return;
         }
+
 
         const wasInside = wasInsideRef.current;
         
