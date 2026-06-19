@@ -1,5 +1,4 @@
 import { Home, Calendar, Heart, HelpCircle, Settings, Bell, FileText, User, MessageCircle } from "lucide-react";
-import CallGuardianButton from "@/components/CallGuardianButton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -70,7 +69,7 @@ const NavTabs = () => {
   const userTabs: any[] = [
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
-    { label: "Call", path: "__call__", render: () => <CallGuardianButton variant="navIcon" /> },
+    { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
     { icon: Heart, label: "My Health", path: "/my-health", badge: refillDue ? 1 : 0 },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];

@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApp } from "@/contexts/AppContext";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/sonner";
 
 interface GuardianRow {
   id: string;
@@ -83,7 +82,14 @@ const CallGuardianButton = ({ variant = "card" }: Props) => {
           body: { guardian_id: g.id },
         });
       } catch {}
-      window.location.href = `tel:${tel}`;
+      // Direct dial — use a synthesized anchor click so the native dialer
+      // launches without an intermediate in-app confirmation step.
+      const a = document.createElement("a");
+      a.href = `tel:${tel}`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     },
     [session?.user?.id, userName]
   );
