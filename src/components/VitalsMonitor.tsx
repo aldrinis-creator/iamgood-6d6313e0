@@ -656,16 +656,25 @@ const DeviceReportsTab = () => {
       </Card>
 
       {analysis && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>{analysis}</ReactMarkdown>
-            </div>
-            <Button onClick={saveToVault} disabled={saving} variant="outline" className="w-full gap-2">
-              <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save to Medical Vault"}
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{analysis}</ReactMarkdown>
+              </div>
+              <Button onClick={saveToVault} disabled={saving} variant="outline" className="w-full gap-2">
+                <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save to Medical Vault"}
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <ReportShareButtons 
+            title="Device Report Analysis"
+            subtitle="Health Diagnostics AI Report"
+            content={analysis}
+            category="Lab Report"
+          />
+        </div>
       )}
     </div>
   );
