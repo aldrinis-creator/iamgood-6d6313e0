@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2, ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
@@ -49,6 +50,9 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
   const [sharePhone, setSharePhone] = useState("");
   const [sharing, setSharing] = useState(false);
   const [nudging, setNudging] = useState(false);
+  const [doctorReport, setDoctorReport] = useState<{ id: string; title: string; description: string | null; record_date: string | null } | null>(null);
+  const [doctorOpen, setDoctorOpen] = useState(false);
+  const [nudgingReport, setNudgingReport] = useState(false);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -74,7 +78,18 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     setLoading(false);
   }, [wardUserId]);
 
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+  const fetchDoctorReport = useCallback(async () => {
+    const { data } = await supabase
+      .from("medical_records")
+      .select("id, title, description, record_date")
+      .eq("user_id", wardUserId)
+      .eq("record_type", "Doctor's Diagnosis")
+      .order("record_date", { ascending: false })
+      .limit(1);
+    setDoctorReport((data && data[0]) ? (data[0] as any) : null);
+  }, [wardUserId]);
+
+  useEffect(() => { fetchRecords(); fetchDoctorReport(); }, [fetchRecords, fetchDoctorReport]);
 
   useEffect(() => {
     if (!wardUserId) return;
