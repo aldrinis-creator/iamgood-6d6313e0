@@ -1,4 +1,5 @@
 import { Home, Calendar, Heart, HelpCircle, Settings, Bell, FileText, User, MessageCircle } from "lucide-react";
+import CallGuardianButton from "@/components/CallGuardianButton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -66,10 +67,10 @@ const NavTabs = () => {
     return () => { supabase.removeChannel(pingChannel); };
   }, [role, session?.user?.id]);
 
-  const userTabs = [
+  const userTabs: any[] = [
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
-    { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
+    { label: "Call", path: "__call__", render: () => <CallGuardianButton variant="navIcon" /> },
     { icon: Heart, label: "My Health", path: "/my-health", badge: refillDue ? 1 : 0 },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];
@@ -120,7 +121,10 @@ const NavTabs = () => {
   return (
     <nav className="sticky bottom-0 w-full bg-card border-t border-border z-40 mt-auto pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-md mx-auto flex">
-        {tabs.map((tab, tabIdx) => {
+        {tabs.map((tab: any, tabIdx) => {
+          if (typeof tab.render === "function") {
+            return <div key={`${tab.path}-${tabIdx}`} className="flex-1 flex">{tab.render()}</div>;
+          }
           const isActive = location.pathname === tab.path;
           const badge = "badge" in tab ? (tab as any).badge : 0;
           return (
