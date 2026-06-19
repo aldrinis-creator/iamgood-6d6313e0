@@ -1,4 +1,4 @@
-import { User, LogOut, Settings, UserCircle, Wrench, Send, CalendarDays, MessageCircle } from "lucide-react";
+import { User, LogOut, Settings, UserCircle, Wrench, Send, CalendarDays } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import AQIWidget from "@/components/AQIWidget";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
