@@ -294,6 +294,49 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
         </CardContent>
       </Card>
 
+      {/* Doctor Visit Report */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex items-start gap-2">
+            <Stethoscope className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Latest Doctor Visit Report</p>
+              {doctorReport ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {doctorReport.record_date
+                    ? new Date(doctorReport.record_date).toLocaleDateString("en-IN")
+                    : "Saved"}
+                  {" — included in PDF"}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Not generated yet. Ward can create one in Health Tools → Doctor Visit Report.
+                </p>
+              )}
+            </div>
+            {doctorReport ? (
+              <Badge variant="default" className="text-[10px] shrink-0">Ready</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
+            )}
+          </div>
+          <div className="flex gap-2 mt-2">
+            {doctorReport ? (
+              <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => setDoctorOpen(true)}>
+                <Eye className="w-3 h-3 mr-1" /> View Report
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="flex-1 h-8" onClick={handleNudgeReport} disabled={nudgingReport}>
+                {nudgingReport ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bell className="w-3 h-3 mr-1" />}
+                Nudge {wardName} for report
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+
+
       {SLOT_DEFS.map((def) => {
         const entry = records[def.key];
         const Icon = def.icon;
