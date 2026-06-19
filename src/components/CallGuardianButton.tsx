@@ -82,8 +82,24 @@ const CallGuardianButton = ({ variant = "card" }: Props) => {
           body: { guardian_id: g.id },
         });
       } catch {}
-      // Direct dial — use a synthesized anchor click so the native dialer
-      // launches without an intermediate in-app confirmation step.
+
+      // Prefer native Capacitor path when running as installed app — this
+      // hands off directly to the OS dialer (no in-browser confirm sheet on
+      // Android). On iOS, OS still shows its own Call/Cancel system prompt
+      // which cannot be suppressed by any app.
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (Capacitor?.isNativePlatform?.()) {
+          // window.open with tel: on Capacitor triggers a native ACTION_DIAL
+          // / openURL intent without a webview confirmation step.
+          window.open(`tel:${tel}`, "_system");
+          return;
+        }
+      } catch {}
+
+      // Web / PWA fallback — synthesized anchor click. Mobile browsers may
+      // still show their own OS-level call confirmation sheet (iOS Safari
+      // always does); this is enforced by the browser and cannot be bypassed.
       const a = document.createElement("a");
       a.href = `tel:${tel}`;
       a.rel = "noopener";
