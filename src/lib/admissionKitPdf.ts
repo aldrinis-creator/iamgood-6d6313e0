@@ -23,6 +23,7 @@ export interface AdmissionKitInput {
   primaryGuardianPhone?: string | null;
   emergencyNotes?: string | null;
   docs: AdmissionKitDoc[];
+  doctorVisitReport?: { dateISO: string; markdown: string } | null;
 }
 
 const NAVY = "#1a365d";
@@ -178,6 +179,47 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
       try {
         pdf.addImage(img.dataUrl, "JPEG", x, yImg, w, h, undefined, "FAST");
       } catch { /* ignore */ }
+    }
+  }
+
+  // ===== Doctor Visit Report (text section) =====
+  if (input.doctorVisitReport && input.doctorVisitReport.markdown?.trim()) {
+    const dateStr = (() => {
+      try { return new Date(input.doctorVisitReport!.dateISO).toLocaleDateString("en-IN"); }
+      catch { return input.doctorVisitReport!.dateISO; }
+    })();
+    pdf.addPage();
+    pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
+    pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
+    pdf.text(`Doctor Visit Report — ${dateStr}`, margin, 26);
+
+    pdf.setTextColor("#000000");
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+
+    // Strip basic markdown for cleaner PDF rendering
+    const clean = input.doctorVisitReport.markdown
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/[`*_>#]/g, "")
+      .replace(/\r/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    const maxW = pageW - margin * 2;
+    const lines = pdf.splitTextToSize(clean, maxW);
+    const lineH = 13;
+    let yT = 60;
+    for (const line of lines) {
+      if (yT > pageH - margin) {
+        pdf.addPage();
+        pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
+        pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
+        pdf.text(`Doctor Visit Report — ${dateStr} (cont.)`, margin, 26);
+        pdf.setTextColor("#000000"); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+        yT = 60;
+      }
+      pdf.text(line, margin, yT);
+      yT += lineH;
     }
   }
 
