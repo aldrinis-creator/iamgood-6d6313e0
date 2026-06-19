@@ -98,11 +98,11 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "medical_records", filter: `user_id=eq.${wardUserId}` },
-        () => fetchRecords()
+        () => { fetchRecords(); fetchDoctorReport(); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [wardUserId, fetchRecords]);
+  }, [wardUserId, fetchRecords, fetchDoctorReport]);
 
   const openPreview = async (entry: SlotEntry, label: string) => {
     const out: { url: string; name: string; isPdf: boolean }[] = [];
