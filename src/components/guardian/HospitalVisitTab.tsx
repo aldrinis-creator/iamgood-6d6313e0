@@ -191,6 +191,9 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     } finally {
       setNudgingReport(false);
     }
+  };
+
+
 
   const handleDownloadKit = async () => {
     setGenerating(true);
