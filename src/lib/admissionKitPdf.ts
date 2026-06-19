@@ -236,46 +236,166 @@ export async function buildAdmissionKitPdf(input: AdmissionKitInput): Promise<Bl
     }
   }
 
-  // ===== Doctor Visit Report (text section) =====
-  if (input.doctorVisitReport && input.doctorVisitReport.markdown?.trim()) {
-    const dateStr = (() => {
-      try { return new Date(input.doctorVisitReport!.dateISO).toLocaleDateString("en-IN"); }
-      catch { return input.doctorVisitReport!.dateISO; }
-    })();
-    pdf.addPage();
-    pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
-    pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
-    pdf.text(`Doctor Visit Report — ${dateStr}`, margin, 26);
-
-    pdf.setTextColor("#000000");
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-
-    // Strip basic markdown for cleaner PDF rendering
-    const clean = input.doctorVisitReport.markdown
-      .replace(/```[\s\S]*?```/g, "")
-      .replace(/[`*_>#]/g, "")
-      .replace(/\r/g, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-
+  // ===== Ward Profile Snapshot =====
+  if (input.profileSnapshot) {
+    const snap = input.profileSnapshot;
+    const lineH = 14;
+    const labelW = 150;
     const maxW = pageW - margin * 2;
-    const lines = pdf.splitTextToSize(clean, maxW);
-    const lineH = 13;
-    let yT = 60;
-    for (const line of lines) {
-      if (yT > pageH - margin) {
+    let yS = 0;
+
+    const ensureSpace = (needed: number, contTitle?: string) => {
+      if (yS === 0 || yS + needed > pageH - margin) {
         pdf.addPage();
         pdf.setFillColor(NAVY); pdf.rect(0, 0, pageW, 40, "F");
         pdf.setTextColor("#ffffff"); pdf.setFontSize(13); pdf.setFont("helvetica", "bold");
-        pdf.text(`Doctor Visit Report — ${dateStr} (cont.)`, margin, 26);
-        pdf.setTextColor("#000000"); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
-        yT = 60;
+        pdf.text(contTitle || "Ward Profile Snapshot", margin, 26);
+        pdf.setTextColor("#000000");
+        yS = 60;
       }
-      pdf.text(line, margin, yT);
-      yT += lineH;
+    };
+
+    const drawSectionHeader = (title: string) => {
+      ensureSpace(40);
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.setTextColor(NAVY);
+      pdf.text(title, margin, yS);
+      yS += 6;
+      pdf.setDrawColor(NAVY); pdf.setLineWidth(0.8);
+      pdf.line(margin, yS, pageW - margin, yS);
+      yS += 12;
+      pdf.setTextColor("#000000");
+    };
+
+    const drawRow = (label: string, value: string) => {
+      const text = value && value.trim() ? value : "—";
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(10);
+      const wrapped = pdf.splitTextToSize(text, maxW - labelW);
+      const need = lineH * Math.max(1, wrapped.length);
+      ensureSpace(need + 4);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(label, margin, yS);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(wrapped, margin + labelW, yS);
+      yS += need;
+    };
+
+    const drawNote = (text: string) => {
+      pdf.setFont("helvetica", "italic"); pdf.setFontSize(10); pdf.setTextColor("#666666");
+      ensureSpace(lineH + 4);
+      pdf.text(text, margin, yS);
+      yS += lineH;
+      pdf.setTextColor("#000000");
+    };
+
+    const fmtList = (arr?: string[] | null) =>
+      arr && arr.length ? arr.join(", ") : "";
+    const fmtNum = (n?: number | null, suffix = "") =>
+      n != null && !Number.isNaN(n) ? `${n}${suffix}` : "";
+    const fmtDate = (d?: string | null) => {
+      if (!d) return "";
+      try { return new Date(d).toLocaleDateString("en-IN"); } catch { return d; }
+    };
+
+    // 1. Personal Information
+    drawSectionHeader("1. Personal Information");
+    drawRow("Full Name:", snap.personal.full_name || "");
+    drawRow(
+      "Date of Birth:",
+      snap.personal.date_of_birth
+        ? `${fmtDate(snap.personal.date_of_birth)}${snap.personal.age != null ? ` (${snap.personal.age} yrs)` : ""}`
+        : ""
+    );
+    drawRow("Mobile:", snap.personal.phone || "");
+    drawRow("Gender:", snap.personal.gender ? snap.personal.gender.charAt(0).toUpperCase() + snap.personal.gender.slice(1) : "");
+    yS += 8;
+
+    // 2. Current Medications
+    drawSectionHeader("2. Current Medications");
+    if (snap.medications.length === 0) {
+      drawNote("No active medications recorded.");
+    } else {
+      for (const m of snap.medications) {
+        const stock = (m.remaining_quantity != null && m.total_quantity != null)
+          ? `  •  Stock: ${m.remaining_quantity}/${m.total_quantity}`
+          : "";
+        const parts = [m.dosage, m.frequency].filter(Boolean).join(", ");
+        drawRow(`• ${m.name}`, `${parts}${stock}`);
+      }
     }
+    yS += 8;
+
+    // 3. Body Metrics
+    drawSectionHeader("3. Body Metrics");
+    drawRow("Weight:", fmtNum(snap.bodyMetrics.weight_kg, " kg"));
+    drawRow("Height:", fmtNum(snap.bodyMetrics.height_m, " m"));
+    drawRow(
+      "BMI:",
+      snap.bodyMetrics.bmi != null
+        ? `${snap.bodyMetrics.bmi.toFixed(1)}${snap.bodyMetrics.bmi_label ? ` — ${snap.bodyMetrics.bmi_label}` : ""}`
+        : ""
+    );
+    yS += 8;
+
+    // 4. Body & Health
+    drawSectionHeader("4. Body & Health");
+    drawRow("Blood Group:", snap.bodyHealth.blood_group || "");
+    drawRow("Diet Type:", snap.bodyHealth.diet_type ? snap.bodyHealth.diet_type.replace(/-/g, " ") : "");
+    drawRow("Allergies:", fmtList(snap.bodyHealth.allergies));
+    drawRow("Medical Conditions:", fmtList(snap.bodyHealth.medical_conditions));
+    drawRow("Activity Level:", snap.bodyHealth.activity_level || "");
+    drawRow("Smoking:", snap.bodyHealth.smoking || "");
+    drawRow("Alcohol:", snap.bodyHealth.alcohol || "");
+    if (snap.bodyHealth.dietary_preferences && snap.bodyHealth.dietary_preferences.length) {
+      drawRow("Dietary Preferences:", fmtList(snap.bodyHealth.dietary_preferences));
+    }
+    if (snap.bodyHealth.health_goals && snap.bodyHealth.health_goals.length) {
+      drawRow("Health Goals:", fmtList(snap.bodyHealth.health_goals));
+    }
+    yS += 8;
+
+    // 5. Past Medical History
+    drawSectionHeader("5. Past Medical History");
+    const hosp = snap.medicalHistory.filter((h) => h.type === "hospitalization");
+    const surg = snap.medicalHistory.filter((h) => h.type === "surgery");
+    const other = snap.medicalHistory.filter((h) => h.type !== "hospitalization" && h.type !== "surgery");
+
+    const drawHistoryGroup = (title: string, items: typeof snap.medicalHistory) => {
+      if (!items.length) return;
+      ensureSpace(lineH + 8);
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(10.5);
+      pdf.text(title, margin, yS);
+      yS += lineH;
+      for (const h of items) {
+        const head = `• ${h.reason}${h.nature ? ` (${h.nature})` : ""}`;
+        const meta = [
+          h.hospital_name ? `at ${h.hospital_name}` : "",
+          h.start_date ? `from ${fmtDate(h.start_date)}` : "",
+          h.end_date ? `to ${fmtDate(h.end_date)}` : "",
+          h.doctor_name ? `Dr. ${h.doctor_name}` : "",
+        ].filter(Boolean).join("  •  ");
+        drawRow(head, meta);
+        if (h.treatment) drawRow("   Treatment:", h.treatment);
+        if (h.medications) drawRow("   Medications:", h.medications);
+        if (h.advice) drawRow("   Advice:", h.advice);
+      }
+    };
+
+    if (!hosp.length && !surg.length && !other.length) {
+      drawNote("No past hospitalizations or surgeries recorded.");
+    } else {
+      drawHistoryGroup("Hospitalizations", hosp);
+      drawHistoryGroup("Surgeries", surg);
+      drawHistoryGroup("Other", other);
+    }
+    yS += 8;
+
+    // 6. Family Doctor
+    drawSectionHeader("6. Family Doctor");
+    drawRow("Doctor Name:", snap.familyDoctor.name || "");
+    drawRow("Doctor Phone:", snap.familyDoctor.phone || "");
   }
+
+
 
   return pdf.output("blob");
 }
