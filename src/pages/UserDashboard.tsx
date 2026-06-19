@@ -6,6 +6,7 @@ import useRefillDue from "@/hooks/useRefillDue";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
+import CallGuardianButton from "@/components/CallGuardianButton";
 import HealthPassport from "@/components/HealthPassport";
 import AppLayout from "@/components/AppLayout";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -299,6 +300,11 @@ const UserDashboard = () => {
 
         {/* Check-In Card */}
         <CheckInCard />
+
+        {/* One-tap Call Guardian */}
+        <CallGuardianButton />
+
+
 
         {/* Practice SOS */}
         {isNewUser && (
