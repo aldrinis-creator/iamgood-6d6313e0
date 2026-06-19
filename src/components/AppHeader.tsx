@@ -57,11 +57,6 @@ const AppHeader = () => {
                   <CalendarDays className="w-4 h-4 mr-2" /> Appointments
                 </DropdownMenuItem>
               )}
-              {role !== "guardian" && (
-                <DropdownMenuItem onClick={() => navigate("/messages")}>
-                  <MessageCircle className="w-4 h-4 mr-2" /> Messages
-                </DropdownMenuItem>
-              )}
               <DropdownMenuItem onClick={() => navigate("/my-profile")}>
                 <UserCircle className="w-4 h-4 mr-2" /> My Profile
               </DropdownMenuItem>
