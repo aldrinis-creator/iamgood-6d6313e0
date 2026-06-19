@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { BriefcaseMedical, Download, Eye, Bell, Share2, FileText, IdCard, ShieldCheck, ImageIcon, Loader2, ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
@@ -49,6 +50,9 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
   const [sharePhone, setSharePhone] = useState("");
   const [sharing, setSharing] = useState(false);
   const [nudging, setNudging] = useState(false);
+  const [doctorReport, setDoctorReport] = useState<{ id: string; title: string; description: string | null; record_date: string | null } | null>(null);
+  const [doctorOpen, setDoctorOpen] = useState(false);
+  const [nudgingReport, setNudgingReport] = useState(false);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -74,7 +78,18 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
     setLoading(false);
   }, [wardUserId]);
 
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+  const fetchDoctorReport = useCallback(async () => {
+    const { data } = await supabase
+      .from("medical_records")
+      .select("id, title, description, record_date")
+      .eq("user_id", wardUserId)
+      .eq("record_type", "Doctor's Diagnosis")
+      .order("record_date", { ascending: false })
+      .limit(1);
+    setDoctorReport((data && data[0]) ? (data[0] as any) : null);
+  }, [wardUserId]);
+
+  useEffect(() => { fetchRecords(); fetchDoctorReport(); }, [fetchRecords, fetchDoctorReport]);
 
   useEffect(() => {
     if (!wardUserId) return;
@@ -83,11 +98,11 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "medical_records", filter: `user_id=eq.${wardUserId}` },
-        () => fetchRecords()
+        () => { fetchRecords(); fetchDoctorReport(); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [wardUserId, fetchRecords]);
+  }, [wardUserId, fetchRecords, fetchDoctorReport]);
 
   const openPreview = async (entry: SlotEntry, label: string) => {
     const out: { url: string; name: string; isPdf: boolean }[] = [];
@@ -154,8 +169,31 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
       primaryGuardianPhone: guardianRes.data?.guardian_phone || null,
       emergencyNotes: healthRes.data?.emergency_notes || null,
       docs,
+      doctorVisitReport: doctorReport?.description
+        ? { dateISO: doctorReport.record_date || new Date().toISOString(), markdown: doctorReport.description }
+        : null,
     });
   };
+
+  const handleNudgeReport = async () => {
+    setNudgingReport(true);
+    try {
+      const { error } = await supabase.rpc("insert_notification_deduped", {
+        p_user_id: wardUserId,
+        p_title: "Doctor Visit Report needed",
+        p_message: "Your guardian would like an up-to-date Doctor Visit Report for the Hospital Admission Kit. Open Health Tools → Doctor Visit Report and tap Generate, then Save to Vault.",
+        p_type: "doctor_report_missing",
+      });
+      if (error) throw error;
+      toast.success(`${wardName} notified`);
+    } catch (e: any) {
+      toast.error(e?.message || "Nudge failed");
+    } finally {
+      setNudgingReport(false);
+    }
+  };
+
+
 
   const handleDownloadKit = async () => {
     setGenerating(true);
@@ -256,6 +294,49 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
         </CardContent>
       </Card>
 
+      {/* Doctor Visit Report */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex items-start gap-2">
+            <Stethoscope className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">Latest Doctor Visit Report</p>
+              {doctorReport ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {doctorReport.record_date
+                    ? new Date(doctorReport.record_date).toLocaleDateString("en-IN")
+                    : "Saved"}
+                  {" — included in PDF"}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Not generated yet. Ward can create one in Health Tools → Doctor Visit Report.
+                </p>
+              )}
+            </div>
+            {doctorReport ? (
+              <Badge variant="default" className="text-[10px] shrink-0">Ready</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] shrink-0 border-yellow-500 text-yellow-700 dark:text-yellow-400">Missing</Badge>
+            )}
+          </div>
+          <div className="flex gap-2 mt-2">
+            {doctorReport ? (
+              <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => setDoctorOpen(true)}>
+                <Eye className="w-3 h-3 mr-1" /> View Report
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="flex-1 h-8" onClick={handleNudgeReport} disabled={nudgingReport}>
+                {nudgingReport ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bell className="w-3 h-3 mr-1" />}
+                Nudge {wardName} for report
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+
+
       {SLOT_DEFS.map((def) => {
         const entry = records[def.key];
         const Icon = def.icon;
@@ -323,6 +404,19 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={doctorOpen} onOpenChange={setDoctorOpen}>
+        <DialogContent className="max-w-[420px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              Doctor Visit Report{doctorReport?.record_date ? ` — ${new Date(doctorReport.record_date).toLocaleDateString("en-IN")}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown>{doctorReport?.description || ""}</ReactMarkdown>
+          </div>
         </DialogContent>
       </Dialog>
 

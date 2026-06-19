@@ -25,16 +25,26 @@ const SLOT_LABELS: Record<string, string> = {
 const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
   const navigate = useNavigate();
   const [filledSlots, setFilledSlots] = useState<string[]>([]);
+  const [hasDoctorReport, setHasDoctorReport] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [nudging, setNudging] = useState(false);
 
   const fetchCount = useCallback(async () => {
-    const { data } = await supabase
-      .from("medical_records")
-      .select("id, record_slot, record_type, file_url, file_name")
-      .eq("user_id", wardUserId);
-    const resolved = resolveSlotRows((data || []) as any);
+    const [slotsRes, drRes] = await Promise.all([
+      supabase
+        .from("medical_records")
+        .select("id, record_slot, record_type, file_url, file_name")
+        .eq("user_id", wardUserId),
+      supabase
+        .from("medical_records")
+        .select("id")
+        .eq("user_id", wardUserId)
+        .eq("record_type", "Doctor's Diagnosis")
+        .limit(1),
+    ]);
+    const resolved = resolveSlotRows((slotsRes.data || []) as any);
     setFilledSlots(Object.keys(resolved));
+    setHasDoctorReport(!!(drRes.data && drRes.data.length));
     setLoading(false);
   }, [wardUserId]);
 
@@ -98,6 +108,13 @@ const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
         {!loading && count > 0 && count < TOTAL_SLOTS && (
           <p className="text-[11px] text-muted-foreground">
             Missing: {missing.map(k => SLOT_LABELS[k]).join(", ")}
+          </p>
+        )}
+        {!loading && (
+          <p className="text-[11px] text-muted-foreground">
+            Doctor Visit Report: <span className={hasDoctorReport ? "text-success font-medium" : "text-yellow-600 font-medium"}>
+              {hasDoctorReport ? "ready" : "missing"}
+            </span>
           </p>
         )}
         {!loading && missing.length > 0 && (
