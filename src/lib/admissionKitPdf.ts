@@ -12,6 +12,60 @@ export interface AdmissionKitDoc {
   pages: AdmissionKitPage[]; // empty = missing
 }
 
+export interface ProfileSnapshotMedication {
+  name: string;
+  dosage?: string | null;
+  frequency?: string | null;
+  remaining_quantity?: number | null;
+  total_quantity?: number | null;
+}
+
+export interface ProfileSnapshotHistory {
+  type: string; // "hospitalization" | "surgery"
+  reason: string;
+  nature?: string | null;
+  hospital_name?: string | null;
+  doctor_name?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  treatment?: string | null;
+  medications?: string | null;
+  advice?: string | null;
+}
+
+export interface ProfileSnapshot {
+  personal: {
+    full_name?: string | null;
+    date_of_birth?: string | null;
+    age?: number | null;
+    phone?: string | null;
+    gender?: string | null;
+  };
+  bodyMetrics: {
+    weight_kg?: number | null;
+    height_m?: number | null;
+    bmi?: number | null;
+    bmi_label?: string | null;
+  };
+  bodyHealth: {
+    blood_group?: string | null;
+    diet_type?: string | null;
+    allergies?: string[] | null;
+    medical_conditions?: string[] | null;
+    activity_level?: string | null;
+    smoking?: string | null;
+    alcohol?: string | null;
+    dietary_preferences?: string[] | null;
+    health_goals?: string[] | null;
+  };
+  familyDoctor: {
+    name?: string | null;
+    phone?: string | null;
+  };
+  medications: ProfileSnapshotMedication[];
+  medicalHistory: ProfileSnapshotHistory[];
+}
+
 export interface AdmissionKitInput {
   wardName: string;
   wardDob?: string | null;
@@ -23,7 +77,7 @@ export interface AdmissionKitInput {
   primaryGuardianPhone?: string | null;
   emergencyNotes?: string | null;
   docs: AdmissionKitDoc[];
-  doctorVisitReport?: { dateISO: string; markdown: string } | null;
+  profileSnapshot?: ProfileSnapshot | null;
 }
 
 const NAVY = "#1a365d";
