@@ -407,6 +407,19 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={doctorOpen} onOpenChange={setDoctorOpen}>
+        <DialogContent className="max-w-[420px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              Doctor Visit Report{doctorReport?.record_date ? ` — ${new Date(doctorReport.record_date).toLocaleDateString("en-IN")}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown>{doctorReport?.description || ""}</ReactMarkdown>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="max-w-[380px]">
           <DialogHeader>
