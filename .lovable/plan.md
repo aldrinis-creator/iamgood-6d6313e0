@@ -1,19 +1,59 @@
-I found the current button already uses a `tel:` link, which mobile browsers can still show an OS confirmation sheet. That sheet is controlled by iOS/Android/browser security and cannot be fully suppressed from a normal web/PWA page.
+## Goal
 
-Plan:
-1. Update `CallGuardianButton` to prefer Capacitor native execution when the app is running as an installed native app.
-   - Use `@capacitor/core` to detect native platform.
-   - On Android, use the native intent path so the Ward tap hands off to the phone app more directly than a browser-created `tel:` anchor.
-   - Keep the existing `tel:` fallback for browser/PWA/preview, because browser confirmation is unavoidable there.
-2. Preserve the simple Ward UX.
-   - Single tap on the green band immediately attempts to call the primary Guardian.
-   - No custom in-app confirmation, no extra question, no dropdown on normal tap.
-   - Long-press selection for multiple guardians can remain, but I’ll prevent accidental dropdown opening from interfering with normal tap.
-3. Keep background side effects intact.
-   - Continue logging the call attempt.
-   - Continue sending the Guardian call notification.
-4. Verify the code path.
-   - Confirm the button still renders as `Call Don` and the bottom Messages tab stays unchanged.
-   - Confirm there is no app-created modal/confirmation in the call flow.
+In the Guardian app's Hospital Admission Kit:
 
-Important limitation: in the web preview and PWA/browser mode, Android/iOS may still show the blue `Call +91...` OS sheet. The only way to avoid that class of browser prompt is to use the installed native app path; true automatic phone calls also require platform permissions and may still be restricted by the OS for safety.
+1. Remove the Doctor Visit Report attachment (UI tile + PDF section + nudge).
+2. Add a new **Ward Profile Snapshot** section to the PDF and the on-screen kit, pulling six groups from the Ward's My Profile.
+3. Restrict the entire Hospital Admission Kit (card on dashboard + Hospital Visit tab actions) so only the **Primary Guardian** for that ward can see/use it.
+
+## Profile Snapshot — fields per section
+
+Mirrors the Ward's My Profile screen, sourced from the same tables MyProfile already reads.
+
+1. **Personal Information** — `profiles`: full_name, date_of_birth (+ age), phone, gender
+2. **Current Medications** — `medications`: name, dosage, frequency, remaining/total stock
+3. **Body Metrics** — `health_profile` / persona: weight_kg, height_m, BMI (computed)
+4. **Body & Health** — `health_profile` + `nutrition_personas`: blood_group, diet_type, allergies, medical_conditions, activity_level, smoking, alcohol, dietary_preferences, health_goals
+5. **Past Medical History** — `medical_history`: hospitalizations + surgeries (reason, hospital, dates, treatment/advice)
+6. **Family Doctor** — `health_profile`: doctor_name, doctor_phone
+
+Empty fields render as `—`; empty whole sections still render with a "No data" note so the printed kit is self-documenting.
+
+## Changes
+
+### `src/lib/admissionKitPdf.ts`
+
+- Remove `doctorVisitReport` field from `AdmissionKitInput` and its PDF section.
+- Add `profileSnapshot?: ProfileSnapshot` field with the six grouped objects above.
+- After the cover/documents pages, render a "Ward Profile Snapshot" section: navy header band, one A4 page per group (or grouped with auto-pagination), label/value rows reusing the existing layout helpers.
+
+### `src/components/guardian/HospitalVisitTab.tsx`
+
+- Drop `doctorReport` state, `fetchDoctorReport`, the "Latest Doctor Visit Report" card, the View Report dialog, and the nudge-for-report flow.
+- In `buildKit`, replace the doctor-report fetch with parallel queries to `profiles`, `health_profile`, `nutrition_personas`, `medications` (active only), and `medical_history`, then assemble `profileSnapshot` and pass it to `buildAdmissionKitPdf`.
+- Add an on-screen "Ward Profile Snapshot" card listing the six section names with a small status badge (filled vs. empty) so the guardian can see what will be in the PDF before downloading. Re-use the existing realtime channel to refresh when ward data changes (extend filter to the new tables).
+
+### `src/components/guardian/HospitalKitCard.tsx`
+
+- Remove the `hasDoctorReport` query and the "Doctor Visit Report: ready/missing" line.
+
+### Primary-Guardian gating
+
+- Add a small helper `useIsPrimaryGuardian(wardUserId)` (or inline check) that queries `guardians` for `guardian_user_id = auth.uid()`, `user_id = wardUserId`, `is_primary = true`, `status = 'accepted'`.
+- In `GuardianDashboard.tsx`, only render `<HospitalKitCard>` when the check returns true.
+- In `HospitalVisitTab.tsx`, if not primary, render a single card: "Only the Primary Guardian can access the Hospital Admission Kit for {wardName}." and skip all fetches.
+- No backend RLS change required — all reads are already scoped by the existing accepted-guardian policies; the gate is a UX restriction so non-primary guardians don't see or trigger kit downloads.
+
+## Out of scope
+
+- No changes to the Ward's My Profile UI or schema.
+- No changes to the WhatsApp share flow other than it now sends the new PDF contents.
+- The Doctor Visit Report in Health Tools (Ward side) is untouched.
+
+## Verification
+
+- Sign in as Primary Guardian → Hospital Admission Kit card visible on dashboard; Hospital Visit tab shows the six-section snapshot card; downloaded PDF contains cover → ID/insurance images → Ward Profile Snapshot (6 sections); no Doctor Visit Report anywhere.
+- Sign in as a non-primary accepted Guardian → kit card hidden on dashboard; visiting `/guardian/reports?section=hospital_visit` shows the restriction notice.
+- Ward with sparse profile → snapshot still renders, empty fields show `—`.
+
+Ensure that the PDF downlaod is clear and there is no garbled data. Same with the Share command as Guardians should be able to share the PDF with whoever they choose.

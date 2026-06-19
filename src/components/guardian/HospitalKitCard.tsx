@@ -7,6 +7,7 @@ import { BriefcaseMedical, ChevronRight, Bell, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { SLOT_KEYS, resolveSlotRows } from "@/lib/hospitalKitSlots";
+import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
 
 interface Props {
   wardUserId: string;
@@ -24,34 +25,28 @@ const SLOT_LABELS: Record<string, string> = {
 
 const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
   const navigate = useNavigate();
+  const { isPrimary, loading: gateLoading } = useIsPrimaryGuardian(wardUserId);
   const [filledSlots, setFilledSlots] = useState<string[]>([]);
-  const [hasDoctorReport, setHasDoctorReport] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [nudging, setNudging] = useState(false);
 
   const fetchCount = useCallback(async () => {
-    const [slotsRes, drRes] = await Promise.all([
-      supabase
-        .from("medical_records")
-        .select("id, record_slot, record_type, file_url, file_name")
-        .eq("user_id", wardUserId),
-      supabase
-        .from("medical_records")
-        .select("id")
-        .eq("user_id", wardUserId)
-        .eq("record_type", "Doctor's Diagnosis")
-        .limit(1),
-    ]);
-    const resolved = resolveSlotRows((slotsRes.data || []) as any);
+    const { data } = await supabase
+      .from("medical_records")
+      .select("id, record_slot, record_type, file_url, file_name")
+      .eq("user_id", wardUserId);
+    const resolved = resolveSlotRows((data || []) as any);
     setFilledSlots(Object.keys(resolved));
-    setHasDoctorReport(!!(drRes.data && drRes.data.length));
     setLoading(false);
   }, [wardUserId]);
 
-  useEffect(() => { fetchCount(); }, [fetchCount]);
+  useEffect(() => {
+    if (!isPrimary) return;
+    fetchCount();
+  }, [isPrimary, fetchCount]);
 
   useEffect(() => {
-    if (!wardUserId) return;
+    if (!wardUserId || !isPrimary) return;
     const channel = supabase
       .channel(`hospital-kit-${wardUserId}`)
       .on(
@@ -61,7 +56,10 @@ const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [wardUserId, fetchCount]);
+  }, [wardUserId, isPrimary, fetchCount]);
+
+  // Only Primary Guardian sees the Hospital Admission Kit entry point.
+  if (gateLoading || !isPrimary) return null;
 
   const missing = Object.keys(SLOT_LABELS).filter(k => !filledSlots.includes(k));
   const count = filledSlots.length;
@@ -112,9 +110,7 @@ const HospitalKitCard = ({ wardUserId, wardName }: Props) => {
         )}
         {!loading && (
           <p className="text-[11px] text-muted-foreground">
-            Doctor Visit Report: <span className={hasDoctorReport ? "text-success font-medium" : "text-yellow-600 font-medium"}>
-              {hasDoctorReport ? "ready" : "missing"}
-            </span>
+            Includes Ward Profile Snapshot (Personal, Medications, Body Metrics, Health, History, Family Doctor).
           </p>
         )}
         {!loading && missing.length > 0 && (
