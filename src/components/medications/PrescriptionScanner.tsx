@@ -61,6 +61,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [docFileName, setDocFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [extractedDocText, setExtractedDocText] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     if (isDocument(file)) {
       setExtracting(true);
       setDocFileName(file.name);
+      setSelectedFile(file);
       setImagePreview(null);
       setImageBase64(null);
       setExtractedDocText(null);
@@ -134,6 +136,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
     }
 
     setDocFileName(null);
+    setSelectedFile(file);
     setExtractedDocText(null);
     const reader = new FileReader();
     reader.onload = () => {
@@ -330,7 +333,7 @@ const PrescriptionScanner = ({ alternativeMode, onSelectAlternative, onCancelAlt
         />
       )}
 
-      {result && <SaveToVaultButton result={result} />}
+      {result && <SaveToVaultButton result={result} file={selectedFile} />}
 
       <p className="text-[10px] text-muted-foreground text-center">
         ⚠️ This tool provides informational guidance only. Always consult your doctor before changing medications.
@@ -437,7 +440,7 @@ const PrescriptionResults = ({ result, onSelectAlternative }: { result: ScanResu
   </div>
 );
 
-const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
+const SaveToVaultButton = ({ result, file }: { result: ScanResult; file: File | null }) => {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -457,12 +460,25 @@ const SaveToVaultButton = ({ result }: { result: ScanResult }) => {
         ...(result.interactions?.length ? ["", "Interactions:", ...result.interactions.map(i => `• ${i}`)] : []),
       ].join("\n");
 
+      let fileUrl = null;
+      if (file) {
+        const fileExt = file.name.split('.').pop() || "jpg";
+        const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from("medical-documents").upload(fileName, file);
+        if (uploadError) {
+          console.error("File upload error:", uploadError);
+        } else {
+          fileUrl = fileName;
+        }
+      }
+
       const { error } = await supabase.from("medical_records").insert({
         user_id: user.id,
         title: "Doctor's Diagnosis Analysis",
         record_type: "Doctor's Diagnosis",
         description: description.substring(0, 50000),
         record_date: new Date().toISOString().split("T")[0],
+        ...(fileUrl && { file_url: fileUrl }),
       });
       if (error) throw error;
       setSaved(true);

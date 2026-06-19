@@ -613,11 +613,24 @@ const DeviceReportsTab = () => {
     if (!analysis || !session?.user?.id) return;
     setSaving(true);
     try {
+      let fileUrl = null;
+      if (file) {
+        const fileExt = file.name.split('.').pop() || "jpg";
+        const fileName = `${session.user.id}/${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from("medical-documents").upload(fileName, file);
+        if (uploadError) {
+          console.error("File upload error:", uploadError);
+        } else {
+          fileUrl = fileName;
+        }
+      }
+
       const { error } = await supabase.from("medical_records").insert({
         user_id: session.user.id,
         title: `Device Report Analysis - ${new Date().toLocaleDateString("en-IN")}`,
         record_type: "Lab Report",
         description: analysis.substring(0, 50000),
+        ...(fileUrl && { file_url: fileUrl }),
       });
       if (error) throw error;
       toast.success("Saved to Medical Vault");

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +16,9 @@ import WardPicker from "@/components/WardPicker";
 import JourneyReportCard from "@/components/JourneyReportCard";
 import NutritionTrendChart, { type NutritionTrendPoint } from "@/components/NutritionTrendChart";
 import HospitalVisitTab from "@/components/guardian/HospitalVisitTab";
+import AnalysisReportTab from "@/components/guardian/AnalysisReportTab";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis";
 
 const GuardianReports = () => {
   const { session } = useAuth();
@@ -165,6 +166,7 @@ const GuardianReports = () => {
     { id: "nutrition", label: "Nutrition", icon: Utensils },
     { id: "journeys", label: "Journeys", icon: Navigation },
     { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
+    { id: "analysis", label: "Analysis Reports", icon: FileSearch },
   ];
 
   return (
@@ -334,6 +336,11 @@ const GuardianReports = () => {
         {/* Hospital Visit */}
         {activeSection === "hospital_visit" && wardUserId && (
           <HospitalVisitTab wardUserId={wardUserId} wardName={wardName} />
+        )}
+
+        {/* Analysis Reports */}
+        {activeSection === "analysis" && wardUserId && (
+          <AnalysisReportTab wardUserId={wardUserId} wardName={wardName} />
         )}
       </div>
     </AppLayout>
