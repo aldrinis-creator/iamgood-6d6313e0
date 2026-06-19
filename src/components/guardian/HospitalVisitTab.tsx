@@ -169,8 +169,28 @@ const HospitalVisitTab = ({ wardUserId, wardName }: Props) => {
       primaryGuardianPhone: guardianRes.data?.guardian_phone || null,
       emergencyNotes: healthRes.data?.emergency_notes || null,
       docs,
+      doctorVisitReport: doctorReport?.description
+        ? { dateISO: doctorReport.record_date || new Date().toISOString(), markdown: doctorReport.description }
+        : null,
     });
   };
+
+  const handleNudgeReport = async () => {
+    setNudgingReport(true);
+    try {
+      const { error } = await supabase.rpc("insert_notification_deduped", {
+        p_user_id: wardUserId,
+        p_title: "Doctor Visit Report needed",
+        p_message: "Your guardian would like an up-to-date Doctor Visit Report for the Hospital Admission Kit. Open Health Tools → Doctor Visit Report and tap Generate, then Save to Vault.",
+        p_type: "doctor_report_missing",
+      });
+      if (error) throw error;
+      toast.success(`${wardName} notified`);
+    } catch (e: any) {
+      toast.error(e?.message || "Nudge failed");
+    } finally {
+      setNudgingReport(false);
+    }
 
   const handleDownloadKit = async () => {
     setGenerating(true);
