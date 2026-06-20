@@ -83,7 +83,7 @@ async function buildHealthSummary(supabase: any, userId: string): Promise<{ summ
   const [profileRes, healthRes, medsRes, tokenRes] = await Promise.all([
     supabase.from("profiles").select("full_name, date_of_birth, gender").eq("id", userId).maybeSingle(),
     supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
-    supabase.from("medications").select("name, dosage").eq("user_id", userId).limit(5),
+    supabase.from("medications").select("name, dosage").eq("user_id", userId),
     supabase.from("emergency_share_tokens").select("token").eq("user_id", userId).eq("is_active", true).maybeSingle(),
   ]);
 
@@ -92,7 +92,7 @@ async function buildHealthSummary(supabase: any, userId: string): Promise<{ summ
   if (h?.blood_group) parts.push(`BG:${h.blood_group}`);
   if (h?.allergies?.length) parts.push(`Allergies:${h.allergies.slice(0, 3).join("/")}`);
   if (h?.chronic_conditions?.length) parts.push(`Cond:${h.chronic_conditions.slice(0, 3).join("/")}`);
-  if (medsRes.data?.length) parts.push(`Meds:${medsRes.data.slice(0, 3).map((m: any) => m.name).join("/")}`);
+  if (medsRes.data?.length) parts.push(`Meds:${medsRes.data.map((m: any) => m.name).join("/")}`);
   if (h?.family_doctor_phone) parts.push(`Dr:${h.family_doctor_name || ""} ${h.family_doctor_phone}`);
 
   const summary = parts.length ? parts.join(" | ") : "No health data";
@@ -139,7 +139,7 @@ async function sendWhatsAppViaMsg91(body: RequestBody, healthSummary: string, pr
     body.destination.name,                     // body_3
     userPhone,                                 // body_4
     guardianPhone,                             // body_5
-    healthSummary.slice(0, 200),               // body_6
+    healthSummary.slice(0, 800),               // body_6
     profileLink,                               // body_7
     body.ambulance_type || "BLS",              // body_8
   ]);
