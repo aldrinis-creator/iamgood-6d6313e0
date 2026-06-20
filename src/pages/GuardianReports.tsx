@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,8 +17,12 @@ import JourneyReportCard from "@/components/JourneyReportCard";
 import NutritionTrendChart, { type NutritionTrendPoint } from "@/components/NutritionTrendChart";
 import HospitalVisitTab from "@/components/guardian/HospitalVisitTab";
 import AnalysisReportTab from "@/components/guardian/AnalysisReportTab";
+import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit";
 
 const GuardianReports = () => {
   const { session } = useAuth();
@@ -28,6 +32,7 @@ const GuardianReports = () => {
   const [activeSection, setActiveSection] = useState<ReportSection>(initialSection);
   const wardUserId = selectedWard?.userId || null;
   const wardName = selectedWard?.name || "User";
+  const { isPrimary } = useIsPrimaryGuardian(wardUserId);
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -38,6 +43,7 @@ const GuardianReports = () => {
   const [vitalData, setVitalData] = useState<any[]>([]);
   const [mealLogs, setMealLogs] = useState<any[]>([]);
   const [journeyReports, setJourneyReports] = useState<any[]>([]);
+  const [doctorReports, setDoctorReports] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(!selectedWard);
@@ -71,6 +77,14 @@ const GuardianReports = () => {
     } else if (activeSection === "journeys") {
       supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
         .then(({ data }) => setJourneyReports(data || []));
+    } else if (activeSection === "doctor_visit") {
+      supabase.from("medical_records")
+        .select("id, title, description, record_date, created_at")
+        .eq("user_id", wardUserId)
+        .eq("record_type", "Doctor's Diagnosis")
+        .order("record_date", { ascending: false })
+        .limit(20)
+        .then(({ data }) => setDoctorReports(data || []));
     }
   }, [wardUserId, activeSection]);
 
@@ -167,6 +181,7 @@ const GuardianReports = () => {
     { id: "journeys", label: "Journeys", icon: Navigation },
     { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
     { id: "analysis", label: "Analysis Reports", icon: FileSearch },
+    ...(isPrimary ? [{ id: "doctor_visit" as ReportSection, label: "Doctor Visit", icon: Stethoscope }] : []),
   ];
 
   return (
@@ -341,6 +356,58 @@ const GuardianReports = () => {
         {/* Analysis Reports */}
         {activeSection === "analysis" && wardUserId && (
           <AnalysisReportTab wardUserId={wardUserId} wardName={wardName} />
+        )}
+
+        {/* Doctor Visit Reports — Primary Guardian only */}
+        {activeSection === "doctor_visit" && wardUserId && (
+          isPrimary ? (
+            doctorReports.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No Doctor Visit Reports yet
+                </CardContent>
+              </Card>
+            ) : (
+              <Accordion type="single" collapsible className="space-y-2">
+                {doctorReports.map((r) => {
+                  const visual = tryParseVisualReport(r.description || "");
+                  return (
+                    <AccordionItem key={r.id} value={r.id} className="border rounded-lg bg-card">
+                      <AccordionTrigger className="px-4 py-3 text-left hover:no-underline">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">{r.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {r.record_date ? format(new Date(r.record_date), "dd MMM yyyy") : ""}
+                          </p>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <ReportShareButtons
+                          title={r.title}
+                          subtitle={`${wardName} — Doctor Visit Report`}
+                          content={r.description || ""}
+                          category="Doctor Visit Report"
+                        />
+                        {visual ? (
+                          <VisualHealthReport report={visual} />
+                        ) : (
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <ReactMarkdown>{r.description || ""}</ReactMarkdown>
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                Doctor Visit Reports are accessible to the Primary Guardian only.
+              </CardContent>
+            </Card>
+          )
         )}
       </div>
     </AppLayout>
