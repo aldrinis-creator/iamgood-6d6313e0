@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       // 3. Fetch User Email from Auth
       let userEmail: string | undefined;
       try {
-        const { data: authUser } = await supabase.auth.admin.getUser(userId);
+        const { data: authUser } = await supabase.auth.admin.getUserById(userId);
         userEmail = authUser?.user?.email;
       } catch (err) {
         console.error(`Error fetching auth email for user ${userId}:`, err);
