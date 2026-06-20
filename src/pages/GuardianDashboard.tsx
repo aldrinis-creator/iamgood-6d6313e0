@@ -832,8 +832,15 @@ const GuardianDashboard = () => {
 
   return (
     <AppLayout>
+      <IncomingCallOverlay
+        open={!!incomingCall}
+        wardName={incomingCall?.wardName || "Your ward"}
+        wardPhone={incomingCall?.wardPhone}
+        onDismiss={dismissIncomingCall}
+      />
       <div className="p-4 space-y-4">
         <WardPicker />
+
         {activeSOS && (
           <Card className={`border-destructive bg-destructive/10 ${activeSOS.isStale ? "" : "animate-pulse"}`}>
             <CardContent className="p-4">
