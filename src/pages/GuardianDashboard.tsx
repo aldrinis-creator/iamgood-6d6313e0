@@ -244,6 +244,8 @@ const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { toast } = useToast();
+  const { call: incomingCall, dismiss: dismissIncomingCall } = useIncomingCallListener();
+
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
   const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string } | null>(null);
