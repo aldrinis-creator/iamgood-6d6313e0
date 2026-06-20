@@ -34,6 +34,9 @@ import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/u
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
 import HospitalKitCard from "@/components/guardian/HospitalKitCard";
 import WardInactivityPopup from "@/components/WardInactivityPopup";
+import IncomingCallOverlay from "@/components/guardian/IncomingCallOverlay";
+import { useIncomingCallListener } from "@/hooks/useIncomingCallListener";
+
 
 interface Notification {
   id: string;
