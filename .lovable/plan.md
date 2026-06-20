@@ -1,59 +1,58 @@
 ## Goal
 
-In the Guardian app's Hospital Admission Kit:
+When the Ward taps the green Call Guardian tab, the Guardian's Check-iN app should *actively ring* — loud, looping, attention-grabbing — regardless of whether the Guardian's browser tab is muted or in the background, **as long as the app is reachable** (foreground tab, background tab, or installed PWA with push enabled).
 
-1. Remove the Doctor Visit Report attachment (UI tile + PDF section + nudge).
-2. Add a new **Ward Profile Snapshot** section to the PDF and the on-screen kit, pulling six groups from the Ward's My Profile.
-3. Restrict the entire Hospital Admission Kit (card on dashboard + Hospital Visit tab actions) so only the **Primary Guardian** for that ward can see/use it.
+> Honest limit up front: if the Guardian's *phone* is in system Silent / DND / Focus mode, or the Check-iN app is fully uninstalled/closed with no push permission, nothing the web app does can force the phone hardware to ring. A real phone-style ring-through requires a native VoIP app (CallKit/ConnectionService). This plan gets us as close as possible inside the web/PWA.
 
-## Profile Snapshot — fields per section
+## What changes
 
-Mirrors the Ward's My Profile screen, sourced from the same tables MyProfile already reads.
+### 1. Backend — boost the existing call push (`notify-guardian-call`)
+The edge function already sends a web push. Tweak its payload so the Guardian's service worker treats it as a *call*, not a normal notification:
+- Add `kind: "incoming_call"`, `wardName`, `guardianId`, and a `callId` (uuid) to the JSON body.
+- Keep `requireInteraction: true` and `tag` so the notification can't be silently coalesced.
+- Also publish a Supabase Realtime broadcast on a per-guardian channel `guardian-call:{guardianUserId}` with the same payload, so a guardian who already has the app open gets the ring instantly without waiting for the push round-trip.
 
-1. **Personal Information** — `profiles`: full_name, date_of_birth (+ age), phone, gender
-2. **Current Medications** — `medications`: name, dosage, frequency, remaining/total stock
-3. **Body Metrics** — `health_profile` / persona: weight_kg, height_m, BMI (computed)
-4. **Body & Health** — `health_profile` + `nutrition_personas`: blood_group, diet_type, allergies, medical_conditions, activity_level, smoking, alcohol, dietary_preferences, health_goals
-5. **Past Medical History** — `medical_history`: hospitalizations + surgeries (reason, hospital, dates, treatment/advice)
-6. **Family Doctor** — `health_profile`: doctor_name, doctor_phone
+### 2. Guardian service worker (`src/sw.ts`)
+Handle `kind: "incoming_call"`:
+- Show the notification with `requireInteraction`, `renotify: true`, a custom vibration pattern, and an "Answer" / "Dismiss" action.
+- On `notificationclick → Answer`, focus an existing client or open `/guardian?incoming_call={callId}` so the in-app ringer screen takes over.
 
-Empty fields render as `—`; empty whole sections still render with a "No data" note so the printed kit is self-documenting.
+### 3. New in-app ringer (Guardian side)
+- New component `IncomingCallOverlay.tsx`: full-screen modal with Ward name, Answer (dials the Ward back via `tel:`) and Dismiss buttons, a pulsing avatar, and a looping ringtone.
+- New hook `useIncomingCallListener.ts` mounted once in `GuardianDashboard` (and any other guardian-only route shell). It:
+  - Subscribes to Realtime channel `guardian-call:{auth.uid()}`.
+  - Also listens for `postMessage` from the service worker (for pushes received while a tab is open).
+  - On signal, opens the overlay and starts the ringer.
+- Ringer audio: bundle a short looping ringtone (`src/assets/ringtone.mp3`, ~3 s, loud). Play via `HTMLAudioElement` with `loop=true`, plus a Web Audio oscillator fallback (880 Hz pulses, reusing the existing distress-tone util) so a fresh tab that hasn't had a user gesture yet still produces sound the moment the user taps "Answer/Open" from the notification (the notification click counts as a user gesture).
+- Auto-stop after 45 s if not answered; log a `missed_call` activity row.
 
-## Changes
+### 4. Guardian-side opt-in awareness
+- On the Guardian dashboard, add a one-line tip near the Alerts section: "Keep Check-iN open or installed and notifications on so Ward calls can ring you." Only show if push permission ≠ granted.
+- No new settings, no new permissions beyond the existing push subscription.
 
-### `src/lib/admissionKitPdf.ts`
+### 5. Ward side
+No change — the Ward already calls `notify-guardian-call` then dials `tel:`. Stays the same.
 
-- Remove `doctorVisitReport` field from `AdmissionKitInput` and its PDF section.
-- Add `profileSnapshot?: ProfileSnapshot` field with the six grouped objects above.
-- After the cover/documents pages, render a "Ward Profile Snapshot" section: navy header band, one A4 page per group (or grouped with auto-pagination), label/value rows reusing the existing layout helpers.
+## Files touched
 
-### `src/components/guardian/HospitalVisitTab.tsx`
-
-- Drop `doctorReport` state, `fetchDoctorReport`, the "Latest Doctor Visit Report" card, the View Report dialog, and the nudge-for-report flow.
-- In `buildKit`, replace the doctor-report fetch with parallel queries to `profiles`, `health_profile`, `nutrition_personas`, `medications` (active only), and `medical_history`, then assemble `profileSnapshot` and pass it to `buildAdmissionKitPdf`.
-- Add an on-screen "Ward Profile Snapshot" card listing the six section names with a small status badge (filled vs. empty) so the guardian can see what will be in the PDF before downloading. Re-use the existing realtime channel to refresh when ward data changes (extend filter to the new tables).
-
-### `src/components/guardian/HospitalKitCard.tsx`
-
-- Remove the `hasDoctorReport` query and the "Doctor Visit Report: ready/missing" line.
-
-### Primary-Guardian gating
-
-- Add a small helper `useIsPrimaryGuardian(wardUserId)` (or inline check) that queries `guardians` for `guardian_user_id = auth.uid()`, `user_id = wardUserId`, `is_primary = true`, `status = 'accepted'`.
-- In `GuardianDashboard.tsx`, only render `<HospitalKitCard>` when the check returns true.
-- In `HospitalVisitTab.tsx`, if not primary, render a single card: "Only the Primary Guardian can access the Hospital Admission Kit for {wardName}." and skip all fetches.
-- No backend RLS change required — all reads are already scoped by the existing accepted-guardian policies; the gate is a UX restriction so non-primary guardians don't see or trigger kit downloads.
-
-## Out of scope
-
-- No changes to the Ward's My Profile UI or schema.
-- No changes to the WhatsApp share flow other than it now sends the new PDF contents.
-- The Doctor Visit Report in Health Tools (Ward side) is untouched.
+- `supabase/functions/notify-guardian-call/index.ts` — extend payload, add realtime broadcast.
+- `src/sw.ts` — handle `incoming_call` push kind, postMessage to clients.
+- `src/components/guardian/IncomingCallOverlay.tsx` *(new)*
+- `src/hooks/useIncomingCallListener.ts` *(new)*
+- `src/pages/GuardianDashboard.tsx` — mount listener + overlay.
+- `src/assets/ringtone.mp3` *(new bundled asset)*
+- `src/lib/audioAlerts.ts` — small helper to start/stop the call ringer (reuses existing audio infra).
 
 ## Verification
 
-- Sign in as Primary Guardian → Hospital Admission Kit card visible on dashboard; Hospital Visit tab shows the six-section snapshot card; downloaded PDF contains cover → ID/insurance images → Ward Profile Snapshot (6 sections); no Doctor Visit Report anywhere.
-- Sign in as a non-primary accepted Guardian → kit card hidden on dashboard; visiting `/guardian/reports?section=hospital_visit` shows the restriction notice.
-- Ward with sparse profile → snapshot still renders, empty fields show `—`.
+After build:
+1. Sign in as Guardian on one browser, Ward on another.
+2. Ward taps Call Guardian → Guardian's open tab shows the full-screen ringing overlay with looping tone within ~1 s.
+3. Background the Guardian tab → push notification appears, clicking "Answer" focuses the tab and starts the ringer.
+4. Revoke push permission for the Guardian → confirm only the open-tab realtime path still rings (no errors).
 
-Ensure that the PDF downlaod is clear and there is no garbled data. Same with the Share command as Guardians should be able to share the PDF with whoever they choose.
+## Explicitly out of scope
+
+- True phone ring-through that bypasses system Silent/DND (would need native CallKit/ConnectionService).
+- WhatsApp / SMS fallback (you picked push + in-app ringer only).
+- Two-way VoIP audio — the "Answer" button still uses `tel:` to place the actual call.
