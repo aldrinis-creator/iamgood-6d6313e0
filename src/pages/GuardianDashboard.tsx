@@ -34,6 +34,9 @@ import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/u
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
 import HospitalKitCard from "@/components/guardian/HospitalKitCard";
 import WardInactivityPopup from "@/components/WardInactivityPopup";
+import IncomingCallOverlay from "@/components/guardian/IncomingCallOverlay";
+import { useIncomingCallListener } from "@/hooks/useIncomingCallListener";
+
 
 interface Notification {
   id: string;
@@ -241,6 +244,8 @@ const GuardianDashboard = () => {
   const { session } = useAuth();
   const { settings } = useUserSettings();
   const { toast } = useToast();
+  const { call: incomingCall, dismiss: dismissIncomingCall } = useIncomingCallListener();
+
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
   const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string } | null>(null);
@@ -827,8 +832,15 @@ const GuardianDashboard = () => {
 
   return (
     <AppLayout>
+      <IncomingCallOverlay
+        open={!!incomingCall}
+        wardName={incomingCall?.wardName || "Your ward"}
+        wardPhone={incomingCall?.wardPhone}
+        onDismiss={dismissIncomingCall}
+      />
       <div className="p-4 space-y-4">
         <WardPicker />
+
         {activeSOS && (
           <Card className={`border-destructive bg-destructive/10 ${activeSOS.isStale ? "" : "animate-pulse"}`}>
             <CardContent className="p-4">

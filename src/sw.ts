@@ -117,6 +117,29 @@ self.addEventListener("push", (event: PushEvent) => {
   const data = event.data ? event.data.json() : {};
   const title = data.title || "Check-iN";
   const isMedication = data.type === "medication";
+  const isIncomingCall = data.kind === "incoming_call" || data.type === "guardian_call";
+
+  // Notify any open clients so the in-app ringer starts immediately
+  if (isIncomingCall) {
+    event.waitUntil(
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((list) => {
+          for (const client of list) {
+            try {
+              client.postMessage({
+                kind: "incoming_call",
+                callId: data.callId,
+                wardName: data.wardName,
+                wardPhone: data.wardPhone,
+                wardUserId: data.wardUserId,
+                guardianId: data.guardianId,
+              });
+            } catch {}
+          }
+        })
+    );
+  }
 
   const options: NotificationOptions = {
     body: data.body || "You have a notification",
@@ -126,16 +149,24 @@ self.addEventListener("push", (event: PushEvent) => {
     data: {
       url: data.url || "/",
       type: data.type || "general",
+      kind: data.kind || null,
       medication_id: data.medication_id || null,
       log_id: data.log_id || null,
       user_id: data.user_id || null,
       scheduled_time: data.scheduled_time || null,
     },
     // @ts-ignore
-    vibrate: [200, 100, 200],
+    vibrate: isIncomingCall ? [800, 400, 800, 400, 800, 400, 800] : [200, 100, 200],
+    // @ts-ignore
+    renotify: isIncomingCall ? true : false,
     requireInteraction: true,
     // @ts-ignore
-    actions: isMedication
+    actions: isIncomingCall
+      ? [
+          { action: "answer", title: "📞 Answer" },
+          { action: "dismiss", title: "✖ Dismiss" },
+        ]
+      : isMedication
       ? [
           { action: "taken", title: "✅ Taken" },
           { action: "snooze", title: "⏰ Snooze 15min" },
@@ -144,6 +175,7 @@ self.addEventListener("push", (event: PushEvent) => {
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
+
 
 // Notification click
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
