@@ -77,6 +77,14 @@ const GuardianReports = () => {
     } else if (activeSection === "journeys") {
       supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
         .then(({ data }) => setJourneyReports(data || []));
+    } else if (activeSection === "doctor_visit") {
+      supabase.from("medical_records")
+        .select("id, title, description, record_date, created_at")
+        .eq("user_id", wardUserId)
+        .eq("record_type", "Doctor's Diagnosis")
+        .order("record_date", { ascending: false })
+        .limit(20)
+        .then(({ data }) => setDoctorReports(data || []));
     }
   }, [wardUserId, activeSection]);
 
