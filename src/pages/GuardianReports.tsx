@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,8 +17,12 @@ import JourneyReportCard from "@/components/JourneyReportCard";
 import NutritionTrendChart, { type NutritionTrendPoint } from "@/components/NutritionTrendChart";
 import HospitalVisitTab from "@/components/guardian/HospitalVisitTab";
 import AnalysisReportTab from "@/components/guardian/AnalysisReportTab";
+import ReactMarkdown from "react-markdown";
+import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit";
 
 const GuardianReports = () => {
   const { session } = useAuth();
