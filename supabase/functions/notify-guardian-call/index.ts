@@ -108,10 +108,11 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await admin
       .from("profiles")
-      .select("full_name")
+      .select("full_name, phone")
       .eq("id", wardId)
       .maybeSingle();
     const wardName = profile?.full_name || "Your ward";
+    const wardPhone = profile?.phone || null;
 
     let guardianUserId = guardian.guardian_user_id as string | null;
     if (!guardianUserId && guardian.guardian_phone) {
@@ -123,11 +124,35 @@ Deno.serve(async (req) => {
       guardianUserId = gp?.id || null;
     }
 
+    const callId = crypto.randomUUID();
     const title = "📞 Incoming call from your ward";
     const body = `${wardName} is calling you now.`;
 
     let sent = 0;
     if (guardianUserId) {
+      // Realtime broadcast — instant ring for guardians with the app open
+      try {
+        const channel = admin.channel(`guardian-call:${guardianUserId}`, {
+          config: { broadcast: { ack: false } },
+        });
+        await channel.subscribe();
+        await channel.send({
+          type: "broadcast",
+          event: "incoming_call",
+          payload: {
+            kind: "incoming_call",
+            callId,
+            wardName,
+            wardPhone,
+            wardUserId: wardId,
+            guardianId: guardian.id,
+          },
+        });
+        await admin.removeChannel(channel);
+      } catch (e) {
+        console.error("realtime broadcast fail", e);
+      }
+
       await admin.rpc("insert_notification_deduped", {
         p_user_id: guardianUserId,
         p_title: title,
@@ -148,19 +173,31 @@ Deno.serve(async (req) => {
             try {
               const url = new URL(s.endpoint);
               const jwt = await createJWT(key, `${url.protocol}//${url.host}`, VAPID_SUBJECT);
+              const qs = new URLSearchParams({
+                incoming_call: callId,
+                ward_name: wardName,
+                ...(wardPhone ? { ward_phone: wardPhone } : {}),
+              }).toString();
               const payload = JSON.stringify({
                 title,
                 body,
-                tag: `guardian-call-${guardian.id}`,
-                url: "/guardian",
+                tag: `guardian-call-${callId}`,
+                url: `/guardian?${qs}`,
                 type: "guardian_call",
+                kind: "incoming_call",
+                callId,
+                wardName,
+                wardPhone,
+                wardUserId: wardId,
+                guardianId: guardian.id,
                 requireInteraction: true,
               });
               const res = await fetch(s.endpoint, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  TTL: "600",
+                  TTL: "60",
+                  Urgency: "high",
                   Authorization: `vapid t=${jwt}, k=${VAPID_PUBLIC_KEY}`,
                 },
                 body: payload,
@@ -176,6 +213,7 @@ Deno.serve(async (req) => {
         }
       }
     }
+
 
     return new Response(JSON.stringify({ ok: true, sent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
