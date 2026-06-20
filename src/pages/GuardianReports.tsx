@@ -357,6 +357,58 @@ const GuardianReports = () => {
         {activeSection === "analysis" && wardUserId && (
           <AnalysisReportTab wardUserId={wardUserId} wardName={wardName} />
         )}
+
+        {/* Doctor Visit Reports — Primary Guardian only */}
+        {activeSection === "doctor_visit" && wardUserId && (
+          isPrimary ? (
+            doctorReports.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No Doctor Visit Reports yet
+                </CardContent>
+              </Card>
+            ) : (
+              <Accordion type="single" collapsible className="space-y-2">
+                {doctorReports.map((r) => {
+                  const visual = tryParseVisualReport(r.description || "");
+                  return (
+                    <AccordionItem key={r.id} value={r.id} className="border rounded-lg bg-card">
+                      <AccordionTrigger className="px-4 py-3 text-left hover:no-underline">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">{r.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {r.record_date ? format(new Date(r.record_date), "dd MMM yyyy") : ""}
+                          </p>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <ReportShareButtons
+                          title={r.title}
+                          subtitle={`${wardName} — Doctor Visit Report`}
+                          content={r.description || ""}
+                          category="Doctor Visit Report"
+                        />
+                        {visual ? (
+                          <VisualHealthReport report={visual} />
+                        ) : (
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <ReactMarkdown>{r.description || ""}</ReactMarkdown>
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                Doctor Visit Reports are accessible to the Primary Guardian only.
+              </CardContent>
+            </Card>
+          )
+        )}
       </div>
     </AppLayout>
   );
