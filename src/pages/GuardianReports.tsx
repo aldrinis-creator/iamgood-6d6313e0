@@ -32,6 +32,7 @@ const GuardianReports = () => {
   const [activeSection, setActiveSection] = useState<ReportSection>(initialSection);
   const wardUserId = selectedWard?.userId || null;
   const wardName = selectedWard?.name || "User";
+  const { isPrimary } = useIsPrimaryGuardian(wardUserId);
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -42,6 +43,7 @@ const GuardianReports = () => {
   const [vitalData, setVitalData] = useState<any[]>([]);
   const [mealLogs, setMealLogs] = useState<any[]>([]);
   const [journeyReports, setJourneyReports] = useState<any[]>([]);
+  const [doctorReports, setDoctorReports] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(!selectedWard);
