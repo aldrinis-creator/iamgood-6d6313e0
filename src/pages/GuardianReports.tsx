@@ -181,6 +181,7 @@ const GuardianReports = () => {
     { id: "journeys", label: "Journeys", icon: Navigation },
     { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
     { id: "analysis", label: "Analysis Reports", icon: FileSearch },
+    ...(isPrimary ? [{ id: "doctor_visit" as ReportSection, label: "Doctor Visit", icon: Stethoscope }] : []),
   ];
 
   return (
