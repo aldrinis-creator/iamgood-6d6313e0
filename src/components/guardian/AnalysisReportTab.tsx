@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Printer, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { buildLetterheadHtml, markdownToHtml } from "@/lib/reportPdf";
 
 export default function AnalysisReportTab({ wardUserId, wardName }: { wardUserId: string; wardName: string }) {
   const [reports, setReports] = useState<any[]>([]);
@@ -42,45 +43,33 @@ export default function AnalysisReportTab({ wardUserId, wardName }: { wardUserId
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Analysis Report - ${wardName}</title>
-          <style>
-            body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; color: #333; padding: 2rem; max-width: 800px; margin: 0 auto; }
-            h1 { font-size: 1.5rem; margin-bottom: 0.5rem; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
-            .meta { color: #666; font-size: 0.875rem; margin-bottom: 2rem; }
-            .content { white-space: pre-wrap; font-size: 0.9rem; margin-bottom: 2rem; }
-            .doc-preview { max-width: 100%; max-height: 500px; border: 1px solid #eee; margin-top: 1rem; page-break-inside: avoid; }
-            @media print {
-              body { padding: 0; }
-              @page { margin: 1cm; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="no-print" style="margin-bottom: 20px;">
-            <button onclick="window.print()" style="padding: 8px 16px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Print to PDF</button>
-          </div>
-          <h1>${report.title}</h1>
-          <div class="meta">
-            For: ${wardName}<br/>
-            Date: ${new Date(report.created_at).toLocaleDateString("en-IN")}<br/>
-            Type: ${report.record_type}
-          </div>
-          <div class="content">${report.description?.replace(/\n/g, '<br/>')}</div>
-          ${docUrl && !docUrl.includes('.pdf') ? `
-            <h3>Original Document:</h3>
-            <img src="${docUrl}" class="doc-preview" onload="window.print()" />
-          ` : ''}
-          ${(!docUrl || docUrl.includes('.pdf')) ? `
-            <script>window.onload = () => window.print();</script>
-          ` : ''}
-        </body>
-      </html>
-    `);
+    let bodyContent = markdownToHtml(report.description || "");
+
+    if (docUrl && !docUrl.includes('.pdf')) {
+      bodyContent += `
+        <h3 style="margin-top: 24px; border-bottom: 1px solid #ccc; padding-bottom: 8px;">Original Document:</h3>
+        <img src="${docUrl}" style="max-width: 100%; border: 1px solid #eee; margin-top: 12px; page-break-inside: avoid;" onload="setTimeout(() => window.print(), 500)" />
+      `;
+    }
+
+    const html = buildLetterheadHtml({
+      title: report.title,
+      subtitle: `For: ${wardName} | Type: ${report.record_type}`,
+      bodyHtml: bodyContent,
+      actionBarHtml: `
+        <div class="no-print" style="margin-bottom: 20px; text-align: center; padding: 20px;">
+          <button onclick="window.print()" style="padding: 10px 20px; background: #000; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Print to PDF</button>
+        </div>
+      `,
+      includeDisclaimer: true
+    });
+
+    printWindow.document.write(html);
     printWindow.document.close();
+
+    if (!docUrl || docUrl.includes('.pdf')) {
+      setTimeout(() => printWindow.print(), 500);
+    }
   };
 
   if (loading) return <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -114,7 +103,7 @@ export default function AnalysisReportTab({ wardUserId, wardName }: { wardUserId
                 <div>
                   <h3 className="font-semibold text-sm">{report.title}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(report.created_at).toLocaleDateString("en-IN")} • {report.record_type}
+                    {new Date(report.created_at).toLocaleDateString("en-IN")} Â• {report.record_type}
                   </p>
                 </div>
               </div>

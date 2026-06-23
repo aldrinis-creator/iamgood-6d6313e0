@@ -21,7 +21,7 @@ interface ReportOptions {
 }
 
 /** Convert basic markdown to HTML */
-function markdownToHtml(md: string): string {
+export function markdownToHtml(md: string): string {
   return md
     .replace(/^### (.+)$/gm, '<h3 style="color:#1a365d;margin:16px 0 8px;font-size:15px;">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 style="color:#1a365d;margin:18px 0 8px;font-size:17px;">$1</h2>')
