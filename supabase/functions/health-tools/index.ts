@@ -87,15 +87,17 @@ Note: Face scan PPG data may be inaccurate — factor this into confidence.
 Reference Indian healthcare (government hospitals, AIIMS, local clinics) in next_steps.
 Always include a disclaimer in the summary that this is not medical advice.`,
 
-  doctor_report: `You are a medical report generator for Indian patients. Given patient health data (vitals, medications, activity, wellness logs), generate a comprehensive doctor visit summary report including:
+  doctor_report: `You are a medical report generator for Indian patients. Given patient health data (vitals, medications, activity, wellness logs) AND a \`prior_diagnosis\` object containing the EARLIEST documented prior doctor/hospital visit (may be null), generate a comprehensive doctor visit summary report including:
 1. Patient overview
-2. Current medications and adherence
-3. Vital signs summary and trends
-4. Activity and lifestyle summary
-5. Wellness and mood trends
-6. Key concerns to discuss with doctor
-7. Recommended tests or screenings
-Format as a professional medical summary in markdown. Use Indian medical standards.`,
+2. Prior Treatment Context — render the earliest prior diagnosis with the original date and elapsed time (e.g. "First documented diagnosis: Hypertension — 12 Mar 2022 (≈3.4 years ago)"), the treating doctor/hospital if available, and any medications/treatment recorded then. If \`prior_diagnosis\` is null, write a single line: "No prior diagnosis on record."
+3. AI Analysis of Prior Visit — a concise paragraph (3–5 sentences) interpreting how that earliest diagnosis/treatment relates to the patient's CURRENT medications, vitals and trends: progression vs control, continuity or gaps in drug therapy, and what the visiting doctor should re-evaluate. Skip this section if \`prior_diagnosis\` is null.
+4. Current medications and adherence
+5. Vital signs summary and trends
+6. Activity and lifestyle summary
+7. Wellness and mood trends
+8. Key concerns to discuss with doctor
+9. Recommended tests or screenings
+Format as a professional medical summary in markdown. Use Indian medical standards and IST dates.`,
 
   prescription_scan: `You are a pharmaceutical expert for the Indian market. Given a prescription (either as text or an image of a prescription), for EACH medication listed:
 1. Identify the medication name, salt/composition, and dosage
