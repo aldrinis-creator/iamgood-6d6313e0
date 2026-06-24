@@ -165,21 +165,6 @@ Deno.serve(async (req) => {
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
-      .map((r) => {
-        const mobile = normalizePhone(r.phone);
-        if (mobile.length < 11) return null;
-        return {
-          to: [mobile],
-          components: {
-            body_1: { type: "text", value: (r.name || "there").slice(0, 60) },
-            body_2: { type: "text", value: title.slice(0, 100) },
-            body_3: { type: "text", value: dateStr },
-            body_4: { type: "text", value: timeStr },
-            body_5: { type: "text", value: body5 },
-          },
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
 
     if (to_and_components.length === 0) {
       return new Response(
