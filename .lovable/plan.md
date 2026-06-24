@@ -1,43 +1,30 @@
 ## Goal
-Add a "Doctor Visit" section to the Guardian Reports tab (`/guardian/reports`) so guardians can view the Ward's Doctor Visit Reports.
-
-## Scope
-Read-only view of reports the Ward has already generated and saved to their Vault. Guardians do not generate new reports on the Ward's behalf.
+Add prior-treatment continuity to the Doctor Visit Report so the doctor sees the **earliest prior diagnosis** along with timelines and a brief AI analysis of that previous visit.
 
 ## Changes
 
-### 1. `src/pages/GuardianReports.tsx`
-- Add new section id `doctor_visit` with label "Doctor Visit" and `Stethoscope` (or `FileText`) icon to the `sections` array.
-- Add data state `doctorReports: any[]`.
-- In the data-fetch `useEffect`, when `activeSection === "doctor_visit"`:
-  ```ts
-  supabase.from("medical_records")
-    .select("id, title, description, record_date, created_at")
-    .eq("user_id", wardUserId)
-    .eq("record_type", "Doctor's Diagnosis")
-    .order("record_date", { ascending: false })
-    .limit(20)
+### 1. `src/components/health-tools/DoctorVisitReport.tsx`
+Extend the data fetched before calling the edge function:
+- Query `medical_records` for the user filtered to diagnosis-type records (`record_type in ('Doctor's Diagnosis','Diagnosis','Prescription')`), ordered by `record_date ASC limit 1` → **earliest prior diagnosis**.
+- Query `medical_history` ordered by `diagnosed_date ASC nulls last, created_at ASC limit 1` as a secondary source (covers users who logged conditions there instead of as a record).
+- Compute timeline metadata client-side: `earliest_date`, `days_since`, `years_since` (IST).
+- Add a new `prior_diagnosis` object to the payload sent to the `health-tools` edge function:
   ```
-- Render a new block that lists each report as a `Card`:
-  - Title + date (formatted)
-  - Expand/collapse to show the report body via `ReactMarkdown` (reuse `VisualHealthReport` + `tryParseVisualReport` like the user-side component does, for parity).
-  - Per-report `ReportShareButtons` (PDF/share) using the report's `description` as content.
-- Empty state: "No Doctor Visit Reports yet" card.
+  prior_diagnosis: {
+    source: 'medical_records' | 'medical_history' | null,
+    title, description, record_date | diagnosed_date,
+    days_since, years_since
+  }
+  ```
 
-### 2. Access control
-Restrict the section to the Primary Guardian (consistent with the Hospital Kit decision):
-- Use existing `useIsPrimaryGuardian(wardUserId)` hook.
-- If not primary: hide the `doctor_visit` badge from `sections` and short-circuit the panel with a "Primary Guardian only" message if the URL is hit directly.
+### 2. `supabase/functions/health-tools/index.ts`
+Update the `doctor_report` system prompt to add a new required section:
+- **"Prior Treatment Context"** — render the earliest diagnosis with its date and elapsed time (e.g. "First documented diagnosis: Hypertension — 12 Mar 2022 (3 years 4 months ago)").
+- **"AI Analysis of Prior Visit"** — a brief paragraph interpreting how that earlier diagnosis/treatment relates to the patient's current medications, vitals, and trends (progression, control, gaps, drug continuity).
+- Instruct the model to omit the section gracefully ("No prior diagnosis on record") when `prior_diagnosis` is null.
 
-### 3. No new edge functions, no schema changes
-- RLS for `medical_records` already allows accepted guardians to read the ward's records (verify in `is_accepted_guardian_of` policy chain during implementation; if missing, plan will add a SELECT policy — but expectation is it already exists since other Guardian tabs read it).
+No DB/schema changes, no UI changes to the Guardian Reports tab, no changes to save-to-vault flow.
 
 ## Out of scope
-- Generating a new Doctor Visit Report from the Guardian app (kept user-only to avoid duplicate AI cost and ensure the Ward owns their narrative).
-- Editing/deleting reports from the Guardian side.
-- Re-adding the Doctor Visit attachment to the Hospital Emergency Kit (explicitly removed earlier).
-
-## Verification
-- Login as Primary Guardian → Reports → Doctor Visit tab shows saved reports; non-primary guardians don't see the tab.
-- Empty state renders when ward has no reports.
-- PDF share works per report.
+- Pulling the *full* history of prior diagnoses (user asked for the **earliest** one for continuity).
+- Editing the visual report renderer — output stays markdown-compatible.

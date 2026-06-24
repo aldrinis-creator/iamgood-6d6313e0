@@ -24,13 +24,57 @@ const DoctorVisitReport = () => {
     setLoading(true);
     setSaved(false);
     try {
-      const [profileRes, medsRes, activityRes, wellnessRes, faceRes] = await Promise.all([
+      const [profileRes, medsRes, activityRes, wellnessRes, faceRes, priorRecRes, priorHistRes] = await Promise.all([
         supabase.from("health_profile").select("*").eq("user_id", session.user.id).maybeSingle(),
         supabase.from("medications").select("name, dosage, frequency, schedule_times").eq("user_id", session.user.id),
         supabase.from("activity_logs").select("*").eq("user_id", session.user.id).order("log_date", { ascending: false }).limit(7),
         supabase.from("wellness_logs").select("*").eq("user_id", session.user.id).order("log_date", { ascending: false }).limit(7),
         supabase.from("face_scans").select("*").eq("user_id", session.user.id).order("scanned_at", { ascending: false }).limit(5),
+        supabase.from("medical_records")
+          .select("title, description, record_type, record_date")
+          .eq("user_id", session.user.id)
+          .in("record_type", ["Doctor's Diagnosis", "Diagnosis", "Prescription"])
+          .order("record_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase.from("medical_history")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("diagnosed_date", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
       ]);
+
+      // Build prior diagnosis (earliest available)
+      let prior_diagnosis: any = null;
+      const recDate = priorRecRes.data?.record_date as string | undefined;
+      const histDate = (priorHistRes.data?.diagnosed_date || priorHistRes.data?.created_at) as string | undefined;
+      const pickRecord =
+        priorRecRes.data && (!histDate || (recDate && recDate <= histDate));
+      const computeAge = (dateStr?: string) => {
+        if (!dateStr) return { days_since: null, years_since: null };
+        const d = new Date(dateStr).getTime();
+        const days = Math.floor((Date.now() - d) / (1000 * 60 * 60 * 24));
+        return { days_since: days, years_since: +(days / 365.25).toFixed(1) };
+      };
+      if (pickRecord && priorRecRes.data) {
+        prior_diagnosis = {
+          source: "medical_records",
+          title: priorRecRes.data.title,
+          description: priorRecRes.data.description,
+          record_type: priorRecRes.data.record_type,
+          date: recDate,
+          ...computeAge(recDate),
+        };
+      } else if (priorHistRes.data) {
+        prior_diagnosis = {
+          source: "medical_history",
+          ...priorHistRes.data,
+          date: histDate,
+          ...computeAge(histDate),
+        };
+      }
 
       const payload = {
         profile: profileRes.data,
@@ -38,6 +82,7 @@ const DoctorVisitReport = () => {
         activity: activityRes.data || [],
         wellness: wellnessRes.data || [],
         faceScans: faceRes.data || [],
+        prior_diagnosis,
       };
 
       const { data, error } = await supabase.functions.invoke("health-tools", {
