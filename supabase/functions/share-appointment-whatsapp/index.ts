@@ -60,20 +60,19 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    {
-      const _uc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-      const { data: _u, error: _e } = await _uc.auth.getUser();
-      if (_e || !_u?.user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    const _uc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: _u, error: _e } = await _uc.auth.getUser();
+    if (_e || !_u?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const callerId = _u.user.id;
+
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
     const integratedNumber =
       Deno.env.get("MSG91_INTEGRATED_NUMBER") || DEFAULT_INTEGRATED_NUMBER;
     const templateName =
       Deno.env.get("MSG91_APPT_SHARE_TEMPLATE_NAME") || DEFAULT_TEMPLATE_NAME;
     const namespaceRaw = Deno.env.get("MSG91_APPT_SHARE_TEMPLATE_ID") || "";
-    // Treat empty / "null" as no namespace (per the curl, namespace is null for this template)
     const namespace =
       !namespaceRaw || namespaceRaw.toLowerCase() === "null" ? null : namespaceRaw;
     const langCode = Deno.env.get("MSG91_APPT_SHARE_LANG") || DEFAULT_LANG;
@@ -99,10 +98,47 @@ Deno.serve(async (req) => {
       recipients: Recipient[];
     };
 
-    if (!appointment || !Array.isArray(recipients) || recipients.length === 0) {
+    if (!appointment?.id || !Array.isArray(recipients) || recipients.length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: "appointment and recipients[] are required" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify appointment ownership and restrict recipients to caller's accepted guardians
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: apptRow } = await admin
+      .from("appointments")
+      .select("user_id")
+      .eq("id", appointment.id)
+      .maybeSingle();
+    if (!apptRow || apptRow.user_id !== callerId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: guardianRows } = await admin
+      .from("guardians")
+      .select("guardian_phone, guardian_name")
+      .eq("user_id", callerId)
+      .eq("status", "accepted");
+    const allowedPhones = new Set(
+      (guardianRows || [])
+        .map((g: any) => normalizePhone(g.guardian_phone || ""))
+        .filter((p: string) => p.length >= 11)
+    );
+
+    const MAX_RECIPIENTS = 5;
+    const filteredRecipients = recipients
+      .filter((r) => allowedPhones.has(normalizePhone(r.phone || "")))
+      .slice(0, MAX_RECIPIENTS);
+
+    if (filteredRecipients.length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Recipients must be your accepted guardians" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
