@@ -149,7 +149,22 @@ Deno.serve(async (req) => {
     const location = appointment.location ? `, ${appointment.location}` : "";
     const body5 = `${doctor}${location}`.slice(0, 200);
 
-    const to_and_components = recipients
+    const to_and_components = filteredRecipients
+      .map((r) => {
+        const mobile = normalizePhone(r.phone);
+        if (mobile.length < 11) return null;
+        return {
+          to: [mobile],
+          components: {
+            body_1: { type: "text", value: (r.name || "there").slice(0, 60) },
+            body_2: { type: "text", value: title.slice(0, 100) },
+            body_3: { type: "text", value: dateStr },
+            body_4: { type: "text", value: timeStr },
+            body_5: { type: "text", value: body5 },
+          },
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
       .map((r) => {
         const mobile = normalizePhone(r.phone);
         if (mobile.length < 11) return null;
