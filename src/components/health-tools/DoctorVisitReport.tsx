@@ -40,7 +40,7 @@ const DoctorVisitReport = () => {
         supabase.from("medical_history")
           .select("*")
           .eq("user_id", session.user.id)
-          .order("diagnosed_date", { ascending: true, nullsFirst: false })
+          .order("start_date", { ascending: true, nullsFirst: false })
           .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle(),
@@ -49,7 +49,7 @@ const DoctorVisitReport = () => {
       // Build prior diagnosis (earliest available)
       let prior_diagnosis: any = null;
       const recDate = priorRecRes.data?.record_date as string | undefined;
-      const histDate = (priorHistRes.data?.diagnosed_date || priorHistRes.data?.created_at) as string | undefined;
+      const histDate = (priorHistRes.data?.start_date || priorHistRes.data?.created_at) as string | undefined;
       const pickRecord =
         priorRecRes.data && (!histDate || (recDate && recDate <= histDate));
       const computeAge = (dateStr?: string) => {
