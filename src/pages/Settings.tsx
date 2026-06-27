@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SafeZoneEditor from "@/components/SafeZoneEditor";
+import ModeSelector from "@/components/ModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -699,6 +700,7 @@ const Settings = () => {
         {/* ============ CHECK-IN TAB ============ */}
         {activeTab === "checkin" && (
           <div className="space-y-4">
+            <ModeSelector />
             {/* Sleep Mode / Check-Out pills */}
             <div className="flex gap-2">
               <Badge

@@ -409,82 +409,82 @@ const CheckInCard = () => {
         {isPaused ? (
           <div className="text-center space-y-3">
             <div
-              className="relative w-24 h-24 mx-auto flex items-center justify-center"
+              className="relative w-32 h-32 mx-auto flex items-center justify-center"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-12 h-12 text-success fill-current" />
+              <Heart className="w-16 h-16 text-success fill-current" />
             </div>
-            <p className="text-accessible font-semibold text-success">
+            <p className="text-2xl font-bold text-success">
               {pauseLabel} — Check-iNs Paused
             </p>
-            <p className="text-sm text-muted-foreground">
-              Tap Active in the mode selector above to resume check-ins.
+            <p className="text-lg text-muted-foreground">
+              To change mode to Active, go to Settings.
             </p>
           </div>
         ) : isApproaching && !checkedIn && getCurrentWindow() === null ? (
           <div className="text-center space-y-3">
-            <p className="text-accessible font-semibold text-foreground">
+            <p className="text-2xl font-bold text-foreground">
               {userName}, Check-iN coming up!
             </p>
             <button
               onClick={() => setShowDialog(true)}
               disabled={loading}
-              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              className="relative w-36 h-36 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in early"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
+              <Heart className="w-20 h-20 text-sos fill-current drop-shadow-lg" />
             </button>
-            <p className="text-sm text-muted-foreground font-medium">
+            <p className="text-lg text-muted-foreground font-medium">
               Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Get ready for your next check-in at {formatHour(getNextCheckInTime().getHours())}
             </p>
           </div>
         ) : !checkedIn ? (
           <div className="text-center space-y-3">
-            <p className="text-accessible font-semibold text-foreground">
+            <p className="text-2xl font-bold text-foreground">
               {userName}, did you Check-In today?
             </p>
             <button
               onClick={() => setShowDialog(true)}
               disabled={loading}
-              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              className="relative w-36 h-36 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
+              <Heart className="w-20 h-20 text-sos fill-current drop-shadow-lg" />
             </button>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Tap the heart to Check-iN
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Next check-in: {nextLabel} • <span className="font-semibold text-sos">{timeLeft}</span> remaining
             </p>
           </div>
         ) : (
           <div className="text-center space-y-3">
             <div
-              className="relative w-32 h-32 mx-auto flex items-center justify-center"
+              className="relative w-40 h-40 mx-auto flex items-center justify-center"
               style={{
                 background: checkedInStatus === "late"
                   ? 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(38 92% 50% / 0.15) 60%, transparent 80%)'
                   : 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className={`w-20 h-20 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
+              <Heart className={`w-24 h-24 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
             </div>
-            <p className={`text-accessible font-semibold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
+            <p className={`text-2xl font-bold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
               {checkedInStatus === "late" ? "✓ Checked In (Late)" : "✓ Checked In!"}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Next Check-iN: {nextLabel}
             </p>
           </div>

@@ -230,47 +230,6 @@ const UserDashboard = () => {
         <VaultClaimCancelBanner />
         <EmailPromptBanner userEmail={session?.user?.email} />
         <AudioUnlocker />
-        {/* Mode Selector */}
-        <Card className="bg-primary/5">
-          <CardContent className="p-3 space-y-3">
-            <div className="flex gap-2">
-              {MODE_OPTIONS.map(({ mode, icon: Icon, label }) => (
-                <Button
-                  key={mode}
-                  variant={pauseMode === mode ? "default" : "outline"}
-                  size="sm"
-                  className={`flex-1 gap-1.5 ${
-                    pauseMode === mode && mode === "active" ? "bg-primary text-primary-foreground" : ""
-                  } ${
-                    pauseMode === mode && mode !== "active" ? "bg-success text-success-foreground" : ""
-                  }`}
-                  onClick={() => handleModeChange(mode)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground text-center">
-              {MODE_OPTIONS.find(o => o.mode === pauseMode)?.description}
-            </p>
-
-            {/* Show active sleep schedule info */}
-            {pauseMode === "sleep" && settings.sleepSchedule && (
-              <p className="text-xs text-success text-center">
-                🌙 Sleep: {settings.sleepSchedule.from} – {settings.sleepSchedule.to} • Auto-resumes at {settings.sleepSchedule.to}
-              </p>
-            )}
-
-            {/* Show active checkout info */}
-            {pauseMode === "checked-out" && settings.checkOutConfig?.endsAt && (
-              <p className="text-xs text-success text-center">
-                🚪 Returns at {formatISTTime(settings.checkOutConfig.endsAt)}
-                {settings.checkOutConfig.reason ? ` • ${settings.checkOutConfig.reason}` : ""}
-              </p>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Hydration High-Risk Banner */}
         {showHydrationBanner && (
