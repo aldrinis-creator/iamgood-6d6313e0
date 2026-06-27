@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SafeZoneEditor from "@/components/SafeZoneEditor";
+import ModeSelector from "@/components/ModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
