@@ -700,6 +700,7 @@ const Settings = () => {
         {/* ============ CHECK-IN TAB ============ */}
         {activeTab === "checkin" && (
           <div className="space-y-4">
+            <ModeSelector />
             {/* Sleep Mode / Check-Out pills */}
             <div className="flex gap-2">
               <Badge
