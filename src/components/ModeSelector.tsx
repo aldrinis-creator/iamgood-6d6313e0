@@ -46,7 +46,8 @@ export default function ModeSelector() {
       message,
       type: "mode_change",
     }));
-    await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications }).catch((e) => console.error(e));
+    const { error } = await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
+    if (error) console.error("Failed to notify guardians:", error);
   }, [session?.user?.id]);
 
   const handleModeChange = (newMode: PauseMode) => {
