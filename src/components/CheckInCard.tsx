@@ -472,19 +472,19 @@ const CheckInCard = () => {
         ) : (
           <div className="text-center space-y-3">
             <div
-              className="relative w-32 h-32 mx-auto flex items-center justify-center"
+              className="relative w-40 h-40 mx-auto flex items-center justify-center"
               style={{
                 background: checkedInStatus === "late"
                   ? 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(38 92% 50% / 0.15) 60%, transparent 80%)'
                   : 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className={`w-20 h-20 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
+              <Heart className={`w-24 h-24 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
             </div>
-            <p className={`text-accessible font-semibold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
+            <p className={`text-2xl font-bold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
               {checkedInStatus === "late" ? "✓ Checked In (Late)" : "✓ Checked In!"}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Next Check-iN: {nextLabel}
             </p>
           </div>
