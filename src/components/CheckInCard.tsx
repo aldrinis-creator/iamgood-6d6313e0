@@ -113,9 +113,9 @@ const CheckInCard = () => {
       ? getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex])
       : (() => { const d = new Date(windowStart); d.setHours(23, 59, 59, 999); return d; })();
       
-    // Apply 30 min early cutoff for the *end* of the query, so it doesn't bleed into the next slot's early window
+    // Apply 60 min early cutoff for the *end* of the query, so it doesn't bleed into the next slot's early window
     if (nextHourIndex < CHECK_IN_HOURS.length) {
-      windowEnd.setMinutes(windowEnd.getMinutes() - 30);
+      windowEnd.setMinutes(windowEnd.getMinutes() - 60);
     }
 
     // Check if a check-in already exists for this window
@@ -232,8 +232,8 @@ const CheckInCard = () => {
       setTimeLeft(formatTimeLeft(ms));
       const minsLeft = getMinutesUntilNext();
       const currentWindow = getCurrentWindow();
-      // Approaching = within 30 min of next window AND not currently in an active window (or already checked in)
-      if (minsLeft <= 30 && minsLeft > 0 && (currentWindow === null || checkedIn)) {
+      // Approaching = within 60 min of next window AND not currently in an active window (or already checked in)
+      if (minsLeft <= 60 && minsLeft > 0 && (currentWindow === null || checkedIn)) {
         setIsApproaching(true);
         setApproachingMinutes(Math.ceil(minsLeft));
       } else {
@@ -257,7 +257,7 @@ const CheckInCard = () => {
     
     // If we're approaching the next window and checking in early, log it for the upcoming window
     const minsLeft = getMinutesUntilNext();
-    if (windowHour === null && minsLeft <= 30 && minsLeft > 0) {
+    if (windowHour === null && minsLeft <= 60 && minsLeft > 0) {
       scheduledAt = getNextCheckInTime();
     }
 
