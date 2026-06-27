@@ -21,14 +21,14 @@ const getCurrentWindow = () => {
   
   for (const h of CHECK_IN_HOURS) {
     const earlyStart = getCheckInWindowStart(h);
-    earlyStart.setMinutes(earlyStart.getMinutes() - 30);
-    
+    earlyStart.setMinutes(earlyStart.getMinutes() - 60);
+
     const windowStart = getCheckInWindowStart(h);
     const nextHourIndex = CHECK_IN_HOURS.indexOf(h) + 1;
     let windowEnd = new Date(windowStart);
     if (nextHourIndex < CHECK_IN_HOURS.length) {
       windowEnd = getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex]);
-      windowEnd.setMinutes(windowEnd.getMinutes() - 30);
+      windowEnd.setMinutes(windowEnd.getMinutes() - 60);
     } else {
       windowEnd.setHours(23, 59, 59, 999);
     }
