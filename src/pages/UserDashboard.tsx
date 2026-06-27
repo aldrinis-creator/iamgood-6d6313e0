@@ -281,18 +281,6 @@ const UserDashboard = () => {
           </Card>
         )}
 
-        {/* Health Passport — collapsible */}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="health-passport">
-            <AccordionTrigger className="text-accessible font-semibold">
-              Health Passport
-            </AccordionTrigger>
-            <AccordionContent>
-              <HealthPassport />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
         {/* Map My Journey */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>
           <CardContent className="p-4 flex items-center gap-3">
@@ -337,6 +325,18 @@ const UserDashboard = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Health Passport — collapsible */}
+        <Accordion type="single" collapsible>
+          <AccordionItem value="health-passport">
+            <AccordionTrigger className="text-accessible font-semibold">
+              Health Passport
+            </AccordionTrigger>
+            <AccordionContent>
+              <HealthPassport />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
 
       {/* Dialogs */}
