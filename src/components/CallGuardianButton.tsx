@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Phone, Video, UserPlus } from "lucide-react";
+import { Phone, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,9 +33,6 @@ const normalizePhone = (raw: string) => {
   if (raw.startsWith("+")) return raw;
   return `+${digits}`;
 };
-
-/** Strip to just digits for WhatsApp deep links (no '+'). */
-const waDigits = (raw: string) => normalizePhone(raw).replace(/\D/g, "");
 
 const CallGuardianButton = ({ variant = "card" }: Props) => {
   const { session } = useAuth();
