@@ -45,7 +45,7 @@ const getNextCheckInTime = () => {
   const nowMs = now.getTime();
   for (const h of CHECK_IN_HOURS) {
     const earlyStart = getCheckInWindowStart(h);
-    earlyStart.setMinutes(earlyStart.getMinutes() - 30);
+    earlyStart.setMinutes(earlyStart.getMinutes() - 60);
     if (nowMs < earlyStart.getTime()) {
       return getCheckInWindowStart(h);
     }
