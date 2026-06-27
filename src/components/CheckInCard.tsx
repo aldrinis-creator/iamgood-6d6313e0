@@ -448,24 +448,24 @@ const CheckInCard = () => {
           </div>
         ) : !checkedIn ? (
           <div className="text-center space-y-3">
-            <p className="text-accessible font-semibold text-foreground">
+            <p className="text-2xl font-bold text-foreground">
               {userName}, did you Check-In today?
             </p>
             <button
               onClick={() => setShowDialog(true)}
               disabled={loading}
-              className="relative w-28 h-28 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              className="relative w-36 h-36 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-16 h-16 text-sos fill-current drop-shadow-lg" />
+              <Heart className="w-20 h-20 text-sos fill-current drop-shadow-lg" />
             </button>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Tap the heart to Check-iN
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Next check-in: {nextLabel} • <span className="font-semibold text-sos">{timeLeft}</span> remaining
             </p>
           </div>
