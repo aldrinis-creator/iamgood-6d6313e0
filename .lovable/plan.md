@@ -1,22 +1,24 @@
-## Summary
-Change the Check-iN pre-window across the app so users can check in up to **1 hour before** each scheduled slot (7 AM, 12 PM, 7 PM IST), instead of the current 30 minutes.
+## Problem
 
-## Affected files & changes
+The `send-weekly-reports` edge function exists and is correctly gated to require a service-role bearer, but **no pg_cron job was ever created to invoke it**. Confirmed by listing `cron.job` — there is no entry matching `weekly` (jobs 1, 2, 3, 4, 6, 7, 10–13, 15, 18, 22, 28 exist; none target weekly reports). That is why no Sunday emails go out.
 
-### Frontend logic
-- **`src/components/CheckInCard.tsx`**
-  - Update `getCurrentWindow()`: `earlyStart` offset from `-30` to `-60` minutes.
-  - Update `getCurrentWindow()`: window-end overlap buffer from `-30` to `-60` minutes.
-  - Update `getNextCheckInTime()`: `earlyStart` offset from `-30` to `-60` minutes.
-  - Update `loadCurrentCheckIn()`: query window-end overlap buffer from `-30` to `-60` minutes.
-  - Update approaching threshold in countdown effect: `minsLeft <= 30` → `minsLeft <= 60`.
-  - Update early-check-in handler: `minsLeft <= 30` → `minsLeft <= 60`.
+## Fix
 
-- **`src/hooks/useCheckInAudio.ts`**
-  - Update the pre-alert browser notification threshold from `PRE_ALERT_MIN = 5` to `PRE_ALERT_MIN = 60` (or add a separate early-window constant) so the T-5 logic aligns with the new 1-hour window if needed. **Clarification needed:** do you want any audio/browser reminder during that 60-minute pre-window, or only at T-5 as today?
+Create a single pg_cron job that calls the edge function every Sunday at 09:00 IST.
 
-### Backend logic
-- Edge functions (`check-missed-checkins`, `send-checkin-push`) operate on `scheduled_at` and post-due grace periods; they are **not** affected by the pre-window change.
+- 09:00 IST = **03:30 UTC** Sunday → cron expression `30 3 * * 0`
+- Use `net.http_post` to `https://<project>.supabase.co/functions/v1/send-weekly-reports`
+- Send `Authorization: Bearer <SERVICE_ROLE_KEY>` so the in-function auth gate passes (anon key would be rejected with 401)
+- Job name: `send-weekly-reports-sun-9am-ist`
 
-## Open question
-Do you want a browser/audio reminder at T-60 (when the window first opens), or keep the reminder at T-5 only and simply allow the heart tap to work starting 60 minutes early?
+Because the SQL contains the project URL and service-role key, it will be applied via `supabase--insert` (not via the migration tool), per the scheduled-jobs guidance — so remixes don't inherit our keys.
+
+## Verification
+
+1. After insert, re-query `cron.job` to confirm the new row is present and `active = true`.
+2. Check `cron.job_run_details` after the next scheduled tick (or trigger a manual `net.http_post` once) to confirm a 200 response from the function.
+3. Spot-check `email_send_log` for `template_name = 'weekly-report'` rows on the following Sunday.
+
+## Out of scope
+
+No code changes to `send-weekly-reports/index.ts` or the email template — both are already correct. This is purely a missing-scheduler fix.
