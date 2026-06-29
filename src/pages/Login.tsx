@@ -306,9 +306,10 @@ const Login = () => {
           <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
             <Heart className="w-8 h-8 text-success-foreground fill-current" />
           </div>
-          <h1 className="text-2xl font-bold text-primary">Check-iN</h1>
-          <p className="text-sm text-muted-foreground">Your Personal Emergency Response System</p>
+          <h1 className="text-3xl font-bold text-primary">Check-iN</h1>
+          <p className="text-base text-muted-foreground">Your Personal Emergency Response System</p>
         </div>
+
 
         <Button
           type="button"
