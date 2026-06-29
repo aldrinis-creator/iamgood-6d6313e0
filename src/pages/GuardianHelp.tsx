@@ -169,9 +169,9 @@ const GuardianHelp = () => {
         </p>
 
         <div className="pt-4 pb-2 space-y-2">
-          <Button variant="outline" className="w-full gap-2" onClick={() => navigate("/contact-us")}>
+          <Button variant="outline" className="w-full gap-2" onClick={() => navigate("/support")}>
             <HelpCircle className="w-4 h-4" />
-            Contact Support
+            Contact Customer Service
           </Button>
           <Button variant="destructive" className="w-full gap-2" onClick={handleLogout}>
             <LogOut className="w-4 h-4" />

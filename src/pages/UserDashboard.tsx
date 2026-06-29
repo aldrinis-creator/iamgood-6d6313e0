@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import OnboardingWizard from "@/components/OnboardingWizard";
-import VoiceQueryButton from "@/components/VoiceQueryButton";
+import VoiceAgentButton from "@/components/VoiceAgentButton";
 import AudioUnlocker from "@/components/AudioUnlocker";
 import { formatISTTime } from "@/lib/istTime";
 import SOSDialog from "@/components/SOSDialog";
@@ -363,7 +363,7 @@ const UserDashboard = () => {
         />
       )}
 
-      <VoiceQueryButton />
+      <VoiceAgentButton persona="user" />
     </AppLayout>
   );
 };
