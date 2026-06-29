@@ -1,24 +1,47 @@
-## Problem
+## Goal
 
-The `send-weekly-reports` edge function exists and is correctly gated to require a service-role bearer, but **no pg_cron job was ever created to invoke it**. Confirmed by listing `cron.job` — there is no entry matching `weekly` (jobs 1, 2, 3, 4, 6, 7, 10–13, 15, 18, 22, 28 exist; none target weekly reports). That is why no Sunday emails go out.
+Reduce credit burn from Cloud compute and over-frequent cron invocations.
 
-## Fix
+## 1. Downsize the Cloud instance (you do this in the UI)
 
-Create a single pg_cron job that calls the edge function every Sunday at 09:00 IST.
+Instance sizing isn't changeable from code — it's a project setting. Steps:
 
-- 09:00 IST = **03:30 UTC** Sunday → cron expression `30 3 * * 0`
-- Use `net.http_post` to `https://<project>.supabase.co/functions/v1/send-weekly-reports`
-- Send `Authorization: Bearer <SERVICE_ROLE_KEY>` so the in-function auth gate passes (anon key would be rejected with 401)
-- Job name: `send-weekly-reports-sun-9am-ist`
+1. Open the project → **Backend** (Lovable Cloud) → **Advanced settings**.
+2. Under **Instance size**, pick the next tier down (e.g. Large → Medium, or Medium → Small).
+3. Confirm. Resize takes a few minutes; the backend may briefly show `RESIZING`.
 
-Because the SQL contains the project URL and service-role key, it will be applied via `supabase--insert` (not via the migration tool), per the scheduled-jobs guidance — so remixes don't inherit our keys.
+I'll verify health with `supabase--cloud_status` once you've triggered it. If the app feels sluggish after, we can step back up.
 
-## Verification
+## 2. Slow the over-frequent cron job
 
-1. After insert, re-query `cron.job` to confirm the new row is present and `active = true`.
-2. Check `cron.job_run_details` after the next scheduled tick (or trigger a manual `net.http_post` once) to confirm a 200 response from the function.
-3. Spot-check `email_send_log` for `template_name = 'weekly-report'` rows on the following Sunday.
+Audit of `cron.job` shows the real offender is `**process-email-queue**` running every **5 seconds** (~17,280 invocations/day). The push-notification crons are already at 1/min — no change needed there.
 
-## Out of scope
+Change:
 
-No code changes to `send-weekly-reports/index.ts` or the email template — both are already correct. This is purely a missing-scheduler fix.
+- `process-email-queue`: **5 seconds →** `* * * * *` **(every 1 .5 minutes)**
+
+That's ~99.7% fewer invocations. Trade-off: outbound emails (auth + transactional) may sit in the queue up to ~90s instead of ~5s. For auth OTPs and password resets that's still well within acceptable UX (users wait far longer for SMTP delivery anyway).
+
+All other crons are already reasonable (1m, 5m, 10m, 15m, hourly, daily) — Change the 1m cron to 1.5 minutes. Rest is No Change.
+
+## 3. Technical change
+
+One SQL statement via `supabase--insert`:
+
+```sql
+SELECT cron.unschedule('process-email-queue');
+SELECT cron.schedule(
+  'process-email-queue',
+  '* * * * *',
+  $$SELECT net.http_post(... existing call ...)$$
+);
+```
+
+I'll fetch the existing job's command first so the rescheduled job keeps the same URL, headers, and service-role bearer.
+
+## 4. Verify
+
+- `SELECT schedule FROM cron.job WHERE jobname='process-email-queue'` → confirms `* * * * *`.
+- Check `email-queue-health-check` logs after ~10 min to confirm queue depth stays healthy.
+
+No frontend or edge-function code changes.
