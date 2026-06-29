@@ -328,22 +328,23 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <Label>Email or Phone</Label>
-            <Input placeholder="Enter email or phone number" className="text-base" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+            <Label className="text-base">Email or Phone</Label>
+            <Input placeholder="Enter email or phone number" className="text-lg py-6" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
           </div>
           <div>
-            <Label>Password</Label>
+            <Label className="text-base">Password</Label>
             <div className="relative">
-              <Input placeholder="Enter password" className="text-base pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input placeholder="Enter password" className="text-lg py-6 pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="remember-me" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-primary text-primary" />
-            <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">Remember my email / phone</Label>
+            <input type="checkbox" id="remember-me" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-5 w-5 rounded border-primary text-primary" />
+            <Label htmlFor="remember-me" className="text-base font-normal cursor-pointer">Remember my email / phone</Label>
           </div>
+
           <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
