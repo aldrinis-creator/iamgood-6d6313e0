@@ -29,6 +29,7 @@ import { formatISTDateTime, formatISTTime, formatISTDate } from "@/lib/istTime";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGuardianWard } from "@/contexts/GuardianWardContext";
+import VoiceAgentButton from "@/components/VoiceAgentButton";
 import WardPicker from "@/components/WardPicker";
 import { useVaultClaimStatus, ACTIVE_CLAIM_STATUSES } from "@/components/vault/useVaultClaimStatus";
 import WardTodayAppointmentsStrip from "@/components/guardian/WardTodayAppointmentsStrip";
@@ -1231,6 +1232,7 @@ const GuardianDashboard = () => {
           }
         }}
       />
+      <VoiceAgentButton persona="guardian" wardUserId={wardUserId} wardName={wardName} />
     </AppLayout>
   );
 };

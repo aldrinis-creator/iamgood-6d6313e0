@@ -57,6 +57,7 @@ const AdminEmails = lazy(() => import("./pages/AdminEmails"));
 const VaultClaim = lazy(() => import("./pages/VaultClaim"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
+const CustomerService = lazy(() => import("./pages/CustomerService"));
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ const App = () => (
                 {/* Shared routes (both roles) */}
                 <Route path="/settings" element={<UserRoute><Settings /></UserRoute>} />
                 <Route path="/help" element={<HelpRouter />} />
+                <Route path="/support" element={<ProtectedRoute><CustomerService /></ProtectedRoute>} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
                 <Route path="/blood-banks" element={<ProtectedRoute><GuardianWardProvider><BloodBanks /></GuardianWardProvider></ProtectedRoute>} />
