@@ -143,7 +143,20 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
   const handleOpen = async () => {
     setOpen(true);
     await ensureAudioReady();
+    // Auto-speak greeting and auto-start listening so the first reply is fully voice-driven.
+    if (messages.length === 0) {
+      setPhase("speaking");
+      speakFallback(greeting, () => {
+        setPhase("idle");
+        if (supported) {
+          try { start(); } catch {}
+        }
+      });
+    } else if (supported) {
+      try { start(); } catch {}
+    }
   };
+
 
   const handleClose = () => {
     abortRef.current?.abort();
