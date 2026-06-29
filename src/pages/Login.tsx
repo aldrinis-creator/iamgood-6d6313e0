@@ -350,8 +350,8 @@ const Login = () => {
           </Button>
         </form>
 
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-3 text-sm">
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-3 text-base">
             <button className="text-primary font-medium" onClick={() => navigate("/register")}>
               Don't have an account? <span className="underline">Register</span>
             </button>
@@ -360,8 +360,9 @@ const Login = () => {
               Login as Admin
             </button>
           </div>
-          <button className="text-sm text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+          <button className="text-base text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
         </div>
+
       </div>
     </div>
   );
