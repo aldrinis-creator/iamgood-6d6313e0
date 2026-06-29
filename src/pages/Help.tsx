@@ -315,8 +315,16 @@ const Help = () => {
           </div>
         )}
 
-        {/* Logout button */}
-        <div className="pt-4 pb-2">
+        {/* Contact + Logout */}
+        <div className="pt-4 pb-2 space-y-2">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => navigate("/support")}
+          >
+            <Mail className="w-4 h-4" />
+            Contact Customer Service
+          </Button>
           <Button
             variant="destructive"
             className="w-full gap-2"
