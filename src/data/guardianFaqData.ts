@@ -316,4 +316,92 @@ export const guardianFaqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "What's New (July 2026)",
+    icon: "bell",
+    items: [
+      {
+        question: "Will I hear an alarm for old missed check-ins when I open the app?",
+        answer: "Yes. When you open or foreground the Guardian app, Check-iN scans for any unresolved missed check-ins that are more than 1 hour old for your selected Ward. If one is found, a loud alarm loops every 12 seconds with a Dismiss button — even if your phone is on silent. This is on by default.",
+      },
+      {
+        question: "How do I turn the persistent missed-check-in alarm off?",
+        answer: "Go to Guardian Settings → Notifications → 'Persistent missed check-in alarm' and toggle it off. Push notifications and the Alerts inbox continue to work as normal.",
+      },
+      {
+        question: "When exactly does the alarm stop?",
+        answer: "The instant you tap Dismiss, or the moment the Ward completes a check-in (even a late one). It also stops if the missed check-in is otherwise resolved.",
+      },
+    ],
+  },
+  {
+    title: "Safe Zone WhatsApp Alerts",
+    icon: "shield",
+    items: [
+      {
+        question: "How am I notified when my Ward leaves a Safe Zone?",
+        answer: "You receive an instant WhatsApp message via the 'safe_zone' template with your Ward's name and the time they moved outside their defined Safe Zone — in addition to the push notification.",
+      },
+      {
+        question: "Do I get a WhatsApp when they come back?",
+        answer: "Yes — a matching 'safe_zone_return' WhatsApp fires the moment your Ward re-enters the Safe Zone, so you know they're safe again without needing to ask.",
+      },
+    ],
+  },
+  {
+    title: "Incoming Call from Ward",
+    icon: "bell",
+    items: [
+      {
+        question: "Can my Ward call me from inside the app?",
+        answer: "Yes. When your Ward taps their one-tap Call button, two things happen simultaneously: your mobile phone rings (a normal call), AND the Check-iN app on your device shows an incoming-call overlay with a ringer — so you don't miss it even if the mobile network drops.",
+      },
+      {
+        question: "How do I accept or decline the in-app call?",
+        answer: "Tap Accept to acknowledge (this silences the in-app ringer). Tap Decline to dismiss the overlay. Either way, your mobile phone still rings independently.",
+      },
+    ],
+  },
+  {
+    title: "Weekly Report Email",
+    icon: "file-text",
+    items: [
+      {
+        question: "When is the weekly report emailed?",
+        answer: "Every Sunday at 09:00 IST. It summarises your Ward's past week: check-in adherence, medication adherence, vitals trends, activity, and any alerts.",
+      },
+      {
+        question: "I stopped getting the weekly report — why?",
+        answer: "Check your Ward has at least 3 days of recorded activity in the past week, and check your Guardian Settings → Notifications → Email is on. If it still doesn't arrive, contact support at /support.",
+      },
+    ],
+  },
+  {
+    title: "Doctor Visit Report",
+    icon: "file-text",
+    items: [
+      {
+        question: "Where do I find the Doctor Visit Report?",
+        answer: "Guardian Dashboard → Reports tab → Doctor Visit section. This section is visible only to the Primary Guardian of the Ward and pulls diagnoses from the Ward's medical records with an AI-generated summary suitable for handing to a treating doctor.",
+      },
+      {
+        question: "Is it in the Hospital Admission Kit too?",
+        answer: "Yes. The Admission Kit PDF now bundles the full 6-section Ward Profile Snapshot plus the Doctor Visit Report, so hospital staff get the complete medical picture in one document.",
+      },
+    ],
+  },
+  {
+    title: "Voice Agent & Customer Service",
+    icon: "bell",
+    items: [
+      {
+        question: "Can I use the Voice Agent too?",
+        answer: "Yes — tap the mic button on your Guardian Dashboard. It greets you in voice and starts listening. Ask questions about your Ward's status or use Chat mode for a companion conversation. Free for all Guardians, with a soft cap of about 50 turns per day.",
+      },
+      {
+        question: "How do I contact Check-iN support?",
+        answer: "Open /support (or Help → Contact Customer Service). Chat on WhatsApp with your details pre-filled, call the support line, browse Guardian FAQs, or email a ticket. Support hours: Mon–Sat, 9 AM – 6 PM IST.",
+      },
+    ],
+  },
 ];
