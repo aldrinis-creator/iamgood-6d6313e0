@@ -1,87 +1,55 @@
-# Plan: Conversational Voice Agents + Customer Services
+# 60-Second Check-iN Demo Video
 
-Extend the existing "Hey Check-iN" voice assistant into a real **conversational agent** (multi-turn, with companion mode) for both Users and Guardians, and add a unified **Customer Services** hub (WhatsApp + tel call + extended FAQ).
+A code-generated MP4 demo built with Remotion. Rendered in two aspect ratios (1920×1080 landscape + 1080×1920 vertical) from the same scene library. Uses real Check-iN brand colors, animated phone mockups with authentic app screenshots, and ElevenLabs "Sarah" voiceover with burned-in captions.
 
-## Part A — Conversational Voice Agent
+Final output: `/mnt/documents/checkin-demo-landscape.mp4` and `/mnt/documents/checkin-demo-vertical.mp4`.
 
-### 1. Backend: upgrade `voice-query` → `voice-agent`
+## Storyboard (60s @ 30fps = 1800 frames)
 
-- New edge function `supabase/functions/voice-agent/index.ts` (keep old `voice-query` for back-compat one-shots).
-- Accepts `{ messages: [{role, content}], mode: "health" | "companion", persona: "user" | "guardian" }`.
-- Pre-fetches context based on persona:
-  - **User**: today's meds/check-ins/nutrition/appointments/passport (as today).
-  - **Guardian**: active ward summary — missed check-ins, ward meds adherence today, last vitals, last known location safe-zone status, pending alerts.
-- Mode-aware system prompt:
-  - `health` → factual, concise (current behavior).
-  - `companion` → warm small-talk, mindfulness nudges, gentle reminders, emotional check-ins. Never gives medical diagnoses.
-- Same Gemini → ElevenLabs (Sarah) pipeline; returns `{ answer, audio }`.
-- Multi-turn: client sends rolling last 10 messages; server trims to fit.
+| Time | Scene | Visual | Voiceover |
+|------|-------|--------|-----------|
+| 0–6s | **Hook** | Animated Check-iN heart logo pulse, tagline fades in | "Meet Check-iN — peace of mind for families, in just three taps a day." |
+| 6–14s | **User: Check-iN** | Phone mockup, big heart, tap animation, "Checked In ✓" | "At 7 AM, noon, and 7 PM, tap the heart. Your family instantly knows you're safe." |
+| 14–22s | **User: Meds + SOS** | Split — medication reminder + red SOS button pressed | "Never miss a medication. And in an emergency, one tap alerts everyone who cares." |
+| 22–32s | **Guardian: Ward ring** | Guardian dashboard, ward health score ring animates 0→92 | "Guardians see the full picture — vitals, mood, adherence — at a glance." |
+| 32–40s | **Guardian: Missed alert** | Red missed-check-in overlay + WhatsApp Safe Zone alert card | "If a check-in is missed, or your loved one leaves their safe zone, we alert you instantly on WhatsApp." |
+| 40–48s | **Safety net** | Fall detection overlay, Map My Journey trail, Vault icon | "Fall detection, journey tracking, and a secure health vault — all working quietly in the background." |
+| 48–55s | **Feature grid** | 8 tile grid pulse (Meds, Vitals, First Aid, etc.) | "Plus medications, vitals, first aid, blood banks, and a voice assistant that's always listening." |
+| 55–60s | **Outro** | Logo, "iamgood.lovable.app", "Free to start" | "Check-iN. Because caring should be simple." |
 
-### 2. Frontend: upgrade `VoiceQueryButton.tsx` → `VoiceAgentButton.tsx`
+## Visual Direction
 
-- Replace single tap-to-talk with a **conversation sheet** (slide-up `Sheet`):
-  - Transcript bubbles (user + AI), auto-scroll.
-  - Mic button at bottom (tap to talk, tap to stop).
-  - Mode toggle pills at top: **Ask** (health Q&A) / **Chat** (companion).
-  - "End conversation" button clears history.
-- Conversation state held in component (no DB persistence — privacy by default).
-- Reuses `useVoiceRecognition` (STT) + audio unlock from current implementation.
-- Available on **UserDashboard** (existing FAB position) and added to **GuardianDashboard** with guardian context.
+- **Palette:** Navy #1a365d (primary), Emerald #10b981 (Check-iN accent), SOS Red #ef4444, Cream #fefaf3 background, Charcoal #1f2937 text
+- **Fonts:** `Plus Jakarta Sans` (display, bold) + `Inter` (body) via `@remotion/google-fonts`
+- **Motion system:** Default entrance = spring `{damping: 18, stiffness: 180}` with 4-frame stagger. Scene transitions = `slide` for User→Guardian handoff, `fade` elsewhere. Persistent soft radial gradient background drifts across all scenes.
+- **Phone mockup:** Rounded 48px frame, 9:19.5 aspect, subtle shadow. Real screenshots captured via Playwright from the running preview go inside the frame.
 
-### 3. Settings
+## Technical Plan
 
-- New section in Settings → "Voice Assistant":
-  - Default mode (Ask / Chat).
-  - Voice picker (Sarah / Lily / George) — Phase 2 from existing memory.
-  - Persisted in `user_settings.settings.voiceAgent`.
+1. **Scaffold** `remotion/` project with bun; install `remotion`, `@remotion/cli`, `@remotion/renderer`, `@remotion/bundler`, `@remotion/transitions`, `@remotion/google-fonts`, `@remotion/compositor-linux-x64-musl`. Fix NixOS compositor binary + symlink ffmpeg/ffprobe.
+2. **Capture screenshots** via Playwright against `http://localhost:8080` (login as test user if `LOVABLE_BROWSER_AUTH_STATUS=injected`): User dashboard, Check-iN card, Medication tab, SOS dialog, Guardian dashboard, Ward ring, Missed alert overlay. Save to `remotion/public/screens/`. If auth is unavailable, fall back to illustrated mockups.
+3. **Generate voiceover** — one `voiceover.mp3` per script segment via ElevenLabs Sarah (`EXAVITQu4vr4xnSDxMaL`, multilingual_v2). Run a one-off Node script using `ELEVENLABS_API_KEY` (already synced via the standard connector) → save to `remotion/public/audio/`. Get durations with `@remotion/media-utils` and pin scene lengths to VO.
+4. **Compositions** — register TWO compositions in `Root.tsx`:
+   - `demo-landscape` 1920×1080
+   - `demo-vertical` 1080×1920
+   Both consume the same 8 scene components with responsive layout props.
+5. **Scenes** — one file each under `src/scenes/`: `Hook`, `UserCheckIn`, `UserMedsSos`, `GuardianRing`, `GuardianAlerts`, `SafetyNet`, `FeatureGrid`, `Outro`. Wired via `<TransitionSeries>`.
+6. **Captions** — burned-in bottom band, word-by-word highlight driven by frame → VO timing map.
+7. **Render** via programmatic script (`scripts/render-remotion.mjs`) using `chromeMode: "chrome-for-testing"`, `concurrency: 1`, non-muted (VO must be audible), h264. Run twice: once per composition. Copy MP4s to `/mnt/documents/`.
+8. **QA** — extract a still at t=3s, 15s, 30s, 45s, 55s per render via `bunx remotion still`; visually inspect frames for layout/text issues before delivering.
 
-### 4. Free for all
+## Deliverables
 
-- No gating. Uses existing `LOVABLE_API_KEY` + `ELEVENLABS_API_KEY` secrets (already configured).
-- Soft per-user daily cap (e.g. 50 turns/day) tracked in memory map in edge function to prevent runaway costs; surfaces friendly "you've reached today's chat limit" message.
+- `/mnt/documents/checkin-demo-landscape.mp4` (~15–20 MB)
+- `/mnt/documents/checkin-demo-vertical.mp4` (~15–20 MB)
+- `remotion/` folder committed to the project so the demo can be re-rendered / edited later
+- `<presentation-artifact>` tags for both MP4s in the final reply
 
-## Part B — Customer Services Hub
+## Risks & Fallbacks
 
-### 1. New page: `src/pages/CustomerService.tsx`
+- **Screenshot capture fails** (auth unavailable) → fall back to hand-crafted SVG mockups inside the phone frame; video still ships.
+- **ElevenLabs credit exhausted** → fall back to on-screen captions only; render is silent but complete.
+- **Render exceeds 10 min sandbox cap** → drop vertical from first pass; deliver landscape, then render vertical in a follow-up turn.
+- **Bundle install issues on NixOS** → the musl compositor swap + ffmpeg symlink (per skill instructions) is applied up-front.
 
-Three primary actions, each a big tappable card:
-
-1. **💬 WhatsApp us** — opens `https://wa.me/<SUPPORT_NUMBER>?text=<prefilled context>` with user name + plan + app version pre-filled.
-2. **📞 Call support** — `tel:<SUPPORT_NUMBER>` (Mon–Sat 9–6 IST hours displayed).
-3. **✉️ Email a ticket** — reuses existing `ContactUsForm`.
-
-Below: searchable FAQ (reuses `faqData` / `guardianFaqData` based on role).
-
-### 2. Routing & nav entry
-
-- Route: `/support` (and `/guardian/support`).
-- Added to:
-  - User: Settings → "Help & Support" tile (replaces current `Help` link, which becomes FAQ-only inside this page).
-  - Guardian: Settings → same.
-  - Bottom of `Help.tsx` / `GuardianHelp.tsx` → "Still need help? Contact us" → links here.
-
-### 3. Support number config
-
-- Stored as `VITE_SUPPORT_WHATSAPP` and `VITE_SUPPORT_PHONE` in `.env` (public, non-secret).
-- Defaults to existing Futurewave support number — confirm with you before publishing.
-
-### 4. WhatsApp template (optional Phase 2)
-
-- If you want **inbound** WhatsApp messages routed to a CRM/inbox, that needs MSG91 Inbound Webhook setup — flagging as out-of-scope for v1 since `wa.me` deep link is sufficient for outbound conversation.
-
-## Out of scope (call out)
-
-- Real-time WebRTC voice (ElevenLabs Conversational AI) — keeping STT→LLM→TTS as agreed.
-- Voice agent actions (logging meds, triggering SOS by voice) — read-only Q&A + companion only.
-- AI chatbot for customer service triage — using human-routed WhatsApp/phone/email; can add later.
-- Twilio phone hotline — using `tel:` deep link only.
-
-## Files touched
-
-**New**: `supabase/functions/voice-agent/index.ts`, `src/components/VoiceAgentButton.tsx` (replaces VoiceQueryButton), `src/components/voice/ConversationSheet.tsx`, `src/pages/CustomerService.tsx`.
-**Modified**: `src/pages/UserDashboard.tsx`, `src/pages/GuardianDashboard.tsx`, `src/pages/Settings.tsx`, `src/pages/GuardianSettings.tsx`, `src/pages/Help.tsx`, `src/pages/GuardianHelp.tsx`, `src/App.tsx` (routes), `src/hooks/useUserSettings.ts` (voiceAgent defaults).
-
-## Questions before build
-
-1. **Support phone / WhatsApp number** to wire into the Customer Service page? (I'll use `+91-7045868482` placeholder otherwise.)
-2. **Daily voice-agent turn cap per user** — OK with 25/day, or different?
+Estimated render time: ~4–6 min per composition. Total build time: ~15–20 min.
