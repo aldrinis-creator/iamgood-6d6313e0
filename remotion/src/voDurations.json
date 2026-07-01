@@ -1,0 +1,34 @@
+{
+  "s1_hook": {
+    "text": "Meet Check-iN. Peace of mind for families, in just three taps a day.",
+    "seconds": 4.551111
+  },
+  "s2_checkin": {
+    "text": "At seven A M, noon, and seven P M — tap the heart. Your family instantly knows you're safe.",
+    "seconds": 6.640907
+  },
+  "s3_meds_sos": {
+    "text": "Never miss a medication. And in an emergency, one tap alerts everyone who cares.",
+    "seconds": 5.526349
+  },
+  "s4_ring": {
+    "text": "Guardians see the full picture — vitals, mood, adherence — at a glance.",
+    "seconds": 4.690431
+  },
+  "s5_alerts": {
+    "text": "If a check-in is missed, or your loved one leaves their safe zone, we alert you instantly on WhatsApp.",
+    "seconds": 5.897868
+  },
+  "s6_safety": {
+    "text": "Fall detection, journey tracking, and a secure health vault — all working quietly in the background.",
+    "seconds": 5.665669
+  },
+  "s7_grid": {
+    "text": "Plus medications, vitals, first aid, blood banks, and a voice assistant that's always listening.",
+    "seconds": 6.873107
+  },
+  "s8_outro": {
+    "text": "Check-iN. Because caring should be simple.",
+    "seconds": 2.739955
+  }
+}
