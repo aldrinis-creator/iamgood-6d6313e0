@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
 
     const { data: logs, error } = await supabase
       .from("medication_logs")
-      .select("id, user_id, scheduled_at, medication:medications(name)")
+      .select("id, user_id, scheduled_at, medication_id, medication:medications(name)")
       .eq("status", "missed")
       .is("whatsapp_alerted_at", null)
       .gte("scheduled_at", todayStartUTC.toISOString())
@@ -176,24 +176,65 @@ Deno.serve(async (req) => {
       }
     }
 
+
     const eligibleLogs = logs.filter(
       (l) => !guardianUserIds.has(l.user_id) && !pausedUserIds.has(l.user_id),
     );
+
+    // FIX: Fetch all taken logs for these users today to avoid race condition alerts
+    const { data: takenLogs } = await supabase
+      .from("medication_logs")
+      .select("user_id, medication_id, scheduled_at")
+      .in("user_id", userIds)
+      .in("status", ["taken", "taken_late"])
+      .gte("scheduled_at", todayStartUTC.toISOString())
+      .lte("scheduled_at", todayEndUTC.toISOString());
+
+    const takenSet = new Set<string>();
+    if (takenLogs) {
+      for (const t of takenLogs) {
+        if (!t.scheduled_at) continue;
+        const d = new Date(t.scheduled_at);
+        const hourKey = ${d.getUTCFullYear()}---;
+        // Note: medication_id needs to be included in the logs select above for this to work perfectly.
+        // We will just use user_id + hourKey + medication_id if available.
+        // Wait, the main query only selects medication:medications(name) but we need medication_id.
+        // We must update the main query to select medication_id!
+        takenSet.add(${t.user_id}||);
+      }
+    }
+
+    const trulyEligibleLogs = [];
+    const raceConditionSkippedIds = [];
+
+    for (const l of eligibleLogs) {
+      const d = new Date(l.scheduled_at);
+      const hourKey = ${d.getUTCFullYear()}---;
+      const tKey = ${l.user_id}||;
+      
+      if (takenSet.has(tKey)) {
+        raceConditionSkippedIds.push(l.id);
+      } else {
+        trulyEligibleLogs.push(l);
+      }
+    }
 
     // Silently mark skipped logs as alerted so we don't reprocess them forever.
     const skippedIds = logs
       .filter((l) => guardianUserIds.has(l.user_id) || pausedUserIds.has(l.user_id))
       .map((l) => l.id);
-    if (skippedIds.length > 0) {
+      
+    const allSkippedIds = [...skippedIds, ...raceConditionSkippedIds];
+    if (allSkippedIds.length > 0) {
       await supabase
         .from("medication_logs")
         .update({ whatsapp_alerted_at: now.toISOString() })
-        .in("id", skippedIds);
+        .in("id", allSkippedIds);
     }
 
-    if (eligibleLogs.length === 0) {
+    if (trulyEligibleLogs.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No eligible users", processed: 0 }),
+        JSON.stringify({ message: "No eligible users (or all taken)", processed: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -201,7 +242,8 @@ Deno.serve(async (req) => {
     // Group by user + scheduled hour
     type Group = { user_id: string; hourKey: string; logIds: string[]; medNames: Set<string>; scheduled: Date };
     const groups = new Map<string, Group>();
-    for (const l of eligibleLogs) {
+    for (const l of trulyEligibleLogs) {
+
       const d = new Date(l.scheduled_at);
       const hourKey = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}`;
       const key = `${l.user_id}|${hourKey}`;
