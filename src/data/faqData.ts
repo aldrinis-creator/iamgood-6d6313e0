@@ -1,5 +1,5 @@
 // FAQ data — update this file whenever FAQs change.
-// Last updated: 2026-05-27
+// Last updated: 2026-07-01
 
 export interface FaqItem {
   question: string;
@@ -12,7 +12,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-05-27";
+export const FAQ_VERSION = "2026-07-01";
 
 export const faqSections: FaqSection[] = [
   {
