@@ -1191,4 +1191,128 @@ export const faqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "What's New (July 2026)",
+    icon: "rocket",
+    items: [
+      {
+        question: "Can I check in earlier than the scheduled time?",
+        answer: "Yes — the check-in heart now unlocks 60 minutes before your scheduled slot (previously 30 minutes). Tap the pulsing heart any time in that hour to check in early.",
+      },
+      {
+        question: "Will I be reminded even if the app is closed?",
+        answer: "Yes. Push reminders now fire in three waves per missed slot — at the scheduled time (T-0), 10 minutes later, and 30 minutes later — driven by a server-side cron. They reach your lock screen even when Check-iN is not open.",
+      },
+      {
+        question: "What happens if I respond late to a check-in?",
+        answer: "Your check-in is still recorded and marked as a late response. Your Guardian sees the late completion on their dashboard, so nothing gets lost.",
+      },
+      {
+        question: "Where did the Active / Sleep / Checked-Out toggle go?",
+        answer: "It moved out of the top of the home screen into Settings → Check-iN → Mode. The home screen is now cleaner with a larger heart and clearer status.",
+      },
+      {
+        question: "Why is Health Passport now above Map My Journey on the home tiles?",
+        answer: "We reordered the tiles so daily health at-a-glance sits above travel tools — Health Passport now appears directly above Map My Journey.",
+      },
+    ],
+  },
+  {
+    title: "Medication Voice Alerts",
+    icon: "pill",
+    items: [
+      {
+        question: "Does the app speak the medication name at dose time?",
+        answer: "Yes. At T-0 (the exact scheduled time), the app announces the medication name out loud — e.g. \"Time to take Metformin\" — in addition to the chime and push. This is on by default.",
+      },
+      {
+        question: "How do I turn the medication voice alert off?",
+        answer: "Go to Settings → Alerts and toggle 'Medication voice alert at due time' off. The chime, vibration and push notification continue to work.",
+      },
+    ],
+  },
+  {
+    title: "Appointment Loud Alerts",
+    icon: "calendar-clock",
+    items: [
+      {
+        question: "How loud is the appointment alert?",
+        answer: "At the alert lead time you selected when adding the appointment, the app plays a 3-burst loud chime followed by a spoken reminder that says the appointment title and time — designed to be heard even if you've stepped away from the phone.",
+      },
+      {
+        question: "Can I change the alert lead time?",
+        answer: "Yes — when adding or editing an appointment, set the primary and secondary alert lead times (e.g. 1 hour before, 15 minutes before). The loud alert fires precisely at each lead time.",
+      },
+    ],
+  },
+  {
+    title: "Blood Bank Directory",
+    icon: "heart",
+    items: [
+      {
+        question: "How do I find blood banks near me?",
+        answer: "Open Emergency First Aid or Services → Blood Banks. Follow the 3-step flow: pick your blood group → pick the component (Whole Blood, Plasma, Platelets, etc.) → see the nearest matching centres sorted by distance.",
+      },
+      {
+        question: "How many blood banks are listed?",
+        answer: "6,145 blood banks across India, with contact numbers and directions. Sign-in is required to view the directory to protect centre data.",
+      },
+    ],
+  },
+  {
+    title: "One-Tap Call & In-App Ring",
+    icon: "phone",
+    items: [
+      {
+        question: "How do I call my Guardian in one tap?",
+        answer: "The green Call button on your home screen dials your Primary Guardian instantly using your phone's normal mobile call — no menus, no lists.",
+      },
+      {
+        question: "Does the Guardian's phone ring inside the Check-iN app too?",
+        answer: "Yes. When you tap Call, an in-app ringer also fires on your Guardian's Check-iN app (via realtime) — so even if your mobile call is missed, they see and hear the incoming Check-iN call.",
+      },
+    ],
+  },
+  {
+    title: "Safe Zone WhatsApp Alerts",
+    icon: "map-pin",
+    items: [
+      {
+        question: "What happens when I leave a Safe Zone?",
+        answer: "Your accepted Guardians get an instant WhatsApp message (via the 'safe_zone' template) telling them you've moved outside your defined Safe Zone, along with your name and time.",
+      },
+      {
+        question: "Do they get told when I come back?",
+        answer: "Yes — a matching 'safe_zone_return' WhatsApp is sent the moment you re-enter the Safe Zone, so Guardians know you're back to safety without needing to ask.",
+      },
+    ],
+  },
+  {
+    title: "Voice Agent & Customer Service",
+    icon: "bell",
+    items: [
+      {
+        question: "What is the Voice Agent?",
+        answer: "A conversational assistant you can talk to. Tap the mic button on your home screen — it greets you in voice and starts listening. Two modes: Ask (health & app questions) and Chat (companion conversation). Free for everyone.",
+      },
+      {
+        question: "Is there a usage limit?",
+        answer: "There is a soft cap of about 50 turns per day per account to keep the service fast and free for all.",
+      },
+      {
+        question: "How do I reach Check-iN Customer Service?",
+        answer: "Open /support (or Help → Contact Customer Service). You can chat on WhatsApp with your details pre-filled, call our support line, browse FAQs, or email a ticket. Support hours: Mon–Sat, 9 AM – 6 PM IST.",
+      },
+    ],
+  },
+  {
+    title: "Hospital Admission Kit — Updated",
+    icon: "hospital",
+    items: [
+      {
+        question: "What's now included in the Hospital Admission Kit?",
+        answer: "In addition to your IDs, insurance and vitals, the Kit now includes the full 6-section 'Ward Profile Snapshot' and the AI-generated Doctor Visit Report — so the treating team gets your complete medical picture in one PDF.",
+      },
+    ],
+  },
 ];
