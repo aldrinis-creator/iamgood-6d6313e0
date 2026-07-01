@@ -2709,6 +2709,7 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      email_queue_dispatch: { Args: never; Returns: undefined }
       email_queue_stats: {
         Args: never
         Returns: {
