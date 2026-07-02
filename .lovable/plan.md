@@ -1,67 +1,26 @@
-# Update FAQs with All Recent Changes
+## Problem
 
-Refresh both FAQ files (`src/data/faqData.ts` and `src/data/guardianFaqData.ts`) so the in-app Help pages, search, and downloadable Markdown guides reflect every feature added in this working session. Bump `FAQ_VERSION` and `GUARDIAN_FAQ_VERSION` to `2026-07-01`.
+The admin verification screen shows `Email failed: Email invoke error: Edge Function returned a non-2xx status code` because `send-transactional-email` is failing to boot:
 
-## Ward FAQ additions (`faqData.ts`)
+```
+worker boot error: Uncaught SyntaxError: The requested module
+'npm:@react-email/components@0.0.22' does not provide an export named 'Col'
+  at .../_shared/transactional-email-templates/weekly-report.tsx:4:81
+```
 
-Add/refresh these Q&As across existing sections (create new sections where noted):
+`@react-email/components@0.0.22` does not export `Col` (and `Row` behaves differently in this version). Because the shared templates registry is imported at cold-start, ANY template that fails to import brings down the whole `send-transactional-email` function — that's why the 2FA email (a different template) also fails. SMS still works because it goes through MSG91 directly.
 
-**Daily Check-In**
-- Early check-in window is now **60 minutes** before the scheduled time (was 30).
-- Push reminders now fire at **T-0, T+10, T+30** even if the app is closed.
-- Late responses are recorded and surfaced to Guardians.
+## Fix
 
-**Medications (new/updated)**
-- Voice alert at T-0 announcing the medication name (toggle in Settings, default ON).
+Edit `supabase/functions/_shared/transactional-email-templates/weekly-report.tsx`:
 
-**Appointments (new section)**
-- Loud 3-burst chime + spoken reminder at the selected alert lead time.
+1. Remove `Row, Col` from the `@react-email/components` import.
+2. Replace any `<Row>`/`<Col>` layout in the template with an HTML `<table>`/`<tr>`/`<td>` block (or stacked `<Section>` + inline-styled `<div>`s) styled with the existing navy-blue email tokens, so the weekly report still renders side-by-side stats in email clients.
+3. Redeploy `send-transactional-email` so the boot error clears.
 
-**Emergency & Hospital**
-- Blood Bank Directory (6,145 centres) — 3-step Group → Component → Nearest flow; sign-in required.
-- Hospital Admission Kit now includes the full **Ward Profile Snapshot** (6 sections) and the **Doctor Visit Report**.
+No changes to `admin-2fa`, admin UI, other templates, config, or DB.
 
-**Communication (new section)**
-- One-tap **Call Guardian** button (mobile call) on the home screen.
-- In-app ringer to the Guardian's phone via Realtime.
+## Verification
 
-**Safe Zones**
-- WhatsApp alerts to Guardians on **exit** (`safe_zone`) and **return** (`safe_zone_return`).
-
-**Voice Assistant / Customer Service (new section)**
-- Conversational **Voice Agent** (Ask + Chat modes, auto-speaks first reply, 50 turns/day soft cap) — free for all.
-- **Customer Service** hub at `/support`: WhatsApp, phone (Mon–Sat 9–6 IST), email ticket, FAQ.
-
-**Home Screen / Settings**
-- Mode selector (Active / Sleep / Checked-Out) moved to **Settings → Check-iN**.
-- Health Passport tile now sits above Map My Journey.
-
-## Guardian FAQ additions (`guardianFaqData.ts`)
-
-**Alerts & Audio (new/updated)**
-- Persistent missed check-in audio escalation on app open/foreground (loops every 12s, Dismiss button, toggle in Guardian Settings, default ON).
-- WhatsApp Safe Zone exit + return alerts explained.
-
-**Communication (new section)**
-- Incoming in-app call ringer from the Ward; how to accept/decline.
-
-**Reports (new/updated)**
-- Weekly report now emailed every **Sunday 09:00 IST**.
-- Doctor Visit Report section in Reports tab (Primary Guardian only).
-
-**Hospital Admission Kit**
-- Now includes Ward Profile Snapshot + Doctor Visit Report.
-
-**Voice Agent & Customer Service (new section)**
-- Same Voice Agent available to Guardians.
-- `/support` hub details.
-
-## Technical notes
-
-- Both files are plain TS arrays; append items to existing sections and push new `FaqSection` objects where needed. Icons use the existing `iconMap` keys in `Help.tsx` / `GuardianHelp.tsx` (`heart`, `shield`, `bell`, `phone`, `message-circle`, etc.) — if a new icon key is introduced, extend the corresponding `iconMap` in the page files.
-- Bump both version constants; the download filename and footer pick these up automatically.
-- No schema, backend, or route changes.
-
-## Out of scope
-- No UI/layout changes to Help pages.
-- No changes to blog, legal pages, or Guardian dashboard.
+- Confirm `send-transactional-email` logs no longer show the boot error.
+- Trigger admin verification: expect "Code sent" toast with both SMS and Email succeeding (no red banner).
