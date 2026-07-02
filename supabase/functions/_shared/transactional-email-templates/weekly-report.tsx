@@ -72,15 +72,15 @@ const WeeklyReportEmail = ({
           <Heading style={cardTitle}>🔔 Check-iN Compliance</Heading>
           <Hr style={innerDivider} />
           <Row style={statsRow}>
-            <Col style={statCol}>
+            <Column style={statCol}>
               <Text style={statVal}>{checkInStats.rate}%</Text>
               <Text style={statLabel}>Compliance</Text>
-            </Col>
-            <Col style={statDetailCol}>
+            </Column>
+            <Column style={statDetailCol}>
               <Text style={detailText}>• Completed Check-iNs: <strong>{checkInStats.responded}</strong></Text>
               <Text style={detailText}>• Missed Check-iNs: <strong>{checkInStats.missed}</strong></Text>
               <Text style={detailText}>• Total Scheduled: <strong>{checkInStats.total}</strong></Text>
-            </Col>
+            </Column>
           </Row>
         </Section>
 
@@ -89,15 +89,15 @@ const WeeklyReportEmail = ({
           <Heading style={cardTitle}>💊 Medication Compliance</Heading>
           <Hr style={innerDivider} />
           <Row style={statsRow}>
-            <Col style={statCol}>
+            <Column style={statCol}>
               <Text style={statVal}>{medicationStats.rate}%</Text>
               <Text style={statLabel}>Compliance</Text>
-            </Col>
-            <Col style={statDetailCol}>
+            </Column>
+            <Column style={statDetailCol}>
               <Text style={detailText}>• Taken: <strong>{medicationStats.taken}</strong></Text>
               <Text style={detailText}>• Missed: <strong>{medicationStats.missed}</strong></Text>
               <Text style={detailText}>• Total Scheduled: <strong>{medicationStats.total}</strong></Text>
-            </Col>
+            </Column>
           </Row>
         </Section>
 
@@ -106,15 +106,15 @@ const WeeklyReportEmail = ({
           <Heading style={cardTitle}>🧘 Wellness & Mood</Heading>
           <Hr style={innerDivider} />
           <Row style={statsRow}>
-            <Col style={statCol}>
+            <Column style={statCol}>
               <Text style={statVal}>{wellnessStats.avgSleep}h</Text>
               <Text style={statLabel}>Avg Daily Sleep</Text>
-            </Col>
-            <Col style={statDetailCol}>
+            </Column>
+            <Column style={statDetailCol}>
               <Text style={detailText}>• Dominant Mood: <strong>{wellnessStats.topMood}</strong></Text>
               <Text style={detailText}>• Avg Energy Level: <strong>{wellnessStats.avgEnergy}/5</strong></Text>
               <Text style={detailText}>• Avg Stress Level: <strong>{wellnessStats.avgStress}/5</strong></Text>
-            </Col>
+            </Column>
           </Row>
         </Section>
 
@@ -123,14 +123,14 @@ const WeeklyReportEmail = ({
           <Heading style={cardTitle}>🏃 Activity & Steps</Heading>
           <Hr style={innerDivider} />
           <Row style={statsRow}>
-            <Col style={statCol}>
+            <Column style={statCol}>
               <Text style={statVal}>{(activityStats.totalSteps / 1000).toFixed(1)}k</Text>
               <Text style={statLabel}>Total Steps</Text>
-            </Col>
-            <Col style={statDetailCol}>
+            </Column>
+            <Column style={statDetailCol}>
               <Text style={detailText}>• Total Exercise: <strong>{activityStats.totalExerciseMin} minutes</strong></Text>
               <Text style={detailText}>• Avg Daily Steps: <strong>{Math.round(activityStats.totalSteps / 7)} steps</strong></Text>
-            </Col>
+            </Column>
           </Row>
         </Section>
 
