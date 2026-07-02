@@ -2769,6 +2769,10 @@ export type Database = {
         Returns: undefined
       }
       is_accepted_guardian_of: { Args: { _user_id: string }; Returns: boolean }
+      is_accepted_vault_nominee: {
+        Args: { _guardian_id: string; _user_id: string }
+        Returns: boolean
+      }
       link_guardian_user_id: { Args: never; Returns: undefined }
       lookup_emergency_token: {
         Args: { _token: string }
