@@ -420,7 +420,7 @@ const CheckInCard = () => {
               {pauseLabel} — Check-iNs Paused
             </p>
             <p className="text-lg text-white">
-              To change mode to Active, go to Settings.
+              To update mode, select from the above.
             </p>
           </div>
         ) : isApproaching && !checkedIn && getCurrentWindow() === null ? (

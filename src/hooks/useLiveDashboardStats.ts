@@ -16,24 +16,31 @@ export function useLiveDashboardStats() {
     if (!session?.user?.id) return;
 
     const fetchStats = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
+      const todayDate = new Date();
+      const todayStr = todayDate.toISOString().slice(0, 10);
+      todayDate.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(todayDate);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const [checkInsRes, medsRes] = await Promise.all([
+      const [checkInsRes, medsRes, healthRes] = await Promise.all([
         supabase
           .from("check_ins")
           .select("status")
           .eq("user_id", session.user.id)
-          .gte("scheduled_at", today.toISOString())
+          .gte("scheduled_at", todayDate.toISOString())
           .lt("scheduled_at", tomorrow.toISOString()),
         supabase
           .from("medication_logs")
           .select("status")
           .eq("user_id", session.user.id)
-          .gte("scheduled_time", today.toISOString())
+          .gte("scheduled_time", todayDate.toISOString())
           .lt("scheduled_time", tomorrow.toISOString()),
+        supabase
+          .from("health_passport_scores")
+          .select("overall")
+          .eq("user_id", session.user.id)
+          .eq("score_date", todayStr)
+          .maybeSingle()
       ]);
 
       let ciCompleted = 0;
@@ -50,19 +57,14 @@ export function useLiveDashboardStats() {
         mCompleted = medsRes.data.filter(m => m.status === "taken" || m.status === "taken_late").length;
       }
 
-      // Simple health score logic
-      let score = 100;
-      const ciMissed = (checkInsRes.data || []).filter(c => c.status === "missed").length;
-      const mMissed = (medsRes.data || []).filter(m => m.status === "missed").length;
-      score -= (ciMissed * 10);
-      score -= (mMissed * 5);
+      const score = healthRes.data?.overall ?? 0;
       
       setStats({
         checkInsCompleted: ciCompleted,
         checkInsTotal: ciTotal,
         medsCompleted: mCompleted,
         medsTotal: mTotal,
-        healthScore: Math.max(0, score),
+        healthScore: score,
       });
     };
 

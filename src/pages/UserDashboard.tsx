@@ -306,19 +306,19 @@ const UserDashboard = () => {
         <div className="flex gap-2">
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
             <div className="text-[20px] font-bold text-success mb-1">
-              {stats.checkInsCompleted}<span className="text-[12px] text-muted-foreground font-normal">/{stats.checkInsTotal}</span>
+              {stats.checkInsCompleted}<span className="text-[12px] text-white font-normal">/{stats.checkInsTotal}</span>
             </div>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Check-ins</div>
+            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Check-ins</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
             <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}</div>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Health</div>
+            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Health</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
             <div className="text-[20px] font-bold text-warning mb-1">
-              {stats.medsCompleted}<span className="text-[12px] text-muted-foreground font-normal">/{stats.medsTotal || 0}</span>
+              {stats.medsCompleted}<span className="text-[12px] text-white font-normal">/{stats.medsTotal || 0}</span>
             </div>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Meds</div>
+            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Meds</div>
           </div>
         </div>
 

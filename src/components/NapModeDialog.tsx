@@ -29,7 +29,7 @@ const NapModeDialog = ({ open, onClose, onSave, defaultDurationMins }: NapModeDi
         </DialogHeader>
 
         <p className="text-sm text-t2">
-          How long would you like to nap? Check-iNs will be paused.
+          How long would you like to nap? During this time, you won't receive check-in reminders or alerts.
         </p>
 
         <div className="grid grid-cols-2 gap-3 mt-2">
