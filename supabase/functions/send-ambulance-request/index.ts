@@ -80,10 +80,12 @@ function normalizePhone(p: string | null | undefined): string {
 }
 
 async function buildHealthSummary(supabase: any, userId: string): Promise<{ summary: string; profileLink: string }> {
-  const [profileRes, healthRes, medsRes, tokenRes] = await Promise.all([
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [profileRes, healthRes, medsRes, logsRes, tokenRes] = await Promise.all([
     supabase.from("profiles").select("full_name, date_of_birth, gender").eq("id", userId).maybeSingle(),
     supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
     supabase.from("medications").select("name, dosage").eq("user_id", userId),
+    supabase.from("medication_logs").select("status, medications(name)").eq("user_id", userId).gte("scheduled_at", last24h).in("status", ["taken", "taken_late"]),
     supabase.from("emergency_share_tokens").select("token").eq("user_id", userId).eq("is_active", true).maybeSingle(),
   ]);
 
@@ -93,6 +95,10 @@ async function buildHealthSummary(supabase: any, userId: string): Promise<{ summ
   if (h?.allergies?.length) parts.push(`Allergies:${h.allergies.slice(0, 3).join("/")}`);
   if (h?.chronic_conditions?.length) parts.push(`Cond:${h.chronic_conditions.slice(0, 3).join("/")}`);
   if (medsRes.data?.length) parts.push(`Meds:${medsRes.data.map((m: any) => m.name).join("/")}`);
+  if (logsRes.data?.length) {
+    const takenMeds = logsRes.data.map((l: any) => l.medications?.name).filter(Boolean);
+    if (takenMeds.length) parts.push(`Taken(24h):${Array.from(new Set(takenMeds)).join("/")}`);
+  }
   if (h?.family_doctor_phone) parts.push(`Dr:${h.family_doctor_name || ""} ${h.family_doctor_phone}`);
 
   const summary = parts.length ? parts.join(" | ") : "No health data";

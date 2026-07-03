@@ -18,6 +18,7 @@ interface EmergencyData {
   family_doctor_name: string | null;
   family_doctor_phone: string | null;
   medications: { name: string; dosage: string }[];
+  recently_taken_meds: { name: string; dosage: string; taken_at: string }[];
   guardians: { name: string; phone: string; relation: string | null; is_primary: boolean }[];
   hospitalizations: { reason: string; hospital_name: string | null; start_date: string | null; end_date: string | null; treatment: string | null }[];
   surgeries: { reason: string; hospital_name: string | null; doctor_name: string | null; start_date: string | null }[];
@@ -51,12 +52,14 @@ const EmergencyProfile = () => {
       const userId = (tokenResult as any).user_id as string;
 
       // Fetch all data in parallel (anon RLS allows it for active tokens)
-      const [profileRes, healthRes, medsRes, guardiansRes, historyRes] = await Promise.all([
+      const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const [profileRes, healthRes, medsRes, guardiansRes, historyRes, logsRes] = await Promise.all([
         supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
         supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
         supabase.from("medications").select("name, dosage").eq("user_id", userId),
         supabase.from("guardians_emergency_safe" as any).select("guardian_name, guardian_phone, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
         supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
+        supabase.from("medication_logs").select("taken_at, medications(name, dosage)").eq("user_id", userId).gte("scheduled_at", last24h).in("status", ["taken", "taken_late"]).order("taken_at", { ascending: false }),
       ]);
 
       const p = profileRes.data;
@@ -74,6 +77,7 @@ const EmergencyProfile = () => {
         family_doctor_name: h?.family_doctor_name || null,
         family_doctor_phone: h?.family_doctor_phone || null,
         medications: (medsRes.data || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
+        recently_taken_meds: (logsRes.data || []).map((l: any) => ({ name: l.medications?.name || "Unknown", dosage: l.medications?.dosage || "", taken_at: l.taken_at })),
         guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation, is_primary: !!g.is_primary })),
         hospitalizations: (historyRes.data || []).filter((h: any) => h.type === "hospitalization").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, start_date: h.start_date, end_date: h.end_date, treatment: h.treatment })),
         surgeries: (historyRes.data || []).filter((h: any) => h.type === "surgery").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, doctor_name: h.doctor_name, start_date: h.start_date })),
@@ -190,6 +194,30 @@ const EmergencyProfile = () => {
                 <div key={i} className="flex items-center justify-between py-1 border-b border-border last:border-0">
                   <span className="text-sm font-medium">{m.name}</span>
                   <span className="text-sm text-muted-foreground">{m.dosage}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Recently Taken Medications */}
+        {data.recently_taken_meds.length > 0 && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-primary">
+                <Pill className="w-4 h-4" /> Taken Recently (24h)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {data.recently_taken_meds.map((m, i) => (
+                <div key={i} className="flex items-center justify-between py-1 border-b border-primary/10 last:border-0">
+                  <div>
+                    <span className="text-sm font-medium">{m.name}</span>
+                    {m.dosage && <span className="text-xs text-muted-foreground ml-2">{m.dosage}</span>}
+                  </div>
+                  <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    {new Date(m.taken_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               ))}
             </CardContent>

@@ -1,12 +1,8 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, Eye, EyeOff, Smartphone, Mail } from "lucide-react";
+import { Eye, EyeOff, Smartphone, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -21,43 +17,6 @@ const GoogleIcon = () => (
     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
   </svg>
-);
-
-const GoogleSignInButton = ({ label = "Sign in with Google" }: { label?: string }) => {
-  const [loading, setLoading] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (error) {
-      toast.error("Google sign-in failed", { description: String(error) });
-    }
-    setLoading(false);
-  };
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className="w-full text-base py-6 gap-3"
-      size="lg"
-      onClick={handleGoogleSignIn}
-      disabled={loading}
-    >
-      <GoogleIcon />
-      {loading ? "Connecting..." : label}
-    </Button>
-  );
-};
-
-const OrDivider = () => (
-  <div className="flex items-center gap-3 my-2">
-    <div className="flex-1 h-px bg-border" />
-    <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-    <div className="flex-1 h-px bg-border" />
-  </div>
 );
 
 const isPhoneInput = (value: string) => /^\+?\d[\d\s-]{5,}$/.test(value.trim());
@@ -78,14 +37,31 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem(REMEMBER_KEY));
   const [loading, setLoading] = useState(false);
+  
+  // Navigation states
+  const [emailMode, setEmailMode] = useState(false);
+  const [otpMode, setOtpMode] = useState(false);
+  
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [otpMode, setOtpMode] = useState(false);
+  
   const [otpPhone, setOtpPhone] = useState("");
+  
   const [showResendVerify, setShowResendVerify] = useState(false);
   const [resendEmail, setResendEmail] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) {
+      toast.error("Google sign-in failed", { description: String(error) });
+    }
+    setLoading(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +75,7 @@ const Login = () => {
         const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
         if (fnError || !data) {
           toast.error("No account found with this phone number.");
+          setLoading(false);
           return;
         }
         emailToUse = data as string;
@@ -156,17 +133,13 @@ const Login = () => {
     }
   };
 
-  // OTP login mode
+  // OTP FLOW
   if (otpMode) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
-              <Heart className="w-8 h-8 text-success-foreground fill-current" />
-            </div>
-            <h1 className="text-2xl font-bold text-primary">Check-iN</h1>
-            <p className="text-sm text-muted-foreground">Sign in with OTP</p>
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+        <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
+          <div className="flex items-center gap-2 text-[13px] text-auth-text-2 cursor-pointer mb-2" onClick={() => setOtpMode(false)}>
+            ‹ Back
           </div>
 
           {!otpPhone ? (() => {
@@ -174,96 +147,186 @@ const Login = () => {
             const hasInput = identifier.trim().length > 0;
             const isValid = digitCount >= 10;
             return (
-            <div className="space-y-4">
-              <div>
-                <Label>Phone Number</Label>
-                <PhoneInput
-                  value={identifier}
-                  onChange={setIdentifier}
-                  placeholder="98765 43210"
-                />
-                {hasInput && !isValid && (
-                  <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
-                )}
-              </div>
-              <Button
-                className="w-full bg-primary text-lg py-6"
-                size="lg"
-                disabled={!isValid}
-                onClick={() => {
-                  const phone = formatPhone(identifier.trim());
-                  setOtpPhone(phone);
-                }}
-              >
-                <Smartphone className="w-5 h-5 mr-2" />
-                Send OTP
-              </Button>
-              <div className="text-center">
-                <button className="text-sm text-primary underline" onClick={() => setOtpMode(false)}>
-                  Back to password sign in
-                </button>
-              </div>
-            </div>
+              <>
+                <div className="mb-6 mt-2">
+                  <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Enter your<br/>phone number</h1>
+                  <div className="text-[14px] text-auth-text-2">We'll send you a one-time code to sign in</div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Phone number</label>
+                  <div className="bg-navy-mid border border-auth-border-hi rounded-xl p-1">
+                    <PhoneInput
+                      value={identifier}
+                      onChange={setIdentifier}
+                      placeholder="98765 43210"
+                      className="border-0 shadow-none bg-transparent h-12"
+                    />
+                  </div>
+                  {hasInput && !isValid && (
+                    <p className="text-[11px] text-auth-red mt-1.5">Enter at least 10 digits</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-1">
+                  <div 
+                    onClick={() => setRememberMe(!rememberMe)}
+                    className={`w-5 h-5 rounded-[5px] border-[1.5px] flex items-center justify-center cursor-pointer shrink-0 transition-colors ${rememberMe ? 'bg-auth-green border-auth-green text-[#0A1525]' : 'bg-navy-mid border-auth-border-hi'}`}
+                  >
+                    {rememberMe && <span className="text-xs font-bold">✓</span>}
+                  </div>
+                  <div className="text-[13px] text-auth-text-2 cursor-pointer select-none" onClick={() => setRememberMe(!rememberMe)}>Remember this phone number</div>
+                </div>
+
+                <div className="mt-auto pt-6 flex flex-col gap-2">
+                  <button 
+                    disabled={!isValid}
+                    onClick={() => {
+                      const phone = formatPhone(identifier.trim());
+                      setOtpPhone(phone);
+                    }}
+                    className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl flex items-center justify-center disabled:opacity-50 transition-transform active:scale-[0.98]"
+                  >
+                    Send OTP ›
+                  </button>
+                  <div className="text-center text-[12px] text-auth-text-3 mt-1 leading-relaxed">A 6-digit code will be sent via SMS to this number</div>
+                </div>
+              </>
             );
           })() : (
-            <OtpVerification
-              phone={otpPhone}
-              onVerified={async (data) => {
-                if (data?.no_account) {
-                  toast.error("No account found", { description: "Please register first." });
-                  setOtpPhone("");
-                  return;
-                }
-
-                if (data?.token_hash && data?.email) {
-                  const { error: verifyError } = await supabase.auth.verifyOtp({
-                    token_hash: data.token_hash,
-                    type: "magiclink",
-                  });
-                  if (verifyError) {
-                    toast.error("Sign in failed", { description: verifyError.message });
+            <>
+              <div className="mb-6 mt-2">
+                <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Enter the code</h1>
+                <div className="text-[14px] text-auth-text-2">Sent to <strong className="text-auth-text-1">{otpPhone}</strong></div>
+              </div>
+              <OtpVerification
+                phone={otpPhone}
+                onVerified={async (data) => {
+                  if (data?.no_account) {
+                    toast.error("No account found", { description: "Please register first." });
+                    setOtpPhone("");
                     return;
                   }
-                  toast.success("Signed in successfully!");
-                  navigate("/dashboard");
-                } else {
-                  toast.error("Could not create session. Please try again.");
-                  setOtpPhone("");
-                }
-              }}
-              onCancel={() => setOtpPhone("")}
-            />
+                  if (data?.token_hash && data?.email) {
+                    const { error: verifyError } = await supabase.auth.verifyOtp({
+                      token_hash: data.token_hash,
+                      type: "magiclink",
+                    });
+                    if (verifyError) {
+                      toast.error("Sign in failed", { description: verifyError.message });
+                      return;
+                    }
+                    toast.success("Signed in successfully!");
+                    navigate("/dashboard");
+                  } else {
+                    toast.error("Could not create session. Please try again.");
+                    setOtpPhone("");
+                  }
+                }}
+                onCancel={() => setOtpPhone("")}
+              />
+            </>
           )}
         </div>
       </div>
     );
   }
 
+  // EMAIL FORM
+  if (emailMode) {
+    return (
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+        <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
+          <div className="flex items-center gap-2 text-[13px] text-auth-text-2 cursor-pointer mb-2" onClick={() => setEmailMode(false)}>
+            ‹ Back
+          </div>
+          
+          <div className="mb-6 mt-2">
+            <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Sign in<br/>with Email</h1>
+            <div className="text-[14px] text-auth-text-2">Enter your email and password</div>
+          </div>
+
+          <form onSubmit={handleLogin} className="flex flex-col gap-3 flex-1">
+            <div>
+              <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email address</label>
+              <input 
+                type="text" 
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-base placeholder:text-auth-text-3 outline-none focus:border-auth-green transition-colors"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] py-[13px] pl-[13px] pr-10 text-auth-text-1 text-base placeholder:text-auth-text-3 outline-none focus:border-auth-green transition-colors"
+                  required
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-auth-text-3" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div className="text-right mt-2">
+                <button type="button" className="text-[12px] text-auth-green" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <div 
+                onClick={() => setRememberMe(!rememberMe)}
+                className={`w-5 h-5 rounded-[5px] border-[1.5px] flex items-center justify-center cursor-pointer shrink-0 transition-colors ${rememberMe ? 'bg-auth-green border-auth-green text-[#0A1525]' : 'bg-navy-mid border-auth-border-hi'}`}
+              >
+                {rememberMe && <span className="text-xs font-bold">✓</span>}
+              </div>
+              <div className="text-[13px] text-auth-text-2 cursor-pointer select-none" onClick={() => setRememberMe(!rememberMe)}>Remember my email</div>
+            </div>
+
+            <div className="mt-auto pt-6 pb-4">
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl flex items-center justify-center disabled:opacity-50 transition-transform active:scale-[0.98]"
+              >
+                {loading ? "Signing in..." : "Sign in ›"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // OTHER STATES (Forgot Password, Resend Verify)
   if (showForgot) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
-              <Heart className="w-8 h-8 text-success-foreground fill-current" />
-            </div>
-            <h1 className="text-2xl font-bold text-primary">Reset Password</h1>
-            <p className="text-sm text-muted-foreground">Enter your email to receive a reset link</p>
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex items-center justify-center">
+        <div className="w-full max-w-[320px] flex flex-col">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold mb-2">Reset Password</h1>
+            <p className="text-sm text-auth-text-2">Enter your email to receive a reset link</p>
           </div>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <div>
-              <Label>Email</Label>
-              <Input placeholder="Enter your email" className="text-base" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
-            </div>
-            <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={forgotLoading}>
+          <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+            <input 
+              type="email" 
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              placeholder="Email address"
+              className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-base outline-none focus:border-auth-green"
+              required
+            />
+            <button type="submit" disabled={forgotLoading} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
               {forgotLoading ? "Sending..." : "Send Reset Link"}
-            </Button>
-          </form>
-          <div className="text-center">
-            <button className="text-sm text-primary underline" onClick={() => setShowForgot(false)}>
-              Back to Sign In
             </button>
-          </div>
+          </form>
+          <button className="text-[13px] text-auth-text-3 mt-6" onClick={() => setShowForgot(false)}>‹ Back to Sign In</button>
         </div>
       </div>
     );
@@ -271,96 +334,96 @@ const Login = () => {
 
   if (showResendVerify) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
-              <Mail className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-primary">Email Not Verified</h1>
-            <p className="text-sm text-muted-foreground">Your email address hasn't been verified yet. Please check your inbox or resend the verification email.</p>
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex items-center justify-center">
+        <div className="w-full max-w-[320px] flex flex-col">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold mb-2">Email Not Verified</h1>
+            <p className="text-sm text-auth-text-2">Check your inbox or resend the verification email.</p>
           </div>
-          <form onSubmit={handleResendVerification} className="space-y-4">
-            <div>
-              <Label>Email</Label>
-              <Input placeholder="Enter your email" className="text-base" type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)} required />
-            </div>
-            <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={resendLoading}>
+          <form onSubmit={handleResendVerification} className="flex flex-col gap-4">
+            <input 
+              type="email" 
+              value={resendEmail}
+              onChange={(e) => setResendEmail(e.target.value)}
+              placeholder="Email address"
+              className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-base outline-none focus:border-auth-green"
+              required
+            />
+            <button type="submit" disabled={resendLoading} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
               {resendLoading ? "Sending..." : "Resend Verification Email"}
-            </Button>
-          </form>
-          <div className="text-center">
-            <button className="text-sm text-primary underline" onClick={() => setShowResendVerify(false)}>
-              Back to Sign In
             </button>
-          </div>
+          </form>
+          <button className="text-[13px] text-auth-text-3 mt-6" onClick={() => setShowResendVerify(false)}>‹ Back to Sign In</button>
         </div>
       </div>
     );
   }
 
+  // MAIN SELECTION
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
-            <Heart className="w-8 h-8 text-success-foreground fill-current" />
+    <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center">
+      <div className="w-full max-w-[320px] flex-1 flex flex-col pt-[6vh]">
+        
+        <div className="flex flex-col items-center gap-3 mb-5">
+          <div className="w-14 h-14 rounded-2xl bg-navy-mid border-[1.5px] border-auth-green/30 flex items-center justify-center">
+            <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
+              <path d="M18 4L22 8H30V16L34 18L30 20V28H22L18 32L14 28H6V20L2 18L6 16V8H14L18 4Z" stroke="#2ECC8A" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(46,204,138,0.08)"/>
+              <path d="M12 18L16 22L24 14" stroke="#2ECC8A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-          <h1 className="text-3xl font-bold text-primary">Check-iN</h1>
-          <p className="text-base text-muted-foreground">Your Personal Emergency Response System</p>
+          <div className="text-[20px] font-bold text-auth-text-1 tracking-tight">Check-iN</div>
         </div>
 
+        <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Welcome back</h1>
+        <div className="text-[14px] text-auth-text-2 mb-[18px]">Sign in to your safety network</div>
 
-        <Button
-          type="button"
-          variant="default"
-          className="w-full text-base py-6 gap-3"
-          size="lg"
+        {/* Primary Method */}
+        <div className="text-[11px] font-semibold text-auth-text-3 tracking-widest uppercase mb-2 mt-2">Recommended</div>
+        
+        <div 
           onClick={() => setOtpMode(true)}
+          className="bg-auth-green-glow/20 border-[1.5px] border-auth-green rounded-2xl p-3.5 mb-2.5 flex items-center gap-3.5 cursor-pointer hover:bg-auth-green-glow/30 transition-colors"
         >
-          <Smartphone className="w-5 h-5" />
-          Sign in with Phone OTP
-        </Button>
-
-        <OrDivider />
-        <GoogleSignInButton label="Sign in with Google" />
-        <OrDivider />
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <Label className="text-base">Email or Phone</Label>
-            <Input placeholder="Enter email or phone number" className="text-lg py-6" type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+          <div className="w-10 h-10 rounded-lg bg-auth-green-glow flex items-center justify-center text-[18px] shrink-0">📱</div>
+          <div className="flex-1">
+            <div className="text-[15px] font-semibold text-auth-text-1 mb-0.5">Phone OTP</div>
+            <div className="text-[12px] text-auth-text-2">Get a code on your mobile</div>
           </div>
-          <div>
-            <Label className="text-base">Password</Label>
-            <div className="relative">
-              <Input placeholder="Enter password" className="text-lg py-6 pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
-              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="remember-me" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-5 w-5 rounded border-primary text-primary" />
-            <Label htmlFor="remember-me" className="text-base font-normal cursor-pointer">Remember my email / phone</Label>
-          </div>
+          <div className="text-[16px] text-auth-green">›</div>
+        </div>
 
-          <Button type="submit" className="w-full bg-primary text-lg py-6" size="lg" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Button>
-        </form>
-
-        <div className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-3 text-base">
-            <button className="text-primary font-medium" onClick={() => navigate("/register")}>
-              Don't have an account? <span className="underline">Register</span>
-            </button>
-            <span className="text-muted-foreground">·</span>
-            <button className="text-primary font-medium underline" onClick={() => navigate("/admin/login")}>
-              Login as Admin
-            </button>
+        <div className="text-[11px] font-semibold text-auth-text-3 tracking-widest uppercase mt-3.5 mb-2">Other options</div>
+        
+        <div 
+          onClick={handleGoogleSignIn} 
+          className="bg-navy-card border-[1.5px] border-auth-border rounded-2xl p-3.5 mb-2.5 flex items-center gap-3.5 cursor-pointer hover:border-auth-border-hi transition-colors"
+        >
+          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+            <GoogleIcon />
           </div>
-          <button className="text-base text-muted-foreground" onClick={() => setShowForgot(true)}>Forgot Password?</button>
+          <div className="flex-1">
+            <div className="text-[15px] font-semibold text-auth-text-1 mb-0.5">Google</div>
+            <div className="text-[12px] text-auth-text-2">Continue with your Google account</div>
+          </div>
+          <div className="text-[16px] text-auth-text-3">›</div>
+        </div>
+
+        <div 
+          onClick={() => setEmailMode(true)} 
+          className="bg-navy-card border-[1.5px] border-auth-border rounded-2xl p-3.5 mb-2.5 flex items-center gap-3.5 cursor-pointer hover:border-auth-border-hi transition-colors"
+        >
+          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-[18px] shrink-0">🔑</div>
+          <div className="flex-1">
+            <div className="text-[15px] font-semibold text-auth-text-1 mb-0.5">Email & password</div>
+            <div className="text-[12px] text-auth-text-2">Sign in with email address</div>
+          </div>
+          <div className="text-[16px] text-auth-text-3">›</div>
+        </div>
+
+        <div className="mt-auto pt-6 text-center">
+          <div className="text-[13px] text-auth-text-3 cursor-pointer" onClick={() => navigate("/register")}>
+            New to Check-iN? <span className="text-auth-green font-semibold">Create account</span>
+          </div>
         </div>
 
       </div>

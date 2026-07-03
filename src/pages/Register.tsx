@@ -1,26 +1,17 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, Heart, Plus, Trash2, User, ChevronLeft, Mail, Users, CheckCircle2, ChevronDown, AlertCircle, Smartphone, Download } from "lucide-react";
-import usePwaInstall from "@/hooks/usePwaInstall";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
+import usePwaInstall from "@/hooks/usePwaInstall";
 
 const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
 
 const GoogleIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] shrink-0" aria-hidden="true">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -28,45 +19,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const GoogleSignInButton = ({ label = "Sign up with Google" }: { label?: string }) => {
-  const [loading, setLoading] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (error) {
-      toast.error("Google sign-in failed", { description: String(error) });
-    }
-    setLoading(false);
-  };
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className="w-full text-base min-h-[48px] gap-3"
-      size="lg"
-      onClick={handleGoogleSignIn}
-      disabled={loading}
-    >
-      <GoogleIcon />
-      {loading ? "Connecting..." : label}
-    </Button>
-  );
-};
-
-const OrDivider = () => (
-  <div className="flex items-center gap-3 my-2">
-    <div className="flex-1 h-px bg-border" />
-    <span className="text-xs text-muted-foreground uppercase tracking-wider">or</span>
-    <div className="flex-1 h-px bg-border" />
-  </div>
-);
-
 type SelectedRole = "user" | "guardian" | null;
-
 const TOTAL_STEPS_USER = 4;
 const TOTAL_STEPS_GUARDIAN = 3;
 
@@ -74,14 +27,6 @@ const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const { canInstall, installApp, isInstalled } = usePwaInstall();
-
-  const handleInstallClick = async () => {
-    if (canInstall) {
-      await installApp();
-    } else {
-      navigate("/install");
-    }
-  };
   const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<number>(1);
@@ -92,18 +37,22 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [dob, setDob] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  
   const [sentGuardianCount, setSentGuardianCount] = useState(0);
   const [guardians, setGuardians] = useState([{ name: "", phone: "", email: "", relation: "" }]);
+  
   const [nominationBlocked, setNominationBlocked] = useState(false);
   const [isInviteLink, setIsInviteLink] = useState(false);
+  const [showEmailSection, setShowEmailSection] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
   const progressPercent = (step / totalSteps) * 100;
 
-  // Handle invite link: /register?nomination=accept&token=...
   useEffect(() => {
     const nomination = searchParams.get("nomination");
     const token = searchParams.get("token");
@@ -111,12 +60,7 @@ const Register = () => {
       setIsInviteLink(true);
       setSelectedRole("guardian");
       setStep(2);
-      // Try to pre-fill name from nomination token
-      supabase
-        .from("guardians")
-        .select("guardian_name, guardian_phone")
-        .eq("nomination_token", token)
-        .maybeSingle()
+      supabase.from("guardians").select("guardian_name, guardian_phone").eq("nomination_token", token).maybeSingle()
         .then(({ data }) => {
           if (data) {
             setFullName(data.guardian_name || "");
@@ -128,11 +72,26 @@ const Register = () => {
 
   const handleRoleSelect = (role: SelectedRole) => {
     setSelectedRole(role);
-    setStep(2);
+    if (role === "guardian") {
+      // Don't auto-advance for guardian, force them to read the warning and click next
+    } else {
+      setStep(2);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) {
+      toast.error("Google sign-in failed", { description: String(error) });
+    }
+    setGoogleLoading(false);
   };
 
   const handleBack = () => {
-    if (step === 2 && selectedRole) {
+    if (step === 2) {
       setStep(1);
       setSelectedRole(null);
     } else if (step === 3) {
@@ -156,76 +115,42 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
-  const [showEmailSection, setShowEmailSection] = useState(false);
-
-  const phoneDigitCount = getDigitCount(phone);
-  const isPhoneValid = phoneDigitCount >= 10;
-
-  const generatePlaceholderEmail = (phoneNum: string) => {
-    const cleaned = phoneNum.replace(/[\s\-\+]/g, "");
-    return `${cleaned}@phone.checkin.app`;
-  };
+  const isPhoneValid = getDigitCount(phone) >= 10;
 
   const handleDetailsNext = () => {
-    if (!fullName) {
-      toast.error("Please enter your name");
-      return;
-    }
-    if (!isPhoneValid) {
-      toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
-      return;
-    }
-    if (email && !password) {
-      toast.error("Password is required when email is provided");
-      return;
-    }
+    if (!fullName) return toast.error("Please enter your name");
+    if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+    if (email && !password) return toast.error("Password is required when email is provided");
     setStep(3);
   };
 
   const handleOtpVerified = async () => {
     setPhoneVerified(true);
     if (selectedRole === "user") {
-      setStep(4); // Guardian nomination
+      setStep(4);
     } else {
-      // Guardian role: check nomination exists before proceeding
       const cleanPhone = phone.replace(/[\s\-\+]/g, "");
       const { data: hasNomination } = await supabase.rpc("check_guardian_nomination" as any, { _phone: cleanPhone });
       if (!hasNomination) {
         setNominationBlocked(true);
         return;
       }
-      // Check 3-ward limit by phone
       const { data: wardCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanPhone });
       if (typeof wardCount === "number" && wardCount >= 3) {
         toast.error("Ward limit reached", { description: "You already monitor 3 users (maximum)." });
         return;
       }
-      handleSubmit(); // Guardian role: submit directly
+      handleSubmit();
     }
   };
 
-  const handleOtpCancel = () => {
-    setStep(2); // Back to details
-  };
+  const handleOtpCancel = () => setStep(2);
 
   const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
     try {
-      // Send branded guardian invitation via transactional email system
-      const baseUrl = "https://iamgood.lovable.app";
       await supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "guardian-invitation",
-          recipientEmail: guardianEmail,
-          idempotencyKey: `guardian-invite-${guardianEmail}-${Date.now()}`,
-          templateData: {
-            guardianName,
-            userName,
-            relation,
-            acceptLink: `${baseUrl}/register`,
-          },
-        },
+        body: { templateName: "guardian-invitation", recipientEmail: guardianEmail, idempotencyKey: `guardian-invite-${guardianEmail}-${Date.now()}`, templateData: { guardianName, userName, relation, acceptLink: `https://iamgood.lovable.app/register` } },
       });
-      // Also send WhatsApp/SMS via the old function (keeps MSG91 integration)
       await supabase.functions.invoke("send-guardian-invite", {
         body: { guardian_name: guardianName, user_name: userName, relation },
       });
@@ -235,536 +160,382 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
-    if (!fullName) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
+    if (!fullName) return toast.error("Please fill in all required fields");
     if (selectedRole === "user" && (!guardians[0].name || !guardians[0].phone)) {
       toast.error("Primary guardian name and phone are required");
       return;
     }
+    
     if (selectedRole === "user") {
       for (const g of guardians.filter(g => g.phone)) {
-        if (getDigitCount(g.phone) < 10) {
-          toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has fewer than 10 digits in their phone number.` });
-          return;
-        }
-      }
-    }
-
-    // Check 3-ward limit for each nominated guardian (by email AND phone)
-    if (selectedRole === "user") {
-      for (const g of guardians.filter(g => g.phone)) {
+        if (getDigitCount(g.phone) < 10) return toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has fewer than 10 digits.` });
+        
         const cleanGPhone = g.phone.replace(/[\s\-\+]/g, "");
-        // Check by phone
         const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
-        if (typeof phoneCount === "number" && phoneCount >= 3) {
-          toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users (maximum). Please choose a different guardian.` });
-          return;
-        }
-        // Also check by email if provided
+        if (typeof phoneCount === "number" && phoneCount >= 3) return toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users.` });
+        
         if (g.email) {
           const { data: emailCount } = await supabase.rpc("guardian_ward_count", { _guardian_email: g.email });
-          if (typeof emailCount === "number" && emailCount >= 3) {
-            toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users (maximum). Please choose a different guardian.` });
-            return;
-          }
+          if (typeof emailCount === "number" && emailCount >= 3) return toast.error("Guardian limit reached", { description: `${g.name || g.email} already monitors 3 users.` });
         }
       }
     }
 
-    const guardianRows = selectedRole === "user"
-      ? guardians
-          .filter((g) => g.name && g.phone)
-          .map((g, i) => ({
-            guardian_name: g.name.trim(),
-            guardian_phone: g.phone.replace(/\s/g, ""),
-            guardian_email: g.email?.trim() || null,
-            relation: g.relation || null,
-            is_primary: i === 0,
-          }))
-      : [];
-
-    // Use provided email or generate placeholder for phone-only registration
-    const emailToUse = email.trim() || generatePlaceholderEmail(phone);
+    const guardianRows = selectedRole === "user" ? guardians.filter(g => g.name && g.phone).map((g, i) => ({ guardian_name: g.name.trim(), guardian_phone: g.phone.replace(/\s/g, ""), guardian_email: g.email?.trim() || null, relation: g.relation || null, is_primary: i === 0 })) : [];
+    const emailToUse = email.trim() || `${phone.replace(/[\s\-\+]/g, "")}@phone.checkin.app`;
     const passwordToUse = password || crypto.randomUUID();
 
     setLoading(true);
-    const { data, error } = await signUp(emailToUse, passwordToUse, { 
-      full_name: fullName,
-      app_role: selectedRole || "user",
-      phone: phone.replace(/\s/g, ""),
-      date_of_birth: dob || "",
-      guardians: guardianRows,
-    });
-
+    const { data, error } = await signUp(emailToUse, passwordToUse, { full_name: fullName, app_role: selectedRole || "user", phone: phone.replace(/\s/g, ""), date_of_birth: dob || "", guardians: guardianRows });
     if (error) {
       setLoading(false);
-      toast.error("Registration failed", { description: error.message });
-      return;
+      return toast.error("Registration failed", { description: error.message });
     }
 
     const guardiansWithEmail = guardianRows.filter(g => g.guardian_email);
     if (selectedRole === "user") {
-      for (const g of guardiansWithEmail) {
-        if (g.guardian_email) {
-          sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
-        }
-      }
+      for (const g of guardiansWithEmail) if (g.guardian_email) sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
     }
     setSentGuardianCount(guardiansWithEmail.length);
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
-      // Explicitly accept nomination via token if available
       const nominationToken = searchParams.get("token");
       if (nominationToken) {
-        try {
-          await supabase.functions.invoke("guardian-nomination-response", {
-            body: { token: nominationToken, action: "accept" },
-          });
-        } catch (e) {
-          console.error("Failed to accept nomination:", e);
-        }
+        try { await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } }); } catch (e) { console.error(e); }
       }
     }
-
     setLoading(false);
     setRegistrationComplete(true);
   };
 
-  // --- Nomination blocked screen (guardian without nomination) ---
+  const handleInstallClick = async () => {
+    if (canInstall) await installApp();
+    else navigate("/install");
+  };
+
+  // --- BLOCKED ---
   if (nominationBlocked) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-destructive/10 mx-auto flex items-center justify-center">
-            <AlertCircle className="w-10 h-10 text-destructive" />
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
+        <div className="w-full max-w-[320px] flex flex-col items-center">
+          <div className="w-16 h-16 rounded-full bg-auth-amber-soft border-[1.5px] border-[#F5A6234D] flex items-center justify-center text-[28px] mb-4">🔒</div>
+          <h1 className="text-[22px] font-bold text-center tracking-tight mb-1.5">No invitation found</h1>
+          <div className="text-[14px] text-auth-text-2 text-center mb-6">Your phone number hasn't been nominated as a guardian yet.</div>
+
+          <div className="bg-navy-card border border-auth-border-hi rounded-2xl p-3.5 mb-5 w-full">
+            <div className="text-[12px] font-semibold text-auth-text-2 mb-2.5 uppercase tracking-wide">How to get invited</div>
+            <div className="flex gap-2.5 items-start mb-2">
+              <div className="w-5 h-5 rounded-full bg-auth-amber-soft border border-[#F5A6234D] flex items-center justify-center text-[11px] font-bold text-auth-amber shrink-0">1</div>
+              <div className="text-[13px] text-auth-text-2 leading-relaxed">Ask the person you want to protect to open Check-iN</div>
+            </div>
+            <div className="flex gap-2.5 items-start mb-2">
+              <div className="w-5 h-5 rounded-full bg-auth-amber-soft border border-[#F5A6234D] flex items-center justify-center text-[11px] font-bold text-auth-amber shrink-0">2</div>
+              <div className="text-[13px] text-auth-text-2 leading-relaxed">They go to <strong className="text-auth-text-1">Settings → Guardians</strong> and add your phone</div>
+            </div>
+            <div className="flex gap-2.5 items-start">
+              <div className="w-5 h-5 rounded-full bg-auth-amber-soft border border-[#F5A6234D] flex items-center justify-center text-[11px] font-bold text-auth-amber shrink-0">3</div>
+              <div className="text-[13px] text-auth-text-2 leading-relaxed">You'll receive an SMS/WhatsApp invite link — use it to register</div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">No Nomination Found</h1>
-            <p className="text-muted-foreground">
-              You haven't been nominated as a guardian yet.
-            </p>
+
+          <div className="w-full flex flex-col gap-2.5">
+            <button onClick={() => navigate("/login")} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">Got it — go to Sign In</button>
+            <div className="text-[13px] text-auth-text-3 text-center mt-1.5 cursor-pointer" onClick={() => { setNominationBlocked(false); setStep(1); setSelectedRole(null); }}>
+              Registering for yourself? <span className="text-auth-green font-semibold">Switch to User</span>
+            </div>
           </div>
-          <div className="p-4 rounded-xl bg-muted/50 border border-border text-left space-y-2">
-            <p className="text-sm text-foreground font-medium">How to become a guardian:</p>
-            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
-              <li>Ask the person you want to protect to open Check-iN</li>
-              <li>They go to <strong>Settings → Guardians</strong></li>
-              <li>They add your phone number as a guardian</li>
-              <li>You'll receive an invite link — use it to register</li>
-            </ol>
-          </div>
-          <Button className="w-full text-lg min-h-[52px]" size="lg" onClick={() => navigate("/login")}>
-            Go to Sign In
-          </Button>
-          <button type="button" className="text-sm text-primary underline" onClick={() => { setNominationBlocked(false); setStep(1); setSelectedRole(null); }}>
-            Register as a User instead
-          </button>
         </div>
       </div>
     );
   }
 
-  // --- Registration success screen ---
+  // --- SUCCESS ---
   if (registrationComplete) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-success/10 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-success" />
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
+        <div className="w-full max-w-[320px] flex flex-col items-center">
+          <div className="w-[72px] h-[72px] rounded-full bg-auth-green-glow border-[1.5px] border-[#2ECC8A66] flex items-center justify-center text-[32px] mb-5">
+            {selectedRole === "user" ? "✅" : "🛡️"}
+          </div>
+          
+          <h1 className="text-[22px] font-bold text-center tracking-tight mb-1.5">
+            {selectedRole === "user" ? `You're all set,\n${fullName.split(" ")[0]}!` : `Guardian account\nready, ${fullName.split(" ")[0]}!`}
+          </h1>
+          <div className="text-[14px] text-auth-text-2 text-center mb-6 leading-relaxed">
+            {selectedRole === "user" 
+              ? "Welcome to Check-iN. Taking you to your dashboard now." 
+              : "You're now protecting your ward. Taking you to your Guardian dashboard."}
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">Account Created!</h1>
-            <p className="text-muted-foreground">Welcome to Check-iN, {fullName}.</p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4 text-left">
-            {email ? (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
-                <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Verify your email</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    We've sent a verification link to <strong className="text-foreground">{email}</strong>. Please check your inbox and click the link to activate your account.
-                  </p>
-                </div>
+          <div className="w-full flex flex-col gap-2 mb-6">
+            <div className="bg-navy-card border border-auth-border-hi rounded-[10px] p-3 flex items-center gap-2.5">
+              <div className="text-[16px] shrink-0">📱</div>
+              <div className="text-[13px] text-auth-text-2 leading-relaxed">
+                <strong className="text-auth-text-1">Phone verified</strong> — sign in anytime with an OTP
               </div>
-            ) : (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
-                <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Phone verified — you're all set!</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Sign in with your phone number and OTP. You can add an email later from Settings.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {selectedRole === "user" && sentGuardianCount > 0 && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-success/5 border border-success/10">
-                <Users className="w-5 h-5 text-success mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Guardian invitations sent</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {sentGuardianCount === 1
-                      ? "An invitation email has been sent to your guardian."
-                      : `Invitation emails have been sent to ${sentGuardianCount} guardians.`}
-                    {" "}They'll receive instructions to set up their guardian account.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {selectedRole === "user" && sentGuardianCount === 0 && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50 border border-border">
-                <Users className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">No guardian invitations sent</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Your guardians were saved but no email invitations were sent (no email addresses provided). You can add guardian emails later from Settings.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {selectedRole === "guardian" && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10">
-                <Shield className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Guardian account ready</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {email
-                      ? "Once you verify your email, you'll be able to monitor and respond to your ward's safety check-ins."
-                      : "Your guardian account is linked. Sign in with your phone number to start monitoring your ward."}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!isInstalled && (
-            <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-left space-y-3">
-              <div className="flex items-start gap-3">
-                <Smartphone className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-medium text-foreground text-sm">Install Check-iN on your phone</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Get instant SOS alerts and check-in updates — even when the app is closed.
-                  </p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                onClick={handleInstallClick}
-              >
-                <Download className="w-4 h-4" /> Install App
-              </Button>
             </div>
-          )}
+            
+            {selectedRole === "user" && guardians[0]?.name && (
+              <div className="bg-navy-card border border-auth-border-hi rounded-[10px] p-3 flex items-center gap-2.5">
+                <div className="text-[16px] shrink-0">👨‍👧</div>
+                <div className="text-[13px] text-auth-text-2 leading-relaxed">
+                  <strong className="text-auth-text-1">{guardians[0].name.split(" ")[0]}</strong> has been notified as your guardian
+                </div>
+              </div>
+            )}
+            
+            {selectedRole === "guardian" && (
+              <div className="bg-navy-card border border-auth-border-hi rounded-[10px] p-3 flex items-center gap-2.5">
+                <div className="text-[16px] shrink-0">📍</div>
+                <div className="text-[13px] text-auth-text-2 leading-relaxed">
+                  <strong className="text-auth-text-1">Live location</strong> access is now active during emergencies
+                </div>
+              </div>
+            )}
 
-          <Separator />
+            {!isInstalled && (
+              <div className="bg-navy-card border border-auth-border-hi rounded-[10px] p-3 flex items-center gap-2.5">
+                <div className="text-[16px] shrink-0">📲</div>
+                <div className="text-[13px] text-auth-text-2 leading-relaxed">
+                  Install Check-iN for instant SOS alerts when the app is closed
+                </div>
+              </div>
+            )}
+          </div>
 
-          <Button
-            className="w-full text-lg min-h-[52px]"
-            size="lg"
-            onClick={() => navigate("/login")}
-          >
-            Go to Sign In
-          </Button>
-
-          {email ? (
-            <p className="text-xs text-muted-foreground">
-              Didn't receive the email? Check your spam folder or sign in to resend the verification.
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              You can sign in immediately using Phone OTP.
-            </p>
-          )}
+          <div className="w-full flex flex-col gap-2.5 mt-auto">
+            <button onClick={() => navigate("/dashboard")} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
+              {selectedRole === "user" ? "Go to my dashboard ›" : "Open Guardian dashboard ›"}
+            </button>
+            {!isInstalled && (
+              <button onClick={handleInstallClick} className="w-full bg-transparent text-auth-green text-[14px] font-semibold py-3 rounded-2xl">
+                Install app on this phone
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
-  // --- Step 1: Role selection ---
+  // --- STEP 1: ROLE ---
   if (step === 1) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center p-4 pb-8">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-success mx-auto flex items-center justify-center">
-              <Heart className="w-8 h-8 text-success-foreground fill-current" />
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
+        <div className="w-full max-w-[320px] flex flex-col">
+          <div className="text-[11px] text-auth-text-3 font-semibold tracking-widest uppercase text-center mb-2">Create account</div>
+          <h1 className="text-[22px] font-bold text-center tracking-tight mb-6">How will you use<br/>Check-iN?</h1>
+
+          <button 
+            onClick={() => handleRoleSelect("user")}
+            className={`w-full bg-navy-card border-[1.5px] rounded-2xl p-4 mb-2.5 flex items-start gap-3.5 transition-colors text-left ${selectedRole === "user" ? "border-auth-green bg-auth-green-glow/20" : "border-auth-border hover:border-auth-green hover:bg-auth-green-glow/5"}`}
+          >
+            <div className="w-11 h-11 rounded-xl bg-navy-soft flex items-center justify-center text-[20px] shrink-0">🧓</div>
+            <div>
+              <div className="text-[15px] font-semibold text-auth-text-1 mb-[3px]">To protect myself</div>
+              <div className="text-[12px] text-auth-text-2 leading-relaxed mb-1.5">Set up daily check-ins and invite family to watch over me</div>
+              <div className="text-[11px] italic text-auth-green">← Seniors & lone dwellers tap here</div>
             </div>
-            <h1 className="text-2xl font-bold text-primary">Create Account</h1>
-            <p className="text-sm text-muted-foreground">How will you use Check-iN?</p>
-          </div>
+          </button>
 
-          <div className="grid gap-4">
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("user")}
-              className="flex items-center gap-4 p-5 rounded-xl border-2 border-border bg-card text-left transition-colors hover:border-primary focus:border-primary focus:outline-none min-h-[80px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Heart className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground text-base">To protect myself</p>
-                <p className="text-sm text-muted-foreground">Set up daily check-ins & invite guardians who will help me in an emergency</p>
-                <p className="text-sm font-bold italic text-foreground mt-1">(Seniors and Lone dwellers click this box)</p>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("guardian")}
-              className="flex items-center gap-4 p-5 rounded-xl border-2 border-border bg-card text-left transition-colors hover:border-primary focus:border-primary focus:outline-none min-h-[80px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground text-base">To protect someone else</p>
-                <p className="text-sm text-muted-foreground">Monitor a user as their Guardian</p>
-                <p className="text-sm font-bold italic text-foreground mt-1">(Guardians / Family members of Seniors and Lone dwellers click this box)</p>
-              </div>
-            </button>
-          </div>
+          <button 
+            onClick={() => handleRoleSelect("guardian")}
+            className={`w-full bg-navy-card border-[1.5px] rounded-2xl p-4 mb-2.5 flex items-start gap-3.5 transition-colors text-left ${selectedRole === "guardian" ? "border-auth-green bg-auth-green-glow/20" : "border-auth-border hover:border-auth-green hover:bg-auth-green-glow/5"}`}
+          >
+            <div className="w-11 h-11 rounded-xl bg-navy-soft flex items-center justify-center text-[20px] shrink-0">👨‍👧</div>
+            <div>
+              <div className="text-[15px] font-semibold text-auth-text-1 mb-[3px]">To protect someone I love</div>
+              <div className="text-[12px] text-auth-text-2 leading-relaxed mb-1.5">Monitor a family member or ward as their Guardian</div>
+              {selectedRole === "guardian" && <div className="text-[11px] italic text-auth-green">← Selected</div>}
+              {selectedRole !== "guardian" && <div className="text-[11px] italic text-auth-text-3">← Family & caregivers tap here</div>}
+            </div>
+          </button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <button type="button" className="text-primary underline font-medium" onClick={() => navigate("/login")}>
-              Sign In
-            </button>
-          </p>
+          {selectedRole === "guardian" && (
+            <div className="bg-auth-amber-soft border border-[#F5A62340] rounded-[10px] p-3 mb-4 flex items-start gap-2.5 mt-2 animate-in fade-in slide-in-from-top-4">
+              <div className="text-[16px] shrink-0 mt-[1px]">⚠️</div>
+              <div className="text-[12px] text-[#E8C27A] leading-relaxed">
+                <strong className="text-auth-amber">You'll need an invitation</strong> from the person you're protecting before you can create a Guardian account. Ask them to add your phone in Settings → Guardians.
+              </div>
+            </div>
+          )}
+
+          <div className="mt-auto pt-6 flex flex-col gap-3">
+            {selectedRole === "guardian" && (
+              <button onClick={() => setStep(2)} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
+                I have an invitation — continue ›
+              </button>
+            )}
+            <div className="text-center text-[13px] text-auth-text-3 cursor-pointer" onClick={() => navigate("/login")}>
+              Already have an account? <span className="text-auth-green font-semibold">Sign in</span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // --- Step 2: Personal details ---
+  // PROGRESS HEADER COMPONENT
+  const ProgressHeader = () => (
+    <div className="flex items-center gap-2.5 mb-5 mt-2">
+      <button onClick={handleBack} className="w-8 h-8 rounded-lg bg-navy-mid border border-auth-border-hi flex items-center justify-center text-auth-text-2 text-[14px]">‹</button>
+      <div className="flex-1 h-1 bg-navy-soft rounded-full overflow-hidden">
+        <div className="h-full bg-auth-green transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+      </div>
+      <div className="text-[11px] text-auth-text-3 whitespace-nowrap">Step {step} / {totalSteps}</div>
+    </div>
+  );
+
+  // --- STEP 2: DETAILS ---
   if (step === 2) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
-        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-          <div className="flex items-center gap-3 mb-4">
-            <button type="button" onClick={handleBack} className="p-2 -ml-2 rounded-lg hover:bg-muted">
-              <ChevronLeft className="w-5 h-5 text-foreground" />
-            </button>
-            <div className="flex-1">
-              <Progress value={progressPercent} className="h-2" />
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              Step {step}/{totalSteps}
-            </span>
-          </div>
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+        <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
+          <ProgressHeader />
+          <h1 className="text-[22px] font-bold tracking-tight mb-1">{selectedRole === "guardian" ? "Guardian details" : "Your details"}</h1>
+          <div className="text-[14px] text-auth-text-2 mb-6">{selectedRole === "guardian" ? "Set up your guardian account" : "Tell us about yourself"}</div>
 
-          <div className="text-center space-y-1 mb-6">
-            <h1 className="text-xl font-bold text-foreground">
-              {selectedRole === "guardian" ? "Guardian Details" : "Your Details"}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {selectedRole === "guardian"
-                ? "Set up your guardian account"
-                : "Tell us about yourself"}
-            </p>
-          </div>
-
-          <GoogleSignInButton label="Sign up with Google" />
-          <OrDivider />
-
-          <div className="space-y-4 flex-1">
+          <div className="flex flex-col gap-3.5 mb-2">
             <div>
-              <Label>Full Name *</Label>
-              <Input placeholder="Enter your name" className="text-base min-h-[48px]" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </div>
-            <div>
-              <Label>Phone Number *</Label>
-              <PhoneInput
-                value={phone}
-                onChange={setPhone}
-                placeholder="98765 43210"
-                className="min-h-[48px]"
-              />
-              {phone.trim().length > 0 && !isPhoneValid && (
-                <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
-              )}
-            </div>
-            <div>
-              <Label>Date of Birth</Label>
-              <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />
+              <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Your full name *</label>
+              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
             </div>
 
-            <Collapsible open={showEmailSection} onOpenChange={setShowEmailSection}>
-              <CollapsibleTrigger asChild>
-                <button type="button" className="flex items-center gap-2 text-sm text-primary font-medium w-full py-2">
-                  <Mail className="w-4 h-4" />
-                  Add email for notifications (optional)
-                  <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${showEmailSection ? "rotate-180" : ""}`} />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-2">
+            <div>
+              <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Your phone number *</label>
+              <div className="bg-navy-mid border border-auth-border-hi rounded-xl p-1">
+                <PhoneInput value={phone} onChange={setPhone} placeholder="98765 43210" className="border-0 shadow-none bg-transparent h-12" />
+              </div>
+              {selectedRole === "guardian" && <div className="text-[11px] text-auth-text-2 mt-1.5">Must match the number the ward invited</div>}
+            </div>
+
+            {selectedRole === "user" && (
+              <div>
+                <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Date of birth</label>
+                <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green [color-scheme:dark]" />
+              </div>
+            )}
+
+            <div 
+              className="flex items-center gap-2 py-2.5 mt-1 border-t border-auth-border cursor-pointer text-auth-green text-[13px] font-medium"
+              onClick={() => setShowEmailSection(!showEmailSection)}
+            >
+              <span>{showEmailSection ? "-" : "+"}</span> Add email for alerts <span className="ml-auto text-[11px] text-auth-text-3 font-normal">Optional</span>
+            </div>
+
+            {showEmailSection && (
+              <div className="flex flex-col gap-3.5 animate-in slide-in-from-top-2">
                 <div>
-                  <Label>Email</Label>
-                  <Input placeholder="Email address" className="text-base min-h-[48px]" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
                 </div>
                 {email && (
                   <div>
-                    <Label>Password</Label>
-                    <Input placeholder="Create password" className="text-base min-h-[48px]" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-                    <p className="text-xs text-muted-foreground mt-1">Required when email is provided</p>
+                    <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
                   </div>
                 )}
-              </CollapsibleContent>
-            </Collapsible>
-            <div>
-              <Label>Date of Birth</Label>
-              <Input type="date" className="text-base min-h-[48px]" value={dob} onChange={(e) => setDob(e.target.value)} />
-            </div>
+              </div>
+            )}
           </div>
 
-          <div className="sticky bottom-4 pt-4 mt-4">
-            <Button
-              type="button"
-              className="w-full bg-primary text-lg min-h-[52px]"
-              size="lg"
-              disabled={loading}
-              onClick={handleDetailsNext}
-            >
-              {selectedRole === "guardian"
-                ? loading ? "Creating Account..." : "Next — Verify Phone"
-                : "Next — Verify Phone"}
-            </Button>
+          <div className="mt-auto pt-6 flex flex-col gap-2.5">
+            {selectedRole === "user" && (
+              <>
+                <div className="flex items-center gap-2.5 text-auth-text-3 text-[12px] tracking-wide mb-1.5">
+                  <div className="flex-1 h-px bg-auth-border" /> or sign up faster <div className="flex-1 h-px bg-auth-border" />
+                </div>
+                <button onClick={handleGoogleSignIn} disabled={googleLoading} className="w-full bg-navy-mid border border-auth-border-hi text-auth-text-1 text-[14px] font-medium py-[13px] rounded-2xl flex items-center justify-center gap-2.5">
+                  <GoogleIcon /> {googleLoading ? "Connecting..." : "Continue with Google"}
+                </button>
+              </>
+            )}
+            <button onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl mt-0.5">
+              Next — Verify phone ›
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- Step 3: OTP verification ---
+  // --- STEP 3: OTP ---
   if (step === 3) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
-        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-          <div className="flex items-center gap-3 mb-4">
-            <button type="button" onClick={handleOtpCancel} className="p-2 -ml-2 rounded-lg hover:bg-muted">
-              <ChevronLeft className="w-5 h-5 text-foreground" />
-            </button>
-            <div className="flex-1">
-              <Progress value={(3 / totalSteps) * 100} className="h-2" />
-            </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              Step 3/{totalSteps}
-            </span>
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+        <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
+          <ProgressHeader />
+          <h1 className="text-[22px] font-bold tracking-tight mb-1">Verify your<br/>phone</h1>
+          <div className="text-[14px] text-auth-text-2 mb-5">We sent a 6-digit code to<br/><strong className="text-auth-text-1">{phone}</strong></div>
+          <OtpVerification phone={phone.replace(/[\s\-\+]/g, "")} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
+        </div>
+      </div>
+    );
+  }
+
+  // --- STEP 4: GUARDIAN NOMINATION (User only) ---
+  if (step === 4) {
+    return (
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center overflow-y-auto">
+        <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
+          <ProgressHeader />
+          <h1 className="text-[22px] font-bold tracking-tight mb-1">Nominate your<br/>guardian</h1>
+          <div className="text-[14px] text-auth-text-2 mb-6 leading-relaxed">At least 1 required. They'll be alerted if you miss a check-in.</div>
+
+          <div className="flex flex-col gap-2.5 flex-1">
+            {guardians.map((g, i) => (
+              <div key={i} className="bg-navy-card border border-auth-border-hi rounded-[16px] p-3.5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-auth-green bg-auth-green-glow px-2 py-0.5 rounded-full tracking-wide uppercase">
+                    {i === 0 ? "Primary Guardian" : `Guardian ${i + 1}`}
+                  </span>
+                  {i > 0 && <button onClick={() => removeGuardian(i)} className="text-auth-text-3 hover:text-auth-red text-[16px]">✕</button>}
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <input type="text" placeholder="👤 Guardian Name" value={g.name} onChange={e => updateGuardian(i, "name", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
+                  
+                  <div className="bg-navy-mid border border-auth-border rounded-[10px] p-1 focus-within:border-auth-green">
+                    <PhoneInput value={g.phone} onChange={val => updateGuardian(i, "phone", val)} placeholder="📱 Phone Number" className="h-10 border-0 shadow-none bg-transparent" />
+                  </div>
+
+                  <input type="email" placeholder="✉️ Email for alerts (optional)" value={g.email} onChange={e => updateGuardian(i, "email", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
+                  
+                  <select value={g.relation} onChange={e => updateGuardian(i, "relation", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green appearance-none">
+                    <option value="" disabled>🔗 Relation (e.g. Son, Daughter)</option>
+                    <option value="spouse">Spouse</option>
+                    <option value="son">Son</option>
+                    <option value="daughter">Daughter</option>
+                    <option value="sibling">Sibling</option>
+                    <option value="friend">Friend</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+
+            {guardians.length < 5 && (
+              <button onClick={addGuardian} className="w-full bg-transparent border-[1.5px] border-dashed border-auth-green/30 text-auth-green text-[13px] font-semibold py-3 rounded-[16px] flex items-center justify-center gap-1.5 mb-2 mt-1">
+                + Add another guardian ({guardians.length}/5)
+              </button>
+            )}
           </div>
 
-          <div className="mt-8">
-            <OtpVerification
-              phone={phone.replace(/\s/g, "")}
-              purpose="register"
-              onVerified={handleOtpVerified}
-              onCancel={handleOtpCancel}
-            />
+          <div className="mt-6 flex flex-col gap-2.5">
+            <button disabled={loading} onClick={handleSubmit} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
+              {loading ? "Creating..." : "Create my account ›"}
+            </button>
+            <div className="text-center text-[13px] text-auth-text-3 cursor-pointer mt-1" onClick={handleSubmit}>
+              <span className="text-auth-green font-semibold">Skip</span> — add guardians later in Settings
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- Step 4: Nominate guardians (user role only) ---
-  return (
-    <div className="min-h-[100dvh] bg-background flex flex-col p-4 pb-8">
-      <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-        <div className="flex items-center gap-3 mb-4">
-          <button type="button" onClick={handleBack} className="p-2 -ml-2 rounded-lg hover:bg-muted">
-            <ChevronLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <div className="flex-1">
-            <Progress value={progressPercent} className="h-2" />
-          </div>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Step {step}/{totalSteps}
-          </span>
-        </div>
-
-        <div className="text-center space-y-1 mb-6">
-          <h1 className="text-xl font-bold text-foreground">Nominate Guardians</h1>
-          <p className="text-sm text-muted-foreground">Minimum 1 required • Maximum 5</p>
-        </div>
-
-        <div className="space-y-4 flex-1">
-          {guardians.map((g, i) => (
-            <div key={i} className="space-y-3 p-4 rounded-xl bg-muted/50 border border-border relative">
-              {i === 0 && (
-                <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                  Primary Guardian
-                </span>
-              )}
-              {i > 0 && (
-                <button type="button" onClick={() => removeGuardian(i)} className="absolute top-3 right-3 text-muted-foreground hover:text-destructive">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-              <div>
-                <Label className="text-xs">Name *</Label>
-                <Input placeholder="Guardian name" className="text-base min-h-[48px]" value={g.name} onChange={(e) => updateGuardian(i, "name", e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Phone *</Label>
-                <PhoneInput
-                  value={g.phone}
-                  onChange={(val) => updateGuardian(i, "phone", val)}
-                  placeholder="98765 43210"
-                />
-                {g.phone.trim().length > 0 && getDigitCount(g.phone) < 10 && (
-                  <p className="text-sm text-destructive mt-1">Enter at least 10 digits</p>
-                )}
-              </div>
-              <div>
-                <Label className="text-xs">Email {i === 0 ? "*" : "(for notifications)"}</Label>
-                <Input placeholder="guardian@email.com" type="email" className="text-base min-h-[48px]" value={g.email} onChange={(e) => updateGuardian(i, "email", e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">Relation</Label>
-                <Select value={g.relation} onValueChange={(val) => updateGuardian(i, "relation", val)}>
-                  <SelectTrigger className="min-h-[48px]"><SelectValue placeholder="Select relation" /></SelectTrigger>
-                  <SelectContent>
-                    {["Spouse", "Son", "Daughter", "Sibling", "Friend", "Neighbor", "Other"].map((r) => (
-                      <SelectItem key={r} value={r.toLowerCase()}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ))}
-          {guardians.length < 5 && (
-            <Button type="button" variant="outline" size="sm" onClick={addGuardian} className="w-full min-h-[44px]">
-              <Plus className="w-4 h-4 mr-1" /> Add Guardian ({guardians.length}/5)
-            </Button>
-          )}
-        </div>
-
-        <div className="sticky bottom-4 pt-4 mt-4">
-          <Button
-            type="button"
-            className="w-full bg-primary text-lg min-h-[52px]"
-            size="lg"
-            disabled={loading}
-            onClick={handleSubmit}
-          >
-            {loading ? "Creating Account..." : "Create Account"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 export default Register;

@@ -19,6 +19,35 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        "navy": {
+          DEFAULT: "#0F1E35",
+          deep: "#0A1525",
+          mid: "#162744",
+          card: "#1C3050",
+          soft: "#243D60",
+        },
+        "auth-green": {
+          DEFAULT: "#2ECC8A",
+          dim: "#1E9E6A",
+          glow: "rgba(46,204,138,0.18)",
+        },
+        "auth-amber": {
+          DEFAULT: "#F5A623",
+          soft: "rgba(245,166,35,0.12)",
+        },
+        "auth-red": {
+          DEFAULT: "#E55353",
+          soft: "rgba(229,83,83,0.12)",
+        },
+        "auth-text": {
+          1: "#F0F4FF",
+          2: "#9BAAC4",
+          3: "#5E7499",
+        },
+        "auth-border": {
+          DEFAULT: "rgba(255,255,255,0.08)",
+          hi: "rgba(255,255,255,0.15)",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

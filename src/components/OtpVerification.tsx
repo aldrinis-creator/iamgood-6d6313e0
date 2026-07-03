@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
@@ -121,57 +120,56 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
   };
 
   return (
-    <div className="space-y-6 text-center">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Verify your phone</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {sendState === "sending" && "Sending code…"}
-          {sendState === "sent" && <>Enter the 6-digit code sent to <strong>{phone}</strong> via SMS and WhatsApp</>}
-          {sendState === "failed" && "Couldn't deliver code. Try resend below."}
-          {sendState === "rate_limited" && "Too many attempts. Wait 10 minutes."}
-          {sendState === "idle" && <>Enter the 6-digit code sent to <strong>{phone}</strong> via SMS and WhatsApp</>}
-        </p>
+    <div className="flex flex-col">
+      <div className="bg-auth-green-glow/20 border border-auth-green/30 rounded-xl p-3 mb-5 flex items-start gap-2.5">
+        <div className="text-[18px] shrink-0 mt-[1px]">💬</div>
+        <div className="text-[13px] text-auth-text-2 leading-relaxed">
+          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> from your SMS. Code is valid for <strong className="text-auth-green font-bold">10 minutes.</strong></>}
+        </div>
       </div>
 
       {(sendState === "failed" || sendState === "rate_limited") && lastError && (
-        <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+        <div className="flex items-center gap-2 rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 text-[13px] text-auth-red mb-5">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{lastError}</span>
         </div>
       )}
 
-      <div className="flex justify-center">
-        <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-          <InputOTPGroup>
-            <InputOTPSlot index={0} />
-            <InputOTPSlot index={1} />
-            <InputOTPSlot index={2} />
-            <InputOTPSlot index={3} />
-            <InputOTPSlot index={4} />
-            <InputOTPSlot index={5} />
+      <div className="flex justify-between w-full mb-5">
+        <InputOTP maxLength={6} value={otp} onChange={setOtp} containerClassName="flex w-full gap-2 justify-between">
+          <InputOTPGroup className="flex w-full gap-2">
+            {[0, 1, 2, 3, 4, 5].map((idx) => (
+              <InputOTPSlot 
+                key={idx} 
+                index={idx} 
+                className="flex-1 h-[52px] bg-navy-mid border-[1.5px] border-auth-border-hi rounded-[10px] text-[22px] font-bold text-auth-text-1 flex items-center justify-center focus-visible:border-auth-green focus-visible:ring-0" 
+              />
+            ))}
           </InputOTPGroup>
         </InputOTP>
       </div>
 
-      <Button
-        onClick={verifyOtp}
-        className="w-full min-h-[48px] text-base"
-        disabled={otp.length !== 6 || loading || sendState === "sending"}
-      >
-        {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify OTP"}
-      </Button>
-
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between mt-2 mb-6">
+        <div className="text-[13px] text-auth-text-3">
+          {sendState === "sending" ? "Sending..." : resendTimer > 0 ? `Resend in ${resendTimer}s` : ""}
+        </div>
         <button
           type="button"
           onClick={resendOtp}
           disabled={resendTimer > 0 || sendState === "sending" || sendState === "rate_limited"}
-          className="text-primary disabled:text-muted-foreground"
+          className="text-[13px] font-semibold text-auth-green disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {sendState === "sending" ? "Sending…" : resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
+          {resendTimer > 0 ? "Change number?" : "Resend OTP"}
         </button>
-        <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground">
-          Cancel
+      </div>
+
+      <div className="mt-auto flex flex-col gap-2">
+        <button
+          onClick={verifyOtp}
+          disabled={otp.length !== 6 || loading || sendState === "sending"}
+          className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl flex items-center justify-center disabled:opacity-50 transition-transform active:scale-[0.98]"
+        >
+          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & continue ›"}
         </button>
       </div>
     </div>
