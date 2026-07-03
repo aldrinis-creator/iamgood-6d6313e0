@@ -40,8 +40,9 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const [gEmail, setGEmail] = useState("");
   const [gRelation, setGRelation] = useState("");
 
-  // Check-in
+  // Check-in & Nap
   const [selectedPreset, setSelectedPreset] = useState(1);
+  const [defaultNapMins, setDefaultNapMins] = useState(60);
 
   // Medication
   const [medName, setMedName] = useState("");
@@ -79,7 +80,11 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
         .maybeSingle();
 
       const currentSettings = (existing?.settings as Record<string, unknown>) || {};
-      const newSettings = { ...currentSettings, checkInTimes: preset.times };
+      const newSettings = { 
+        ...currentSettings, 
+        checkInTimes: preset.times,
+        defaultNapDurationMins: defaultNapMins 
+      };
 
       if (existing) {
         await supabase.from("user_settings").update({ settings: newSettings }).eq("id", existing.id);
@@ -289,7 +294,23 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
                 </button>
               ))}
             </div>
-            <Button className="w-full" onClick={handleNext}>
+            <div className="pt-2 border-t border-border mt-2">
+              <p className="text-xs font-semibold mb-2 text-center">Default Nap Duration</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[15, 30, 60, 120].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setDefaultNapMins(mins)}
+                    className={`py-2 rounded-md text-xs font-medium transition-colors ${
+                      defaultNapMins === mins ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {mins === 60 ? "1h" : mins === 120 ? "2h" : `${mins}m`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button className="w-full mt-2" onClick={handleNext}>
               Continue <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>

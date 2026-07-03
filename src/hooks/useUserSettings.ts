@@ -59,6 +59,7 @@ export interface UserSettings {
   // Check-In
   sleepMode: boolean;
   pauseMode: PauseMode;
+  defaultNapDurationMins: number;
   expectedReturn: string | null;
   nudgeFrequency: string;
   fallDetection: boolean;
@@ -135,6 +136,7 @@ const DEFAULTS: UserSettings = {
   medicationMissedNotify: true,
   sleepMode: true,
   pauseMode: "active",
+  defaultNapDurationMins: 60,
   expectedReturn: null,
   nudgeFrequency: "4",
   fallDetection: true,

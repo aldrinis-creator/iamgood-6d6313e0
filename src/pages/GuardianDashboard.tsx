@@ -1026,7 +1026,7 @@ const GuardianDashboard = () => {
               <DropdownMenuItem onClick={() => handleCallUser("flash")}>⚡ Flash Call</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="flex-col h-auto py-4 bg-success hover:bg-success/90" size="lg" onClick={handleRoute} disabled={!wardLocation}>
+          <Button className="flex-col h-auto py-4 bg-blue-600 hover:bg-blue-700 text-white" size="lg" onClick={handleRoute} disabled={!wardLocation}>
             <Navigation className="w-5 h-5 mb-1" />
             <span className="text-xs">Route</span>
           </Button>

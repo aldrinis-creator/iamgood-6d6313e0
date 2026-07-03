@@ -92,10 +92,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
           {/* Disclaimer Footer */}
           <footer className="px-4 py-6 mt-6 text-center space-y-3 border-t border-border">
-            <p className="text-xs text-muted-foreground font-medium">
+            <p className="text-xs text-white font-medium">
               In case of emergency, call your local emergency number immediately.
             </p>
-            <div className="text-xs text-muted-foreground space-y-1">
+            <div className="text-xs text-white space-y-1">
               <p>© {new Date().getFullYear()} My Health Companion. All rights reserved.</p>
               <p>This app provides general health information only.</p>
               <p>Not a substitute for professional medical advice.</p>
@@ -105,23 +105,23 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 href={PRIVACY_POLICY_PDF_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                className="text-xs text-white hover:text-white/80 transition-colors underline"
               >
                 Privacy Policy
               </a>
-              <span className="text-muted-foreground">·</span>
+              <span className="text-white">·</span>
               <Link
                 to="/terms-of-service"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                className="text-xs text-white hover:text-white/80 transition-colors underline"
               >
                 Terms of Service
               </Link>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground font-mono">v1.1.0</span>
-              <span className="text-muted-foreground">·</span>
+              <span className="text-white">·</span>
+              <span className="text-xs text-white font-mono">v1.1.0</span>
+              <span className="text-white">·</span>
               <button
                 onClick={() => setShowCookieSettings(true)}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-white hover:text-white/80 transition-colors"
               >
                 <Settings className="w-3.5 h-3.5" />
                 Cookie Settings

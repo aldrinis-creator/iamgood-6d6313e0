@@ -18,9 +18,11 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import SleepModeDialog from "@/components/SleepModeDialog";
+import NapModeDialog from "@/components/NapModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import VoiceAgentButton from "@/components/VoiceAgentButton";
+import { useLiveDashboardStats } from "@/hooks/useLiveDashboardStats";
 import AudioUnlocker from "@/components/AudioUnlocker";
 import { formatISTTime } from "@/lib/istTime";
 import SOSDialog from "@/components/SOSDialog";
@@ -75,7 +77,10 @@ const UserDashboard = () => {
   const signupDateStr = session?.user?.created_at;
   const isNewUser = signupDateStr ? (Date.now() - new Date(signupDateStr).getTime()) < 30 * 24 * 60 * 60 * 1000 : true;
 
+  const stats = useLiveDashboardStats();
+
   const [showSleepDialog, setShowSleepDialog] = useState(false);
+  const [showNapDialog, setShowNapDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
   const [showPracticeDialog, setShowPracticeDialog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -190,17 +195,22 @@ const UserDashboard = () => {
     } else if (newMode === "sleep") {
       setShowSleepDialog(true);
     } else if (newMode === "nap") {
-      // For now, default nap to 2 hours or similar if no dialog
-      const now = new Date();
-      now.setHours(now.getHours() + 2);
-      updateSetting("checkOutConfig", { endsAt: now, reason: "Taking a nap" });
-      setPauseMode("nap");
-      updateSetting("pauseMode", "nap");
-      toast.success(`${userName} taking a nap for 2 hours`);
-      notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap.`);
+      setShowNapDialog(true);
     } else if (newMode === "checked-out") {
       setShowCheckOutDialog(true);
     }
+  };
+
+  const handleNapSave = (durationMins: number) => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + durationMins);
+    updateSetting("checkOutConfig", { endsAt: now, reason: "Taking a nap" });
+    setPauseMode("nap");
+    updateSetting("pauseMode", "nap");
+    updateSetting("defaultNapDurationMins", durationMins);
+    setShowNapDialog(false);
+    toast.success(`${userName} taking a nap for ${durationMins >= 60 ? `${durationMins / 60} hour(s)` : `${durationMins} mins`}`);
+    notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap until ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`);
   };
 
   const handleSleepSave = (schedule: SleepSchedule) => {
@@ -280,7 +290,7 @@ const UserDashboard = () => {
                 key={m}
                 onClick={() => handleModeChange(m)}
                 className={`flex-1 py-2 px-1 rounded-lg text-[11px] font-semibold transition-all ${
-                  isActive ? "bg-navy-card text-foreground shadow-sm border border-white/5" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  isActive ? "bg-navy-card text-t1 shadow-sm border border-white/5" : "text-t1 hover:text-white hover:bg-white/5"
                 }`}
               >
                 {labels[m]}
@@ -296,19 +306,19 @@ const UserDashboard = () => {
         <div className="flex gap-2">
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
             <div className="text-[20px] font-bold text-success mb-1">
-              2<span className="text-[12px] text-muted-foreground font-normal">/3</span>
+              {stats.checkInsCompleted}<span className="text-[12px] text-muted-foreground font-normal">/{stats.checkInsTotal}</span>
             </div>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Check-ins</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
-            <div className="text-[20px] font-bold text-warning mb-1">
-              1<span className="text-[12px] text-muted-foreground font-normal">/2</span>
-            </div>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Meds</div>
+            <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}</div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Health</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4">
-            <div className="text-[20px] font-bold text-primary mb-1">82</div>
-            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Health</div>
+            <div className="text-[20px] font-bold text-warning mb-1">
+              {stats.medsCompleted}<span className="text-[12px] text-muted-foreground font-normal">/{stats.medsTotal || 0}</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Meds</div>
           </div>
         </div>
 
@@ -325,10 +335,10 @@ const UserDashboard = () => {
                 <AlertTriangle className="w-5 h-5 text-sos" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-foreground">Practice SOS Mode</h3>
-                <p className="text-xs text-muted-foreground">Test the alarm safely without notifying anyone</p>
+                <h3 className="font-semibold text-sm text-t1">Practice SOS Mode</h3>
+                <p className="text-xs text-t2">Test the alarm safely without notifying anyone</p>
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              <ChevronRight className="w-4 h-4 text-t2 shrink-0" />
             </CardContent>
           </Card>
         )}
@@ -398,6 +408,12 @@ const UserDashboard = () => {
         currentSchedule={settings.sleepSchedule}
         isActive={pauseMode === "sleep"}
         onSave={handleSleepSave}
+      />
+      <NapModeDialog
+        open={showNapDialog}
+        onClose={() => setShowNapDialog(false)}
+        onSave={handleNapSave}
+        defaultDurationMins={settings.defaultNapDurationMins || 60}
       />
       <CheckOutSettingsDialog
         open={showCheckOutDialog}

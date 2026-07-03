@@ -397,7 +397,7 @@ const CheckInCard = () => {
     <>
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-4">
-        <p className="text-center text-sm font-medium text-muted-foreground mb-2">
+        <p className="text-center text-sm font-medium text-white mb-2">
           {new Date().toLocaleDateString("en-IN", {
             weekday: "long",
             year: "numeric",
@@ -419,7 +419,7 @@ const CheckInCard = () => {
             <p className="text-2xl font-bold text-success">
               {pauseLabel} — Check-iNs Paused
             </p>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-white">
               To change mode to Active, go to Settings.
             </p>
           </div>
