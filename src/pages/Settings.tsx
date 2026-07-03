@@ -722,6 +722,30 @@ const Settings = () => {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="text-xl">💤</span> Auto-Nap Schedule
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Automatically pause check-ins during your daily scheduled nap.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Enable Daily Nap</p>
+                    <p className="text-xs text-muted-foreground">Uses the schedule set in the Dashboard Nap button.</p>
+                  </div>
+                  <Switch checked={settings.autoNapMode} onCheckedChange={(v) => updateSetting("autoNapMode", v)} />
+                </div>
+                {settings.napSchedule && (
+                  <div className="bg-primary/5 rounded-md p-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm">Scheduled daily from <strong>{settings.napSchedule.from}</strong> to <strong>{settings.napSchedule.to}</strong></span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
                   <Clock className="w-5 h-5 text-primary" />
                   Inactivity Nudge Interval
                 </CardTitle>

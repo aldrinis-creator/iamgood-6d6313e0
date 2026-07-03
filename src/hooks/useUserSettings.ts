@@ -66,6 +66,8 @@ export interface UserSettings {
   fallSensitivity: string;
   // Sleep schedule
   sleepSchedule: SleepSchedule;
+  napSchedule: SleepSchedule | null;
+  autoNapMode: boolean;
   // Check-Out config
   checkOutConfig: CheckOutConfig;
   // Appointments
@@ -142,6 +144,8 @@ const DEFAULTS: UserSettings = {
   fallDetection: true,
   fallSensitivity: "medium",
   sleepSchedule: DEFAULT_SLEEP_SCHEDULE,
+  napSchedule: null,
+  autoNapMode: true,
   checkOutConfig: DEFAULT_CHECKOUT_CONFIG,
   preAlert: "15min",
   shareLocation: true,

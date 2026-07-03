@@ -201,10 +201,15 @@ const UserDashboard = () => {
     }
   };
 
-  const handleNapSave = (durationMins: number) => {
+  const handleNapSave = (schedule: SleepSchedule, durationMins: number) => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + durationMins);
     updateSetting("checkOutConfig", { endsAt: now, reason: "Taking a nap" });
+    
+    // Save as daily recurring nap schedule
+    updateSetting("napSchedule", schedule);
+    updateSetting("autoNapMode", true);
+
     setPauseMode("nap");
     updateSetting("pauseMode", "nap");
     updateSetting("defaultNapDurationMins", durationMins);

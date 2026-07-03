@@ -18,7 +18,7 @@ import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
 import useAppointmentAlarms from "@/hooks/useAppointmentAlarms";
 import useExerciseReminder from "@/hooks/useExerciseReminder";
-import useAutoSleepMode from "@/hooks/useAutoSleepMode";
+import useAutoPauseModes from "@/hooks/useAutoPauseModes";
 import ReminderOverlay from "@/components/ReminderOverlay";
 import useLocationSync from "@/hooks/useLocationSync";
 import SOSActiveBar from "@/components/SOSActiveBar";
@@ -52,7 +52,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { loginInProgress } = useAuth();
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
-  useAutoSleepMode();
+  useAutoPauseModes();
 
   useEffect(() => {
     const onOnline = () => setOffline(false);
