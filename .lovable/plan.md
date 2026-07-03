@@ -1,26 +1,57 @@
-## Problem
+# Fix: OTP login fails for Aldrin (and any user with formatted phone)
 
-The admin verification screen shows `Email failed: Email invoke error: Edge Function returned a non-2xx status code` because `send-transactional-email` is failing to boot:
+## Root cause
 
+Edge function logs show:
 ```
-worker boot error: Uncaught SyntaxError: The requested module
-'npm:@react-email/components@0.0.22' does not provide an export named 'Col'
-  at .../_shared/transactional-email-templates/weekly-report.tsx:4:81
+[send-otp] get_email_by_phone(+919819576467): null undefined
 ```
 
-`@react-email/components@0.0.22` does not export `Col` (and `Row` behaves differently in this version). Because the shared templates registry is imported at cold-start, ANY template that fails to import brings down the whole `send-transactional-email` function — that's why the 2FA email (a different template) also fails. SMS still works because it goes through MSG91 directly.
+Aldrin's OTP was sent and verified successfully, but the phone→email lookup returned `null`, so `send-otp` responded with `no_account: true` and the client never received a session.
 
-## Fix
+Why: `profiles.phone` for Aldrin is stored as `"+91 9819576467"` (with a space), but the edge function normalizes the entered phone to `+919819576467` (no space) before calling `get_email_by_phone`. The RPC does an exact string match, so it misses the row.
 
-Edit `supabase/functions/_shared/transactional-email-templates/weekly-report.tsx`:
+A DB check confirms 1 of 4 profiles has whitespace/formatting in `phone` — this will hit any similarly formatted account.
 
-1. Remove `Row, Col` from the `@react-email/components` import.
-2. Replace any `<Row>`/`<Col>` layout in the template with an HTML `<table>`/`<tr>`/`<td>` block (or stacked `<Section>` + inline-styled `<div>`s) styled with the existing navy-blue email tokens, so the weekly report still renders side-by-side stats in email clients.
-3. Redeploy `send-transactional-email` so the boot error clears.
+## Fix (two-part, both needed)
 
-No changes to `admin-2fa`, admin UI, other templates, config, or DB.
+### 1. Make `get_email_by_phone` format-tolerant (DB migration)
+
+Update the RPC to compare normalized digits on both sides, so it matches whether the stored value is `+91 9819576467`, `+919819576467`, or `9819576467`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_email_by_phone(_phone text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT au.email
+  FROM auth.users au
+  JOIN public.profiles p ON p.id = au.id
+  WHERE regexp_replace(COALESCE(p.phone, ''), '\D', '', 'g')
+      = regexp_replace(COALESCE(_phone, ''), '\D', '', 'g')
+    AND regexp_replace(COALESCE(p.phone, ''), '\D', '', 'g') <> ''
+  LIMIT 1;
+$$;
+```
+
+Apply the same normalization to `check_guardian_nomination`, `guardian_ward_count_by_phone`, and the phone-based branch of `link_guardian_user_id` so guardian lookups don't hit the same bug.
+
+### 2. Backfill stored phones to canonical form
+
+One-off update to strip whitespace/formatting so future exact-match code paths (realtime filters, direct `eq('phone', …)` queries) also work:
+
+```sql
+UPDATE public.profiles
+SET phone = regexp_replace(phone, '[\s\-\(\)]', '', 'g')
+WHERE phone ~ '[\s\-\(\)]';
+
+UPDATE public.guardians
+SET guardian_phone = regexp_replace(guardian_phone, '[\s\-\(\)]', '', 'g')
+WHERE guardian_phone ~ '[\s\-\(\)]';
+```
 
 ## Verification
 
-- Confirm `send-transactional-email` logs no longer show the boot error.
-- Trigger admin verification: expect "Code sent" toast with both SMS and Email succeeding (no red banner).
+After deploy, Aldrin re-attempts OTP login: verify edge function log shows `get_email_by_phone(+919819576467): aldrin@futurewave.in` and the client receives `token_hash` + `email`, completing sign-in.
+
+No frontend changes required.
