@@ -27,7 +27,7 @@ export const DEFAULT_ACTIVITY_GOALS: ActivityGoals = {
   spo2: 98,
 };
 
-export type PauseMode = "active" | "sleep" | "checked-out";
+export type PauseMode = "active" | "sleep" | "nap" | "checked-out";
 
 export interface SleepSchedule {
   from: string; // "22:00"

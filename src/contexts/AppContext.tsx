@@ -6,7 +6,7 @@ import { queueSOS } from "@/lib/offlineQueue";
 import { useUserSettings } from "@/hooks/useUserSettings";
 
 export type UserRole = "user" | "guardian";
-export type PauseMode = "active" | "sleep" | "checked-out";
+export type PauseMode = "active" | "sleep" | "nap" | "checked-out";
 
 export type SOSRecipientChannelStatus = "accepted" | "rejected" | "not_attempted";
 export type SOSRecipientSkipReason = "self_targeted" | "invalid_phone" | "duplicate_phone";

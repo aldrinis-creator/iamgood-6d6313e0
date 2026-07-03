@@ -524,6 +524,7 @@ const GuardianDashboard = () => {
     : 0;
   const inactivitySuppressed =
     wardPauseMode === "sleep" ||
+    wardPauseMode === "nap" ||
     (wardPauseMode === "checked-out" &&
       (!wardPauseDetails.endsAt || new Date(wardPauseDetails.endsAt).getTime() > nowTick));
   const showInactivity = !!wardLastActive && !inactivitySuppressed;
@@ -913,9 +914,11 @@ const GuardianDashboard = () => {
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                   wardPauseMode === "active" ? "bg-success text-success-foreground" :
                   wardPauseMode === "sleep" ? "bg-primary text-primary-foreground" :
+                  wardPauseMode === "nap" ? "bg-primary text-primary-foreground" :
                   "bg-amber-500 text-white"
                 }`}>
                   {wardPauseMode === "sleep" ? <Moon className="w-5 h-5" /> :
+                   wardPauseMode === "nap" ? <span className="text-xl">💤</span> :
                    wardPauseMode === "checked-out" ? <LogOut className="w-5 h-5" /> :
                    wardName.charAt(0).toUpperCase()}
                 </div>
@@ -930,6 +933,11 @@ const GuardianDashboard = () => {
                   {wardPauseMode === "sleep" && (
                     <p className="text-xs text-primary font-medium">
                       😴 Sleep Mode {wardPauseDetails.sleepTo ? `— until ${wardPauseDetails.sleepTo}` : ""}
+                    </p>
+                  )}
+                  {wardPauseMode === "nap" && (
+                    <p className="text-xs text-primary font-medium">
+                      💤 Nap Mode {wardPauseDetails.endsAt ? `— until ${new Date(wardPauseDetails.endsAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ""}
                     </p>
                   )}
                   {wardPauseMode === "checked-out" && (

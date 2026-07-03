@@ -179,7 +179,6 @@ const UserDashboard = () => {
 
   const handleModeChange = (newMode: PauseMode) => {
     if (newMode === pauseMode) {
-      // Tapping the active mode again → go back to active
       if (newMode !== "active") {
         returnToActive();
       }
@@ -190,6 +189,15 @@ const UserDashboard = () => {
       returnToActive();
     } else if (newMode === "sleep") {
       setShowSleepDialog(true);
+    } else if (newMode === "nap") {
+      // For now, default nap to 2 hours or similar if no dialog
+      const now = new Date();
+      now.setHours(now.getHours() + 2);
+      updateSetting("checkOutConfig", { endsAt: now, reason: "Taking a nap" });
+      setPauseMode("nap");
+      updateSetting("pauseMode", "nap");
+      toast.success(`${userName} taking a nap for 2 hours`);
+      notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap.`);
     } else if (newMode === "checked-out") {
       setShowCheckOutDialog(true);
     }
@@ -257,8 +265,52 @@ const UserDashboard = () => {
           </Card>
         )}
 
+        {/* Mode Toggle */}
+        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+          {(["active", "sleep", "nap", "checked-out"] as const).map((m) => {
+            const isActive = pauseMode === m;
+            const labels = {
+              "active": "☀️ Active",
+              "sleep": "🌙 Sleep",
+              "nap": "💤 Nap",
+              "checked-out": "🚪 Away"
+            };
+            return (
+              <button
+                key={m}
+                onClick={() => handleModeChange(m)}
+                className={`flex-1 py-2 px-1 rounded-lg text-[11px] font-semibold transition-all ${
+                  isActive ? "bg-navy-card text-foreground shadow-sm border border-white/5" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                }`}
+              >
+                {labels[m]}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Check-In Card */}
         <CheckInCard />
+
+        {/* Today's Stats */}
+        <div className="flex gap-2">
+          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+            <div className="text-[20px] font-bold text-success mb-1">
+              2<span className="text-[12px] text-muted-foreground font-normal">/3</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Check-ins</div>
+          </div>
+          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+            <div className="text-[20px] font-bold text-warning mb-1">
+              1<span className="text-[12px] text-muted-foreground font-normal">/2</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Meds</div>
+          </div>
+          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+            <div className="text-[20px] font-bold text-primary mb-1">82</div>
+            <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Health</div>
+          </div>
+        </div>
 
         {/* One-tap Call Guardian */}
         <CallGuardianButton />

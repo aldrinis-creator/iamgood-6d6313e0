@@ -470,22 +470,18 @@ const CheckInCard = () => {
             </p>
           </div>
         ) : (
-          <div className="text-center space-y-3">
-            <div
-              className="relative w-40 h-40 mx-auto flex items-center justify-center"
-              style={{
-                background: checkedInStatus === "late"
-                  ? 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(38 92% 50% / 0.15) 60%, transparent 80%)'
-                  : 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(145 47% 55% / 0.15) 60%, transparent 80%)',
-              }}
-            >
-              <Heart className={`w-24 h-24 fill-current ${checkedInStatus === "late" ? "text-amber-500" : "text-success"}`} />
+          <div className="text-center py-4">
+            <div className="w-24 h-24 rounded-full border-[3px] border-warning mx-auto flex flex-col items-center justify-center mb-4">
+              <div className="text-[22px] font-bold text-warning leading-none">
+                {nextLabel.split(' ')[0]}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">Next check-in</div>
             </div>
-            <p className={`text-2xl font-bold ${checkedInStatus === "late" ? "text-amber-600" : "text-success"}`}>
+            <p className={`text-lg font-bold mb-1 ${checkedInStatus === "late" ? "text-warning" : "text-success"}`}>
               {checkedInStatus === "late" ? "✓ Checked In (Late)" : "✓ Checked In!"}
             </p>
-            <p className="text-lg text-muted-foreground">
-              Next Check-iN: {nextLabel}
+            <p className="text-sm text-muted-foreground">
+              Your guardians have been notified.
             </p>
           </div>
         )}

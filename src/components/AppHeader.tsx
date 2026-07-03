@@ -22,27 +22,22 @@ const AppHeader = () => {
   };
 
   return (
-    <header className="bg-primary text-primary-foreground px-4 pt-6 pb-3">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full bg-success flex items-center justify-center font-bold text-sm text-success-foreground">
-            C-iN
-          </div>
-          <div>
-            <p className="text-xs opacity-80">{getGreeting()}</p>
-            <p className="font-semibold text-accessible">{userName}</p>
-          </div>
+    <header className="bg-background text-foreground px-4 pt-6 pb-2">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-[13px] text-muted-foreground font-medium">{getGreeting()},</div>
+          <div className="text-[22px] font-bold text-foreground tracking-tight">{userName}</div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <NotificationCenter />
           <AQIWidget role={role} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center overflow-hidden border border-primary-foreground/30 shadow-sm">
+              <button className="w-10 h-10 rounded-full bg-navy-card border border-white/5 flex items-center justify-center overflow-hidden shadow-sm relative">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-4 h-4" />
+                  <User className="w-5 h-5 text-muted-foreground" />
                 )}
               </button>
             </DropdownMenuTrigger>
