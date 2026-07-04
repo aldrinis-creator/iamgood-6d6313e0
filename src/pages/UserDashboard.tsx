@@ -214,7 +214,10 @@ const UserDashboard = () => {
     updateSetting("pauseMode", "nap");
     updateSetting("defaultNapDurationMins", durationMins);
     setShowNapDialog(false);
-    toast.success(`${userName} taking a nap for ${durationMins >= 60 ? `${durationMins / 60} hour(s)` : `${durationMins} mins`}`);
+    
+    // Display requested pop-up wording
+    toast.success("Your Nap time is now active. No alerts will be sent to your Guardian/s", { duration: 5000 });
+    
     notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap until ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`);
   };
 
