@@ -307,17 +307,17 @@ const UserDashboard = () => {
 
         {/* Today's Stats */}
         <div className="flex gap-2">
-          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/dashboard")}>
             <div className="text-[20px] font-bold text-success mb-1">
               {stats.checkInsCompleted}<span className="text-[12px] text-white font-normal">/{stats.checkInsTotal}</span>
             </div>
             <div className="text-[11px] text-white font-medium uppercase tracking-wide">Check-ins</div>
           </div>
-          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/health-passport")}>
             <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}</div>
             <div className="text-[11px] text-white font-medium uppercase tracking-wide">Health</div>
           </div>
-          <div className="flex-1 bg-navy-card rounded-2xl p-4">
+          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/my-health?tool=Tablets&returnTo=dashboard")}>
             <div className="text-[20px] font-bold text-warning mb-1">
               {stats.medsCompleted}<span className="text-[12px] text-white font-normal">/{stats.medsTotal || 0}</span>
             </div>
@@ -347,16 +347,7 @@ const UserDashboard = () => {
         )}
 
         {/* Health Passport — collapsible */}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="health-passport">
-            <AccordionTrigger className="text-accessible font-semibold">
-              Health Passport
-            </AccordionTrigger>
-            <AccordionContent>
-              <HealthPassport />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        {/* Health Passport dropdown removed per user request */}
 
         {/* Map My Journey */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>

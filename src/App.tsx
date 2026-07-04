@@ -22,6 +22,7 @@ const GuardianAlerts = lazy(() => import("./pages/GuardianAlerts"));
 const GuardianReports = lazy(() => import("./pages/GuardianReports"));
 const GuardianServices = lazy(() => import("./pages/GuardianServices"));
 const MyHealth = lazy(() => import("./pages/MyHealth"));
+const HealthPassportPage = lazy(() => import("./pages/HealthPassportPage"));
 const Services = lazy(() => import("./pages/Services"));
 const MedicalVault = lazy(() => import("./pages/MedicalVault"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -92,6 +93,7 @@ const App = () => (
                 {/* User-only routes */}
                 <Route path="/dashboard" element={<UserRoute><UserDashboard /></UserRoute>} />
                 <Route path="/my-health" element={<UserRoute><MyHealth /></UserRoute>} />
+                <Route path="/health-passport" element={<UserRoute><HealthPassportPage /></UserRoute>} />
                 <Route path="/financial-health" element={<UserRoute><FinancialHealth /></UserRoute>} />
                 <Route path="/medical-vault" element={<UserRoute><MedicalVault /></UserRoute>} />
                 <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />

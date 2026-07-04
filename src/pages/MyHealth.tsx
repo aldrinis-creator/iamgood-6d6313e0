@@ -104,15 +104,18 @@ const MyHealth = () => {
   const navigate = useNavigate();
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
+  const [returnToRoute, setReturnToRoute] = useState<string | null>(null);
   const { canAccess, gate, upgradeDialogOpen, upgradeFeature, requiredPlan, upgradeDescription, closeUpgradeDialog } = useFeatureGate();
   const refillDue = useRefillDue();
 
   useEffect(() => {
     const tool = searchParams.get("tool");
+    const rTo = searchParams.get("returnTo");
     if (!tool) return;
     const redirected = legacyToolRedirect[tool] ?? tool;
     if (toolComponents[redirected] || HUB_TOOLS.includes(redirected)) {
       setSelectedTool(redirected);
+      if (rTo) setReturnToRoute(`/${rTo}`);
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -151,7 +154,10 @@ const MyHealth = () => {
     return (
       <AppLayout>
         <div className="p-4 space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedTool(null)} className="gap-1">
+          <Button variant="ghost" size="sm" onClick={() => {
+            if (returnToRoute) navigate(returnToRoute);
+            else setSelectedTool(null);
+          }} className="gap-1">
             <ArrowLeft className="w-4 h-4" /> {selectedTool}
           </Button>
           {ToolComponent && <ToolComponent />}
@@ -165,7 +171,10 @@ const MyHealth = () => {
     return (
       <AppLayout>
         <div className="p-4 space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedTool(null)} className="gap-1">
+          <Button variant="ghost" size="sm" onClick={() => {
+            if (returnToRoute) navigate(returnToRoute);
+            else setSelectedTool(null);
+          }} className="gap-1">
             <ArrowLeft className="w-4 h-4" /> {selectedTool}
           </Button>
           <div className="space-y-2">
