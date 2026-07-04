@@ -33,8 +33,8 @@ export function useLiveDashboardStats() {
           .from("medication_logs")
           .select("status")
           .eq("user_id", session.user.id)
-          .gte("scheduled_time", todayDate.toISOString())
-          .lt("scheduled_time", tomorrow.toISOString()),
+          .gte("scheduled_at", todayDate.toISOString())
+          .lt("scheduled_at", tomorrow.toISOString()),
         supabase
           .from("health_passport_scores")
           .select("overall")

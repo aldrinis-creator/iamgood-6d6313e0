@@ -201,24 +201,19 @@ const UserDashboard = () => {
     }
   };
 
-  const handleNapSave = (schedule: SleepSchedule, durationMins: number) => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + durationMins);
-    updateSetting("checkOutConfig", { endsAt: now, reason: "Taking a nap" });
-    
+  const handleNapSave = (schedule: SleepSchedule) => {
     // Save as daily recurring nap schedule
     updateSetting("napSchedule", schedule);
     updateSetting("autoNapMode", true);
 
     setPauseMode("nap");
     updateSetting("pauseMode", "nap");
-    updateSetting("defaultNapDurationMins", durationMins);
     setShowNapDialog(false);
     
     // Display requested pop-up wording
     toast.success("Your Nap time is now active. No alerts will be sent to your Guardian/s", { duration: 5000 });
     
-    notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap until ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`);
+    notifyGuardians("dYOT Nap Mode", `${userName} is taking a nap from ${schedule.from} to ${schedule.to}.`);
   };
 
   const handleSleepSave = (schedule: SleepSchedule) => {
@@ -420,8 +415,9 @@ const UserDashboard = () => {
       <NapModeDialog
         open={showNapDialog}
         onClose={() => setShowNapDialog(false)}
+        currentSchedule={settings.napSchedule}
+        isActive={pauseMode === "nap"}
         onSave={handleNapSave}
-        defaultDurationMins={settings.defaultNapDurationMins || 60}
       />
       <CheckOutSettingsDialog
         open={showCheckOutDialog}

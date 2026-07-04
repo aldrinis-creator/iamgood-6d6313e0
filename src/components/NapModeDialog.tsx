@@ -2,34 +2,40 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SleepSchedule } from "@/hooks/useUserSettings";
 
 interface NapModeDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (schedule: SleepSchedule, durationMins: number) => void;
-  defaultDurationMins: number;
+  currentSchedule: SleepSchedule | null;
+  isActive: boolean;
+  onSave: (schedule: SleepSchedule) => void;
 }
 
-const NapModeDialog = ({ open, onClose, onSave, defaultDurationMins }: NapModeDialogProps) => {
-  const [durationMins, setDurationMins] = useState<number>(defaultDurationMins);
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+const NapModeDialog = ({ open, onClose, currentSchedule, isActive, onSave }: NapModeDialogProps) => {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   useEffect(() => {
     if (open) {
-      setDurationMins(defaultDurationMins);
-      setCurrentTime(new Date());
+      if (currentSchedule) {
+        setFrom(currentSchedule.from);
+        setTo(currentSchedule.to);
+      } else {
+        const now = new Date();
+        const fromStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        now.setMinutes(now.getMinutes() + 60); // Default to 1 hour
+        const toStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        setFrom(fromStr);
+        setTo(toStr);
+      }
     }
-  }, [open, defaultDurationMins]);
+  }, [open, currentSchedule]);
 
   const handleSave = () => {
-    const now = new Date();
-    const fromStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    
-    now.setMinutes(now.getMinutes() + durationMins);
-    const toStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-    onSave({ from: fromStr, to: toStr }, durationMins);
+    onSave({ from, to });
   };
 
   return (
@@ -42,32 +48,44 @@ const NapModeDialog = ({ open, onClose, onSave, defaultDurationMins }: NapModeDi
           </DialogTitle>
         </DialogHeader>
 
-        {currentTime && (
-          <div className="bg-primary/10 rounded-lg p-3 mt-2 flex items-center justify-between border border-primary/20">
-            <span className="text-sm font-medium text-t1 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" /> Daily Nap Start Time
-            </span>
-            <span className="text-sm font-bold text-primary">
-              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        )}
-
-        <p className="text-sm text-t2 mt-3">
-          How long would you like to nap? During this time, you won't receive check-in reminders or alerts. This will repeat daily.
+        <p className="text-sm text-t2 mt-1">
+          Set your daily nap hours. During this time, you won't receive check-in reminders or alerts. This will repeat daily.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          {[15, 30, 60, 120].map((mins) => (
-            <Button
-              key={mins}
-              variant={durationMins === mins ? "default" : "outline"}
-              className={durationMins === mins ? "bg-navy-card text-t1 border border-primary" : "text-t2 border-white/10 hover:text-t1"}
-              onClick={() => setDurationMins(mins)}
-            >
-              {mins === 60 ? "1 Hour" : mins === 120 ? "2 Hours" : `${mins} Mins`}
-            </Button>
-          ))}
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1 text-sm text-t1">
+              <Clock className="w-3.5 h-3.5 text-primary" /> From
+            </Label>
+            <Input
+              type="time"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="text-sm bg-navy-card border-white/10 text-t1"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1 text-sm text-t1">
+              <Clock className="w-3.5 h-3.5 text-primary" /> To
+            </Label>
+            <Input
+              type="time"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="text-sm bg-navy-card border-white/10 text-t1"
+            />
+          </div>
+        </div>
+
+        <div className="bg-primary/5 rounded-lg p-3 mt-4 space-y-1 border border-primary/10">
+          <p className="text-sm font-medium text-t1">
+            Current setting: {from} to {to}
+          </p>
+          {isActive && (
+            <p className="text-sm text-success flex items-center gap-1">
+              ✓ Nap mode is currently active
+            </p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 mt-5">
