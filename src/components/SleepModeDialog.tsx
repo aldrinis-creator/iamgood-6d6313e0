@@ -9,14 +9,14 @@ import { SleepSchedule, DEFAULT_SLEEP_SCHEDULE } from "@/hooks/useUserSettings";
 interface SleepModeDialogProps {
   open: boolean;
   onClose: () => void;
-  currentSchedule: SleepSchedule;
+  currentSchedule?: SleepSchedule;
   isActive: boolean;
   onSave: (schedule: SleepSchedule) => void;
 }
 
 const SleepModeDialog = ({ open, onClose, currentSchedule, isActive, onSave }: SleepModeDialogProps) => {
-  const [from, setFrom] = useState(currentSchedule.from || DEFAULT_SLEEP_SCHEDULE.from);
-  const [to, setTo] = useState(currentSchedule.to || DEFAULT_SLEEP_SCHEDULE.to);
+  const [from, setFrom] = useState(currentSchedule?.from || DEFAULT_SLEEP_SCHEDULE.from);
+  const [to, setTo] = useState(currentSchedule?.to || DEFAULT_SLEEP_SCHEDULE.to);
 
   const handleSave = () => {
     onSave({ from, to });

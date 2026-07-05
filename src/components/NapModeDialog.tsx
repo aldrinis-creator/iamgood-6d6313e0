@@ -15,7 +15,7 @@ export const DEFAULT_NAP_SCHEDULE: NapSchedule = { from: "14:00", to: "16:00" };
 interface NapModeDialogProps {
   open: boolean;
   onClose: () => void;
-  currentSchedule: NapSchedule;
+  currentSchedule?: NapSchedule;
   isActive: boolean;
   onSave: (schedule: NapSchedule) => void;
 }
@@ -58,15 +58,15 @@ const PRESETS: { label: string; from: string; to: string }[] = [
 const NapModeDialog = ({ open, onClose, currentSchedule, isActive, onSave }: NapModeDialogProps) => {
   const { settings } = useUserSettings();
 
-  const [from, setFrom] = useState(currentSchedule.from || DEFAULT_NAP_SCHEDULE.from);
-  const [to,   setTo  ] = useState(currentSchedule.to   || DEFAULT_NAP_SCHEDULE.to);
+  const [from, setFrom] = useState(currentSchedule?.from || DEFAULT_NAP_SCHEDULE.from);
+  const [to,   setTo  ] = useState(currentSchedule?.to   || DEFAULT_NAP_SCHEDULE.to);
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
 
   // Sync when dialog opens / schedule changes
   useEffect(() => {
     if (open) {
-      setFrom(currentSchedule.from || DEFAULT_NAP_SCHEDULE.from);
-      setTo(currentSchedule.to   || DEFAULT_NAP_SCHEDULE.to);
+      setFrom(currentSchedule?.from || DEFAULT_NAP_SCHEDULE.from);
+      setTo(currentSchedule?.to   || DEFAULT_NAP_SCHEDULE.to);
       setSelectedPreset(null);
     }
   }, [open, currentSchedule]);
@@ -87,8 +87,8 @@ const NapModeDialog = ({ open, onClose, currentSchedule, isActive, onSave }: Nap
   const isValid = from && to && durMins > 0;
 
   // Labels for the time pickers showing existing saved time
-  const savedFromLabel = currentSchedule.from ? to12h(currentSchedule.from) : null;
-  const savedToLabel   = currentSchedule.to   ? to12h(currentSchedule.to)   : null;
+  const savedFromLabel = currentSchedule?.from ? to12h(currentSchedule.from) : null;
+  const savedToLabel   = currentSchedule?.to   ? to12h(currentSchedule.to)   : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
