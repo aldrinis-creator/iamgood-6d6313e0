@@ -17,7 +17,7 @@ function supabaseForUser(ctx) {
 var list_medications_today_default = defineTool({
   name: "list_medications_today",
   title: "List today's medications",
-  description: "Return the signed-in user's active medications scheduled for today, including dose, times, and last taken.",
+  description: "Return the signed-in user's currently active medications and their scheduled times for today.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (_input, ctx) => {
@@ -25,13 +25,14 @@ var list_medications_today_default = defineTool({
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
     const supabase = supabaseForUser(ctx);
-    const { data, error } = await supabase.from("medications").select("id, name, dose, frequency, times, notes, is_active").eq("user_id", ctx.getUserId()).eq("is_active", true).order("name");
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const { data, error } = await supabase.from("medications").select("id, name, dosage, frequency, schedule_times, instructions, start_date, end_date").eq("user_id", ctx.getUserId()).lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("name");
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
     const rows = data ?? [];
     return {
-      content: [{ type: "text", text: rows.length ? JSON.stringify(rows, null, 2) : "No active medications." }],
+      content: [{ type: "text", text: rows.length ? JSON.stringify(rows, null, 2) : "No active medications for today." }],
       structuredContent: { medications: rows, count: rows.length }
     };
   }
@@ -50,7 +51,7 @@ function supabaseForUser2(ctx) {
 var list_appointments_default = defineTool2({
   name: "list_upcoming_appointments",
   title: "List upcoming appointments",
-  description: "Return the signed-in user's upcoming medical appointments (from now onward).",
+  description: "Return the signed-in user's upcoming medical appointments (today onward), ordered by date and time.",
   inputSchema: {
     limit: z.number().int().min(1).max(50).optional().describe("Max appointments to return (default 10).")
   },
@@ -60,8 +61,8 @@ var list_appointments_default = defineTool2({
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
     const supabase = supabaseForUser2(ctx);
-    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
-    const { data, error } = await supabase.from("appointments").select("id, title, doctor_name, hospital_name, appointment_at, notes").eq("user_id", ctx.getUserId()).gte("appointment_at", nowIso).order("appointment_at", { ascending: true }).limit(limit ?? 10);
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const { data, error } = await supabase.from("appointments").select("id, title, appointment_type, doctor_name, location, start_date, start_time, end_time, description").eq("user_id", ctx.getUserId()).gte("start_date", today).order("start_date", { ascending: true }).order("start_time", { ascending: true }).limit(limit ?? 10);
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
@@ -85,7 +86,7 @@ function supabaseForUser3(ctx) {
 var get_health_status_default = defineTool3({
   name: "get_health_status",
   title: "Get today's health status",
-  description: "Return the signed-in user's most recent Health Passport score and today's check-in status.",
+  description: "Return the signed-in user's latest Health Passport score (with category breakdown) and today's check-in responses.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (_input, ctx) => {
@@ -96,15 +97,12 @@ var get_health_status_default = defineTool3({
     const userId = ctx.getUserId();
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const [passportRes, checkInRes] = await Promise.all([
-      supabase.from("health_passport").select("score, recorded_at, categories").eq("user_id", userId).order("recorded_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("check_ins").select("id, check_in_time, window_key, mood").eq("user_id", userId).gte("check_in_time", `${today}T00:00:00.000Z`).order("check_in_time", { ascending: false })
+      supabase.from("health_passport_scores").select("overall, activity, checkin, medications, nutrition, vitals, wellness, score_date").eq("user_id", userId).order("score_date", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("check_ins").select("id, scheduled_at, responded_at, status, response").eq("user_id", userId).gte("scheduled_at", `${today}T00:00:00.000Z`).lte("scheduled_at", `${today}T23:59:59.999Z`).order("scheduled_at", { ascending: true })
     ]);
-    const passport = passportRes.data ?? null;
-    const checkIns = checkInRes.data ?? [];
     const summary = {
-      passportScore: passport?.score ?? null,
-      passportRecordedAt: passport?.recorded_at ?? null,
-      todaysCheckIns: checkIns
+      healthPassport: passportRes.data ?? null,
+      todaysCheckIns: checkInRes.data ?? []
     };
     return {
       content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],

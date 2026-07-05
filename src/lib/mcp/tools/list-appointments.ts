@@ -12,7 +12,7 @@ function supabaseForUser(ctx: ToolContext) {
 export default defineTool({
   name: "list_upcoming_appointments",
   title: "List upcoming appointments",
-  description: "Return the signed-in user's upcoming medical appointments (from now onward).",
+  description: "Return the signed-in user's upcoming medical appointments (today onward), ordered by date and time.",
   inputSchema: {
     limit: z.number().int().min(1).max(50).optional().describe("Max appointments to return (default 10)."),
   },
@@ -22,13 +22,15 @@ export default defineTool({
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
     const supabase = supabaseForUser(ctx);
-    const nowIso = new Date().toISOString();
+    const today = new Date().toISOString().slice(0, 10);
+
     const { data, error } = await supabase
       .from("appointments")
-      .select("id, title, doctor_name, hospital_name, appointment_at, notes")
+      .select("id, title, appointment_type, doctor_name, location, start_date, start_time, end_time, description")
       .eq("user_id", ctx.getUserId())
-      .gte("appointment_at", nowIso)
-      .order("appointment_at", { ascending: true })
+      .gte("start_date", today)
+      .order("start_date", { ascending: true })
+      .order("start_time", { ascending: true })
       .limit(limit ?? 10);
 
     if (error) {
