@@ -59,6 +59,7 @@ const VaultClaim = lazy(() => import("./pages/VaultClaim"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const CustomerService = lazy(() => import("./pages/CustomerService"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const queryClient = new QueryClient();
 
@@ -123,6 +124,7 @@ const App = () => (
                 <Route path="/j/:token" element={<PublicJourneyView />} />
                 <Route path="/install" element={<Install />} />
                 <Route path="/unsubscribe" element={<Unsubscribe />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
