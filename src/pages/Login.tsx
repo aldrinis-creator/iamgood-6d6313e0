@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Smartphone, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,13 @@ import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
+
+// Only allow same-origin relative paths as post-login redirect targets.
+const sanitizeNext = (raw: string | null): string | null => {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+};
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
@@ -32,6 +39,8 @@ const REMEMBER_KEY = "checkin_remember_id";
 const Login = () => {
   const { signIn, resetPassword } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = sanitizeNext(searchParams.get("next"));
   const [identifier, setIdentifier] = useState(() => localStorage.getItem(REMEMBER_KEY) || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -54,8 +63,11 @@ const Login = () => {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
+    const redirectUri = nextPath
+      ? `${window.location.origin}${nextPath}`
+      : window.location.origin;
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: redirectUri,
     });
     if (error) {
       toast.error("Google sign-in failed", { description: String(error) });
@@ -95,7 +107,7 @@ const Login = () => {
         } else {
           localStorage.removeItem(REMEMBER_KEY);
         }
-        navigate("/dashboard");
+        navigate(nextPath ?? "/dashboard");
       }
     } catch (err: any) {
       toast.error("Sign in failed", { description: err?.message || "An unexpected error occurred" });
