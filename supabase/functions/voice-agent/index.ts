@@ -12,11 +12,11 @@ const json = (body: unknown, status = 200) =>
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+const SARVAM_API_KEY = Deno.env.get("SARVAM_API_KEY") || "sk_yl2d4msc_LouCY7vzRj0DS5xMkrez8iwQ";
 
 const MODEL = "google/gemini-2.5-flash";
-const TTS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah
-const TTS_MODEL = "eleven_turbo_v2_5";
+const TTS_SPEAKER = "aditya"; // Sarvam speaker
+const TTS_TARGET_LANGUAGE = "en-IN"; // Indian English
 
 const MAX_TURNS_PER_DAY = 50;
 const dailyTurns = new Map<string, { count: number; date: string }>();
@@ -31,26 +31,53 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
-  if (!ELEVENLABS_API_KEY || !text) return null;
+  if (!SARVAM_API_KEY || !text) return null;
   try {
-    const resp = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}?output_format=mp3_44100_128`,
-      {
-        method: "POST",
-        headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          model_id: TTS_MODEL,
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true, speed: 1.0 },
-        }),
-      }
-    );
+    const resp = await fetch("https://api.sarvam.ai/text-to-speech", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": SARVAM_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputs: [text.slice(0, 500)], // Sometimes inputs array is used
+        target_language_code: TTS_TARGET_LANGUAGE,
+        speaker: TTS_SPEAKER,
+      }),
+    });
+
     if (!resp.ok) {
-      console.error("[voice-agent] TTS failed:", resp.status);
+      // Try fallback format if it fails (the API has had two formats: 'inputs' array vs 'text' string)
+      const resp2 = await fetch("https://api.sarvam.ai/text-to-speech", {
+        method: "POST",
+        headers: {
+          "api-subscription-key": SARVAM_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: text.slice(0, 2500),
+          target_language_code: TTS_TARGET_LANGUAGE,
+          speaker: TTS_SPEAKER,
+          model: "bulbul:v3"
+        }),
+      });
+
+      if (!resp2.ok) {
+        console.error("[voice-agent] Sarvam TTS failed:", resp2.status, await resp2.text());
+        return null;
+      }
+      const data = await resp2.json();
+      if (data.audios && data.audios.length > 0) {
+        return `data:audio/wav;base64,${data.audios[0]}`;
+      }
       return null;
     }
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    return `data:audio/mpeg;base64,${bytesToBase64(buf)}`;
+
+    const data = await resp.json();
+    if (data.audios && data.audios.length > 0) {
+      return `data:audio/wav;base64,${data.audios[0]}`;
+    }
+    return null;
   } catch (e) {
     console.error("[voice-agent] TTS exception:", e);
     return null;
