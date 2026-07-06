@@ -1634,6 +1634,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_logs: {
+        Row: {
+          channel: string
+          created_at: string
+          guardian_id: string | null
+          id: string
+          metadata: Json | null
+          status: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          metadata?: Json | null
+          status?: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          metadata?: Json | null
+          status?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_ward_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
