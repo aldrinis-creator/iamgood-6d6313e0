@@ -80,16 +80,30 @@ const VoiceQueryButton = () => {
 
   const playAudio = useCallback((dataUrl: string, onEnd?: () => void): boolean => {
     try {
-      stopAudio();
-      const audio = new Audio(dataUrl);
-      audioRef.current = audio;
+      // Reuse the audio element created inside the gesture (handleTap) so mobile
+      // browsers keep the user-activation and allow playback after our async fetch.
+      // Fall back to a fresh element if it doesn't exist yet.
+      let audio = audioRef.current;
+      if (!audio) {
+        audio = new Audio();
+        audioRef.current = audio;
+      } else {
+        try { audio.pause(); } catch { /* ignore */ }
+      }
       audio.onended = () => onEnd?.();
-      audio.onerror = () => onEnd?.();
+      audio.onerror = () => {
+        console.warn("[voice-query] audio element error");
+        onEnd?.();
+      };
+      audio.src = dataUrl;
+      audio.volume = 1;
+      audio.currentTime = 0;
       const p = audio.play();
       if (p && typeof p.catch === "function") {
         p.catch((err) => {
-          console.warn("[voice-query] audio play blocked:", err);
-          onEnd?.();
+          console.warn("[voice-query] audio play blocked, falling back to speechSynthesis:", err);
+          const started = speakTextFallback(answer || "", onEnd);
+          if (!started) onEnd?.();
         });
       }
       return true;
@@ -98,7 +112,7 @@ const VoiceQueryButton = () => {
       onEnd?.();
       return false;
     }
-  }, [stopAudio]);
+  }, [stopAudio, answer]);
 
   const handleSpeakTap = useCallback(() => {
     if (phase === "speaking") {
