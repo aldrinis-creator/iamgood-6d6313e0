@@ -251,13 +251,17 @@ const VoiceQueryButton = () => {
     setAnswer("");
     setAutoSpoke(false);
     await ensureAudioReady();
-    // Unlock HTMLAudioElement playback by playing a brief silent buffer inside the gesture
+    // Unlock HTMLAudioElement playback: create the audio element inside the gesture
+    // and play a brief silent buffer. Reusing this same element later (in playAudio)
+    // is what allows mobile browsers to auto-play the TTS blob after our async fetch.
     try {
-      const silent = new Audio(
-        "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA"
-      );
-      silent.volume = 0;
-      silent.play().catch(() => { /* ignore */ });
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      audioRef.current.src =
+        "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+      audioRef.current.volume = 0;
+      audioRef.current.play().catch(() => { /* ignore */ });
     } catch { /* ignore */ }
     if ("vibrate" in navigator) try { navigator.vibrate(40); } catch { /* ignore */ }
     start();
