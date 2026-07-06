@@ -40,36 +40,15 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        inputs: [text.slice(0, 500)], // Sometimes inputs array is used
+        inputs: [text.slice(0, 2500)],
         target_language_code: TTS_TARGET_LANGUAGE,
         speaker: TTS_SPEAKER,
+        model: "bulbul:v3"
       }),
     });
 
     if (!resp.ok) {
-      // Try fallback format if it fails (the API has had two formats: 'inputs' array vs 'text' string)
-      const resp2 = await fetch("https://api.sarvam.ai/text-to-speech", {
-        method: "POST",
-        headers: {
-          "api-subscription-key": SARVAM_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: text.slice(0, 2500),
-          target_language_code: TTS_TARGET_LANGUAGE,
-          speaker: TTS_SPEAKER,
-          model: "bulbul:v3"
-        }),
-      });
-
-      if (!resp2.ok) {
-        console.error("[voice-agent] Sarvam TTS failed:", resp2.status, await resp2.text());
-        return null;
-      }
-      const data = await resp2.json();
-      if (data.audios && data.audios.length > 0) {
-        return `data:audio/wav;base64,${data.audios[0]}`;
-      }
+      console.error("[voice-agent] Sarvam TTS failed:", resp.status, await resp.text());
       return null;
     }
 
