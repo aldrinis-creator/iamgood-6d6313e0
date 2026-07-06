@@ -12,47 +12,66 @@ const json = (body: unknown, status = 200) =>
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+const SARVAM_API_KEY = Deno.env.get("SARVAM_API_KEY");
 
 const MODEL = "google/gemini-2.5-flash";
-const TTS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah — clear, warm female
-const TTS_MODEL = "eleven_turbo_v2_5";
+// Sarvam TTS — Indian voices. bulbul:v2 speakers: anushka, manisha, vidya, arya (female), abhilash, karun, hitesh (male).
+const SARVAM_SPEAKER = "anushka";
+const SARVAM_MODEL = "bulbul:v2";
+const SARVAM_LANG = "en-IN";
+const SARVAM_MAX_CHARS = 1500; // per-input cap for bulbul:v2
 
-// Encode binary safely without spread overflow
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+// Split text into chunks under Sarvam's per-input character cap, preferring sentence boundaries.
+function chunkForSarvam(text: string, maxChars = SARVAM_MAX_CHARS): string[] {
+  if (text.length <= maxChars) return [text];
+  const sentences = text.match(/[^.!?]+[.!?]*\s*/g) ?? [text];
+  const chunks: string[] = [];
+  let current = "";
+  for (const s of sentences) {
+    if (s.length > maxChars) {
+      if (current) { chunks.push(current); current = ""; }
+      for (let i = 0; i < s.length; i += maxChars) chunks.push(s.slice(i, i + maxChars));
+      continue;
+    }
+    if (current.length + s.length > maxChars) { chunks.push(current); current = ""; }
+    current += s;
   }
-  return btoa(binary);
+  if (current) chunks.push(current);
+  return chunks;
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
-  if (!ELEVENLABS_API_KEY || !text) return null;
+  if (!SARVAM_API_KEY || !text) return null;
   try {
-    const resp = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${TTS_VOICE_ID}?output_format=mp3_44100_128`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: TTS_MODEL,
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true, speed: 1.0 },
-        }),
-      }
-    );
+    const inputs = chunkForSarvam(text);
+    const resp = await fetch("https://api.sarvam.ai/text-to-speech", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": SARVAM_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputs,
+        target_language_code: SARVAM_LANG,
+        speaker: SARVAM_SPEAKER,
+        model: SARVAM_MODEL,
+        enable_preprocessing: true,
+      }),
+    });
     if (!resp.ok) {
       const err = await resp.text();
-      console.error("[voice-query] TTS failed:", resp.status, err.slice(0, 300));
+      console.error("[voice-query] Sarvam TTS failed:", resp.status, err.slice(0, 300));
       return null;
     }
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    return `data:audio/mpeg;base64,${bytesToBase64(buf)}`;
+    const data = await resp.json();
+    const audios: string[] = Array.isArray(data?.audios) ? data.audios : [];
+    if (audios.length === 0) {
+      console.error("[voice-query] Sarvam TTS returned no audios");
+      return null;
+    }
+    // Sarvam returns base64-encoded WAV per input; return the first (typically the only) chunk.
+    // Concatenating raw WAV base64 chunks would corrupt the header, so we send them one at a time.
+    return `data:audio/wav;base64,${audios[0]}`;
   } catch (e) {
     console.error("[voice-query] TTS exception:", e);
     return null;
