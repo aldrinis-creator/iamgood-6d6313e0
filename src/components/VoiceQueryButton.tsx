@@ -226,7 +226,15 @@ const VoiceQueryButton = () => {
 
   useEffect(() => {
     if (error) {
-      toast.error(error === "not-allowed" ? "Microphone permission denied." : `Voice error: ${error}`);
+      const msg =
+        error === "not-allowed"
+          ? "Microphone permission denied. Enable mic access in your browser."
+          : error === "service-not-allowed"
+            ? "Voice recognition is blocked in this preview. Open the app in a new browser tab (or the installed app) and try again."
+            : error === "no-speech"
+              ? "I didn't catch that. Please try again."
+              : `Voice error: ${error}`;
+      toast.error(msg);
       setPhase("idle");
     }
   }, [error]);
