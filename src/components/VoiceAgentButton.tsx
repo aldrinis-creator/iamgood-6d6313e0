@@ -3,7 +3,7 @@ import { Mic, Loader2, Volume2, X, Heart, Stethoscope, MessageCircle } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
 import { useMediaRecorderStt } from "@/hooks/useMediaRecorderStt";
-import { ensureAudioReady } from "@/lib/audioAlerts";
+import { ensureAudioReady, playBase64Audio, stopBase64Audio } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
