@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Loader2, Volume2, X, Heart, Stethoscope, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
+import { useMediaRecorderStt } from "@/hooks/useMediaRecorderStt";
 import { ensureAudioReady } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
+type SttMode = "browser" | "sarvam";
+const FALLBACK_ERRORS = new Set(["service-not-allowed", "not-allowed", "network", "audio-capture"]);
 type Mode = "health" | "companion";
 type Persona = "user" | "guardian";
 interface Msg { role: "user" | "assistant"; content: string }
@@ -113,47 +116,90 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
     }
   }, [mode, persona, wardUserId, playAudio]);
 
+  const [sttMode, setSttMode] = useState<SttMode>(() =>
+    isSpeechRecognitionSupported() ? "browser" : "sarvam",
+  );
+  const fallbackNoticeShownRef = useRef(false);
+  const messagesRef = useRef<Msg[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const { listening, interim, error, start, stop, supported } = useVoiceRecognition({
-    onFinal: (t) => sendTurn(t, messages),
+    onFinal: (t) => sendTurn(t, messagesRef.current),
+  });
+
+  const sarvam = useMediaRecorderStt({
+    language: "unknown",
+    onFinal: (t) => sendTurn(t, messagesRef.current),
+    onError: (msg) => {
+      toast.error(msg);
+      setPhase("idle");
+    },
   });
 
   useEffect(() => { setInterimText(interim); }, [interim]);
   useEffect(() => { if (listening) setPhase("listening"); }, [listening]);
+  useEffect(() => { if (sarvam.recording) setPhase("listening"); }, [sarvam.recording]);
+  useEffect(() => { if (sarvam.uploading) setPhase("thinking"); }, [sarvam.uploading]);
+
   useEffect(() => {
-    if (error) {
-      toast.error(error === "not-allowed" ? "Microphone permission denied." : `Voice error: ${error}`);
-      setPhase("idle");
+    if (!error) return;
+    if (FALLBACK_ERRORS.has(error) && sarvam.supported) {
+      if (!fallbackNoticeShownRef.current) {
+        fallbackNoticeShownRef.current = true;
+        toast.message("Switching to cloud voice…");
+      }
+      setSttMode("sarvam");
+      // Auto-retry once with Sarvam so the tap isn't wasted.
+      void sarvam.start();
+      return;
     }
-  }, [error]);
+    toast.error(error === "not-allowed" ? "Microphone permission denied." : `Voice error: ${error}`);
+    setPhase("idle");
+  }, [error, sarvam]);
 
   const handleMicTap = async () => {
-    if (phase === "listening") { stop(); return; }
+    if (phase === "listening") {
+      if (sttMode === "sarvam") sarvam.stop(); else stop();
+      return;
+    }
     if (phase === "speaking") { stopAudio(); setPhase("idle"); return; }
     if (phase === "thinking") return;
-    if (!supported) { toast.error("Voice not supported on this browser."); return; }
+
     await ensureAudioReady();
     try {
       const silent = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA");
       silent.volume = 0; silent.play().catch(() => {});
-    } catch {}
-    if ("vibrate" in navigator) try { navigator.vibrate(40); } catch {}
-    start();
+    } catch { /* ignore */ }
+    if ("vibrate" in navigator) try { navigator.vibrate(40); } catch { /* ignore */ }
+
+    if (sttMode === "sarvam" || !supported) {
+      if (!sarvam.supported) { toast.error("Voice not supported on this browser."); return; }
+      setSttMode("sarvam");
+      void sarvam.start();
+    } else {
+      start();
+    }
   };
+
+  const autoStart = useCallback(() => {
+    if (sttMode === "browser" && supported) {
+      try { start(); } catch { /* ignore */ }
+    } else if (sarvam.supported) {
+      void sarvam.start();
+    }
+  }, [sttMode, supported, start, sarvam]);
 
   const handleOpen = async () => {
     setOpen(true);
     await ensureAudioReady();
-    // Auto-speak greeting and auto-start listening so the first reply is fully voice-driven.
     if (messages.length === 0) {
       setPhase("speaking");
       speakFallback(greeting, () => {
         setPhase("idle");
-        if (supported) {
-          try { start(); } catch {}
-        }
+        autoStart();
       });
-    } else if (supported) {
-      try { start(); } catch {}
+    } else {
+      autoStart();
     }
   };
 
@@ -161,6 +207,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
   const handleClose = () => {
     abortRef.current?.abort();
     stop();
+    sarvam.stop();
     stopAudio();
     setOpen(false);
     setPhase("idle");
@@ -174,7 +221,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
     setPhase("idle");
   };
 
-  if (!isSpeechRecognitionSupported()) return null;
+  // Render FAB on any device — Sarvam fallback keeps mic usable even without Web Speech.
 
   const Icon = phase === "thinking" ? Loader2 : phase === "speaking" ? Volume2 : Mic;
   const greeting = persona === "guardian"

@@ -1,57 +1,49 @@
-# Fix: OTP login fails for Aldrin (and any user with formatted phone)
+# Hybrid Speech-to-Text: Browser + Sarvam Fallback
 
-## Root cause
+Keep the current free, on-device Web Speech API as the fast path. Automatically fall back to server-side Sarvam STT (`saarika:v2`) whenever Web Speech is unavailable or errors out — so the mic works inside the Lovable preview iframe, on iOS Safari, and in any webview.
 
-Edge function logs show:
-```
-[send-otp] get_email_by_phone(+919819576467): null undefined
-```
+## Behaviour
 
-Aldrin's OTP was sent and verified successfully, but the phone→email lookup returned `null`, so `send-otp` responded with `no_account: true` and the client never received a session.
+1. Tap mic → try browser Web Speech first (unchanged fast path).
+2. If Web Speech is unsupported, OR it errors with `service-not-allowed` / `not-allowed` / `network` / `audio-capture`, silently switch to Sarvam recording mode for that tap.
+3. Sarvam mode: record mic audio with `MediaRecorder`, stop on second tap (or after 20s auto-cutoff / silence), upload to the new `sarvam-stt` edge function, feed the returned transcript into the same `sendTurn()` path as before.
+4. UI stays identical — user just sees "Listening…" then the transcript appears. No mode toggle exposed.
+5. Sarvam is only called when needed, so cost stays near zero on Android Chrome and the installed PWA/Capacitor app.
 
-Why: `profiles.phone` for Aldrin is stored as `"+91 9819576467"` (with a space), but the edge function normalizes the entered phone to `+919819576467` (no space) before calling `get_email_by_phone`. The RPC does an exact string match, so it misses the row.
+## New edge function: `supabase/functions/sarvam-stt/index.ts`
 
-A DB check confirms 1 of 4 profiles has whitespace/formatting in `phone` — this will hit any similarly formatted account.
+- `verify_jwt = true` (JWT-bound user client, matches `voice-query` and `transcribe-voice`).
+- Accepts `multipart/form-data` with an `audio` file part (webm/opus, mp4, or wav) and optional `language` field (default `en-IN`).
+- Forwards to `POST https://api.sarvam.ai/speech-to-text` with header `api-subscription-key: ${SARVAM_API_KEY}` and body fields `model=saarika:v2`, `language_code=<lang>`, `file=<audio>`.
+- Returns `{ transcript: string, language?: string }`.
+- Standard CORS, 401 on missing auth, surfaces 402/429 from Sarvam, logs errors.
+- Uses the existing `SARVAM_API_KEY` secret — no new secrets needed.
 
-## Fix (two-part, both needed)
+## New client hook: `src/hooks/useMediaRecorderStt.ts`
 
-### 1. Make `get_email_by_phone` format-tolerant (DB migration)
+- Wraps `navigator.mediaDevices.getUserMedia({ audio: true })` + `MediaRecorder`.
+- Picks the best supported mime type (`audio/webm;codecs=opus` → `audio/mp4` → `audio/webm`).
+- Exposes `{ recording, start, stop, error, supported }` with the same shape-ish surface as `useVoiceRecognition` so `VoiceAgentButton` can swap between them cleanly.
+- On `stop()`: builds a Blob, POSTs to `sarvam-stt` via `supabase.functions.invoke`, returns transcript through an `onFinal` callback.
+- 20s hard cap auto-stop; rejects blobs < 2KB (empty/silent) with a "didn't catch that" error.
 
-Update the RPC to compare normalized digits on both sides, so it matches whether the stored value is `+91 9819576467`, `+919819576467`, or `9819576467`.
+## Edits to `src/components/VoiceAgentButton.tsx`
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_email_by_phone(_phone text)
-RETURNS text
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT au.email
-  FROM auth.users au
-  JOIN public.profiles p ON p.id = au.id
-  WHERE regexp_replace(COALESCE(p.phone, ''), '\D', '', 'g')
-      = regexp_replace(COALESCE(_phone, ''), '\D', '', 'g')
-    AND regexp_replace(COALESCE(p.phone, ''), '\D', '', 'g') <> ''
-  LIMIT 1;
-$$;
-```
+- Import the new hook alongside `useVoiceRecognition`.
+- Track `sttMode: "browser" | "sarvam"` in state, default `"browser"`. If `isSpeechRecognitionSupported()` is false at mount, initialise to `"sarvam"`.
+- In the existing `onerror` handler for browser STT, when `error ∈ {service-not-allowed, not-allowed, network, audio-capture}`, set `sttMode = "sarvam"`, show a one-time toast "Switching to cloud voice…", and immediately re-invoke `start()` on the Sarvam hook.
+- `handleMicTap()` calls either hook's `start` / `stop` based on `sttMode`.
+- Interim transcript UI only shows for browser mode (Sarvam has no interim); replace it with a subtle "Recording…" indicator when Sarvam is active.
+- Remove the `if (!isSpeechRecognitionSupported()) return null;` early return so the FAB renders on iOS too.
 
-Apply the same normalization to `check_guardian_nomination`, `guardian_ward_count_by_phone`, and the phone-based branch of `link_guardian_user_id` so guardian lookups don't hit the same bug.
+## Files touched
 
-### 2. Backfill stored phones to canonical form
+- Create `supabase/functions/sarvam-stt/index.ts`
+- Create `src/hooks/useMediaRecorderStt.ts`
+- Edit `src/components/VoiceAgentButton.tsx` (also apply the same pattern in `src/components/VoiceQueryButton.tsx` if it still ships — will verify during build)
 
-One-off update to strip whitespace/formatting so future exact-match code paths (realtime filters, direct `eq('phone', …)` queries) also work:
+## Out of scope
 
-```sql
-UPDATE public.profiles
-SET phone = regexp_replace(phone, '[\s\-\(\)]', '', 'g')
-WHERE phone ~ '[\s\-\(\)]';
-
-UPDATE public.guardians
-SET guardian_phone = regexp_replace(guardian_phone, '[\s\-\(\)]', '', 'g')
-WHERE guardian_phone ~ '[\s\-\(\)]';
-```
-
-## Verification
-
-After deploy, Aldrin re-attempts OTP login: verify edge function log shows `get_email_by_phone(+919819576467): aldrin@futurewave.in` and the client receives `token_hash` + `email`, completing sign-in.
-
-No frontend changes required.
+- No changes to `voice-query` TTS pipeline (Sarvam bulbul stays).
+- No language picker UI — Sarvam defaults to `en-IN`; Hindi auto-detect can come later.
+- No streaming STT — one-shot per utterance keeps it simple.
