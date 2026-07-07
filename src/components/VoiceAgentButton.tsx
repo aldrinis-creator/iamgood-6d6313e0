@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Loader2, Volume2, X, Heart, Stethoscope, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
+import { useMediaRecorderStt } from "@/hooks/useMediaRecorderStt";
 import { ensureAudioReady } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
+type SttMode = "browser" | "sarvam";
+const FALLBACK_ERRORS = new Set(["service-not-allowed", "not-allowed", "network", "audio-capture"]);
 type Mode = "health" | "companion";
 type Persona = "user" | "guardian";
 interface Msg { role: "user" | "assistant"; content: string }
