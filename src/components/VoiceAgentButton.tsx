@@ -116,31 +116,69 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
     }
   }, [mode, persona, wardUserId, playAudio]);
 
+  const [sttMode, setSttMode] = useState<SttMode>(() =>
+    isSpeechRecognitionSupported() ? "browser" : "sarvam",
+  );
+  const fallbackNoticeShownRef = useRef(false);
+  const messagesRef = useRef<Msg[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const { listening, interim, error, start, stop, supported } = useVoiceRecognition({
-    onFinal: (t) => sendTurn(t, messages),
+    onFinal: (t) => sendTurn(t, messagesRef.current),
+  });
+
+  const sarvam = useMediaRecorderStt({
+    language: "unknown",
+    onFinal: (t) => sendTurn(t, messagesRef.current),
+    onError: (msg) => {
+      toast.error(msg);
+      setPhase("idle");
+    },
   });
 
   useEffect(() => { setInterimText(interim); }, [interim]);
   useEffect(() => { if (listening) setPhase("listening"); }, [listening]);
+  useEffect(() => { if (sarvam.recording) setPhase("listening"); }, [sarvam.recording]);
+  useEffect(() => { if (sarvam.uploading) setPhase("thinking"); }, [sarvam.uploading]);
+
   useEffect(() => {
-    if (error) {
-      toast.error(error === "not-allowed" ? "Microphone permission denied." : `Voice error: ${error}`);
-      setPhase("idle");
+    if (!error) return;
+    if (FALLBACK_ERRORS.has(error) && sarvam.supported) {
+      if (!fallbackNoticeShownRef.current) {
+        fallbackNoticeShownRef.current = true;
+        toast.message("Switching to cloud voice…");
+      }
+      setSttMode("sarvam");
+      // Auto-retry once with Sarvam so the tap isn't wasted.
+      void sarvam.start();
+      return;
     }
-  }, [error]);
+    toast.error(error === "not-allowed" ? "Microphone permission denied." : `Voice error: ${error}`);
+    setPhase("idle");
+  }, [error, sarvam]);
 
   const handleMicTap = async () => {
-    if (phase === "listening") { stop(); return; }
+    if (phase === "listening") {
+      if (sttMode === "sarvam") sarvam.stop(); else stop();
+      return;
+    }
     if (phase === "speaking") { stopAudio(); setPhase("idle"); return; }
     if (phase === "thinking") return;
-    if (!supported) { toast.error("Voice not supported on this browser."); return; }
+
     await ensureAudioReady();
     try {
       const silent = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA");
       silent.volume = 0; silent.play().catch(() => {});
-    } catch {}
-    if ("vibrate" in navigator) try { navigator.vibrate(40); } catch {}
-    start();
+    } catch { /* ignore */ }
+    if ("vibrate" in navigator) try { navigator.vibrate(40); } catch { /* ignore */ }
+
+    if (sttMode === "sarvam" || !supported) {
+      if (!sarvam.supported) { toast.error("Voice not supported on this browser."); return; }
+      setSttMode("sarvam");
+      void sarvam.start();
+    } else {
+      start();
+    }
   };
 
   const handleOpen = async () => {
