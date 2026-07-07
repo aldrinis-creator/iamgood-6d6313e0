@@ -3,7 +3,7 @@ import { Mic, Loader2, Volume2, X, Heart, Stethoscope, MessageCircle } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useVoiceRecognition, isSpeechRecognitionSupported } from "@/hooks/useVoiceRecognition";
 import { useMediaRecorderStt } from "@/hooks/useMediaRecorderStt";
-import { ensureAudioReady } from "@/lib/audioAlerts";
+import { ensureAudioReady, playBase64Audio, stopBase64Audio } from "@/lib/audioAlerts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -41,7 +41,6 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
   const [messages, setMessages] = useState<Msg[]>([]);
   const [interimText, setInterimText] = useState("");
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -50,20 +49,16 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
   }, [messages, interimText, phase]);
 
   const stopAudio = useCallback(() => {
-    try { audioRef.current?.pause(); } catch {}
+    stopBase64Audio();
     try { window.speechSynthesis?.cancel(); } catch {}
   }, []);
 
   const playAudio = useCallback((dataUrl: string, onEnd?: () => void) => {
-    try {
-      stopAudio();
-      const audio = new Audio(dataUrl);
-      audioRef.current = audio;
-      audio.onended = () => onEnd?.();
-      audio.onerror = () => onEnd?.();
-      audio.play().catch(() => onEnd?.());
-    } catch { onEnd?.(); }
-  }, [stopAudio]);
+    playBase64Audio(dataUrl, onEnd).catch((err) => {
+      console.error("[VoiceAgent] playAudio failed:", err);
+      onEnd?.();
+    });
+  }, []);
 
   const sendTurn = useCallback(async (userText: string, history: Msg[]) => {
     const newHistory: Msg[] = [...history, { role: "user", content: userText }];
