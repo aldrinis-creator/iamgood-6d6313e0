@@ -181,20 +181,25 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
     }
   };
 
+  const autoStart = useCallback(() => {
+    if (sttMode === "browser" && supported) {
+      try { start(); } catch { /* ignore */ }
+    } else if (sarvam.supported) {
+      void sarvam.start();
+    }
+  }, [sttMode, supported, start, sarvam]);
+
   const handleOpen = async () => {
     setOpen(true);
     await ensureAudioReady();
-    // Auto-speak greeting and auto-start listening so the first reply is fully voice-driven.
     if (messages.length === 0) {
       setPhase("speaking");
       speakFallback(greeting, () => {
         setPhase("idle");
-        if (supported) {
-          try { start(); } catch {}
-        }
+        autoStart();
       });
-    } else if (supported) {
-      try { start(); } catch {}
+    } else {
+      autoStart();
     }
   };
 
@@ -202,6 +207,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
   const handleClose = () => {
     abortRef.current?.abort();
     stop();
+    sarvam.stop();
     stopAudio();
     setOpen(false);
     setPhase("idle");
@@ -215,7 +221,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
     setPhase("idle");
   };
 
-  if (!isSpeechRecognitionSupported()) return null;
+  // Render FAB on any device — Sarvam fallback keeps mic usable even without Web Speech.
 
   const Icon = phase === "thinking" ? Loader2 : phase === "speaking" ? Volume2 : Mic;
   const greeting = persona === "guardian"
