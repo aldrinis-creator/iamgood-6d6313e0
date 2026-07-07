@@ -150,6 +150,68 @@ const playFallbackBeep = () => {
   }
 };
 
+// --- Base64 data-URL playback via WebAudio (bypasses HTMLMediaElement autoplay policy) ---
+let currentSource: AudioBufferSourceNode | null = null;
+let currentFallbackAudio: HTMLAudioElement | null = null;
+
+const decodeBase64 = (b64: string): ArrayBuffer => {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+};
+
+export const stopBase64Audio = () => {
+  try { currentSource?.stop(); } catch { /* ignore */ }
+  currentSource = null;
+  try { currentFallbackAudio?.pause(); } catch { /* ignore */ }
+  currentFallbackAudio = null;
+};
+
+export const playBase64Audio = async (dataUrl: string, onEnd?: () => void): Promise<void> => {
+  if (!dataUrl) { onEnd?.(); return; }
+  const commaIdx = dataUrl.indexOf(",");
+  const b64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+  stopBase64Audio();
+  await ensureAudioReady();
+  const ctx = getAudioContext();
+
+  if (ctx.state === "running") {
+    try {
+      const arrayBuf = decodeBase64(b64);
+      const audioBuf = await ctx.decodeAudioData(arrayBuf);
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(ctx.destination);
+      src.onended = () => { if (currentSource === src) currentSource = null; onEnd?.(); };
+      src.start(0);
+      currentSource = src;
+      return;
+    } catch (err) {
+      console.error("[audio] WebAudio playback failed, falling back to HTMLAudio:", err);
+    }
+  } else {
+    console.warn("[audio] AudioContext not running (state=" + ctx.state + "), using HTMLAudio fallback");
+  }
+
+  // Fallback: HTMLMediaElement (may be blocked by autoplay policy in iframes)
+  try {
+    const audio = new Audio(dataUrl);
+    currentFallbackAudio = audio;
+    audio.onended = () => { if (currentFallbackAudio === audio) currentFallbackAudio = null; onEnd?.(); };
+    audio.onerror = () => {
+      console.error("[audio] HTMLAudio fallback error");
+      if (currentFallbackAudio === audio) currentFallbackAudio = null;
+      onEnd?.();
+    };
+    await audio.play();
+  } catch (err) {
+    console.error("[audio] HTMLAudio fallback play() rejected:", err);
+    onEnd?.();
+  }
+};
+
 export const playChime = async () => {
   await ensureAudioReady();
   const ctx = getAudioContext();

@@ -1,49 +1,60 @@
-# Hybrid Speech-to-Text: Browser + Sarvam Fallback
+# Fix: no audio when using the voice mic
 
-Keep the current free, on-device Web Speech API as the fast path. Automatically fall back to server-side Sarvam STT (`saarika:v2`) whenever Web Speech is unavailable or errors out — so the mic works inside the Lovable preview iframe, on iOS Safari, and in any webview.
+## Root cause
 
-## Behaviour
+Sarvam TTS is fine — I called the API directly and it returns a valid base64 WAV. The audio never reaches the speaker because of how we play it on the client.
 
-1. Tap mic → try browser Web Speech first (unchanged fast path).
-2. If Web Speech is unsupported, OR it errors with `service-not-allowed` / `not-allowed` / `network` / `audio-capture`, silently switch to Sarvam recording mode for that tap.
-3. Sarvam mode: record mic audio with `MediaRecorder`, stop on second tap (or after 20s auto-cutoff / silence), upload to the new `sarvam-stt` edge function, feed the returned transcript into the same `sendTurn()` path as before.
-4. UI stays identical — user just sees "Listening…" then the transcript appears. No mode toggle exposed.
-5. Sarvam is only called when needed, so cost stays near zero on Android Chrome and the installed PWA/Capacitor app.
+In `src/components/VoiceAgentButton.tsx`:
 
-## New edge function: `supabase/functions/sarvam-stt/index.ts`
+```ts
+const audio = new Audio(dataUrl);
+audio.play().catch(() => onEnd?.());
+```
 
-- `verify_jwt = true` (JWT-bound user client, matches `voice-query` and `transcribe-voice`).
-- Accepts `multipart/form-data` with an `audio` file part (webm/opus, mp4, or wav) and optional `language` field (default `en-IN`).
-- Forwards to `POST https://api.sarvam.ai/speech-to-text` with header `api-subscription-key: ${SARVAM_API_KEY}` and body fields `model=saarika:v2`, `language_code=<lang>`, `file=<audio>`.
-- Returns `{ transcript: string, language?: string }`.
-- Standard CORS, 401 on missing auth, surfaces 402/429 from Sarvam, logs errors.
-- Uses the existing `SARVAM_API_KEY` secret — no new secrets needed.
+By the time this runs, **3–8 seconds** have passed since the mic tap (STT upload → LLM → TTS). The browser no longer considers this a user gesture, so `HTMLMediaElement.play()` is blocked by autoplay policy — silently, because we swallow the rejection in `.catch(() => onEnd?.())`. This is why:
 
-## New client hook: `src/hooks/useMediaRecorderStt.ts`
+- Nothing plays in the Lovable preview iframe (iframes are strictest)
+- Nothing plays on iOS Safari
+- The UI just flips back to "idle" with no error toast
 
-- Wraps `navigator.mediaDevices.getUserMedia({ audio: true })` + `MediaRecorder`.
-- Picks the best supported mime type (`audio/webm;codecs=opus` → `audio/mp4` → `audio/webm`).
-- Exposes `{ recording, start, stop, error, supported }` with the same shape-ish surface as `useVoiceRecognition` so `VoiceAgentButton` can swap between them cleanly.
-- On `stop()`: builds a Blob, POSTs to `sarvam-stt` via `supabase.functions.invoke`, returns transcript through an `onFinal` callback.
-- 20s hard cap auto-stop; rejects blobs < 2KB (empty/silent) with a "didn't catch that" error.
+`ensureAudioReady()` **does** resume the shared `AudioContext` on tap, but that unlock only benefits Web Audio playback — not `<audio>` elements or `SpeechSynthesis`. So the fallback `speakFallback()` path has the same problem.
 
-## Edits to `src/components/VoiceAgentButton.tsx`
+## Fix
 
-- Import the new hook alongside `useVoiceRecognition`.
-- Track `sttMode: "browser" | "sarvam"` in state, default `"browser"`. If `isSpeechRecognitionSupported()` is false at mount, initialise to `"sarvam"`.
-- In the existing `onerror` handler for browser STT, when `error ∈ {service-not-allowed, not-allowed, network, audio-capture}`, set `sttMode = "sarvam"`, show a one-time toast "Switching to cloud voice…", and immediately re-invoke `start()` on the Sarvam hook.
-- `handleMicTap()` calls either hook's `start` / `stop` based on `sttMode`.
-- Interim transcript UI only shows for browser mode (Sarvam has no interim); replace it with a subtle "Recording…" indicator when Sarvam is active.
-- Remove the `if (!isSpeechRecognitionSupported()) return null;` early return so the FAB renders on iOS too.
+Route TTS playback through the already-unlocked `AudioContext` in `src/lib/audioAlerts.ts` instead of `new Audio()`. Web Audio doesn't need a fresh gesture once the context is running — and our existing tap on the mic guarantees it is.
 
-## Files touched
+### Changes
 
-- Create `supabase/functions/sarvam-stt/index.ts`
-- Create `src/hooks/useMediaRecorderStt.ts`
-- Edit `src/components/VoiceAgentButton.tsx` (also apply the same pattern in `src/components/VoiceQueryButton.tsx` if it still ships — will verify during build)
+**1. `src/lib/audioAlerts.ts` — add a helper**
+
+Add `playBase64Audio(dataUrl: string, onEnd?: () => void): Promise<void>`:
+- Call `ensureAudioReady()`.
+- Strip the `data:audio/…;base64,` prefix, base64-decode into an `ArrayBuffer`.
+- `audioContext.decodeAudioData(...)` → `AudioBufferSourceNode` → `connect(destination)` → `start(0)`.
+- `source.onended = onEnd`.
+- Keep a module-level `currentSource` so a new call cancels the previous one (mirrors current `stopAudio` behavior).
+- Export `stopBase64Audio()` that calls `currentSource?.stop()` and clears the ref.
+- On any error (decode failure, still-suspended context), log to console and fall back once to `new Audio(dataUrl).play()` — plus call `onEnd` if that also throws, so the UI never gets stuck.
+
+**2. `src/components/VoiceAgentButton.tsx` — use it**
+
+- Replace the `HTMLAudioElement`-based `playAudio` with a call to `playBase64Audio(dataUrl, onEnd)`.
+- Replace `audioRef.current?.pause()` in `stopAudio` with `stopBase64Audio()`.
+- Remove the now-unused `audioRef`.
+- Add a `console.error` in the existing `onerror` path so the next failure is visible in logs, not silent.
+
+**3. Keep `speakFallback` as a last resort**
+
+Only used when the server returned no `audio` blob at all (Sarvam outage). Leave it untouched — that path already works when it works, and there's nothing we can do about `speechSynthesis` autoplay in an iframe from client code.
 
 ## Out of scope
 
-- No changes to `voice-query` TTS pipeline (Sarvam bulbul stays).
-- No language picker UI — Sarvam defaults to `en-IN`; Hindi auto-detect can come later.
-- No streaming STT — one-shot per utterance keeps it simple.
+- No changes to `supabase/functions/voice-agent/index.ts` — TTS is confirmed working.
+- No changes to the STT path (`useMediaRecorderStt`, `useVoiceRecognition`, `sarvam-stt` edge function).
+- No changes to the mic UI, modes, quota, or system prompts.
+
+## Verification
+
+After the change, tapping the mic in the preview iframe should:
+1. Play the Sarvam TTS reply audibly through the speaker.
+2. Log a clear console error if playback ever fails again (no more silent failures).
