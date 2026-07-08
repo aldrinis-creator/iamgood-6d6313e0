@@ -1,40 +1,38 @@
-# Fix voice assistant hallucination on ambulance booking
+Three focused fixes.
 
-## Problem
-When a user asks "How do I book an ambulance?", the voice assistant replies "The app doesn't directly book ambulances…" — a hallucination. The product KB (`supabase/functions/_shared/product-kb.ts`) already documents ambulance booking under **Services → Ambulance**, with guardian-on-behalf support. The model is ignoring the KB and falling back on a generic safety disclaimer, likely because:
+## 1. Voice assistant hallucination — "any meds due?" wrongly says all taken
 
-1. The system prompt buries the KB after ~10 lines of rules, and the "brief safe answer + see a doctor" rule for health advice bleeds into emergency-adjacent questions.
-2. There's no explicit instruction that when a how-to answer *is* in the KB, the assistant MUST use it instead of defaulting to "call emergency services".
-3. The ambulance section in the KB is short (one line) and easy for the model to miss when scanning.
+**Root cause:** `gatherContext` in `supabase/functions/voice-query/index.ts` derives medication counts from `medication_logs` only. Newly scheduled doses that haven't been logged yet (the normal case for upcoming times) never appear, so `taken=0, pending=0, missed=0`, and the model concludes "all taken."
 
-## Fix (voice assistant only — same issue does not repro on the text `product-assistant` because its prompt is stricter)
+**Fix (`supabase/functions/voice-query/index.ts`):**
+- In `gatherContext`, also fetch `medications` with `id, name, dosage, schedule_times, start_date, end_date` (active for today).
+- Build the day's dose slots from `schedule_times` (one per time) in IST, mark each as `taken` / `taken_late` / `missed` / `pending` by matching against `medication_logs` (same medication_id + hour+minute) and comparing scheduled time to "now IST" with the existing 60-minute grace rule used by `WardMedicationStatus`.
+- Replace `medications_today` with `{ total, taken, missed, pending, upcoming: [{name, dosage, time}], overdue: [{name, dosage, time}] }` derived from those slots.
+- Tighten the system prompt: add an explicit rule + example — when asked "any meds due / pending / left today", answer from `medications_today.upcoming` (and `overdue` if any). If both are empty AND `total > 0`, then say all taken; if `total == 0`, say no medications are scheduled.
 
-### 1. `supabase/functions/voice-query/index.ts` — tighten the system prompt
-- Reorder rules so the product-KB rule comes **before** the health-advice rule.
-- Add an explicit instruction: *"If the knowledge base describes a feature that answers the question (e.g. ambulance booking, SOS, vault, refills), you MUST use it. Do not fall back to 'call emergency services' or 'the app doesn't do that' when the feature exists."*
-- Add a short exemplar for the ambulance case so the model anchors correctly:
-  *Example — Q: "How do I book an ambulance?" → A: "Open Services, tap Ambulance, pick a provider and confirm — guardians can also book on behalf of their ward."*
-- Keep the existing off-topic / personal-data / spoken-tone rules unchanged.
+Guardian/product-assistant edge functions are unchanged.
 
-### 2. `supabase/functions/_shared/product-kb.ts` — expand the Ambulance section
-Promote ambulance from a one-liner to its own clear block so both the voice assistant and the text chat retrieve it reliably:
+## 2. Dashboard score display
 
-```
-## Ambulance Booking
-- Open Services (bottom nav) → Ambulance.
-- Choose a provider, confirm pickup location, and tap Book.
-- Available on all plans; pay-per-use tariff applies at the time of booking.
-- Guardians can book on behalf of their ward from the Guardian → Services tab; the ward's emergency card (blood group, allergies, conditions, emergency contacts) is auto-attached.
-- For life-threatening emergencies also press the red SOS button so all guardians are alerted with your live location.
-```
+`src/hooks/useLiveDashboardStats.ts`
+- Change `medsTotal` from `medication_logs.length` to the sum of `schedule_times.length` across the user's active medications (start_date ≤ today, end_date null or ≥ today). This makes MEDS render as e.g. `2/5` reflecting the medication list, and it will fluctuate correctly as doses get logged.
+- `medsCompleted` stays as logs with `status ∈ {taken, taken_late}`.
 
-## Out of scope
-- No frontend changes.
-- No changes to the `product-assistant` edge function (already answers this correctly from the same KB, but it will also benefit from the expanded ambulance section).
-- No model swap or embeddings work.
+`src/pages/UserDashboard.tsx` (line 317)
+- Render Health tile as `{stats.healthScore}<span class="text-[12px] text-white font-normal">/100</span>` to match the Check-ins / Meds `x/y` format.
+
+No other score screens change.
+
+## 3. Delete Nap timings
+
+`src/pages/Settings.tsx` (Auto-Nap Schedule card, lines 722-744)
+- Under the "Scheduled daily from … to …" row, add a small destructive-ghost "Clear nap schedule" button, visible only when `settings.napSchedule` is set.
+- On click: show an `AlertDialog` confirmation ("Delete nap schedule? Auto-Nap will be turned off."). On confirm, call `updateSetting("napSchedule", null)` and `updateSetting("autoNapMode", false)`.
+- Hide the "Scheduled daily…" row after clear (already conditional on `settings.napSchedule`).
+
+`NapModeDialog` and `useAutoPauseModes` need no changes — both already treat a null `napSchedule` as "no nap window."
 
 ## Verification
-1. Redeploy `voice-query`, tap the mic, ask *"How do I book an ambulance?"* → spoken answer describes Services → Ambulance flow, not "call emergency services".
-2. Ask *"Can my guardian book an ambulance for me?"* → mentions Guardian → Services and auto-attached emergency card.
-3. Regression: ask *"How many meds have I taken today?"* → still answers from the personal-data snapshot.
-4. Regression: ask *"What's the Pro plan?"* → still answers from the KB.
+- Voice assistant: ask "any medications due today?" for a user with 5 scheduled doses and 2 taken → answer names the pending ones. Ask again after logging all 5 → says all taken.
+- Dashboard: with 5 schedule slots and 2 taken, Meds tile shows `2/5`; Health tile shows `<score>/100`.
+- Settings: clear nap → schedule row disappears, `autoNapMode` toggles off, no auto-nap transition in `useAutoPauseModes`.

@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
@@ -735,11 +737,42 @@ const Settings = () => {
                   <Switch checked={settings.autoNapMode} onCheckedChange={(v) => updateSetting("autoNapMode", v)} />
                 </div>
                 {settings.napSchedule && (
-                  <div className="bg-primary/5 rounded-md p-3 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <span className="text-sm">Scheduled daily from <strong>{settings.napSchedule.from}</strong> to <strong>{settings.napSchedule.to}</strong></span>
+                  <div className="bg-primary/5 rounded-md p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-primary" />
+                      <span className="text-sm">Scheduled daily from <strong>{settings.napSchedule.from}</strong> to <strong>{settings.napSchedule.to}</strong></span>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2">
+                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear nap schedule
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete nap schedule?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Your daily nap window will be removed and Auto-Nap will be turned off. You can set a new schedule anytime from the Dashboard Nap button.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                              updateSetting("napSchedule", null);
+                              updateSetting("autoNapMode", false);
+                              toast.success("Nap schedule cleared");
+                            }}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
+
               </CardContent>
             </Card>
 

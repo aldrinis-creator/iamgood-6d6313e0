@@ -22,7 +22,7 @@ export function useLiveDashboardStats() {
       const tomorrow = new Date(todayDate);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const [checkInsRes, medsRes, healthRes] = await Promise.all([
+      const [checkInsRes, medLogsRes, medsRes, healthRes] = await Promise.all([
         supabase
           .from("check_ins")
           .select("status")
@@ -35,6 +35,11 @@ export function useLiveDashboardStats() {
           .eq("user_id", session.user.id)
           .gte("scheduled_at", todayDate.toISOString())
           .lt("scheduled_at", tomorrow.toISOString()),
+        supabase
+          .from("medications")
+          .select("schedule_times, start_date, end_date")
+          .eq("user_id", session.user.id)
+          .lte("start_date", todayStr),
         supabase
           .from("health_passport_scores")
           .select("overall")
@@ -50,12 +55,18 @@ export function useLiveDashboardStats() {
         ciCompleted = checkInsRes.data.filter(c => c.status === "responded" || c.status === "late").length;
       }
 
-      let mCompleted = 0;
-      let mTotal = 0;
-      if (medsRes.data) {
-        mTotal = medsRes.data.length;
-        mCompleted = medsRes.data.filter(m => m.status === "taken" || m.status === "taken_late").length;
-      }
+      // Total scheduled doses today = sum of schedule_times across active medications
+      const activeMeds = (medsRes.data ?? []).filter((m: any) =>
+        !m.end_date || m.end_date >= todayStr
+      );
+      const mTotal = activeMeds.reduce(
+        (sum: number, m: any) => sum + (Array.isArray(m.schedule_times) ? m.schedule_times.length : 0),
+        0
+      );
+      const mCompleted = (medLogsRes.data ?? []).filter(
+        (m: any) => m.status === "taken" || m.status === "taken_late"
+      ).length;
+
 
       const score = healthRes.data?.overall ?? 0;
       
