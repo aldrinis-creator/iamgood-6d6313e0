@@ -314,7 +314,7 @@ const UserDashboard = () => {
             <div className="text-[11px] text-white font-medium uppercase tracking-wide">Check-ins</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/health-passport")}>
-            <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}</div>
+            <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}<span className="text-[12px] text-white font-normal">/100</span></div>
             <div className="text-[11px] text-white font-medium uppercase tracking-wide">Health</div>
           </div>
           <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/my-health?tool=Tablets&returnTo=dashboard")}>
