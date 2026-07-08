@@ -45,8 +45,13 @@ Users get three daily check-in prompts at **7 AM, 12 PM and 7 PM IST**. Tapping 
 - SOS state syncs across roles in real time. Only the user can resolve it (Mark as Safe). Guardians see the same active banner until it's resolved.
 - Falls detected by the motion sensor open a 15-second countdown overlay; if the user doesn't cancel, an SOS auto-triggers.
 
-## Ambulance
-Ambulance booking is available on all plans (pay-per-use tariff applies). Open **Services → Ambulance**, pick provider, confirm. Guardians can also book on behalf of their ward; the ward's emergency card payload is auto-attached.
+## Ambulance Booking
+Yes — the Check-iN app books ambulances. Here is how:
+- Open **Services** (bottom navigation) → tap **Ambulance**.
+- Choose a provider, confirm your pickup location, and tap **Book**.
+- Available on **all plans** (including Free); pay-per-use tariff applies at the time of booking.
+- Guardians can book on behalf of their ward from **Guardian → Services → Ambulance**; the ward's emergency card (blood group, allergies, chronic conditions, current meds, emergency contacts) is auto-attached to the booking.
+- For life-threatening emergencies, also press the red **SOS** button so all guardians are alerted with your live location while the ambulance is en route.
 
 ## Medical Vault
 - Store health records, ID documents, insurance, prescriptions, lab reports, and more, organised by category.
