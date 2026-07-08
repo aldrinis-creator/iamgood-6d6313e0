@@ -1,60 +1,69 @@
-# Fix: no audio when using the voice mic
+# Product Help Assistant — extend voice + add floating chat bubble
 
-## Root cause
+## Goal
+Turn "Hey Check-iN" into a dual-purpose assistant that answers both **personal health data** questions (already works) and **product/how-to** questions (features, registration, guardian nomination, vault, medications, subscriptions, SOS, etc.), and expose it to logged-out visitors too via a floating chat bubble on every page.
 
-Sarvam TTS is fine — I called the API directly and it returns a valid base64 WAV. The audio never reaches the speaker because of how we play it on the client.
+## Deliverables
 
-In `src/components/VoiceAgentButton.tsx`:
+### 1. Curated Knowledge Base (repo-versioned markdown)
+New folder `src/data/productKnowledge/` with focused topic files:
+- `overview.md` — what Check-iN is, roles (user vs guardian), IST scheduling model
+- `registration.md` — 4-step wizard, phone-first OTP, nomination-gated guardian signup
+- `guardians.md` — nomination tokens, 72h expiry, 3-ward limit, accept/reject flow, guardian profile scope
+- `check-ins.md` — 7 AM / 12 PM / 7 PM windows, missed-check-in escalation
+- `medications.md` — schedules, adherence T+0…T+50, refills, Jan Aushadhi, batching
+- `sos.md` — trigger, active banner, resolution, ambulance booking
+- `vault.md` — categories, nominee claims, PIN escrow, release tokens
+- `health-tools.md` — passport, face scan, vitals, symptom checker, nutrition
+- `journey.md` — Map My Journey, geofencing, safe zones, journey reports
+- `subscriptions.md` — Free / Basic ₹99 / Pro ₹199 / Premium+ tiers, what's included, payment via futurewave.in/pay
+- `privacy-security.md` — RLS, encryption, offline profile, data control
+- `troubleshooting.md` — common issues, how to contact support
 
-```ts
-const audio = new Audio(dataUrl);
-audio.play().catch(() => onEnd?.());
-```
+A single `src/data/productKnowledge/index.ts` concatenates them into one exported `PRODUCT_KB` string (~10–20k tokens, well under Gemini's context window). Content is distilled from existing `src/data/faqData.ts`, `guardianFaqData.ts`, and `.lovable/memory/features/*` — no duplication of source of truth beyond markdown.
 
-By the time this runs, **3–8 seconds** have passed since the mic tap (STT upload → LLM → TTS). The browser no longer considers this a user gesture, so `HTMLMediaElement.play()` is blocked by autoplay policy — silently, because we swallow the rejection in `.catch(() => onEnd?.())`. This is why:
+### 2. Backend — extend `voice-query` + add public `product-assistant`
+- **Modify `supabase/functions/voice-query/index.ts`**: inject `PRODUCT_KB` into the system prompt and update rules so the assistant answers product/how-to questions from the KB in addition to personal data questions. Add explicit guidance: if question is about "how to use / where to find / what is X", answer from the KB; if about "my data", use the pre-fetched snapshot.
+- **New `supabase/functions/product-assistant/index.ts`** with `verify_jwt = false` (public). Text-only (no TTS to keep it cheap and instant), streams via AI SDK using `google/gemini-2.5-flash-lite`. System prompt: KB + strict guardrails ("only answer from provided context; never invent features; if asked about personal data, tell the visitor to sign in and use the voice assistant"). Rate-limited by IP (in-memory token bucket).
+- Both functions embed the same KB module by copying it into `supabase/functions/_shared/product-kb.ts` at build (or importing via relative path — Deno supports importing repo files under `../../../src/data/productKnowledge/index.ts` when included in the function bundle; if that fails, duplicate as a `_shared` copy kept in sync).
 
-- Nothing plays in the Lovable preview iframe (iframes are strictest)
-- Nothing plays on iOS Safari
-- The UI just flips back to "idle" with no error toast
+### 3. Frontend — Floating Chat Bubble (`ProductHelpChat.tsx`)
+New global FAB rendered from `AppLayout.tsx`, positioned `bottom-4 right-4` (below SOS at `bottom-20` and voice mic at `bottom-40` — reserve `bottom-4` for logged-in users; for logged-out users on marketing/legal pages, it's the only FAB so `bottom-6` is fine).
+- Icon: `MessageCircleQuestion` from lucide (help-flavored, distinct from voice mic and SOS).
+- Tap → opens a bottom-sheet chat panel (max-width 430px per project constraint), title "Ask Check-iN".
+- Message list with markdown rendering (`react-markdown`), user bubbles use `primary` / `primary-foreground`, assistant messages plain text on surface.
+- Suggested-question chips shown on empty state: "How do I add a guardian?", "What's in the Pro plan?", "How does SOS work?", "How do I upload a document to the vault?".
+- Composer: single-line input + send button; disabled while streaming; shows a "Thinking..." shimmer while waiting.
+- Uses AI SDK `useChat` with `DefaultChatTransport` pointed at `/functions/v1/product-assistant`, no persistence (session-only, cleared on page reload — matches "casual help" intent).
+- Hidden on `/admin/*` routes.
 
-`ensureAudioReady()` **does** resume the shared `AudioContext` on tap, but that unlock only benefits Web Audio playback — not `<audio>` elements or `SpeechSynthesis`. So the fallback `speakFallback()` path has the same problem.
+### 4. Guardrails and UX
+- System prompt for both surfaces: answer only from KB; if unknown, direct to `/help` or `/contact`; never invent features; keep answers ≤3 sentences; use plain language suitable for elderly users.
+- Voice assistant continues to answer personal data questions as today; product questions get short spoken answers (already suits Sarvam TTS 1500-char cap).
+- Public chat cannot access any user data — no Supabase client, no auth header, KB-only.
 
-## Fix
+## Files touched
+**New:**
+- `src/data/productKnowledge/*.md` (12 files)
+- `src/data/productKnowledge/index.ts`
+- `src/components/ProductHelpChat.tsx`
+- `supabase/functions/product-assistant/index.ts`
+- `supabase/functions/_shared/product-kb.ts` (mirror of KB for Deno)
 
-Route TTS playback through the already-unlocked `AudioContext` in `src/lib/audioAlerts.ts` instead of `new Audio()`. Web Audio doesn't need a fresh gesture once the context is running — and our existing tap on the mic guarantees it is.
+**Edited:**
+- `supabase/functions/voice-query/index.ts` — add KB to system prompt, update rules
+- `src/components/AppLayout.tsx` — mount `<ProductHelpChat />` globally (hide on admin)
+- `supabase/config.toml` — register new function with `verify_jwt = false`
 
-### Changes
-
-**1. `src/lib/audioAlerts.ts` — add a helper**
-
-Add `playBase64Audio(dataUrl: string, onEnd?: () => void): Promise<void>`:
-- Call `ensureAudioReady()`.
-- Strip the `data:audio/…;base64,` prefix, base64-decode into an `ArrayBuffer`.
-- `audioContext.decodeAudioData(...)` → `AudioBufferSourceNode` → `connect(destination)` → `start(0)`.
-- `source.onended = onEnd`.
-- Keep a module-level `currentSource` so a new call cancels the previous one (mirrors current `stopAudio` behavior).
-- Export `stopBase64Audio()` that calls `currentSource?.stop()` and clears the ref.
-- On any error (decode failure, still-suspended context), log to console and fall back once to `new Audio(dataUrl).play()` — plus call `onEnd` if that also throws, so the UI never gets stuck.
-
-**2. `src/components/VoiceAgentButton.tsx` — use it**
-
-- Replace the `HTMLAudioElement`-based `playAudio` with a call to `playBase64Audio(dataUrl, onEnd)`.
-- Replace `audioRef.current?.pause()` in `stopAudio` with `stopBase64Audio()`.
-- Remove the now-unused `audioRef`.
-- Add a `console.error` in the existing `onerror` path so the next failure is visible in logs, not silent.
-
-**3. Keep `speakFallback` as a last resort**
-
-Only used when the server returned no `audio` blob at all (Sarvam outage). Leave it untouched — that path already works when it works, and there's nothing we can do about `speechSynthesis` autoplay in an iframe from client code.
-
-## Out of scope
-
-- No changes to `supabase/functions/voice-agent/index.ts` — TTS is confirmed working.
-- No changes to the STT path (`useMediaRecorderStt`, `useVoiceRecognition`, `sarvam-stt` edge function).
-- No changes to the mic UI, modes, quota, or system prompts.
+## Out of scope for v1
+- Embeddings / pgvector (revisit if KB grows past ~30k tokens)
+- Persistent chat history for the product bot
+- Voice input on the product chat bubble (text only)
+- Multilingual (English only; matches Sarvam's current `en-IN` setup)
 
 ## Verification
-
-After the change, tapping the mic in the preview iframe should:
-1. Play the Sarvam TTS reply audibly through the speaker.
-2. Log a clear console error if playback ever fails again (no more silent failures).
+1. Ask voice mic "How do I nominate a guardian?" → spoken answer sourced from KB, not hallucinated.
+2. Ask voice mic "How many meds have I taken today?" → still works from personal data snapshot.
+3. Logged out on `/`, tap the help bubble, ask "What's the Pro plan?" → streams a KB-grounded reply.
+4. Ask bubble "What's my blood pressure?" → politely redirects to sign in.
+5. Bubble hidden on `/admin`, visible on marketing, legal, dashboard, and guardian pages.
