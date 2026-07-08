@@ -59,4 +59,6 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.send-weekly-reports]
     verify_jwt = false
+  [functions.product-assistant]
+    verify_jwt = false
 
