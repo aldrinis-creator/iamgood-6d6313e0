@@ -60,6 +60,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const CustomerService = lazy(() => import("./pages/CustomerService"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const ProductHelpChat = lazy(() => import("./components/ProductHelpChat"));
 
 const queryClient = new QueryClient();
 
