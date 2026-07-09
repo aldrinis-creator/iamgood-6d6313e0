@@ -3,7 +3,7 @@
 
 import type { FaqSection } from "./faqData";
 
-export const GUARDIAN_FAQ_VERSION = "2026-07-01";
+export const GUARDIAN_FAQ_VERSION = "2026-07-09";
 
 export const guardianFaqSections: FaqSection[] = [
   {
@@ -404,4 +404,45 @@ export const guardianFaqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "Ask Check-iN Help Bot",
+    icon: "message-circle",
+    items: [
+      {
+        question: "What's the floating chat bubble on my dashboard?",
+        answer: "'Ask Check-iN' — a product help bot. Ask anything about Guardian features: nomination, ward limits, alerts, weekly reports, hospital admission kit, WhatsApp alerts, etc. It answers from the official knowledge base and does not read your ward's personal data.",
+      },
+    ],
+  },
+  {
+    title: "Indian Voice for the Assistant",
+    icon: "mic",
+    items: [
+      {
+        question: "The Voice Agent sounds Indian now — did it change?",
+        answer: "Yes. Voice replies now use Sarvam.ai's Indian-English voice (Anushka) for more natural pronunciation of Indian names, places and medicines. The mic also falls back to server-side transcription if the browser blocks on-device speech recognition, so it works on iPhone Safari and inside previews.",
+      },
+    ],
+  },
+  {
+    title: "Ambulance Booking for Your Ward",
+    icon: "ambulance",
+    items: [
+      {
+        question: "Can I book an ambulance for my Ward?",
+        answer: "Yes. Guardian Dashboard → Services → Ambulance. Your Ward's emergency card (blood group, allergies, chronic conditions, current meds, emergency contacts) is auto-attached to the booking. Available on all plans; pay-per-use tariff applies.",
+      },
+    ],
+  },
+  {
+    title: "Connect Check-iN to AI Assistants (MCP)",
+    icon: "plug",
+    items: [
+      {
+        question: "Can I ask ChatGPT or Claude about my Ward's status?",
+        answer: "Yes, using the MCP (Model Context Protocol) integration. Add Check-iN as an agent integration in ChatGPT / Claude / Cursor, approve on the consent screen, and the assistant gets three read-only tools: today's medications, upcoming appointments, and latest health status — scoped to your account.",
+      },
+    ],
+  },
 ];
+

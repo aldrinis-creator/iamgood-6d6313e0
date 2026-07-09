@@ -1,5 +1,6 @@
 // FAQ data — update this file whenever FAQs change.
-// Last updated: 2026-07-01
+// Last updated: 2026-07-09
+
 
 export interface FaqItem {
   question: string;
@@ -12,7 +13,7 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const FAQ_VERSION = "2026-07-01";
+export const FAQ_VERSION = "2026-07-09";
 
 export const faqSections: FaqSection[] = [
   {
@@ -1315,4 +1316,79 @@ export const faqSections: FaqSection[] = [
       },
     ],
   },
+  {
+    title: "What's New (July 2026 · Update 2)",
+    icon: "rocket",
+    items: [
+      {
+        question: "Why does the Meds tile on my dashboard now show something like 2/5?",
+        answer: "The Meds score now counts every scheduled dose in your medication list for today (sum of all schedule times across your active medications). The number on the left is doses you've marked as taken; the right is total scheduled. It updates live as you log doses.",
+      },
+      {
+        question: "Why does the Health tile show a /100?",
+        answer: "For consistency with Check-ins and Meds, the Health Passport score is now displayed as score/100 on the dashboard tile — same number as before, clearer format.",
+      },
+      {
+        question: "Can I delete my Nap schedule?",
+        answer: "Yes. Go to Settings → Auto-Nap Schedule and tap 'Clear nap schedule'. You'll be asked to confirm. This removes the daily nap window and turns Auto-Nap off — no more automatic Nap-Mode transitions.",
+      },
+      {
+        question: "Does the voice assistant know which medications are still due?",
+        answer: "Yes. Ask 'Any medications due today?' or 'What's left?' — the assistant reads today's dose slots directly from your medication list (not just the log) and tells you which are upcoming, which are overdue, and which are taken.",
+      },
+    ],
+  },
+  {
+    title: "Ask Check-iN Help Bot",
+    icon: "message-circle",
+    items: [
+      {
+        question: "What is the floating chat button in the corner?",
+        answer: "That's the 'Ask Check-iN' help bot — a product knowledge assistant. Ask anything about features, registration, guardian nomination, vault, medications, subscriptions, SOS, ambulance booking, etc. It answers from the official Check-iN knowledge base, not from your personal data.",
+      },
+      {
+        question: "How is it different from the Voice Agent?",
+        answer: "The Voice Agent (mic button) answers questions about your personal data (your meds today, your check-ins, your vitals) and speaks the answer aloud. The Help Bot (chat bubble) answers how-to and product questions in text. Both are free.",
+      },
+    ],
+  },
+  {
+    title: "Indian Voice for the Assistant",
+    icon: "mic",
+    items: [
+      {
+        question: "The voice sounds Indian now — did something change?",
+        answer: "Yes. Voice replies now use Sarvam.ai's Indian-English voice (Anushka) instead of the previous international voice, so pronunciations of Indian names, places and medicines sound natural.",
+      },
+      {
+        question: "Why does the mic sometimes not work in the browser?",
+        answer: "Some browser previews block on-device speech recognition. In those cases the app automatically falls back to Sarvam server-side transcription so the mic still works — including on iPhone Safari and inside the Lovable preview.",
+      },
+    ],
+  },
+  {
+    title: "Ambulance Booking (Clarification)",
+    icon: "ambulance",
+    items: [
+      {
+        question: "Can I book an ambulance from the app?",
+        answer: "Yes. Open Services (bottom navigation) → Ambulance, pick a provider, confirm pickup, and tap Book. Available on all plans including Free (pay-per-use tariff applies). For life-threatening emergencies, also press the red SOS button so guardians get your live location while the ambulance is en route.",
+      },
+    ],
+  },
+  {
+    title: "Connect Check-iN to AI Assistants (MCP)",
+    icon: "plug",
+    items: [
+      {
+        question: "Can I ask ChatGPT or Claude about my Check-iN data?",
+        answer: "Yes. Check-iN exposes an MCP (Model Context Protocol) endpoint with three read-only tools: today's medications, upcoming appointments, and your latest health status. Add Check-iN as an agent integration in ChatGPT / Claude / Cursor and approve access on the consent screen. You stay in control — nothing is written, and access can be revoked anytime.",
+      },
+      {
+        question: "Is my data safe when using MCP?",
+        answer: "Yes. The tools are read-only and scoped to your account via OAuth. No other user's data is exposed, and the assistants only see what you approve on the consent page.",
+      },
+    ],
+  },
 ];
+
