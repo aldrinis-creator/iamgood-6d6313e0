@@ -7,7 +7,6 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        # Apple Developer Portal credentials (configure these securely in the Codemagic UI)
         - app_store_credentials
     triggering:
       events:
@@ -34,3 +33,36 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+
+  android-workflow:
+    name: Android Play Store Build
+    max_build_duration: 120
+    environment:
+      node: latest
+      java: 17
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web assets
+        script: npm run build
+      - name: Sync Capacitor Android
+        script: npx cap sync android
+      - name: Build Android Release Bundle
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GPLAY_SERVICE_ACCOUNT_JSON
+        track: internal
+        submit_as_draft: true
