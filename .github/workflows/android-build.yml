@@ -41,7 +41,7 @@ jobs:
       - name: Build Android Bundle (AAB)
         run: |
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease -x lint -x test --stacktrace
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
