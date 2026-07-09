@@ -33,7 +33,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Make Gradle Executable
         run: chmod +x android/gradlew
@@ -41,8 +41,7 @@ jobs:
       - name: Build Android Bundle (AAB)
         run: |
           cd android
-          ./gradlew bundleRelease -x lint -x test --stacktrace > build_output.log 2>&1
-        continue-on-error: true
+          ./gradlew bundleRelease -x lint -x test --stacktrace
 
       - name: Upload Build Log
         uses: actions/upload-artifact@v4
