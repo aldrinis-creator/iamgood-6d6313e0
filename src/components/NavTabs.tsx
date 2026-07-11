@@ -72,7 +72,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health", badge: refillDue ? 1 : 0 },
+    { icon: Heart, label: "My Health", path: "/my-health", badge: (refillDue || medDue) ? 1 : 0 },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
