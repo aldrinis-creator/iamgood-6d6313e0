@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 import useRefillDue from "@/hooks/useRefillDue";
+import useMedicationDue from "@/hooks/useMedicationDue";
 
 const NavTabs = () => {
   const navigate = useNavigate();
