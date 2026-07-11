@@ -16,6 +16,7 @@ const NavTabs = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const todayApptCount = useTodayAppointments();
   const refillDue = useRefillDue();
+  const medDue = useMedicationDue();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
