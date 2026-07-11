@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
 import useRefillDue from "@/hooks/useRefillDue";
+import useMedicationDue from "@/hooks/useMedicationDue";
 
 const NavTabs = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const NavTabs = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const todayApptCount = useTodayAppointments();
   const refillDue = useRefillDue();
+  const medDue = useMedicationDue();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
@@ -70,7 +72,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health", badge: refillDue ? 1 : 0 },
+    { icon: Heart, label: "My Health", path: "/my-health", badge: (refillDue || medDue) ? 1 : 0 },
     { icon: HelpCircle, label: "Help", path: "/help" },
   ];
 
