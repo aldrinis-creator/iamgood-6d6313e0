@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const {
+    let {
       user_id,
       message,
       guardian_emails,
@@ -137,65 +137,109 @@ Deno.serve(async (req) => {
       doctor_email,
       doctor_name,
       user_name,
+      sos_event_id,
     } = body as any;
-
-    console.log("[send-sos-alert] START", {
-      user_id,
-      hasMessage: !!message,
-      callerEmails: Array.isArray(guardian_emails) ? guardian_emails.length : 0,
-      callerPhones: Array.isArray(guardian_phones) ? guardian_phones.length : 0,
-    });
-
-    if (!user_id || !message) {
-      return new Response(JSON.stringify({ error: "user_id and message required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    // Auth check: caller must be the user themselves OR an accepted guardian of the user.
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const callerId = userData.user.id;
     const supabase = createClient(supabaseUrl, serviceKey);
-    if (callerId !== user_id) {
-      const { data: guardianRow } = await supabase
-        .from("guardians")
-        .select("id")
-        .eq("user_id", user_id)
-        .eq("guardian_user_id", callerId)
-        .eq("status", "accepted")
+
+    // Detect service-role caller (DB trigger / cron safety-net).
+    const authHeader = req.headers.get("Authorization") || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const isServiceRoleCaller = !!bearer && bearer === serviceKey;
+
+    let activeSosId: string | null = null;
+
+    if (isServiceRoleCaller) {
+      if (!sos_event_id) {
+        return new Response(JSON.stringify({ error: "sos_event_id required for service-role invocation" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: sosRow, error: sosErr } = await supabase
+        .from("sos_events")
+        .select("id, user_id, status")
+        .eq("id", sos_event_id)
         .maybeSingle();
-      if (!guardianRow) {
-        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (sosErr || !sosRow) {
+        return new Response(JSON.stringify({ error: "sos_event not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { count: existingAttempts } = await supabase
+        .from("sos_message_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("sos_event_id", sos_event_id);
+      if ((existingAttempts ?? 0) > 0) {
+        console.log("[send-sos-alert] idempotent skip: attempts exist for", sos_event_id);
+        return new Response(JSON.stringify({ skipped: true, reason: "already_dispatched", sos_event_id }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user_id = sosRow.user_id;
+      activeSosId = sosRow.id;
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user_id).maybeSingle();
+      user_name = user_name || prof?.full_name || "A Check-iN user";
+      message = message || `🚨 SOS ALERT from ${user_name} — immediate attention needed.`;
+    } else {
+      if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const callerId = userData.user.id;
+      if (!user_id || !message) {
+        return new Response(JSON.stringify({ error: "user_id and message required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (callerId !== user_id) {
+        const { data: guardianRow } = await supabase
+          .from("guardians")
+          .select("id")
+          .eq("user_id", user_id)
+          .eq("guardian_user_id", callerId)
+          .eq("status", "accepted")
+          .maybeSingle();
+        if (!guardianRow) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+      try {
+        const { data: sosRow } = await supabase
+          .from("sos_events")
+          .select("id")
+          .eq("user_id", user_id)
+          .order("triggered_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        activeSosId = sosRow?.id ?? null;
+      } catch (e) {
+        console.error("[send-sos-alert] sos_events fetch error:", e);
+      }
+      if (activeSosId) {
+        const { count: existingAttempts } = await supabase
+          .from("sos_message_attempts")
+          .select("id", { count: "exact", head: true })
+          .eq("sos_event_id", activeSosId);
+        if ((existingAttempts ?? 0) > 0) {
+          console.log("[send-sos-alert] idempotent skip (user path):", activeSosId);
+          return new Response(JSON.stringify({ skipped: true, reason: "already_dispatched", sos_event_id: activeSosId }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
 
-    // Resolve the latest active SOS event for this user — used to attach delivery attempts.
-    let activeSosId: string | null = null;
-    try {
-      const { data: sosRow } = await supabase
-        .from("sos_events")
-        .select("id")
-        .eq("user_id", user_id)
-        .order("triggered_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      activeSosId = sosRow?.id ?? null;
-    } catch (e) {
-      console.error("[send-sos-alert] sos_events fetch error:", e);
-    }
+    console.log("[send-sos-alert] START", { user_id, sos_event_id: activeSosId, serviceRole: isServiceRoleCaller });
 
     // --- Resolve recipients: accepted OR pending guardians ---
     // SOS is life-safety. A guardian the user explicitly nominated should be

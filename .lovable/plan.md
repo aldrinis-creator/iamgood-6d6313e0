@@ -1,38 +1,55 @@
-## Goal
-Expand the "Ask Check-iN" assistant's knowledge by folding the existing user + guardian FAQs into its knowledge base, so it can answer more questions accurately without duplicating content.
+## What went wrong on 12-Jul at 23:34 IST
 
-## Approach
-Keep a single source of truth for FAQs (the `src/data/*.ts` files the app already renders on the Help pages) and generate the assistant's KB text from them at build/deploy time — so any future FAQ edit automatically reaches the bot.
+- `sos_events` row `42d78690-d852-4697-bb50-7f1b374acfae` was inserted (status `active`, trigger `manual`).
+- `send-sos-alert` edge function received **zero** HTTP calls at that time.
+- `sos_message_attempts` has **no rows** for the last 6 hours → no WhatsApp / SMS / email / push was ever attempted.
+- Auth logs show the JWT was refreshing at the same moment (login 23:32, `bad_jwt: missing sub claim` shortly after) — the client-side `supabase.functions.invoke(...)` call almost certainly failed or was aborted before it reached the edge network.
 
-## Changes
+The SOS pipeline today is entirely browser-driven (`AppContext.triggerSOS`): insert row → then call the edge function from the same tab. If the tab is interrupted between those two steps (auth refresh, tab suspend, screen lock, network blip, dialog close), the event is recorded but **no one is notified and nothing retries**. That is unacceptable for a life-safety feature.
 
-1. **Shared FAQ source, usable by both app and edge function**
-   - Move the FAQ arrays from `src/data/faqData.ts` and `src/data/guardianFaqData.ts` into plain TS modules under `supabase/functions/_shared/` (e.g. `faq-user.ts`, `faq-guardian.ts`) exporting the same typed arrays.
-   - Re-export them from `src/data/faqData.ts` / `src/data/guardianFaqData.ts` so the existing Help pages keep working unchanged.
+## Fix — make dispatch server-authoritative
 
-2. **Compose the KB from curated content + FAQs**
-   - In `supabase/functions/_shared/product-kb.ts`, keep the current curated `PRODUCT_KB` markdown (features, pricing, ambulance section, etc.) as the authoritative core.
-   - Append two auto-generated sections built from the FAQ arrays:
-     - `## User FAQs` — each entry rendered as `### Q: …` / `A: …`.
-     - `## Guardian FAQs` — same shape, clearly labelled as guardian-specific.
-   - Tag each block with its audience so the model can pick the right variant for the asker.
+### 1. DB trigger fires dispatch the moment an SOS row is inserted
 
-3. **Prompt tweaks in `product-assistant/index.ts`**
-   - Update the system prompt to state that curated sections take precedence over FAQ entries when they conflict (curated content is the newer, authoritative source).
-   - Add a rule: if the question is guardian-specific, prefer the Guardian FAQ section; otherwise prefer User FAQ.
-   - Keep the existing guardrails (personal-data redirect, off-topic redirect, no invented features).
+Add an `AFTER INSERT` trigger on `public.sos_events` that calls `send-sos-alert` via `pg_net.http_post` using the service-role key stored in `vault`, passing `{ sos_event_id }`. The trigger runs inside the same transaction that created the row, so if the row exists, dispatch is guaranteed to be scheduled — no dependence on the browser staying alive.
 
-4. **Size / token safety**
-   - FAQs are large; measure the combined KB length. If it exceeds a safe budget for `gemini-2.5-flash-lite`, switch the edge function to a lightweight retrieval step: keyword-match the top ~8 FAQ entries for the user's question and only inline those, alongside the full curated KB. No embeddings/vector DB needed for this volume.
+### 2. `send-sos-alert` accepts server-invoked calls
 
-5. **Suggested-question pills**
-   - Optionally surface 2–3 rotating suggestions sourced from FAQ titles (client-side only, in `ProductHelpChat.tsx`) so users discover newly-answerable topics. No backend change required.
+Update `supabase/functions/send-sos-alert/index.ts` to:
+
+- Accept a service-role auth path where the body is just `{ sos_event_id }` (in addition to today's user-JWT path).
+- Load the `sos_events` row, resolve `user_id`, fetch accepted guardians, build the message (reusing today's logic), and record `sos_message_attempts` as it does today.
+- Idempotency guard: skip if any `sos_message_attempts` row already exists for that `sos_event_id` (so client-invoke + trigger-invoke don't double-send).
+
+### 3. Client stops being the source of truth
+
+In `src/contexts/AppContext.tsx`:
+
+- After inserting `sos_events`, still call `send-sos-alert` (for the fastest possible latency when the tab is healthy), but treat any invoke failure as non-fatal — the DB trigger will cover it.
+- Keep the offline-queue path unchanged.
+
+### 4. Safety-net cron (belt-and-braces)
+
+Add a `pg_cron` job every 1 minute: for any `sos_events` row with `status = 'active'`, `created_at > now() - interval '30 minutes'`, and **no rows in `sos_message_attempts**`, re-invoke `send-sos-alert`. Catches the case where the trigger's `pg_net` call itself fails.
+
+### 5. Backfill the missed alert
+
+Manually invoke `send-sos-alert` once for `sos_event_id = 42d78690-d852-4697-bb50-7f1b374acfae` so today's guardians are finally notified (or, if you consider it stale, mark it resolved with a note). Your call — I'll ask before dispatching.
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` — trigger, helper function, cron job, GRANTs.
+- `supabase/functions/send-sos-alert/index.ts` — service-role branch + idempotency check.
+- `src/contexts/AppContext.tsx` — invoke becomes best-effort, not required for delivery.
 
 ## Verification
-- Deploy `product-assistant`, then ask several questions that previously failed but exist in the FAQs (e.g. "How do I nominate a guardian?", "What happens if I miss a check-in?", guardian-side "How do I accept a nomination?").
-- Confirm curated answers still win where they overlap (e.g. ambulance booking).
-- Confirm Help pages still render identically.
 
-## Out of scope
-- No vector search / embeddings.
-- No changes to the voice agent (`voice-agent` / `voice-query`) — this plan is scoped to the text "Ask Check-iN" bot. Happy to mirror it there in a follow-up if you want.
+- Insert a test SOS row via SQL (no browser) → confirm `send-sos-alert` runs and `sos_message_attempts` populates.
+- Trigger SOS from the app, then kill the tab immediately after the button press → guardians still receive the alert.
+- Confirm no duplicate WhatsApp/SMS when both paths race (idempotency guard).
+
+## Question before I build
+
+For the stranded row `42d78690…` from tonight — **replay the alert to your guardians now, or mark it resolved as stale? mark it stale**
+
+&nbsp;

@@ -178,8 +178,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (error) {
-        console.error("[triggerSOS] send-sos-alert invoke error:", error);
-        toast.error(`SOS backend error: ${error.message || "invoke failed"}`);
+        // Non-fatal: the DB trigger on sos_events will dispatch server-side.
+        console.warn("[triggerSOS] client invoke failed; server trigger will handle dispatch:", error);
         return { delivery: null, invokeError: error.message || "invoke failed" };
       }
 
@@ -216,9 +216,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return { delivery, invokeError: null };
     } catch (e: any) {
-      console.error("[triggerSOS] Failed to invoke send-sos-alert:", e);
+      // Non-fatal: DB trigger dispatches server-side regardless.
+      console.warn("[triggerSOS] client invoke threw; server trigger will handle dispatch:", e);
       const msg = e?.message || String(e);
-      toast.error(`SOS invoke failed: ${msg}`);
       return { delivery: null, invokeError: msg };
     }
   }, [session?.user?.id, profile?.full_name]);
