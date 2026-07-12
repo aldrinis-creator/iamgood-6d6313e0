@@ -74,14 +74,26 @@ Deno.serve(async (req) => {
     }
     if (messages.length === 0) return json({ error: "Please ask a question." }, 400);
 
+    // Audience: caller can hint via body.audience ("user" | "guardian"); default "any".
+    const rawAudience = typeof body?.audience === "string" ? body.audience.toLowerCase() : "any";
+    const audience: Audience = rawAudience === "user" || rawAudience === "guardian" ? rawAudience : "any";
+
+    // Build a query string from the last user message for FAQ retrieval.
+    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const faqBlock = selectRelevantFaqs(lastUser, audience, 10);
+    const systemPrompt = faqBlock
+      ? `${SYSTEM_PROMPT_BASE}\n\n# Matched FAQs\n${faqBlock}`
+      : SYSTEM_PROMPT_BASE;
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
       }),
     });
+
 
     if (aiResp.status === 429) return json({ error: "The assistant is busy — please try again in a moment." }, 429);
     if (aiResp.status === 402) return json({ answer: "The help assistant is temporarily out of credits. Please try again later.", degraded: "credits_exhausted" }, 200);
