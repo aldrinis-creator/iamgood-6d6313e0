@@ -1,101 +1,64 @@
 /// <reference types="npm:@types/react@18.3.1" />
 import * as React from "npm:react@18.3.1";
 import {
-  Body, Container, Head, Heading, Html, Preview, Text, Section, Hr, Row, Column,
+  Body,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Preview,
+  Text,
+  Section,
+  Hr,
+  Row,
+  Column,
 } from "npm:@react-email/components@0.0.22";
+import type { TemplateEntry } from "./registry.ts";
 
-// ── Colour palette (matches the app dark-navy brand) ──────────────────────
-const C = {
-  bg:         "#0F1E35",
-  card:       "#1C3050",
-  cardBorder: "#243D60",
-  green:      "#2ECC8A",
-  greenDim:   "#1A5C40",
-  amber:      "#F5A623",
-  amberDim:   "#7A4F08",
-  red:        "#E55353",
-  redDim:     "#7A1F1F",
-  blue:       "#4682DC",
-  text1:      "#F0F4FF",
-  text2:      "#9BAAC4",
-  text3:      "#5E7499",
-  white:      "#FFFFFF",
-};
+const SITE_NAME = "Check-iN";
 
-// ── Styles ─────────────────────────────────────────────────────────────────
-const s = {
-  main:        { backgroundColor: "#06101E", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
-  container:   { maxWidth: "560px", margin: "0 auto", padding: "24px 16px 40px" },
-  logoBadge:   { display: "inline-block", background: C.card, border: `1.5px solid rgba(46,204,138,0.3)`, borderRadius: "14px", padding: "10px 16px", marginBottom: "20px" },
-  logoText:    { color: C.green, fontSize: "20px", fontWeight: "700", letterSpacing: "-0.02em", margin: 0 },
-  logoSub:     { color: C.text3, fontSize: "11px", margin: "2px 0 0" },
-  heading:     { color: C.text1, fontSize: "24px", fontWeight: "700", margin: "0 0 6px", letterSpacing: "-0.02em" },
-  subheading:  { color: C.text2, fontSize: "14px", margin: "0 0 24px", lineHeight: "1.5" },
-  card:        { background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: "16px", padding: "18px 20px", marginBottom: "12px" },
-  cardTitle:   { color: C.text2, fontSize: "10px", fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase" as const, margin: "0 0 14px" },
-  statNum:     { fontSize: "28px", fontWeight: "700", lineHeight: "1", margin: "0 0 3px" },
-  statLabel:   { color: C.text2, fontSize: "11px", margin: 0 },
-  bodyText:    { color: C.text2, fontSize: "14px", lineHeight: "1.6", margin: "0 0 8px" },
-  pill:        (color: string) => ({
-    display: "inline-block", background: `${color}18`, color, border: `1px solid ${color}30`,
-    borderRadius: "99px", fontSize: "10px", fontWeight: "600", padding: "3px 10px",
-    letterSpacing: "0.04em", textTransform: "uppercase" as const,
-  }),
-  missedRow:   { color: C.text2, fontSize: "13px", margin: "4px 0", paddingLeft: "12px", borderLeft: `2px solid ${C.amber}` },
-  footer:      { color: C.text3, fontSize: "11px", textAlign: "center" as const, marginTop: "28px", lineHeight: "1.6" },
-  hr:          { border: "none", borderTop: `1px solid ${C.cardBorder}`, margin: "16px 0" },
-  barTrack:    { background: "#162744", borderRadius: "3px", height: "6px", width: "100%", marginTop: "5px", overflow: "hidden" },
-  progressBar: (pct: number, color: string) => ({
-    width: `${Math.min(pct, 100)}%`, height: "6px", background: color, borderRadius: "3px",
-  }),
-};
-
-// ── Stat cell ──────────────────────────────────────────────────────────────
-const StatCell = ({ n, label, color }: { n: string | number; label: string; color: string }) => (
-  <Column style={{ textAlign: "center" as const, padding: "0 8px" }}>
-    <Text style={{ ...s.statNum, color }}>{n}</Text>
-    <Text style={s.statLabel}>{label}</Text>
-  </Column>
-);
-
-// ── Score badge ────────────────────────────────────────────────────────────
-const scoreBadge = (score: number) => {
-  if (score >= 80) return { color: C.green, label: "Excellent" };
-  if (score >= 60) return { color: C.amber, label: "Fair" };
-  return { color: C.red, label: "Needs attention" };
-};
-
-// ── Props ──────────────────────────────────────────────────────────────────
-export interface WeeklyReportEmailProps {
-  guardianName: string;
-  wardName: string;
-  weekLabel: string;
-  relation: string;
-  adherencePct: number;
-  medAdherencePct: number;
-  healthScore: number;
-  totalCheckIns: number;
-  respondedCheckIns: number;
-  missedCheckIns: number;
-  totalMeds: number;
-  takenMeds: number;
-  missedMeds: number;
-  lateMeds: number;
-  totalSOS: number;
-  avgHR: number | null;
-  avgSpO2: number | null;
-  missedCheckInDetails: string[];
+export interface WeeklyGuardianReportProps {
+  guardianName?: string;
+  wardName?: string;
+  weekLabel?: string;
+  relation?: string;
+  healthScore?: number;
+  adherencePct?: number;
+  medAdherencePct?: number;
+  totalCheckIns?: number;
+  respondedCheckIns?: number;
+  missedCheckIns?: number;
+  totalMeds?: number;
+  takenMeds?: number;
+  missedMeds?: number;
+  lateMeds?: number;
+  totalSOS?: number;
+  avgHR?: number | null;
+  avgSpO2?: number | null;
+  missedCheckInDetails?: string[];
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-export const WeeklyReportEmail = ({
+// ── Score helpers ──────────────────────────────────────────────────────────
+const scoreColour = (score: number) => (score >= 80 ? "#2ECC8A" : score >= 60 ? "#F5A623" : "#E55353");
+
+const scoreLabel = (score: number) => (score >= 80 ? "Excellent" : score >= 60 ? "Fair" : "Needs attention");
+
+const summaryNote = (score: number, wardName: string) => {
+  if (score >= 80) return `✅ Great week! ${wardName} checked in regularly and took medications on time.`;
+  if (score >= 60)
+    return `⚠️ ${wardName} had a reasonable week but missed a few check-ins or medications. Consider reaching out.`;
+  return `🚨 ${wardName} had a difficult week with multiple missed check-ins or medications. We recommend calling them directly.`;
+};
+
+// ── Component ──────────────────────────────────────────────────────────────
+const WeeklyGuardianReportEmail = ({
   guardianName = "Guardian",
   wardName = "Your ward",
   weekLabel = "This week",
   relation = "Ward",
+  healthScore = 0,
   adherencePct = 0,
   medAdherencePct = 0,
-  healthScore = 0,
   totalCheckIns = 0,
   respondedCheckIns = 0,
   missedCheckIns = 0,
@@ -107,78 +70,140 @@ export const WeeklyReportEmail = ({
   avgHR = null,
   avgSpO2 = null,
   missedCheckInDetails = [],
-}: WeeklyReportEmailProps) => {
-  const badge = scoreBadge(healthScore);
+}: WeeklyGuardianReportProps) => {
+  const scoreColor = scoreColour(healthScore);
 
   return (
     <Html lang="en" dir="ltr">
       <Head />
       <Preview>
-        📊 {wardName}'s weekly report — {badge.label} ({healthScore}/100) · {weekLabel}
+        📊 {wardName}'s weekly report — {scoreLabel(healthScore)} ({healthScore}/100) · {weekLabel}
       </Preview>
       <Body style={s.main}>
         <Container style={s.container}>
-
           {/* ── Logo ── */}
-          <Section style={{ textAlign: "center" as const, marginBottom: "24px" }}>
+          <Section style={s.logoSection}>
             <div style={s.logoBadge}>
-              <Text style={s.logoText}>Check-iN</Text>
-              <Text style={s.logoSub}>Personal Safety Network</Text>
+              <span style={s.logoCheck}>CHECK-</span>
+              <span style={s.logoIN}>iN</span>
             </div>
+            <Text style={s.logoTagline}>Personal Safety Network</Text>
           </Section>
 
-          {/* ── Header ── */}
-          <Section>
-            <Heading style={s.heading}>Weekly Report Card</Heading>
-            <Text style={s.subheading}>
-              Hi {guardianName}, here's how <strong style={{ color: C.text1 }}>{wardName}</strong> ({relation}) did last week · {weekLabel}
-            </Text>
-          </Section>
+          {/* ── Title ── */}
+          <Heading style={s.heading}>Weekly Report Card</Heading>
+          <Text style={s.subheading}>
+            Hi {guardianName}, here's how <strong>{wardName}</strong> ({relation}) did last week · {weekLabel}
+          </Text>
 
           {/* ── Health score banner ── */}
-          <Section style={{ ...s.card, border: `1.5px solid ${badge.color}30`, background: `${badge.color}08`, textAlign: "center" as const, padding: "20px" }}>
-            <Text style={{ color: C.text2, fontSize: "11px", fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 8px" }}>
-              Overall Health Score
+          <Section style={{ ...s.scoreCard, borderColor: scoreColor }}>
+            <Text style={s.scoreLabel}>Overall Health Score</Text>
+            <Text style={{ ...s.scoreNum, color: scoreColor }}>
+              {healthScore}
+              <span style={s.scoreOf}>/100</span>
             </Text>
-            <Text style={{ fontSize: "52px", fontWeight: "800", color: badge.color, margin: "0 0 4px", lineHeight: "1" }}>
-              {healthScore}<span style={{ fontSize: "20px", color: C.text3 }}>/100</span>
-            </Text>
-            <span style={s.pill(badge.color)}>{badge.label}</span>
+            <span
+              style={{
+                ...s.pill,
+                backgroundColor: `${scoreColor}18`,
+                color: scoreColor,
+                border: `1px solid ${scoreColor}30`,
+              }}
+            >
+              {scoreLabel(healthScore)}
+            </span>
           </Section>
 
-          {/* ── Check-in stats ── */}
+          {/* ── Check-in card ── */}
           <Section style={s.card}>
             <Text style={s.cardTitle}>🕐 Check-In Adherence</Text>
             <Row>
-              <StatCell n={`${respondedCheckIns}/${totalCheckIns}`} label="Completed" color={C.green} />
-              <StatCell n={missedCheckIns} label="Missed" color={missedCheckIns > 0 ? C.amber : C.text3} />
-              <StatCell n={`${adherencePct}%`} label="Rate" color={adherencePct >= 80 ? C.green : adherencePct >= 60 ? C.amber : C.red} />
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: "#2ECC8A" }}>
+                  {respondedCheckIns}/{totalCheckIns}
+                </Text>
+                <Text style={s.statLabel}>Completed</Text>
+              </Column>
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: missedCheckIns > 0 ? "#F5A623" : "#9BAAC4" }}>
+                  {missedCheckIns}
+                </Text>
+                <Text style={s.statLabel}>Missed</Text>
+              </Column>
+              <Column style={s.statCol}>
+                <Text
+                  style={{
+                    ...s.statNum,
+                    color: adherencePct >= 80 ? "#2ECC8A" : adherencePct >= 60 ? "#F5A623" : "#E55353",
+                  }}
+                >
+                  {adherencePct}%
+                </Text>
+                <Text style={s.statLabel}>Rate</Text>
+              </Column>
             </Row>
+            {/* Progress bar */}
             <div style={s.barTrack}>
-              <div style={s.progressBar(adherencePct, adherencePct >= 80 ? C.green : C.amber)} />
+              <div
+                style={{
+                  ...s.barFill,
+                  width: `${Math.min(adherencePct, 100)}%`,
+                  backgroundColor: adherencePct >= 80 ? "#2ECC8A" : "#F5A623",
+                }}
+              />
             </div>
             {missedCheckInDetails.length > 0 && (
               <>
-                <Hr style={{ ...s.hr, margin: "14px 0 10px" }} />
-                <Text style={{ ...s.cardTitle, margin: "0 0 8px" }}>Missed times</Text>
-                {missedCheckInDetails.map((detail, i) => (
-                  <Text key={i} style={s.missedRow}>• {detail}</Text>
+                <Hr style={s.innerHr} />
+                <Text style={s.missedTitle}>Missed check-in times:</Text>
+                {missedCheckInDetails.map((d, i) => (
+                  <Text key={i} style={s.missedRow}>
+                    • {d}
+                  </Text>
                 ))}
               </>
             )}
           </Section>
 
-          {/* ── Medication stats ── */}
+          {/* ── Medication card ── */}
           <Section style={s.card}>
             <Text style={s.cardTitle}>💊 Medication Adherence</Text>
             <Row>
-              <StatCell n={`${takenMeds}/${totalMeds}`} label="Taken" color={C.blue} />
-              <StatCell n={lateMeds} label="Late" color={lateMeds > 0 ? C.amber : C.text3} />
-              <StatCell n={missedMeds} label="Missed" color={missedMeds > 0 ? C.red : C.text3} />
-              <StatCell n={`${medAdherencePct}%`} label="Rate" color={medAdherencePct >= 80 ? C.green : medAdherencePct >= 60 ? C.amber : C.red} />
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: "#4682DC" }}>
+                  {takenMeds}/{totalMeds}
+                </Text>
+                <Text style={s.statLabel}>Taken</Text>
+              </Column>
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: lateMeds > 0 ? "#F5A623" : "#9BAAC4" }}>{lateMeds}</Text>
+                <Text style={s.statLabel}>Late</Text>
+              </Column>
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: missedMeds > 0 ? "#E55353" : "#9BAAC4" }}>{missedMeds}</Text>
+                <Text style={s.statLabel}>Missed</Text>
+              </Column>
+              <Column style={s.statCol}>
+                <Text
+                  style={{
+                    ...s.statNum,
+                    color: medAdherencePct >= 80 ? "#2ECC8A" : medAdherencePct >= 60 ? "#F5A623" : "#E55353",
+                  }}
+                >
+                  {medAdherencePct}%
+                </Text>
+                <Text style={s.statLabel}>Rate</Text>
+              </Column>
             </Row>
             <div style={s.barTrack}>
-              <div style={s.progressBar(medAdherencePct, medAdherencePct >= 80 ? C.green : C.amber)} />
+              <div
+                style={{
+                  ...s.barFill,
+                  width: `${Math.min(medAdherencePct, 100)}%`,
+                  backgroundColor: medAdherencePct >= 80 ? "#2ECC8A" : "#F5A623",
+                }}
+              />
             </div>
           </Section>
 
@@ -186,66 +211,196 @@ export const WeeklyReportEmail = ({
           <Section style={s.card}>
             <Text style={s.cardTitle}>❤️ Vitals & Safety</Text>
             <Row>
-              {avgHR ? <StatCell n={`${avgHR} bpm`} label="Avg heart rate" color={C.green} /> : null}
-              {avgSpO2 ? <StatCell n={`${avgSpO2}%`} label="Avg SpO₂" color={C.blue} /> : null}
-              <StatCell
-                n={totalSOS}
-                label="SOS events"
-                color={totalSOS > 0 ? C.red : C.text3}
-              />
+              {avgHR != null && (
+                <Column style={s.statCol}>
+                  <Text style={{ ...s.statNum, color: "#2ECC8A" }}>{avgHR} bpm</Text>
+                  <Text style={s.statLabel}>Avg heart rate</Text>
+                </Column>
+              )}
+              {avgSpO2 != null && (
+                <Column style={s.statCol}>
+                  <Text style={{ ...s.statNum, color: "#4682DC" }}>{avgSpO2}%</Text>
+                  <Text style={s.statLabel}>Avg SpO₂</Text>
+                </Column>
+              )}
+              <Column style={s.statCol}>
+                <Text style={{ ...s.statNum, color: totalSOS > 0 ? "#E55353" : "#9BAAC4" }}>{totalSOS}</Text>
+                <Text style={s.statLabel}>SOS events</Text>
+              </Column>
             </Row>
             {totalSOS > 0 && (
-              <Text style={{ ...s.bodyText, color: C.red, marginTop: "10px", fontSize: "13px" }}>
-                ⚠️ {wardName} triggered {totalSOS} SOS alert{totalSOS > 1 ? "s" : ""} this week. Please review the app for details.
+              <Text style={s.sosWarning}>
+                ⚠️ {wardName} triggered {totalSOS} SOS alert{totalSOS > 1 ? "s" : ""} this week. Please review the app
+                for full details.
               </Text>
             )}
           </Section>
 
           {/* ── Summary note ── */}
-          <Section style={{ ...s.card, background: "rgba(46,204,138,0.04)", border: `1px solid rgba(46,204,138,0.15)` }}>
-            <Text style={s.bodyText}>
-              {healthScore >= 80
-                ? `✅ Great week! ${wardName} is checking in regularly and taking medications on time. Keep up the good work.`
-                : healthScore >= 60
-                ? `⚠️ ${wardName} had a reasonable week but missed a few check-ins or medications. Consider reaching out to check in.`
-                : `🚨 ${wardName} had a difficult week with multiple missed check-ins or medications. We recommend calling them or reviewing the app for more details.`}
-            </Text>
-            <Text style={{ ...s.bodyText, margin: 0 }}>
-              Open the Check-iN Guardian app to see live status, location history, and full medication logs.
+          <Section style={s.summaryBox}>
+            <Text style={s.summaryText}>{summaryNote(healthScore, wardName)}</Text>
+            <Text style={{ ...s.summaryText, marginTop: "8px", marginBottom: "0" }}>
+              Open the Check-iN Guardian app to see live status, location history, and full logs.
             </Text>
           </Section>
 
-          <Hr style={s.hr} />
+          <Hr style={s.divider} />
 
           {/* ── Footer ── */}
           <Text style={s.footer}>
-            Check-iN · Personal Emergency Response System<br />
-            Future Wave Technologies Pvt. Ltd. · Mumbai, India<br />
-            <span style={{ color: C.text3 }}>
-              You are receiving this as a nominated Guardian of {wardName}.
-              To unsubscribe, update notification settings in the Check-iN app.
-            </span>
+            {SITE_NAME} — Personal Emergency Response System{"\n"}
+            Future Wave Technologies Pvt. Ltd. · Mumbai, India{"\n"}
+            You are receiving this as a nominated Guardian of {wardName}. To unsubscribe, update notification settings
+            in the Check-iN app.
           </Text>
-
         </Container>
       </Body>
     </Html>
   );
 };
 
+// ── Styles ─────────────────────────────────────────────────────────────────
+const s = {
+  main: { backgroundColor: "#06101E", fontFamily: "Arial, sans-serif" },
+  container: { maxWidth: "580px", margin: "0 auto", padding: "28px 20px 40px" },
+  logoSection: { textAlign: "center" as const, marginBottom: "6px" },
+  logoBadge: {
+    display: "inline-block",
+    backgroundColor: "#1C3050",
+    border: "1.5px solid rgba(46,204,138,0.3)",
+    borderRadius: "14px",
+    padding: "8px 18px",
+  },
+  logoCheck: { fontSize: "22px", fontWeight: "800" as const, color: "#F0F4FF", letterSpacing: "-0.03em" },
+  logoIN: { fontSize: "22px", fontWeight: "800" as const, color: "#2ECC8A", letterSpacing: "-0.03em" },
+  logoTagline: { fontSize: "12px", color: "#5E7499", margin: "4px 0 20px", textAlign: "center" as const },
+
+  heading: {
+    fontSize: "24px",
+    fontWeight: "700" as const,
+    color: "#F0F4FF",
+    margin: "0 0 6px",
+    letterSpacing: "-0.02em",
+  },
+  subheading: { fontSize: "14px", color: "#9BAAC4", margin: "0 0 20px", lineHeight: "1.5" },
+
+  scoreCard: {
+    backgroundColor: "rgba(46,204,138,0.05)",
+    border: "1.5px solid",
+    borderRadius: "16px",
+    padding: "20px",
+    textAlign: "center" as const,
+    marginBottom: "12px",
+  },
+  scoreLabel: {
+    fontSize: "11px",
+    fontWeight: "600" as const,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase" as const,
+    color: "#9BAAC4",
+    margin: "0 0 8px",
+  },
+  scoreNum: { fontSize: "52px", fontWeight: "800" as const, lineHeight: "1", margin: "0 0 10px" },
+  scoreOf: { fontSize: "20px", color: "#5E7499" },
+  pill: {
+    display: "inline-block",
+    fontSize: "11px",
+    fontWeight: "600" as const,
+    padding: "4px 12px",
+    borderRadius: "99px",
+    letterSpacing: "0.04em",
+  },
+
+  card: {
+    backgroundColor: "#1C3050",
+    border: "1px solid #243D60",
+    borderRadius: "14px",
+    padding: "16px 18px",
+    marginBottom: "10px",
+  },
+  cardTitle: {
+    fontSize: "11px",
+    fontWeight: "600" as const,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase" as const,
+    color: "#9BAAC4",
+    margin: "0 0 14px",
+  },
+  statCol: { textAlign: "center" as const, padding: "0 6px" },
+  statNum: { fontSize: "26px", fontWeight: "700" as const, lineHeight: "1", margin: "0 0 3px", color: "#F0F4FF" },
+  statLabel: { fontSize: "11px", color: "#9BAAC4", margin: "0" },
+
+  barTrack: {
+    backgroundColor: "#162744",
+    borderRadius: "3px",
+    height: "5px",
+    marginTop: "12px",
+    overflow: "hidden" as const,
+  },
+  barFill: { height: "5px", borderRadius: "3px" },
+
+  innerHr: { borderColor: "#243D60", margin: "14px 0 10px" },
+  missedTitle: {
+    fontSize: "11px",
+    fontWeight: "600" as const,
+    color: "#9BAAC4",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.06em",
+    margin: "0 0 6px",
+  },
+  missedRow: {
+    fontSize: "13px",
+    color: "#9BAAC4",
+    margin: "3px 0",
+    paddingLeft: "4px",
+    borderLeft: "2px solid #F5A623",
+  },
+
+  sosWarning: {
+    fontSize: "13px",
+    color: "#E55353",
+    marginTop: "12px",
+    marginBottom: "0",
+    backgroundColor: "rgba(229,83,83,0.08)",
+    padding: "10px 12px",
+    borderRadius: "8px",
+    border: "1px solid rgba(229,83,83,0.2)",
+  },
+
+  summaryBox: {
+    backgroundColor: "rgba(46,204,138,0.05)",
+    border: "1px solid rgba(46,204,138,0.15)",
+    borderRadius: "12px",
+    padding: "14px 16px",
+    marginTop: "8px",
+  },
+  summaryText: { fontSize: "13px", color: "#9BAAC4", lineHeight: "1.6", margin: "0" },
+
+  divider: { borderColor: "#243D60", margin: "24px 0 16px" },
+  footer: {
+    fontSize: "11px",
+    color: "#5E7499",
+    textAlign: "center" as const,
+    lineHeight: "1.7",
+    margin: "0",
+    whiteSpace: "pre-line" as const,
+  },
+};
+
+// ── Template export (matches registry pattern exactly) ─────────────────────
 export const template = {
-  component: WeeklyReportEmail,
+  component: WeeklyGuardianReportEmail,
   subject: (data: Record<string, any>) =>
     `📊 ${data.wardName || "Your ward"}'s Weekly Check-iN Report — ${data.weekLabel || ""}`,
-  displayName: "Weekly Guardian Report",
+  displayName: "Weekly guardian report",
   previewData: {
     guardianName: "Rahul Alphonso",
     wardName: "Aldrin Alphonso",
-    weekLabel: "23 Jun – 29 Jun",
+    weekLabel: "30 Jun – 6 Jul",
     relation: "Son",
+    healthScore: 82,
     adherencePct: 86,
     medAdherencePct: 75,
-    healthScore: 82,
     totalCheckIns: 21,
     respondedCheckIns: 18,
     missedCheckIns: 3,
@@ -256,6 +411,6 @@ export const template = {
     totalSOS: 0,
     avgHR: 74,
     avgSpO2: 97,
-    missedCheckInDetails: ["Mon, 23 Jun, 07:00 AM", "Wed, 25 Jun, 07:00 PM", "Thu, 26 Jun, 12:00 PM"],
+    missedCheckInDetails: ["Mon, 30 Jun — 7:00 AM", "Wed, 2 Jul — 7:00 PM", "Thu, 3 Jul — 12:00 PM"],
   },
-};
+} satisfies TemplateEntry;
