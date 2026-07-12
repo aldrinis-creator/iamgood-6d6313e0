@@ -2757,6 +2757,10 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      dispatch_sos_alert: {
+        Args: { _sos_event_id: string }
+        Returns: undefined
+      }
       email_queue_dispatch: { Args: never; Returns: undefined }
       email_queue_stats: {
         Args: never
@@ -2862,6 +2866,7 @@ export type Database = {
         Args: { dlq_name: string; msg_id: number }
         Returns: number
       }
+      sos_dispatch_safety_net: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "guardian"
