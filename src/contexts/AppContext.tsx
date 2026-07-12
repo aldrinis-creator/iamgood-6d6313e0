@@ -216,9 +216,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return { delivery, invokeError: null };
     } catch (e: any) {
-      console.error("[triggerSOS] Failed to invoke send-sos-alert:", e);
+      // Non-fatal: DB trigger dispatches server-side regardless.
+      console.warn("[triggerSOS] client invoke threw; server trigger will handle dispatch:", e);
       const msg = e?.message || String(e);
-      toast.error(`SOS invoke failed: ${msg}`);
       return { delivery: null, invokeError: msg };
     }
   }, [session?.user?.id, profile?.full_name]);
