@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/contexts/AppContext";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -20,6 +21,8 @@ const APIKEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export default function ProductHelpChat() {
   const { pathname } = useLocation();
+  const { role } = useApp();
+  const audience: "user" | "guardian" | "any" = role === "guardian" ? "guardian" : role === "user" ? "user" : "any";
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -54,7 +57,7 @@ export default function ProductHelpChat() {
           "Content-Type": "application/json",
           ...(APIKEY ? { Authorization: `Bearer ${APIKEY}`, apikey: APIKEY } : {}),
         },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, audience }),
       });
       const data = await resp.json().catch(() => ({}));
       const answer = data?.answer || data?.error || "Sorry, I couldn't answer that. Please try again.";

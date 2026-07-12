@@ -1,4 +1,5 @@
 import { PRODUCT_KB } from "../_shared/product-kb.ts";
+import { selectRelevantFaqs, type Audience } from "../_shared/faq-kb.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,17 +26,19 @@ function rateLimited(ip: string): boolean {
   return b.count > 20;
 }
 
-const SYSTEM_PROMPT = `You are the Check-iN product help assistant. Answer questions about the Check-iN app — features, how to use them, registration, guardian nomination, vault, medications, subscriptions, SOS, privacy, etc. — using ONLY the knowledge base below.
+const SYSTEM_PROMPT_BASE = `You are the Check-iN product help assistant. Answer questions about the Check-iN app — features, how to use them, registration, guardian nomination, vault, medications, subscriptions, SOS, privacy, etc. — using ONLY the knowledge base below.
 
 Rules:
 - Keep answers short (1–3 sentences) and plain-language, suitable for elderly users.
-- If the question isn't covered by the knowledge base, say so honestly and point them to the in-app Help page or Contact Us.
+- The curated "Product Knowledge Base" is authoritative. If a "Matched FAQs" section is provided, use it to answer questions the curated KB doesn't cover, but if the two conflict, prefer the curated KB (it is more recent).
+- If the asker is a Guardian, prefer Guardian FAQ entries; otherwise prefer User FAQ entries.
+- If the question isn't covered by either source, say so honestly and point them to the in-app Help page or Contact Us.
 - If the question is about the user's PERSONAL data ("what's my blood pressure?", "did I take my medicine?", "how many calories today?"), reply: "That's personal to your account — please sign in and tap the microphone button to ask the voice assistant."
 - If the question is completely off-topic (weather, jokes, sports), politely redirect: "I'm the Check-iN help assistant — I can explain features, plans, and how the app works. What would you like to know?"
 - Never invent features, prices, or steps that aren't in the knowledge base.
 - Use markdown sparingly (bold for key terms, short bullet lists only when it genuinely helps).
 
-Knowledge base:
+# Product Knowledge Base
 ${PRODUCT_KB}`;
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
@@ -71,14 +74,26 @@ Deno.serve(async (req) => {
     }
     if (messages.length === 0) return json({ error: "Please ask a question." }, 400);
 
+    // Audience: caller can hint via body.audience ("user" | "guardian"); default "any".
+    const rawAudience = typeof body?.audience === "string" ? body.audience.toLowerCase() : "any";
+    const audience: Audience = rawAudience === "user" || rawAudience === "guardian" ? rawAudience : "any";
+
+    // Build a query string from the last user message for FAQ retrieval.
+    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const faqBlock = selectRelevantFaqs(lastUser, audience, 10);
+    const systemPrompt = faqBlock
+      ? `${SYSTEM_PROMPT_BASE}\n\n# Matched FAQs\n${faqBlock}`
+      : SYSTEM_PROMPT_BASE;
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
       }),
     });
+
 
     if (aiResp.status === 429) return json({ error: "The assistant is busy — please try again in a moment." }, 429);
     if (aiResp.status === 402) return json({ answer: "The help assistant is temporarily out of credits. Please try again later.", degraded: "credits_exhausted" }, 200);
