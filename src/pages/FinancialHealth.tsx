@@ -604,12 +604,22 @@ const ScanPane = ({ onSaved }: { onSaved: () => void; onExtracted: () => void })
       const ex = (data as { extracted?: Record<string, unknown> })?.extracted || {};
       const cat = String(ex.category || "other").toLowerCase();
       const valid = ALL_CATEGORIES.includes(cat as ExpenseCategory) ? (cat as ExpenseCategory) : "other";
+      // Sanity-check AI-extracted date: reject if >90 days in the future or >60 days in the past.
+      // AI often mis-reads the year on bills (e.g. 2024 vs 2026), which silently drops entries
+      // outside the current period so the Financial Healthcare totals never update.
+      let expenseDate = todayIso();
+      if (typeof ex.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ex.date)) {
+        const parsed = new Date(ex.date + "T00:00:00");
+        const today = new Date(todayIso() + "T00:00:00");
+        const diffDays = (parsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays >= -60 && diffDays <= 90) expenseDate = ex.date;
+      }
       setPrefill({
         amount: Number(ex.amount) || 0,
         currency: typeof ex.currency === "string" && ex.currency ? ex.currency : "INR",
         category: valid,
         merchant: typeof ex.merchant === "string" ? ex.merchant : "",
-        expense_date: typeof ex.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ex.date) ? ex.date : todayIso(),
+        expense_date: expenseDate,
       });
       toast.success("Bill scanned — review and save");
     } catch (e: unknown) {

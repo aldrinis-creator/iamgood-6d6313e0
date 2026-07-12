@@ -1,32 +1,25 @@
-## Why it doesn't highlight today
+# Fix: Financial Healthcare total not updating after adding bills
 
-The My Health tab's red badge in `src/components/NavTabs.tsx` (line 73) is driven only by `useRefillDue`, which flags **low stock** (`remaining_quantity <= low_stock_threshold`). It has no awareness of whether a scheduled dose is due-but-untaken. So an overdue medication never turns the tab red.
+## Diagnosis
+
+The screen shows totals filtered to the selected period (Week / Month / Year in IST). The most recent scanned bill was saved with `expense_date = 2024-07-05` — the AI mis-read the year from the bill. Because it's ~2 years in the past, it's excluded from every period view even though it's in the database.
+
+Manual entries with correct 2026 dates do show up. So the load/refresh/RLS/trigger paths are fine — the issue is the AI-extracted date silently landing in the past.
 
 ## Fix
 
-Add a second signal — "any dose due today and not yet logged as taken" — and OR it into the My Health badge.
+1. **Sanity-check AI-extracted dates in `ScanPane.handleFile`** (`src/pages/FinancialHealth.tsx`):
+   - Keep the AI date only if it's within a plausible window: not more than ~90 days in the future and not older than ~2 months ago.
+   - Otherwise fall back to `todayIso()` so the entry lands in the current period.
 
-### 1. New hook `src/hooks/useMedicationDue.ts`
+2. **Visual warning in `ScanReviewForm`**: if the prefilled date is not today's IST date, show a small amber note beside the Date field ("AI read this date from the bill — please confirm") so the user notices before saving.
 
-- Query `medications` (id, schedule_times, start_date, end_date) active for today (IST).
-- Query today's `medication_logs` (medication_id, scheduled_at, status) for the user.
-- Build the day's dose slots; a slot is "due now" if scheduled time is `<= now IST` AND no matching log with status `taken` / `taken_late` / `skipped` exists.
-- Return `true` if any slot is due-now-and-not-taken. Re-check every 60s and via Realtime on `medications` + `medication_logs` (unique channel name per mount, per Core rule).
+3. **Backfill the affected row** so the existing total reflects it:
+   - Update the one bill_scan row from `2024-07-05` to `2026-07-05` (same month/day, correct year — most likely what the bill actually said, since it was scanned on 2026-07-12).
 
-### 2. `src/components/NavTabs.tsx`
+No changes to schema, RLS, triggers, or the load logic — the data flow is already correct.
 
-- Import and call the new hook: `const medDue = useMedicationDue();`.
-- Change the My Health tab badge to `badge: (refillDue || medDue) ? 1 : 0`.
-- Keep the existing "!" glyph and red pulsing style already wired for `My Health`.
+## Files touched
 
-### 3. No other changes
-
-- Dashboard scoring, alarms, and voice assistant remain untouched (they already reflect pending doses correctly per the earlier fix).
-- Guardian nav unaffected.
-
-## Verification
-
-- With a scheduled dose in the past and no log → My Health icon + "!" badge turn red and pulse.
-- After marking the dose taken → badge clears within ~1s (Realtime) or on next 60s poll.
-- Low-stock-only case still turns the tab red (existing behavior preserved).
-- No console errors from duplicate Realtime channels.
+- `src/pages/FinancialHealth.tsx` — date sanity check + inline warning
+- One data update on `healthcare_expenses` to correct the stale year on the existing row
