@@ -100,23 +100,12 @@ export default function ProductHelpChat() {
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
               {messages.length === 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Hi! Ask me anything about Check-iN — features, plans, guardian setup, medications, vault, and more.
-                  </p>
-                  <div className="grid gap-2">
-                    {SUGGESTIONS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => send(s)}
-                        className="text-left text-sm px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent transition-colors"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Hi! Ask me anything about Check-iN — features, plans, guardian setup, medications, vault, and more.
+                </p>
               )}
+
+
 
               {messages.map((m, i) => (
                 <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
@@ -147,6 +136,19 @@ export default function ProductHelpChat() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto px-3 py-2 border-t border-border bg-muted/30">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  disabled={busy}
+                  className="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-full border border-border bg-background hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
             </div>
 
             <form
