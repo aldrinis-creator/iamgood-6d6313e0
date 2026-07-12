@@ -138,6 +138,19 @@ export default function ProductHelpChat() {
               )}
             </div>
 
+            <div className="flex gap-2 overflow-x-auto px-3 py-2 border-t border-border bg-muted/30">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  disabled={busy}
+                  className="shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-full border border-border bg-background hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
             <form
               onSubmit={(e) => { e.preventDefault(); send(input); }}
               className="flex items-center gap-2 p-3 border-t border-border bg-background"
