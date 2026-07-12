@@ -1,7 +1,7 @@
 // Guardian-facing FAQ data — separate from Ward FAQ.
 // Last updated: 2026-07-01
 
-import type { FaqSection } from "./faqData";
+import type { FaqSection } from "./faq-user.ts";
 
 export const GUARDIAN_FAQ_VERSION = "2026-07-09";
 
