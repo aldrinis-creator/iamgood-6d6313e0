@@ -716,6 +716,9 @@ const ScanReviewForm = ({ prefill, billPath, onSaved }: { prefill: Partial<Expen
         <div className="space-y-1">
           <Label>Date</Label>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          {date !== todayIso() && (
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">AI read this date from the bill — please confirm the year.</p>
+          )}
         </div>
         <div className="space-y-1">
           <Label>Merchant</Label>
