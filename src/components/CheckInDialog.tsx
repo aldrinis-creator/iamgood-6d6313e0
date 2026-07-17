@@ -72,6 +72,14 @@ const CheckInDialog = ({ open, onClose, onConfirmOk }: CheckInDialogProps) => {
     setStep("not-well");
   };
 
+  // Auto-dismiss the "Well" confirmation after 3 seconds
+  useEffect(() => {
+    if (!open || step !== "well") return;
+    const t = setTimeout(() => onClose(), 3000);
+    return () => clearTimeout(t);
+  }, [open, step, onClose]);
+
+
   const handleCall = (phone: string) => {
     window.open(`tel:${phone}`, "_self");
   };
