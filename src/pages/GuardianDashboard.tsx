@@ -100,6 +100,47 @@ const VaultClaimStatusStrip = ({ wardUserId }: { wardUserId: string }) => {
     </button>
   );
 };
+const WardMissedEventPopup = ({ alert, wardName, onClose }: { alert: any; wardName: string; onClose: () => void }) => {
+  useEffect(() => {
+    if (!alert) return;
+    const timer = setTimeout(onClose, 10000); // auto-close after 10 seconds
+    return () => clearTimeout(timer);
+  }, [alert, onClose]);
+
+  if (!alert) return null;
+
+  const getSeverityStyles = (severity: string) => {
+    if (severity === "severe") return "bg-red-50 border-red-500 text-red-900 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse";
+    if (severity === "warning") return "bg-orange-50 border-orange-500 text-orange-900 shadow-[0_0_10px_rgba(249,115,22,0.3)]";
+    return "bg-yellow-50 border-yellow-500 text-yellow-900 shadow-[0_0_10px_rgba(234,179,8,0.2)]";
+  };
+
+  const getIcon = (severity: string) => {
+    if (severity === "severe") return <ShieldAlert className="w-8 h-8 text-red-600 animate-bounce" />;
+    if (severity === "warning") return <AlertTriangle className="w-8 h-8 text-orange-600" />;
+    return <AlertTriangle className="w-8 h-8 text-yellow-600" />;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4 pointer-events-none">
+      <div className={`pointer-events-auto w-full max-w-sm rounded-xl border-2 p-5 ${getSeverityStyles(alert.severity || "mild")} transition-all duration-500 flex flex-col items-center text-center gap-3`}>
+        {getIcon(alert.severity || "mild")}
+        <div>
+          <h3 className="font-bold text-lg mb-1 capitalize">{alert.severity || "mild"} Warning</h3>
+          <p className="text-sm font-medium">
+            {wardName} has missed a scheduled {alert.type}.
+          </p>
+          <p className="text-xs mt-1 opacity-80">
+            Scheduled for {new Date(alert.scheduledFor).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}. Please check on them immediately.
+          </p>
+        </div>
+        <Button onClick={onClose} variant="outline" className="w-full mt-2 bg-white/50 hover:bg-white border-current">
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 // Collapsible section wrapper
 const CollapsibleSection = ({ title, icon, children, defaultOpen = false, forceOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean }) => {
@@ -249,7 +290,7 @@ const GuardianDashboard = () => {
 
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
-  const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string } | null>(null);
+  const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string, severity?: "mild" | "warning" | "severe" } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("User");
@@ -313,21 +354,27 @@ const GuardianDashboard = () => {
 
   const fetchMissedEvents = useCallback(async () => {
     if (!wardUserId) return;
-    const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
     const [ciRes, medRes] = await Promise.all([
       supabase.from("check_ins").select("id, scheduled_at")
         .eq("user_id", wardUserId).eq("status", "missed")
-        .lte("scheduled_at", oneHourAgo).gte("scheduled_at", todayStart.toISOString()),
+        .gte("scheduled_at", todayStart.toISOString()),
       supabase.from("medication_logs").select("id, scheduled_at")
         .eq("user_id", wardUserId).eq("status", "missed")
-        .lte("scheduled_at", oneHourAgo).gte("scheduled_at", todayStart.toISOString())
+        .gte("scheduled_at", todayStart.toISOString())
     ]);
 
-    const missedItems: { id: string, type: "check-in" | "medication", scheduledFor: string }[] = [];
-    if (ciRes.data) ciRes.data.forEach(ci => missedItems.push({ id: `ci-${ci.id}`, type: "check-in", scheduledFor: ci.scheduled_at }));
+    const missedItems: { id: string, type: "check-in" | "medication", scheduledFor: string, minutesLate: number }[] = [];
+    const nowTime = Date.now();
+    
+    if (ciRes.data) {
+      ciRes.data.forEach(ci => {
+         const lateness = Math.floor((nowTime - new Date(ci.scheduled_at).getTime()) / 60000);
+         if (lateness >= 60) missedItems.push({ id: `ci-${ci.id}`, type: "check-in", scheduledFor: ci.scheduled_at, minutesLate: lateness });
+      });
+    }
     
     if (medRes.data) {
       const medGroups = new Map<string, any[]>();
@@ -339,16 +386,34 @@ const GuardianDashboard = () => {
         medGroups.get(timeKey)!.push(m.id);
       });
       medGroups.forEach((ids, timeKey) => {
-        missedItems.push({ id: `med-grp-${timeKey}`, type: "medication", scheduledFor: new Date(Number(timeKey)).toISOString() });
+        const lateness = Math.floor((nowTime - Number(timeKey)) / 60000);
+        if (lateness >= 60) {
+          missedItems.push({ id: `med-grp-${timeKey}`, type: "medication", scheduledFor: new Date(Number(timeKey)).toISOString(), minutesLate: lateness });
+        }
       });
     }
 
-    const unalerted = missedItems.find(item => !alertedNotifIds.current.has(item.id));
-    if (unalerted) {
-      setMissedEventAlert(unalerted);
-      alertedNotifIds.current.add(unalerted.id);
-      if (settings.guardianVoiceAlerts !== false) {
-        playVoiceReminder(`Attention Guardian. ${wardName} has missed a scheduled ${unalerted.type} for over an hour. Please check on them.`);
+    // Process most severe first
+    missedItems.sort((a, b) => b.minutesLate - a.minutesLate);
+
+    for (const item of missedItems) {
+      let threshold = 60;
+      let label = "over an hour";
+      let severity = "mild" as "mild" | "warning" | "severe";
+      
+      if (item.minutesLate >= 120) { threshold = 120; label = "over two hours"; severity = "severe"; }
+      else if (item.minutesLate >= 90) { threshold = 90; label = "over 90 minutes"; severity = "warning"; }
+      
+      const thresholdKey = `${item.id}-${threshold}`;
+      
+      if (!alertedNotifIds.current.has(thresholdKey)) {
+        setMissedEventAlert({ ...item, severity });
+        alertedNotifIds.current.add(thresholdKey);
+        
+        if (settings.guardianVoiceAlerts !== false) {
+           playVoiceReminder(`Attention Guardian. ${wardName} has missed a scheduled ${item.type} for ${label}. Please check on them.`);
+        }
+        break; // Only show one new popup at a time
       }
     }
   }, [wardUserId, wardName, settings.guardianVoiceAlerts]);
@@ -834,6 +899,7 @@ const GuardianDashboard = () => {
 
   return (
     <AppLayout>
+      <WardMissedEventPopup alert={missedEventAlert} wardName={wardName} onClose={() => setMissedEventAlert(null)} />
       <IncomingCallOverlay
         open={!!incomingCall}
         wardName={incomingCall?.wardName || "Your ward"}

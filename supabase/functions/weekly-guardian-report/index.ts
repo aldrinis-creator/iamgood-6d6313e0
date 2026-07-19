@@ -139,11 +139,11 @@ Deno.serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const triggeredBy: string = body.triggeredBy || "cron";
 
-    // ── Guard: only run on Sunday 9 AM IST when called by cron ──────────
+    // ── Guard: only run on Sunday when called by cron ──────────
     if (triggeredBy === "cron") {
       const now = nowIST();
-      if (now.getDay() !== 0 || now.getHours() !== 9) {
-        return new Response(JSON.stringify({ skipped: true, reason: "Not Sunday 9 AM IST", ist: now.toString() }), {
+      if (now.getDay() !== 0) {
+        return new Response(JSON.stringify({ skipped: true, reason: "Not Sunday", ist: now.toString() }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
