@@ -43,6 +43,7 @@ interface NotifPrefs {
   push: boolean;
   email: boolean;
   whatsapp: boolean;
+  pop_missed_events: boolean;
   cat_sos: boolean;
   cat_missed_checkin: boolean;
   cat_low_battery: boolean;
@@ -53,7 +54,7 @@ interface NotifPrefs {
 
 const defaultQuiet: QuietHours = { enabled: false, from: "22:00", to: "07:00" };
 const defaultNotif: NotifPrefs = {
-  push: true, email: true, whatsapp: true,
+  push: true, email: true, whatsapp: true, pop_missed_events: true,
   cat_sos: true, cat_missed_checkin: true, cat_low_battery: true,
   cat_medication: true, cat_geofence: true, cat_journey: true,
 };
@@ -333,6 +334,10 @@ const GuardianSettings = () => {
                   <div className="flex items-center justify-between">
                     <Label>Email alerts</Label>
                     <Switch checked={notif.email} onCheckedChange={(v) => setNotif({ ...notif, email: v })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>In-App Pop-ups</Label>
+                    <Switch checked={notif.pop_missed_events !== false} onCheckedChange={(v) => setNotif({ ...notif, pop_missed_events: v })} />
                   </div>
                   <div className="flex items-center justify-between">
                     <Label>WhatsApp alerts</Label>

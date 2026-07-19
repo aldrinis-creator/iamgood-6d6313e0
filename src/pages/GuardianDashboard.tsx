@@ -100,10 +100,10 @@ const VaultClaimStatusStrip = ({ wardUserId }: { wardUserId: string }) => {
     </button>
   );
 };
-const WardMissedEventPopup = ({ alert, wardName, onClose }: { alert: any; wardName: string; onClose: () => void }) => {
+const WardMissedEventPopup = ({ alert, wardName, onClose }: { alert: any; wardName: string; onClose: (userDismissed: boolean) => void }) => {
   useEffect(() => {
     if (!alert) return;
-    const timer = setTimeout(onClose, 10000); // auto-close after 10 seconds
+    const timer = setTimeout(() => onClose(false), 10000); // auto-close after 10 seconds (not user dismissed)
     return () => clearTimeout(timer);
   }, [alert, onClose]);
 
@@ -134,7 +134,7 @@ const WardMissedEventPopup = ({ alert, wardName, onClose }: { alert: any; wardNa
             Scheduled for {new Date(alert.scheduledFor).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}. Please check on them immediately.
           </p>
         </div>
-        <Button onClick={onClose} variant="outline" className="w-full mt-2 bg-white/50 hover:bg-white border-current">
+        <Button onClick={() => onClose(true)} variant="outline" className="w-full mt-2 bg-white/50 hover:bg-white border-current">
           Dismiss
         </Button>
       </div>
@@ -290,7 +290,7 @@ const GuardianDashboard = () => {
 
   const [showAmbulance, setShowAmbulance] = useState(false);
   const [batteryAlertShown, setBatteryAlertShown] = useState(false);
-  const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string, severity?: "mild" | "warning" | "severe" } | null>(null);
+  const [missedEventAlert, setMissedEventAlert] = useState<{ id: string, type: "check-in" | "medication", scheduledFor: string, severity?: "mild" | "warning" | "severe", thresholdKey?: string } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [todayCheckIns, setTodayCheckIns] = useState<CheckIn[]>([]);
   const [wardName, setWardName] = useState("User");
@@ -396,6 +396,10 @@ const GuardianDashboard = () => {
     // Process most severe first
     missedItems.sort((a, b) => b.minutesLate - a.minutesLate);
 
+    // Read toggle from settings
+    const notifPrefs = JSON.parse(localStorage.getItem("guardian_notif_prefs") || "{}");
+    if (notifPrefs.pop_missed_events === false) return;
+
     for (const item of missedItems) {
       let threshold = 60;
       let label = "over an hour";
@@ -407,13 +411,29 @@ const GuardianDashboard = () => {
       const thresholdKey = `${item.id}-${threshold}`;
       
       if (!alertedNotifIds.current.has(thresholdKey)) {
-        setMissedEventAlert({ ...item, severity });
-        alertedNotifIds.current.add(thresholdKey);
+        // Check persistent local storage for max count
+        const alertStateRaw = localStorage.getItem("guardian_alert_state");
+        const alertState = alertStateRaw ? JSON.parse(alertStateRaw) : {};
+        const state = alertState[thresholdKey] || { count: 0, lastAlerted: 0 };
         
-        if (settings.guardianVoiceAlerts !== false) {
-           playVoiceReminder(`Attention Guardian. ${wardName} has missed a scheduled ${item.type} for ${label}. Please check on them.`);
+        if (state.count < 3 && nowTime - state.lastAlerted >= 5 * 60 * 1000) {
+          setMissedEventAlert({ ...item, severity, thresholdKey });
+          alertedNotifIds.current.add(thresholdKey);
+          
+          alertState[thresholdKey] = {
+            count: state.count + 1,
+            lastAlerted: nowTime
+          };
+          localStorage.setItem("guardian_alert_state", JSON.stringify(alertState));
+          
+          // Clear session set after 5 minutes so it can re-trigger in this session if needed
+          setTimeout(() => { alertedNotifIds.current.delete(thresholdKey); }, 5 * 60 * 1000);
+          
+          if (settings.guardianVoiceAlerts !== false) {
+             playVoiceReminder(`Attention Guardian. ${wardName} has missed a scheduled ${item.type} for ${label}. Please check on them.`);
+          }
+          break; // Only show one new popup at a time
         }
-        break; // Only show one new popup at a time
       }
     }
   }, [wardUserId, wardName, settings.guardianVoiceAlerts]);
