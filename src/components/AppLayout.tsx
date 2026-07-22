@@ -28,6 +28,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import useMorningBriefing from "@/hooks/useMorningBriefing";
 import MorningBriefingOverlay from "@/components/MorningBriefingOverlay";
 import useGuardianAudio from "@/hooks/useGuardianAudio";
+import useGuardianAppointmentAlarms from "@/hooks/useGuardianAppointmentAlarms";
 import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
 
 const UserOnlyHooks = () => {
@@ -44,6 +45,7 @@ const UserOnlyHooks = () => {
 
 const GuardianOnlyHooks = () => {
   useGuardianAudio();
+  useGuardianAppointmentAlarms();
   return null;
 };
 
