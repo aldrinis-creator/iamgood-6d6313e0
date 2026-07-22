@@ -51,7 +51,7 @@ const summaryNote = (score: number, wardName: string) => {
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
-const WeeklyGuardianReportEmail = ({
+export const WeeklyGuardianReportEmail = ({
   guardianName = "Guardian",
   wardName = "Your ward",
   weekLabel = "This week",
