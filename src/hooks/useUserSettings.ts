@@ -158,6 +158,7 @@ const DEFAULTS: UserSettings = {
   hasSurgeries: false,
   guardianVoiceAlerts: true,
   guardianPersistentMissedAlarm: true,
+  guardianAppointmentAlarms: true,
   journeyCheckInFrequency: 15,
   journeyTrackingGuardians: [],
   locationSharingGuardianIds: [],
