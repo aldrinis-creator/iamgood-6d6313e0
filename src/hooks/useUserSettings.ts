@@ -87,6 +87,7 @@ export interface UserSettings {
   // Guardian-specific
   guardianVoiceAlerts: boolean;
   guardianPersistentMissedAlarm: boolean;
+  guardianAppointmentAlarms: boolean;
   // Journey Tracking
   journeyCheckInFrequency: number | null;
   journeyTrackingGuardians: string[];
