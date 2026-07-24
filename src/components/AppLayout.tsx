@@ -30,6 +30,7 @@ import MorningBriefingOverlay from "@/components/MorningBriefingOverlay";
 import useGuardianAudio from "@/hooks/useGuardianAudio";
 import useGuardianAppointmentAlarms from "@/hooks/useGuardianAppointmentAlarms";
 import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
+import GuardianSafeZoneOverlay from "@/components/GuardianSafeZoneOverlay";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
