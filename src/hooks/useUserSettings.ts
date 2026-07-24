@@ -160,6 +160,7 @@ const DEFAULTS: UserSettings = {
   guardianVoiceAlerts: true,
   guardianPersistentMissedAlarm: true,
   guardianAppointmentAlarms: true,
+  guardianSafeZoneAlerts: true,
   journeyCheckInFrequency: 15,
   journeyTrackingGuardians: [],
   locationSharingGuardianIds: [],
