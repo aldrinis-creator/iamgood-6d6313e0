@@ -36,6 +36,7 @@ export default function useLocationSync() {
 
     // Reset safety zone state for the current active user sync session using persistent localStorage state
     wasInsideRef.current = localStorage.getItem('isInsideSafeZone') !== 'false';
+    farAlertSentRef.current = localStorage.getItem('farFromSafeZoneAlerted') === 'true';
 
     // If sharing is OFF, wipe any previously stored lastLocation so the
     // Guardian app can't keep displaying a stale dot, then stop.
