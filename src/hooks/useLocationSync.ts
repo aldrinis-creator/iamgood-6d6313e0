@@ -28,6 +28,7 @@ export default function useLocationSync() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const sosStartedAtRef = useRef<number | null>(null);
   const wasInsideRef = useRef<boolean>(localStorage.getItem('isInsideSafeZone') !== 'false');
+  const farAlertSentRef = useRef<boolean>(localStorage.getItem('farFromSafeZoneAlerted') === 'true');
 
   useEffect(() => {
     const userId = session?.user?.id;
