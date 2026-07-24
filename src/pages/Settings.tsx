@@ -631,6 +631,16 @@ const Settings = () => {
                   </div>
                   <Switch checked={settings.guardianAppointmentAlarms} onCheckedChange={(v) => updateSetting("guardianAppointmentAlarms", v)} />
                 </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                    <div>
+                      <p className="text-sm font-medium">Safe-Zone Drift Popups (&gt;1 km)</p>
+                      <p className="text-xs text-muted-foreground">Pop-up alert when your ward moves more than 1 km beyond a safe zone, and again when they return.</p>
+                    </div>
+                  </div>
+                  <Switch checked={settings.guardianSafeZoneAlerts} onCheckedChange={(v) => updateSetting("guardianSafeZoneAlerts", v)} />
+                </div>
               </CardContent>
             </Card>
 
