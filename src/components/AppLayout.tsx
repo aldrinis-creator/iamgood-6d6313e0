@@ -30,6 +30,7 @@ import MorningBriefingOverlay from "@/components/MorningBriefingOverlay";
 import useGuardianAudio from "@/hooks/useGuardianAudio";
 import useGuardianAppointmentAlarms from "@/hooks/useGuardianAppointmentAlarms";
 import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
+import GuardianSafeZoneOverlay from "@/components/GuardianSafeZoneOverlay";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -142,6 +143,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && !loginInProgress && <GuardianPingOverlay />}
         {role === "guardian" && !loginInProgress && <UserPingOverlay />}
         {role === "guardian" && !loginInProgress && <GuardianMissedAlarmOverlay />}
+        {role === "guardian" && !loginInProgress && <GuardianSafeZoneOverlay />}
       </div>
     </div>
   );

@@ -88,6 +88,7 @@ export interface UserSettings {
   guardianVoiceAlerts: boolean;
   guardianPersistentMissedAlarm: boolean;
   guardianAppointmentAlarms: boolean;
+  guardianSafeZoneAlerts: boolean;
   // Journey Tracking
   journeyCheckInFrequency: number | null;
   journeyTrackingGuardians: string[];
@@ -159,6 +160,7 @@ const DEFAULTS: UserSettings = {
   guardianVoiceAlerts: true,
   guardianPersistentMissedAlarm: true,
   guardianAppointmentAlarms: true,
+  guardianSafeZoneAlerts: true,
   journeyCheckInFrequency: 15,
   journeyTrackingGuardians: [],
   locationSharingGuardianIds: [],

@@ -28,6 +28,7 @@ export default function useLocationSync() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const sosStartedAtRef = useRef<number | null>(null);
   const wasInsideRef = useRef<boolean>(localStorage.getItem('isInsideSafeZone') !== 'false');
+  const farAlertSentRef = useRef<boolean>(localStorage.getItem('farFromSafeZoneAlerted') === 'true');
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -35,6 +36,7 @@ export default function useLocationSync() {
 
     // Reset safety zone state for the current active user sync session using persistent localStorage state
     wasInsideRef.current = localStorage.getItem('isInsideSafeZone') !== 'false';
+    farAlertSentRef.current = localStorage.getItem('farFromSafeZoneAlerted') === 'true';
 
     // If sharing is OFF, wipe any previously stored lastLocation so the
     // Guardian app can't keep displaying a stale dot, then stop.
@@ -114,13 +116,27 @@ export default function useLocationSync() {
                   : guardians;
 
                 if (filteredGuardians.length > 0) {
-                  const notifications = filteredGuardians.map((g) => ({
+                  const notifications: any[] = filteredGuardians.map((g) => ({
                     user_id: g.guardian_user_id!,
                     title: "✅ Back in Safe Zone",
                     message: `${userName} has returned to the "${nearest.name}" safe zone area.`,
                     type: "zone_return",
                     read: false,
                   }));
+
+                  // If we had previously alerted "far from safe zone", tell guardians
+                  // the ward is back inside so the popup can flip green.
+                  if (farAlertSentRef.current) {
+                    for (const g of filteredGuardians) {
+                      notifications.push({
+                        user_id: g.guardian_user_id!,
+                        title: "✅ Ward back in safe zone",
+                        message: `${userName} is back inside the "${nearest.name}" safe zone.`,
+                        type: "zone_far_return",
+                        read: false,
+                      });
+                    }
+                  }
 
                   await supabase.rpc("insert_notifications_deduped", {
                     p_notifications: notifications,
@@ -149,21 +165,37 @@ export default function useLocationSync() {
               console.error("safe_zone_return WhatsApp invoke failed", e);
             }
           }
+
+          // Clear the far-away flag whenever we're back inside any safe zone.
+          if (farAlertSentRef.current) {
+            farAlertSentRef.current = false;
+            localStorage.removeItem('farFromSafeZoneAlerted');
+          }
           return;
         }
 
 
         const wasInside = wasInsideRef.current;
-        
-        if (!wasInside) {
-          // Already outside, do not send duplicate alerts
+
+        // Distance beyond the nearest safe zone's edge (metres). Negative if inside
+        // (guarded above), positive when outside.
+        const nearest = (zones as any[]).reduce((prev, curr) => {
+          const prevEdge = haversineDistance(latitude, longitude, prev.lat, prev.lng) - prev.radius_m;
+          const currEdge = haversineDistance(latitude, longitude, curr.lat, curr.lng) - curr.radius_m;
+          return currEdge < prevEdge ? curr : prev;
+        });
+        const distanceBeyondEdgeM = Math.max(
+          0,
+          haversineDistance(latitude, longitude, nearest.lat, nearest.lng) - nearest.radius_m
+        );
+
+        // If we've been outside all along AND haven't crossed the 1 km threshold,
+        // nothing new to report.
+        if (!wasInside && (farAlertSentRef.current || distanceBeyondEdgeM <= 1000)) {
           return;
         }
 
-        // Mark as outside so we don't alert again until they return to a safe zone
-        wasInsideRef.current = false;
-        localStorage.setItem('isInsideSafeZone', 'false');
-
+        // Suppress zone alerts while on an active journey (same rule as before).
         const { data: activeJourney } = await supabase
           .from("journeys")
           .select("id")
@@ -172,12 +204,6 @@ export default function useLocationSync() {
           .maybeSingle();
 
         if (activeJourney) return;
-
-        const nearest = (zones as any[]).reduce((prev, curr) => {
-          const prevDist = haversineDistance(latitude, longitude, prev.lat, prev.lng);
-          const currDist = haversineDistance(latitude, longitude, curr.lat, curr.lng);
-          return currDist < prevDist ? curr : prev;
-        });
 
         const { data: profile } = await supabase
           .from("profiles")
@@ -203,39 +229,70 @@ export default function useLocationSync() {
 
         if (filteredGuardians.length === 0) return;
 
-        const notifications = filteredGuardians.map((g) => ({
-          user_id: g.guardian_user_id!,
-          title: "⚠️ Outside Safe Zone",
-          message: `${userName} has left the "${nearest.name}" safe zone area.`,
-          type: "zone_exit",
-          read: false,
-        }));
+        const notifications: any[] = [];
 
-        await supabase.rpc("insert_notifications_deduped", {
-          p_notifications: notifications,
-        });
+        // First exit (was inside, now outside): existing zone_exit alert.
+        if (wasInside) {
+          wasInsideRef.current = false;
+          localStorage.setItem('isInsideSafeZone', 'false');
 
-        // Fire WhatsApp alert to guardians (best-effort, non-blocking)
-        try {
-          const phones = Array.from(
-            new Set(
-              filteredGuardians
-                .map((g: any) => (g.guardian_phone || "").toString().trim())
-                .filter((p: string) => p.length > 0)
-            )
-          );
-          if (phones.length > 0) {
-            await supabase.functions.invoke("msg91-whatsapp-safezone", {
-              body: {
-                wardName: userName,
-                zoneName: nearest.name,
-                occurredAt: new Date().toISOString(),
-                phones,
-              },
+          for (const g of filteredGuardians) {
+            notifications.push({
+              user_id: g.guardian_user_id!,
+              title: "⚠️ Outside Safe Zone",
+              message: `${userName} has left the "${nearest.name}" safe zone area.`,
+              type: "zone_exit",
+              read: false,
             });
           }
-        } catch (e) {
-          console.error("safe_zone WhatsApp invoke failed", e);
+        }
+
+        // Far-away escalation (>1 km beyond nearest edge), fires once per excursion.
+        if (!farAlertSentRef.current && distanceBeyondEdgeM > 1000) {
+          farAlertSentRef.current = true;
+          localStorage.setItem('farFromSafeZoneAlerted', 'true');
+
+          const km = (distanceBeyondEdgeM / 1000).toFixed(1);
+          for (const g of filteredGuardians) {
+            notifications.push({
+              user_id: g.guardian_user_id!,
+              title: "🚨 Ward far from safe zone",
+              message: `${userName} is about ${km} km from the "${nearest.name}" safe zone.`,
+              type: "zone_far",
+              read: false,
+            });
+          }
+        }
+
+        if (notifications.length > 0) {
+          await supabase.rpc("insert_notifications_deduped", {
+            p_notifications: notifications,
+          });
+        }
+
+        // Fire WhatsApp alert to guardians on the initial exit (unchanged).
+        if (wasInside === true) {
+          try {
+            const phones = Array.from(
+              new Set(
+                filteredGuardians
+                  .map((g: any) => (g.guardian_phone || "").toString().trim())
+                  .filter((p: string) => p.length > 0)
+              )
+            );
+            if (phones.length > 0) {
+              await supabase.functions.invoke("msg91-whatsapp-safezone", {
+                body: {
+                  wardName: userName,
+                  zoneName: nearest.name,
+                  occurredAt: new Date().toISOString(),
+                  phones,
+                },
+              });
+            }
+          } catch (e) {
+            console.error("safe_zone WhatsApp invoke failed", e);
+          }
         }
 
       } catch {
