@@ -116,13 +116,27 @@ export default function useLocationSync() {
                   : guardians;
 
                 if (filteredGuardians.length > 0) {
-                  const notifications = filteredGuardians.map((g) => ({
+                  const notifications: any[] = filteredGuardians.map((g) => ({
                     user_id: g.guardian_user_id!,
                     title: "✅ Back in Safe Zone",
                     message: `${userName} has returned to the "${nearest.name}" safe zone area.`,
                     type: "zone_return",
                     read: false,
                   }));
+
+                  // If we had previously alerted "far from safe zone", tell guardians
+                  // the ward is back inside so the popup can flip green.
+                  if (farAlertSentRef.current) {
+                    for (const g of filteredGuardians) {
+                      notifications.push({
+                        user_id: g.guardian_user_id!,
+                        title: "✅ Ward back in safe zone",
+                        message: `${userName} is back inside the "${nearest.name}" safe zone.`,
+                        type: "zone_far_return",
+                        read: false,
+                      });
+                    }
+                  }
 
                   await supabase.rpc("insert_notifications_deduped", {
                     p_notifications: notifications,
@@ -150,6 +164,12 @@ export default function useLocationSync() {
             } catch (e) {
               console.error("safe_zone_return WhatsApp invoke failed", e);
             }
+          }
+
+          // Clear the far-away flag whenever we're back inside any safe zone.
+          if (farAlertSentRef.current) {
+            farAlertSentRef.current = false;
+            localStorage.removeItem('farFromSafeZoneAlerted');
           }
           return;
         }
