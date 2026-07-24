@@ -143,6 +143,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {role === "user" && !loginInProgress && <GuardianPingOverlay />}
         {role === "guardian" && !loginInProgress && <UserPingOverlay />}
         {role === "guardian" && !loginInProgress && <GuardianMissedAlarmOverlay />}
+        {role === "guardian" && !loginInProgress && <GuardianSafeZoneOverlay />}
       </div>
     </div>
   );
