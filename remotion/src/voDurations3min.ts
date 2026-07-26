@@ -20,21 +20,21 @@ export type VoKey3 =
 export const VO3 = raw as Record<VoKey3, { text: string; seconds: number }>;
 
 const TAIL: Record<VoKey3, number> = {
-  s1_hook: 1.4,
-  s2_checkin: 1.4,
-  s3_missed: 1.4,
-  s4_sos_meds: 1.4,
-  s5_passport: 1.4,
-  s6_vitals: 1.4,
-  s7_vault: 1.4,
-  s8_journey: 1.4,
-  s9_fall: 1.4,
-  s10_ring: 1.4,
-  s11_ambulance: 1.4,
-  s12_voice: 1.4,
-  s13_support: 1.4,
-  s14_grid: 1.4,
-  s15_outro: 3.0,
+  s1_hook: 4.5,
+  s2_checkin: 5.0,
+  s3_missed: 5.5,
+  s4_sos_meds: 5.5,
+  s5_passport: 5.0,
+  s6_vitals: 5.5,
+  s7_vault: 5.5,
+  s8_journey: 5.5,
+  s9_fall: 5.5,
+  s10_ring: 5.0,
+  s11_ambulance: 5.5,
+  s12_voice: 5.5,
+  s13_support: 5.0,
+  s14_grid: 5.0,
+  s15_outro: 4.0,
 };
 
 const LEAD: Record<VoKey3, number> = {
