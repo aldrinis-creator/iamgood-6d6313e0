@@ -1,48 +1,41 @@
-## Goal
-Show a visible, audible popup on the Guardian's app when their Ward drifts **more than 1 km** away from any safe zone boundary, and a second popup when the Ward comes back inside a safe zone. This is on top of the existing zone-exit notification + WhatsApp alert — no changes to that behaviour.
+## 3-Minute Check-iN Feature Tour Video
 
-## Behaviour
+Extend the existing Remotion project (`remotion/`) to produce a ~180-second landscape (1920x1080) feature-tour video with ElevenLabs voiceover matching the current 60s demo.
 
-1. **Far-away alert (>1 km from the nearest safe zone edge)**
-   - Fires only after the ward is already outside all safe zones (existing exit logic already flips `wasInsideRef` to false).
-   - Triggered by the next `useLocationSync` tick where `min(haversine − zone.radius_m)` across all enabled zones is **> 1000 m**.
-   - Fires once per "excursion" (reset when ward returns to any safe zone). A separate ref `farAlertSentRef` + `localStorage` flag `farFromSafeZoneAlerted` prevents repeats.
-   - Suppressed while an active `journeys` row exists (same guard the exit alert already uses).
+### Structure (~15 feature beats, ~11s each)
 
-2. **Return alert**
-   - Fires when the ward re-enters any safe zone AND the far-away alert had been sent for this excursion (so guardians only get the "back safe" popup if they were previously warned about the 1 km drift). This avoids noise for tiny in/out flickers at the zone boundary.
-   - Clears both flags after firing.
+1. **Hook** — "Peace of mind for families, in three taps a day."
+2. **Daily Check-iN** — 7AM/12PM/7PM tap-the-heart flow
+3. **Missed check-in escalation** — guardian gets loud alarm
+4. **SOS button** — one tap alerts everyone, WhatsApp + location
+5. **Medications** — reminders, voice alerts, refill nudges
+6. **Health Passport** — daily score out of 100, trends
+7. **Vitals & face scan** — BP, HR, SpO₂ via camera
+8. **Medical Vault** — secure documents, nominee access
+9. **Map My Journey** — safe zones, geofencing, deviation alerts
+10. **Fall detection** — auto-SOS on impact
+11. **Guardian Dashboard** — vitals, mood, adherence at a glance
+12. **Ambulance booking** — one-tap dispatch with emergency card
+13. **AI Voice Assistant + Ask Check-iN** — Indian-accent help bot
+14. **Customer Services & MCP** — WhatsApp support, Claude/ChatGPT integration
+15. **Outro** — "Check-iN. Because caring should be simple."
 
-3. **Delivery**
-   - Insert a notification row per selected guardian into `public.notifications` with new `type` values:
-     - `zone_far` — "🚨 [Ward] is more than 1 km from the '[Zone]' safe zone."
-     - `zone_far_return` — "✅ [Ward] is back inside the '[Zone]' safe zone."
-   - Uses the existing `insert_notifications_deduped` RPC — no schema change.
-   - No WhatsApp/SMS in this feature (the existing exit/return WhatsApp templates already cover cross-channel).
+### Technical details
 
-4. **Guardian popup**
-   - New component `src/components/GuardianSafeZoneOverlay.tsx`, modelled on `GuardianPingOverlay` and `GuardianMissedAlarmOverlay`.
-   - Subscribes via Supabase Realtime to `notifications` inserts filtered by `user_id=eq.<guardian.id>` and reacts only to `type in ('zone_far','zone_far_return')`.
-   - Renders a centered modal:
-     - `zone_far`: red map-pin icon, title "Ward far from safe zone", body with ward name + zone name + approximate distance (km, from message payload), buttons **Call Ward** (tel:) and **Dismiss**.
-     - `zone_far_return`: green check icon, title "Ward back in safe zone", single **Dismiss** button; auto-dismisses after 8 s.
-   - Plays `playChime()` + vibration (200,100,200) on show. No looped alarm — this is an informational alert, not an SOS.
-   - Mounted in `AppLayout.tsx` only for `role === "guardian" && !loginInProgress`.
+- New file `remotion/src/voDurations3min.ts` with the 15-scene script + timings.
+- Reuse `Hook`, `UserCheckIn`, `UserMedsSos`, `GuardianRing`, `GuardianAlerts`, `SafetyNet`, `FeatureGrid`, `Outro`. Add 7 new scene components under `remotion/src/scenes/` (HealthPassport, Vitals, Vault, Journey, FallDetection, Ambulance, VoiceAssistant, CustomerService) reusing `PhoneFrame` + existing `theme.ts` tokens.
+- New `MainVideo3min.tsx` wiring scenes via `Series` with the same caption + audio pattern.
+- Register a new composition id `demo-3min-landscape` (1920x1080, 30fps) in `Root.tsx`.
+- Regenerate VO MP3s via existing `remotion/scripts/generate-vo.mjs` (ElevenLabs, same voice as 60s demo) into `remotion/public/audio/3min/`.
+- Render via existing `render-remotion.mjs demo-3min-landscape /mnt/documents/checkin-3min.mp4`.
+- Keep total under 190s to stay within the 600s render timeout at concurrency 2.
 
-5. **Settings toggle**
-   - Add `guardianSafeZoneAlerts` (default `true`) to `useUserSettings` schema.
-   - Toggle in `GuardianSettings.tsx` under the existing alerts section: "Safe-zone drift popups (>1 km)".
-   - When off, `GuardianSafeZoneOverlay` early-returns before subscribing.
+### Deliverable
 
-## Files touched
+`/mnt/documents/checkin-3min.mp4` (landscape, ~180s, with narration + captions), served via `<presentation-artifact>`.
 
-- `src/hooks/useLocationSync.ts` — add far-away detection + return branch; insert `zone_far` / `zone_far_return` notifications alongside the existing `zone_exit` / `zone_return` inserts. Stores distance in the message string. New `localStorage` key `farFromSafeZoneAlerted`.
-- `src/components/GuardianSafeZoneOverlay.tsx` — new overlay component (Realtime subscription + modal UI).
-- `src/components/AppLayout.tsx` — mount the overlay for guardians.
-- `src/hooks/useUserSettings.ts` — add `guardianSafeZoneAlerts` field with default `true`.
-- `src/pages/GuardianSettings.tsx` — add the toggle row.
+### Out of scope
 
-## Notes / non-goals
-- No changes to the existing `zone_exit`/`zone_return` alerts, WhatsApp templates, or the `msg91-whatsapp-safezone*` edge functions.
-- Distance is computed against the nearest safe zone's edge (`haversine − radius_m`), not the centre, so the 1 km threshold matches the user's mental model.
-- No new DB tables or migrations — reuses `notifications`.
+- Vertical (9:16) render.
+- Voice change to Sarvam.
+- New in-app UI changes.
