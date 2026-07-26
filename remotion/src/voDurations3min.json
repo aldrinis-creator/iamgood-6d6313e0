@@ -1,0 +1,17 @@
+{
+  "s1_hook": { "text": "", "seconds": 6 },
+  "s2_checkin": { "text": "", "seconds": 6 },
+  "s3_missed": { "text": "", "seconds": 6 },
+  "s4_sos_meds": { "text": "", "seconds": 6 },
+  "s5_passport": { "text": "", "seconds": 6 },
+  "s6_vitals": { "text": "", "seconds": 6 },
+  "s7_vault": { "text": "", "seconds": 6 },
+  "s8_journey": { "text": "", "seconds": 6 },
+  "s9_fall": { "text": "", "seconds": 6 },
+  "s10_ring": { "text": "", "seconds": 6 },
+  "s11_ambulance": { "text": "", "seconds": 6 },
+  "s12_voice": { "text": "", "seconds": 6 },
+  "s13_support": { "text": "", "seconds": 6 },
+  "s14_grid": { "text": "", "seconds": 6 },
+  "s15_outro": { "text": "", "seconds": 4 }
+}
