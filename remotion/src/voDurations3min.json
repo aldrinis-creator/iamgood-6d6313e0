@@ -1,0 +1,62 @@
+{
+  "s1_hook": {
+    "text": "Meet Check-iN. Peace of mind for families caring for aging parents — in just three taps a day.",
+    "seconds": 6.222948
+  },
+  "s2_checkin": {
+    "text": "At seven A M, noon, and seven P M — tap the heart. Your family instantly knows you're safe.",
+    "seconds": 5.990748
+  },
+  "s3_missed": {
+    "text": "Miss a check-in, and every guardian gets a loud alert — even if their phone is on silent.",
+    "seconds": 5.15483
+  },
+  "s4_sos_meds": {
+    "text": "Never miss a medication. And in an emergency, one tap on SOS alerts everyone who cares.",
+    "seconds": 6.362268
+  },
+  "s5_passport": {
+    "text": "Your Health Passport rolls vitals, sleep, mood and meals into one daily score out of a hundred.",
+    "seconds": 6.130068
+  },
+  "s6_vitals": {
+    "text": "No wearable needed. Capture heart rate, oxygen and blood pressure with a thirty-second face scan.",
+    "seconds": 6.222948
+  },
+  "s7_vault": {
+    "text": "The Medical Vault keeps every prescription, lab report and ID document encrypted, and ready for your nominee.",
+    "seconds": 6.687347
+  },
+  "s8_journey": {
+    "text": "Draw safe zones on the map. If your loved one wanders more than a kilometre, guardians hear about it on WhatsApp.",
+    "seconds": 6.594467
+  },
+  "s9_fall": {
+    "text": "Fall detection watches in the background. A fifteen-second window to cancel — or SOS fires automatically.",
+    "seconds": 6.873107
+  },
+  "s10_ring": {
+    "text": "Guardians see the full picture — vitals, mood and medication adherence — in one calm dashboard.",
+    "seconds": 6.548027
+  },
+  "s11_ambulance": {
+    "text": "In a real emergency, one tap dispatches an ambulance, with your medical emergency card pre-sent to the driver.",
+    "seconds": 6.873107
+  },
+  "s12_voice": {
+    "text": "Prefer to just ask? Our Indian-accent voice assistant answers questions about your meds, appointments and the app itself.",
+    "seconds": 7.337506
+  },
+  "s13_support": {
+    "text": "Need a human? Chat with our team on WhatsApp — or plug Check-iN into Claude and ChatGPT with our MCP integration.",
+    "seconds": 7.894785
+  },
+  "s14_grid": {
+    "text": "Plus first aid, blood banks, wellness tracking, doctor visit reports, and much more — all in one app.",
+    "seconds": 6.594467
+  },
+  "s15_outro": {
+    "text": "Check-iN. Because caring should be simple.",
+    "seconds": 2.647075
+  }
+}
