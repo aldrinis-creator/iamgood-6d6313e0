@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame, spring, useVideoConfig, interpolate } from "remotion";
+import { AbsoluteFill, Img, staticFile, useCurrentFrame, spring, useVideoConfig, interpolate } from "remotion";
 import { COLORS } from "../theme";
 import type { Orientation } from "../MainVideo";
 
@@ -21,16 +21,17 @@ export const Hook: React.FC<{ orientation: Orientation }> = ({ orientation }) =>
           width: isV ? 320 : 260,
           height: isV ? 320 : 260,
           borderRadius: "50%",
-          background: `linear-gradient(135deg, ${COLORS.emerald}, #059669)`,
+          background: `linear-gradient(135deg, ${COLORS.emerald}, #1f9e3a)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           boxShadow: `0 30px 80px ${COLORS.emerald}55`,
         }}
       >
-        <svg viewBox="0 0 24 24" width={isV ? 180 : 150} height={isV ? 180 : 150} fill="#fff">
-          <path d="M12 21s-7-4.35-7-10a5 5 0 019-3 5 5 0 019 3c0 5.65-7 10-7 10z" />
-        </svg>
+        <Img
+          src={staticFile("brand/logo.png")}
+          style={{ width: "70%", height: "70%", objectFit: "contain" }}
+        />
       </div>
       <div style={{ textAlign: "center", opacity: titleOp, transform: `translateY(${titleY}px)` }}>
         <div

@@ -4,6 +4,7 @@ import { MainVideo } from "./MainVideo";
 import { MainVideo3min } from "./MainVideo3min";
 import { TOTAL_FRAMES, FPS } from "./voDurations";
 import { TOTAL_FRAMES3, FPS3 } from "./voDurations3min";
+import { TITLE_CARD_FRAMES } from "./MainVideo3min";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -29,7 +30,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="demo-3min-landscape"
         component={MainVideo3min}
-        durationInFrames={TOTAL_FRAMES3}
+        durationInFrames={TOTAL_FRAMES3 + TITLE_CARD_FRAMES}
         fps={FPS3}
         width={1920}
         height={1080}
