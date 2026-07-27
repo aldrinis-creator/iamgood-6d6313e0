@@ -1,20 +1,22 @@
-## Plan
+## Save tech stack reference to project memory
 
-1. **Finish the branded 3-minute landscape render**
-   - Check background process (PID 6863) status; if still running, wait for it. If it stalled or failed, re-run `node scripts/render-remotion.mjs demo-3min-landscape /mnt/documents/checkin-3min.mp4`.
+Create a new memory file capturing the full Check-iN tech stack so future sessions can reference it without re-deriving from source.
 
-2. **Add a 9:16 vertical composition**
-   - In `remotion/src/Root.tsx`, register a new `demo-3min-vertical` composition:
-     - `component={MainVideo3min}`
-     - `width={1080}`, `height={1920}`
-     - `fps={FPS3}`, `durationInFrames={TOTAL_FRAMES3 + TITLE_CARD_FRAMES}`
-     - `defaultProps={{ orientation: "vertical" }}`
-   - No scene code changes required — all 3-min scenes (`TitleCard`, `Hook`, `Outro`, and the 13 feature scenes) already branch on the `orientation` prop and have vertical layouts.
+### Files to write
 
-3. **Render the vertical MP4**
-   - Run `cd remotion && node scripts/render-remotion.mjs demo-3min-vertical /mnt/documents/checkin-3min-vertical.mp4`.
-   - Expected: 1080x1920, ~3m 04s, audio + captions preserved.
+1. **`mem://project/tech-stack-full.md`** — full tech stack breakdown organized by layer:
+   - Frontend (React 18, TS 5, Vite 5, Tailwind v3, shadcn/ui, React Router v7, TanStack Query, Recharts v3, Leaflet, vite-plugin-pwa)
+   - Mobile shells (Capacitor 8 → Android SDK 36, iOS 15+)
+   - Backend / Lovable Cloud (Postgres + RLS, pg_cron, Edge Functions, Realtime, Storage, phone-first Auth)
+   - AI & Voice (Lovable AI Gateway / Gemini 2.5 family, Sarvam.ai bulbul:v2 TTS + saarika:v2 STT, MCP server)
+   - Communications (MSG91 SMS/OTP/WhatsApp, Resend + React Email via futurewave.in, Web Push VAPID)
+   - Payments (Razorpay external checkout at futurewave.in/pay)
+   - Video/Marketing (Remotion 4, ElevenLabs)
+   - Tooling (Bun, Vitest, Playwright, ESLint)
 
-4. **Report both files** with paths and sizes.
+2. **`mem://index.md`** — replace the existing `[Tech Stack Overview]` line under `## Memories` to point to the new, more detailed file.
 
-No changes to scene components, VO, timing, theme, or audio — vertical layouts are already implemented via the `orientation` prop path.
+### Notes
+
+- Existing `mem://project/tech-stack` will be superseded by the new fuller file; the index entry is updated to reference the new path.
+- No application code is touched — memory files only.
