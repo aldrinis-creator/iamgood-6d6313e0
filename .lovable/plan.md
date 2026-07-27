@@ -1,41 +1,49 @@
-## 3-Minute Check-iN Feature Tour Video
+# Brand the Check-iN video
 
-Extend the existing Remotion project (`remotion/`) to produce a ~180-second landscape (1920x1080) feature-tour video with ElevenLabs voiceover matching the current 60s demo.
+Add the real product logo, tighten colors to the Check-iN palette, and bookend the 3‑minute video with a proper title card and end card.
 
-### Structure (~15 feature beats, ~11s each)
+## What changes
 
-1. **Hook** — "Peace of mind for families, in three taps a day."
-2. **Daily Check-iN** — 7AM/12PM/7PM tap-the-heart flow
-3. **Missed check-in escalation** — guardian gets loud alarm
-4. **SOS button** — one tap alerts everyone, WhatsApp + location
-5. **Medications** — reminders, voice alerts, refill nudges
-6. **Health Passport** — daily score out of 100, trends
-7. **Vitals & face scan** — BP, HR, SpO₂ via camera
-8. **Medical Vault** — secure documents, nominee access
-9. **Map My Journey** — safe zones, geofencing, deviation alerts
-10. **Fall detection** — auto-SOS on impact
-11. **Guardian Dashboard** — vitals, mood, adherence at a glance
-12. **Ambulance booking** — one-tap dispatch with emergency card
-13. **AI Voice Assistant + Ask Check-iN** — Indian-accent help bot
-14. **Customer Services & MCP** — WhatsApp support, Claude/ChatGPT integration
-15. **Outro** — "Check-iN. Because caring should be simple."
+1. **Logo asset**
+   - Copy `public/pwa-512x512.png` into `remotion/public/brand/logo.png` (Remotion serves `public/` via `staticFile`).
+   - Also copy `public/Final_Check-iN_Letterhead.png` to `remotion/public/brand/letterhead.png` for the end card.
 
-### Technical details
+2. **Brand palette (theme.ts)**
+   - Align `COLORS` with `branding/tokens.css`:
+     - `navy` #1C3D5A (currently #1a365d)
+     - `emerald` #2EC04A (currently #10b981)
+     - `sos` #EF4444, `amber` #F5A302
+   - Keep names stable so no scene needs refactoring; only hex values shift.
 
-- New file `remotion/src/voDurations3min.ts` with the 15-scene script + timings.
-- Reuse `Hook`, `UserCheckIn`, `UserMedsSos`, `GuardianRing`, `GuardianAlerts`, `SafetyNet`, `FeatureGrid`, `Outro`. Add 7 new scene components under `remotion/src/scenes/` (HealthPassport, Vitals, Vault, Journey, FallDetection, Ambulance, VoiceAssistant, CustomerService) reusing `PhoneFrame` + existing `theme.ts` tokens.
-- New `MainVideo3min.tsx` wiring scenes via `Series` with the same caption + audio pattern.
-- Register a new composition id `demo-3min-landscape` (1920x1080, 30fps) in `Root.tsx`.
-- Regenerate VO MP3s via existing `remotion/scripts/generate-vo.mjs` (ElevenLabs, same voice as 60s demo) into `remotion/public/audio/3min/`.
-- Render via existing `render-remotion.mjs demo-3min-landscape /mnt/documents/checkin-3min.mp4`.
-- Keep total under 190s to stay within the 600s render timeout at concurrency 2.
+3. **Title card (new scene `s0_title`, ~4s)**
+   - Full-bleed navy gradient background (`--primary` navy → deeper navy).
+   - Centered real logo (from `staticFile('brand/logo.png')`), springs in with subtle glow.
+   - Wordmark "Check-iN" in Plus Jakarta 800, white.
+   - Subtitle "Medication Reminder & Senior Safety App for India" in Inter 500.
+   - Small "by Future Wave · futurewave.in" footer chip.
+   - Inserted at the start of `SCENE_ORDER3` in `voDurations3min.ts`; no voiceover (silent brand beat) so existing VO timing stays intact.
 
-### Deliverable
+4. **Hook scene (`s1_hook`) refresh**
+   - Replace the inline SVG heart with the real logo PNG inside the emerald ring for consistency.
 
-`/mnt/documents/checkin-3min.mp4` (landscape, ~180s, with narration + captions), served via `<presentation-artifact>`.
+5. **End card (replace/extend `s15_outro`)**
+   - Navy background, centered logo, wordmark, tagline "Because caring should be simple."
+   - CTA pill in emerald: "iamgood.lovable.app · Free to start".
+   - Footer line: "Future Wave · futurewave.in" with small letterhead mark.
+   - Keep current duration and VO.
 
-### Out of scope
+6. **Re-render**
+   - Rebuild `demo-3min-landscape` to `/mnt/documents/checkin-3min.mp4` (~3m04s after adding the 4s title card).
 
-- Vertical (9:16) render.
-- Voice change to Sarvam.
-- New in-app UI changes.
+## Technical notes
+
+- Files touched:
+  - `remotion/src/theme.ts` (color hex values only)
+  - `remotion/src/scenes/Hook.tsx` (swap SVG for `<Img src={staticFile('brand/logo.png')} />`)
+  - `remotion/src/scenes/Outro.tsx` (logo + branding polish)
+  - `remotion/src/scenes/TitleCard.tsx` (new)
+  - `remotion/src/MainVideo3min.tsx` (register `s0_title` → `TitleCard`)
+  - `remotion/src/voDurations3min.ts` / `.json` (prepend `s0_title` with ~120 frames, no VO entry)
+  - `remotion/public/brand/logo.png`, `remotion/public/brand/letterhead.png` (new assets)
+- No app/runtime code changes; strictly `remotion/` project.
+- No new VO clips needed — title card is silent, end card reuses existing `s15_outro.mp3`.

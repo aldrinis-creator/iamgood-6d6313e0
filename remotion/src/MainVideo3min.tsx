@@ -19,6 +19,9 @@ import { FallDetection } from "./scenes/FallDetection";
 import { Ambulance } from "./scenes/Ambulance";
 import { VoiceAssistant } from "./scenes/VoiceAssistant";
 import { CustomerService } from "./scenes/CustomerService";
+import { TitleCard } from "./scenes/TitleCard";
+
+export const TITLE_CARD_FRAMES = 120; // 4s @ 30fps
 
 loadJakarta("normal", { weights: ["500", "700", "800"], subsets: ["latin"] });
 loadInter("normal", { weights: ["400", "500", "600"], subsets: ["latin"] });
@@ -103,6 +106,11 @@ export const MainVideo3min: React.FC<{ orientation?: Orientation }> = ({ orienta
     <AbsoluteFill style={{ fontFamily: "Plus Jakarta Sans" }}>
       <BackgroundGradient />
       <Series>
+        <Series.Sequence durationInFrames={TITLE_CARD_FRAMES}>
+          <AbsoluteFill>
+            <TitleCard orientation={orientation} />
+          </AbsoluteFill>
+        </Series.Sequence>
         {SCENE_ORDER3.map((key) => {
           const dur = sceneFrames3(key);
           const Comp = SCENES[key];
