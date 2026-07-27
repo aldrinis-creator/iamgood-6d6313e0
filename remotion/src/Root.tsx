@@ -36,6 +36,15 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         defaultProps={{ orientation: "landscape" as const }}
       />
+      <Composition
+        id="demo-3min-vertical"
+        component={MainVideo3min}
+        durationInFrames={TOTAL_FRAMES3 + TITLE_CARD_FRAMES}
+        fps={FPS3}
+        width={1080}
+        height={1920}
+        defaultProps={{ orientation: "vertical" as const }}
+      />
     </>
   );
 };
