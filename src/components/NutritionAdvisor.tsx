@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { toastAiError } from "@/lib/aiErrorMessage";
 import ReactMarkdown from "react-markdown";
 import { Badge } from "@/components/ui/badge";
 
@@ -451,9 +452,7 @@ const NutritionAdvisor = () => {
         setAiResponse(raw || "No response received.");
       }
     } catch (e: any) {
-      if (e?.message?.includes("429")) toast.error("Rate limited. Try again shortly.");
-      else if (e?.message?.includes("402")) toast.error("AI credits exhausted. Please top up.");
-      else toast.error("Something went wrong.");
+      await toastAiError(e, "Something went wrong.");
       setActiveAction(null);
     } finally {
       setLoading(false);

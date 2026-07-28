@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { parseAiError } from "@/lib/aiErrorMessage";
 import { useUserSettings, DEFAULT_VOICE_QUERY_PROMPTS } from "@/hooks/useUserSettings";
 
 type Phase = "idle" | "listening" | "thinking" | "ready" | "speaking";
@@ -155,20 +156,9 @@ const VoiceQueryButton = () => {
       if (ctrl.signal.aborted) return;
       console.log("[voice-query] response:", { hasData: !!data, hasAudio: !!(data as any)?.audio, error });
 
-      let serverMsg: string | undefined;
       let status: number | undefined;
       if (error) {
-        try {
-          const ctx: any = (error as any).context;
-          status = ctx?.status;
-          if (ctx && typeof ctx.json === "function") {
-            const b = await ctx.json();
-            serverMsg = b?.error || b?.detail;
-          } else if (ctx && typeof ctx.text === "function") {
-            const txt = await ctx.text();
-            try { serverMsg = JSON.parse(txt)?.error; } catch { serverMsg = txt?.slice(0, 200); }
-          }
-        } catch { /* ignore */ }
+        status = (error as any)?.context?.response?.status;
 
         // Auto-retry once on transient errors
         if (attempt === 0 && (status === 502 || status === 503 || status === 504 || !status)) {
@@ -182,9 +172,10 @@ const VoiceQueryButton = () => {
           await new Promise((r) => setTimeout(r, 3000));
           return sendQueryInternal(text, 1);
         }
-        throw new Error(serverMsg || error.message || "Voice assistant is temporarily unavailable.");
+        const info = await parseAiError(error);
+        throw new Error(info.message);
       }
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
 
       const reply = (data as any)?.answer ?? "Sorry, I couldn't find an answer.";
       const audio = (data as any)?.audio as string | null | undefined;

@@ -6,6 +6,7 @@ import { AlertTriangle, Send, Loader2, Stethoscope, Bot, User, Save, Check } fro
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { parseAiError } from "@/lib/aiErrorMessage";
 import ReactMarkdown from "react-markdown";
 import ReportShareButtons from "@/components/ReportShareButtons";
 
@@ -44,24 +45,15 @@ const SymptomChecker = () => {
       });
 
       // Try to extract the server's error body even on non-2xx responses
-      let serverError: string | null = null;
-      let status: number | null = null;
       if (error) {
-        status = (error as any)?.context?.response?.status ?? null;
-        try {
-          const body = await (error as any)?.context?.response?.json?.();
-          serverError = body?.error ?? null;
-        } catch { /* ignore */ }
+        const info = await parseAiError(error);
+        const friendly = info.message;
+        toast.error(friendly);
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ I couldn't respond: ${friendly}` }]);
+        return;
       }
-      if (!serverError && data?.error) serverError = data.error;
-
-      if (serverError || error) {
-        let friendly = serverError || "Failed to get response";
-        if (status === 402 || /credit/i.test(friendly)) {
-          friendly = "AI credits exhausted. Please top up in Workspace → Settings → Usage to continue.";
-        } else if (status === 429 || /rate.?limit/i.test(friendly)) {
-          friendly = "AI is busy right now. Please try again in a moment.";
-        }
+      if (data?.error) {
+        const friendly = data.message || data.error;
         toast.error(friendly);
         setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ I couldn't respond: ${friendly}` }]);
         return;

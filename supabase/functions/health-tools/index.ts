@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -459,14 +460,9 @@ serve(async (req) => {
       const status = response.status;
       const text = await response.text();
       console.error("AI gateway error:", status, text);
-      
-      let errorMsg = `AI service error (${status}): ${text.substring(0, 50)}`;
-      if (status === 429) errorMsg = "Rate limited. Please try again in a moment.";
-      if (status === 402) errorMsg = "AI credits exhausted. Please add funds via Lovable.";
-      if (status === 404) errorMsg = "Model not found. The AI Gateway rejected the model name.";
-      
-      return new Response(JSON.stringify({ error: errorMsg }), {
-        status: 200,
+      const info = classifyAiGatewayFailure(status, text);
+      return new Response(JSON.stringify(info), {
+        status: info.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

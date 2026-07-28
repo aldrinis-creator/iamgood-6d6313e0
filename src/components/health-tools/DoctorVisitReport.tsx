@@ -5,6 +5,7 @@ import { FileText, Loader2, Save, Check, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { toastAiError } from "@/lib/aiErrorMessage";
 import ReactMarkdown from "react-markdown";
 import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import ReportShareButtons from "@/components/ReportShareButtons";
@@ -93,7 +94,7 @@ const DoctorVisitReport = () => {
       if (data?.error) { toast.error(data.error); return; }
       setReport(data.response);
     } catch (err: any) {
-      toast.error("Failed to generate report");
+      await toastAiError(err, "Failed to generate report");
     } finally {
       setLoading(false);
     }
