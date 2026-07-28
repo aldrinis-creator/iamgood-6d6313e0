@@ -210,14 +210,22 @@ const NearestHospitals = () => {
           </Card>
         )}
 
-        {!loading && !error && results.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {results.length} {results.length === 1 ? "facility" : "facilities"} found • sorted by nearest
-          </p>
-        )}
-
-        <div className="space-y-3">
-          {results.map((r) => {
+        {!loading && !error && results.length > 0 && (() => {
+          const filtered = filter === "all" ? results : results.filter((r) => r.kind === filter);
+          return (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {filtered.length} {filtered.length === 1 ? "facility" : "facilities"} shown • sorted by nearest
+              </p>
+              <div className="space-y-3">
+                {filtered.length === 0 && (
+                  <Card>
+                    <CardContent className="p-4 text-sm text-muted-foreground text-center">
+                      No {filter === "dental" ? "dental clinics" : "hospitals"} found within 5 km.
+                    </CardContent>
+                  </Card>
+                )}
+                {filtered.map((r) => {
             const isDental = r.kind === "dental";
             const Icon = isDental ? Bluetooth : Hospital;
             const dirUrl = r.location
