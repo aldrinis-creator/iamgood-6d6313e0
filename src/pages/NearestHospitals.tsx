@@ -229,7 +229,11 @@ const NearestHospitals = () => {
                         <p className="text-xs text-muted-foreground mt-1">{r.formattedAddress}</p>
                       )}
                       <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                        <span>{r.distance_km.toFixed(2)} km away</span>
+                        <Badge variant="outline" className="text-[10px] font-semibold border-primary/40 text-primary">
+                          {r.distance_km < 1
+                            ? `${Math.round(r.distance_km * 1000)} m away`
+                            : `${r.distance_km.toFixed(2)} km away`}
+                        </Badge>
                         {typeof r.rating === "number" && (
                           <span className="flex items-center gap-0.5">
                             <Star className="w-3 h-3 fill-current text-yellow-500" />
