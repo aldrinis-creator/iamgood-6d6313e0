@@ -228,8 +228,9 @@ const NearestHospitals = () => {
                 {filtered.map((r) => {
             const isDental = r.kind === "dental";
             const Icon = isDental ? Bluetooth : Hospital;
+            const originParam = origin ? `&origin=${origin.lat},${origin.lng}` : "";
             const dirUrl = r.location
-              ? `https://www.google.com/maps/dir/?api=1&destination=${r.location.latitude},${r.location.longitude}`
+              ? `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${r.location.latitude},${r.location.longitude}&destination_place_id=${encodeURIComponent(r.id)}${originParam}`
               : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.displayName?.text || "")}`;
             const phone = r.internationalPhoneNumber || r.nationalPhoneNumber;
             return (
