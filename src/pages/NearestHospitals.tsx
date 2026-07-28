@@ -63,6 +63,7 @@ const NearestHospitals = () => {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Enriched[]>([]);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  const [filter, setFilter] = useState<"all" | "hospital" | "dental">("all");
 
   const search = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
