@@ -33,6 +33,7 @@ async function searchNearby(
   lat: number,
   lng: number,
   includedTypes: string[],
+  radiusM: number,
 ): Promise<Place[]> {
   const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
     method: "POST",
@@ -46,7 +47,7 @@ async function searchNearby(
       includedTypes,
       maxResultCount: 20,
       locationRestriction: {
-        circle: { center: { latitude: lat, longitude: lng }, radius: SEARCH_RADIUS_M },
+        circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
       },
     }),
   });
