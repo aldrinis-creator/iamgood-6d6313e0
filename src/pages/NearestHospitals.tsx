@@ -168,10 +168,25 @@ const NearestHospitals = () => {
 
         {!loading && !error && results.length === 0 && (
           <Card>
-            <CardContent className="p-4 text-sm text-muted-foreground">
-              No hospitals or dental clinics found within 5 km.
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Hospital className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">No facilities within 5 km</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  We couldn't find any hospitals or dental clinics near your current location. Try again from a different spot or check your GPS signal.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={retry}>Try again</Button>
             </CardContent>
           </Card>
+        )}
+
+        {!loading && !error && results.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {results.length} {results.length === 1 ? "facility" : "facilities"} found • sorted by nearest
+          </p>
         )}
 
         <div className="space-y-3">
