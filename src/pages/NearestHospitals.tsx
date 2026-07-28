@@ -10,7 +10,8 @@ import { haversineDistance } from "@/lib/haversine";
 
 // Same referrer-restricted browser key used elsewhere in the app.
 const GOOGLE_MAPS_API_KEY = "AIzaSyCTaUAI6Q-yrka45TYnP4kYI5gWDjGMjaQ";
-const SEARCH_RADIUS_M = 5000;
+const RADIUS_OPTIONS_KM = [1, 3, 5, 10] as const;
+type RadiusKm = (typeof RADIUS_OPTIONS_KM)[number];
 
 type Place = {
   id: string;
@@ -32,6 +33,7 @@ async function searchNearby(
   lat: number,
   lng: number,
   includedTypes: string[],
+  radiusM: number,
 ): Promise<Place[]> {
   const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
     method: "POST",
@@ -45,7 +47,7 @@ async function searchNearby(
       includedTypes,
       maxResultCount: 20,
       locationRestriction: {
-        circle: { center: { latitude: lat, longitude: lng }, radius: SEARCH_RADIUS_M },
+        circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
       },
     }),
   });
@@ -64,14 +66,16 @@ const NearestHospitals = () => {
   const [results, setResults] = useState<Enriched[]>([]);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "hospital" | "dental">("all");
+  const [radiusKm, setRadiusKm] = useState<RadiusKm>(5);
 
-  const search = useCallback(async (lat: number, lng: number) => {
+  const search = useCallback(async (lat: number, lng: number, radiusKm: number) => {
     setLoading(true);
     setError(null);
     try {
+      const radiusM = radiusKm * 1000;
       const [hospitals, dental] = await Promise.all([
-        searchNearby(lat, lng, ["hospital"]),
-        searchNearby(lat, lng, ["dental_clinic"]),
+        searchNearby(lat, lng, ["hospital"], radiusM),
+        searchNearby(lat, lng, ["dental_clinic"], radiusM),
       ]);
       const seen = new Set<string>();
       const merged: Enriched[] = [];
@@ -113,7 +117,7 @@ const NearestHospitals = () => {
       (pos) => {
         const o = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setOrigin(o);
-        search(o.lat, o.lng);
+        search(o.lat, o.lng, radiusKm);
       },
       (err) => {
         setError(err.message || "Unable to get your location. Enable GPS and try again.");
@@ -121,17 +125,24 @@ const NearestHospitals = () => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Re-run search when the user changes the radius (after we already have origin).
+  useEffect(() => {
+    if (origin) search(origin.lat, origin.lng, radiusKm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radiusKm]);
+
   const retry = () => {
-    if (origin) search(origin.lat, origin.lng);
+    if (origin) search(origin.lat, origin.lng, radiusKm);
     else {
       setLoading(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const o = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setOrigin(o);
-          search(o.lat, o.lng);
+          search(o.lat, o.lng, radiusKm);
         },
         (err) => {
           setError(err.message);
@@ -149,7 +160,31 @@ const NearestHospitals = () => {
         </Button>
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <MapPin className="w-3.5 h-3.5" /> Showing hospitals & dental clinics within 5 km
+          <MapPin className="w-3.5 h-3.5" /> Showing hospitals & dental clinics within {radiusKm} km
+        </div>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Search radius</p>
+          <div className="flex flex-wrap gap-2">
+            {RADIUS_OPTIONS_KM.map((km) => {
+              const active = km === radiusKm;
+              return (
+                <button
+                  key={km}
+                  type="button"
+                  onClick={() => setRadiusKm(km)}
+                  disabled={loading}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap disabled:opacity-60 ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {km} km
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {!loading && !error && results.length > 0 && (() => {
@@ -200,7 +235,7 @@ const NearestHospitals = () => {
                 <Hospital className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-semibold">No facilities within 5 km</p>
+                <p className="text-sm font-semibold">No facilities within {radiusKm} km</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   We couldn't find any hospitals or dental clinics near your current location. Try again from a different spot or check your GPS signal.
                 </p>
@@ -221,7 +256,7 @@ const NearestHospitals = () => {
                 {filtered.length === 0 && (
                   <Card>
                     <CardContent className="p-4 text-sm text-muted-foreground text-center">
-                      No {filter === "dental" ? "dental clinics" : "hospitals"} found within 5 km.
+                      No {filter === "dental" ? "dental clinics" : "hospitals"} found within {radiusKm} km.
                     </CardContent>
                   </Card>
                 )}
