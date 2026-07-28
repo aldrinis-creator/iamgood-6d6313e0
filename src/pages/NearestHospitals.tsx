@@ -160,7 +160,31 @@ const NearestHospitals = () => {
         </Button>
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <MapPin className="w-3.5 h-3.5" /> Showing hospitals & dental clinics within 5 km
+          <MapPin className="w-3.5 h-3.5" /> Showing hospitals & dental clinics within {radiusKm} km
+        </div>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Search radius</p>
+          <div className="flex flex-wrap gap-2">
+            {RADIUS_OPTIONS_KM.map((km) => {
+              const active = km === radiusKm;
+              return (
+                <button
+                  key={km}
+                  type="button"
+                  onClick={() => setRadiusKm(km)}
+                  disabled={loading}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap disabled:opacity-60 ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {km} km
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {!loading && !error && results.length > 0 && (() => {
