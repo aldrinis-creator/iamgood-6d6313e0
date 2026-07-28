@@ -66,14 +66,16 @@ const NearestHospitals = () => {
   const [results, setResults] = useState<Enriched[]>([]);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "hospital" | "dental">("all");
+  const [radiusKm, setRadiusKm] = useState<RadiusKm>(5);
 
-  const search = useCallback(async (lat: number, lng: number) => {
+  const search = useCallback(async (lat: number, lng: number, radiusKm: number) => {
     setLoading(true);
     setError(null);
     try {
+      const radiusM = radiusKm * 1000;
       const [hospitals, dental] = await Promise.all([
-        searchNearby(lat, lng, ["hospital"]),
-        searchNearby(lat, lng, ["dental_clinic"]),
+        searchNearby(lat, lng, ["hospital"], radiusM),
+        searchNearby(lat, lng, ["dental_clinic"], radiusM),
       ]);
       const seen = new Set<string>();
       const merged: Enriched[] = [];
