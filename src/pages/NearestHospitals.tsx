@@ -10,7 +10,8 @@ import { haversineDistance } from "@/lib/haversine";
 
 // Same referrer-restricted browser key used elsewhere in the app.
 const GOOGLE_MAPS_API_KEY = "AIzaSyCTaUAI6Q-yrka45TYnP4kYI5gWDjGMjaQ";
-const SEARCH_RADIUS_M = 5000;
+const RADIUS_OPTIONS_KM = [1, 3, 5, 10] as const;
+type RadiusKm = (typeof RADIUS_OPTIONS_KM)[number];
 
 type Place = {
   id: string;
