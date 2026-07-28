@@ -303,9 +303,12 @@ const NearestHospitals = () => {
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
-        </div>
+                );
+              })}
+              </div>
+            </>
+          );
+        })()}
       </div>
     </AppLayout>
   );
