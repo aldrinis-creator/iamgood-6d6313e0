@@ -168,10 +168,25 @@ const NearestHospitals = () => {
 
         {!loading && !error && results.length === 0 && (
           <Card>
-            <CardContent className="p-4 text-sm text-muted-foreground">
-              No hospitals or dental clinics found within 5 km.
+            <CardContent className="p-6 text-center space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Hospital className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">No facilities within 5 km</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  We couldn't find any hospitals or dental clinics near your current location. Try again from a different spot or check your GPS signal.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={retry}>Try again</Button>
             </CardContent>
           </Card>
+        )}
+
+        {!loading && !error && results.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {results.length} {results.length === 1 ? "facility" : "facilities"} found • sorted by nearest
+          </p>
         )}
 
         <div className="space-y-3">
@@ -214,7 +229,11 @@ const NearestHospitals = () => {
                         <p className="text-xs text-muted-foreground mt-1">{r.formattedAddress}</p>
                       )}
                       <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                        <span>{r.distance_km.toFixed(2)} km away</span>
+                        <Badge variant="outline" className="text-[10px] font-semibold border-primary/40 text-primary">
+                          {r.distance_km < 1
+                            ? `${Math.round(r.distance_km * 1000)} m away`
+                            : `${r.distance_km.toFixed(2)} km away`}
+                        </Badge>
                         {typeof r.rating === "number" && (
                           <span className="flex items-center gap-0.5">
                             <Star className="w-3 h-3 fill-current text-yellow-500" />
