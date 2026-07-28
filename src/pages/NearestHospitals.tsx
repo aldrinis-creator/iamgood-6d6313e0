@@ -117,7 +117,7 @@ const NearestHospitals = () => {
       (pos) => {
         const o = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setOrigin(o);
-        search(o.lat, o.lng);
+        search(o.lat, o.lng, radiusKm);
       },
       (err) => {
         setError(err.message || "Unable to get your location. Enable GPS and try again.");
@@ -125,17 +125,24 @@ const NearestHospitals = () => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  // Re-run search when the user changes the radius (after we already have origin).
+  useEffect(() => {
+    if (origin) search(origin.lat, origin.lng, radiusKm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radiusKm]);
+
   const retry = () => {
-    if (origin) search(origin.lat, origin.lng);
+    if (origin) search(origin.lat, origin.lng, radiusKm);
     else {
       setLoading(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const o = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setOrigin(o);
-          search(o.lat, o.lng);
+          search(o.lat, o.lng, radiusKm);
         },
         (err) => {
           setError(err.message);
