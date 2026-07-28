@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { PRODUCT_KB } from "../_shared/product-kb.ts";
+import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -258,17 +259,14 @@ ${PRODUCT_KB}`;
       }),
     });
 
-    if (aiResp.status === 429) return json({ error: "Voice assistant is busy. Please try again in a moment." }, 429);
-    if (aiResp.status === 402) {
-      // Return 200 with a friendly spoken answer so the UI degrades gracefully
-      // instead of throwing on the client. Audio is null → browser TTS fallback.
-      const msg = "The voice assistant is temporarily out of credits. Please ask your administrator to top up the AI balance.";
-      return json({ answer: msg, audio: null, degraded: "credits_exhausted" }, 200);
-    }
     if (!aiResp.ok) {
       const t = await aiResp.text();
       console.error("[voice-query] AI gateway error:", aiResp.status, t.slice(0, 500));
-      return json({ error: "Voice assistant is temporarily unavailable. Please try again shortly." }, 502);
+      const info = classifyAiGatewayFailure(aiResp.status, t);
+      if (info.code === "credits_exhausted" || info.code === "credit_limit_reached") {
+        return json({ answer: info.message, audio: null, degraded: info.code, code: info.code }, 200);
+      }
+      return json({ error: info.message, code: info.code }, info.status);
     }
 
     const aiData = await aiResp.json();

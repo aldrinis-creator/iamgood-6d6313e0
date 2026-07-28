@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,9 +62,8 @@ serve(async (req) => {
       const status = aiResp.status;
       const t = await aiResp.text();
       console.error("transcribe error", status, t);
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      return new Response(JSON.stringify({ error: "AI error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const info = classifyAiGatewayFailure(status, t);
+      return new Response(JSON.stringify(info), { status: info.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const data = await aiResp.json();

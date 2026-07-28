@@ -1,5 +1,6 @@
 import { PRODUCT_KB } from "../_shared/product-kb.ts";
 import { selectRelevantFaqs, type Audience } from "../_shared/faq-kb.ts";
+import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,12 +96,15 @@ Deno.serve(async (req) => {
     });
 
 
-    if (aiResp.status === 429) return json({ error: "The assistant is busy — please try again in a moment." }, 429);
-    if (aiResp.status === 402) return json({ answer: "The help assistant is temporarily out of credits. Please try again later.", degraded: "credits_exhausted" }, 200);
     if (!aiResp.ok) {
       const t = await aiResp.text();
       console.error("[product-assistant] gateway error:", aiResp.status, t.slice(0, 500));
-      return json({ error: "Help assistant is temporarily unavailable." }, 502);
+      const info = classifyAiGatewayFailure(aiResp.status, t);
+      // Keep the graceful degraded shape for the chat UI
+      if (info.code === "credits_exhausted" || info.code === "credit_limit_reached") {
+        return json({ answer: info.message, degraded: info.code, code: info.code }, 200);
+      }
+      return json({ error: info.message, code: info.code }, info.status);
     }
 
     const data = await aiResp.json();
