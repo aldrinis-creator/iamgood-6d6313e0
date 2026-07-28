@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPin } from "@/lib/encryption";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, ShieldCheck, Loader2 } from "lucide-react";
+import { Lock, ShieldCheck, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 interface VaultGateProps {
@@ -16,6 +17,7 @@ interface VaultGateProps {
 
 const VaultGate = ({ children, title = "Protected Content" }: VaultGateProps) => {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const userId = session?.user?.id;
 
   const [loading, setLoading] = useState(true);
@@ -92,7 +94,11 @@ const VaultGate = ({ children, title = "Protected Content" }: VaultGateProps) =>
   if (unlocked) return <>{children}</>;
 
   return (
-    <div className="flex items-center justify-center py-12 px-4">
+    <div className="p-4">
+      <Button variant="ghost" size="sm" onClick={() => navigate("/my-health")} className="gap-1 mb-2">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </Button>
+      <div className="flex items-center justify-center py-8 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center pb-3">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
@@ -158,6 +164,7 @@ const VaultGate = ({ children, title = "Protected Content" }: VaultGateProps) =>
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
