@@ -7,6 +7,7 @@ import { Camera, Upload, X, Loader2, AlertTriangle, Save, Check, Info, Pill, Shi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { toastAiError } from "@/lib/aiErrorMessage";
 import ReportShareButtons from "@/components/ReportShareButtons";
 import { bannedSingleSubstances } from "@/data/bannedDrugs";
 
@@ -143,7 +144,7 @@ const PillIdentifier = () => {
       }
     } catch (err: any) {
       console.error("Pill ID error:", err);
-      toast.error("Identification failed. Please try a clearer photo.");
+      await toastAiError(err, "Identification failed. Please try a clearer photo.");
     } finally {
       setLoading(false);
     }

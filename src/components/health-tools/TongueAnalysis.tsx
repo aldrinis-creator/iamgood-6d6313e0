@@ -7,6 +7,7 @@ import { Camera, Upload, X, Loader2, AlertTriangle, Save, Check, Info, Smile } f
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { toastAiError } from "@/lib/aiErrorMessage";
 import ReportShareButtons from "@/components/ReportShareButtons";
 
 interface TongueResult {
@@ -130,7 +131,7 @@ const TongueAnalysis = () => {
       }
     } catch (err: any) {
       console.error("Tongue analysis error:", err);
-      toast.error("Analysis failed. Please try a clearer photo.");
+      await toastAiError(err, "Analysis failed. Please try a clearer photo.");
     } finally {
       setLoading(false);
     }

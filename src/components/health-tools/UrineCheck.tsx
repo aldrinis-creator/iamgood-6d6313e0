@@ -8,6 +8,7 @@ import { Camera, Upload, X, Loader2, Droplet, TestTube, AlertTriangle, Save, Che
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { toastAiError } from "@/lib/aiErrorMessage";
 import ReportShareButtons from "@/components/ReportShareButtons";
 
 type Mode = "color" | "dipstick";
@@ -138,11 +139,11 @@ const UrineCheck = () => {
       });
       const { data, error } = result;
       if (error) {
-        toast.error(`Invoke error: ${error.message || "Unknown"}`);
+        await toastAiError(error, `Invoke error: ${error.message || "Unknown"}`);
         return;
       }
       if (data?.error) {
-        toast.error(`API error: ${data.error}`);
+        toast.error(data.message || data.error);
         return;
       }
       const raw = (data?.response || "").trim().replace(/^```json\s*/i, "").replace(/```$/, "");
@@ -151,7 +152,7 @@ const UrineCheck = () => {
       else setDipstickResult(parsed);
     } catch (err: any) {
       console.error("Urine analysis error:", err);
-      toast.error(err?.message === "timeout" ? "Analysis timed out. Try again." : `Analysis failed: ${err?.message || "Unknown error"}`);
+      await toastAiError(err, err?.message === "timeout" ? "Analysis timed out. Try again." : `Analysis failed: ${err?.message || "Unknown error"}`);
     } finally {
       setLoading(false);
     }

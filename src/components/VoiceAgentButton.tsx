@@ -7,6 +7,7 @@ import { ensureAudioReady, playBase64Audio, stopBase64Audio } from "@/lib/audioA
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { toastAiError, parseAiError } from "@/lib/aiErrorMessage";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 type SttMode = "browser" | "sarvam";
@@ -77,18 +78,15 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
       if (ctrl.signal.aborted) return;
 
       if (error) {
-        let msg = error.message || "Voice assistant unavailable.";
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx?.json) { const b = await ctx.json(); msg = b?.error || msg; }
-        } catch {}
-        toast.error(msg);
-        setMessages([...newHistory, { role: "assistant", content: msg }]);
+        const info = await parseAiError(error);
+        toast.error(info.message);
+        setMessages([...newHistory, { role: "assistant", content: info.message }]);
         setPhase("idle");
         return;
       }
       if ((data as any)?.error) {
-        toast.error((data as any).error);
+        const msg = (data as any).message || (data as any).error;
+        toast.error(msg);
         setPhase("idle");
         return;
       }
@@ -106,7 +104,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
       }
     } catch (e: any) {
       if (ctrl.signal.aborted) return;
-      toast.error(e?.message || "Voice assistant failed.");
+      await toastAiError(e, e?.message || "Voice assistant failed.");
       setPhase("idle");
     }
   }, [mode, persona, wardUserId, playAudio]);
