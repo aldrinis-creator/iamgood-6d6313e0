@@ -256,7 +256,7 @@ const NearestHospitals = () => {
                 {filtered.length === 0 && (
                   <Card>
                     <CardContent className="p-4 text-sm text-muted-foreground text-center">
-                      No {filter === "dental" ? "dental clinics" : "hospitals"} found within 5 km.
+                      No {filter === "dental" ? "dental clinics" : "hospitals"} found within {radiusKm} km.
                     </CardContent>
                   </Card>
                 )}
