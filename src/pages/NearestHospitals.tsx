@@ -235,7 +235,7 @@ const NearestHospitals = () => {
                 <Hospital className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-semibold">No facilities within 5 km</p>
+                <p className="text-sm font-semibold">No facilities within {radiusKm} km</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   We couldn't find any hospitals or dental clinics near your current location. Try again from a different spot or check your GPS signal.
                 </p>
