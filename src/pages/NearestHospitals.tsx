@@ -152,6 +152,32 @@ const NearestHospitals = () => {
           <MapPin className="w-3.5 h-3.5" /> Showing hospitals & dental clinics within 5 km
         </div>
 
+        {!loading && !error && results.length > 0 && (() => {
+          const hospitalCount = results.filter((r) => r.kind === "hospital").length;
+          const dentalCount = results.filter((r) => r.kind === "dental").length;
+          const chip = (key: "all" | "hospital" | "dental", label: string, count: number) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                filter === key
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-muted"
+              }`}
+            >
+              {label} <span className="opacity-70">({count})</span>
+            </button>
+          );
+          return (
+            <div className="flex flex-wrap gap-2">
+              {chip("all", "All", results.length)}
+              {chip("hospital", "Hospitals", hospitalCount)}
+              {chip("dental", "Dental Clinics", dentalCount)}
+            </div>
+          );
+        })()}
+
         {loading && (
           <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
             <Loader2 className="w-5 h-5 animate-spin" /> Finding facilities near you…
