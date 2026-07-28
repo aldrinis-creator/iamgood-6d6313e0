@@ -1,36 +1,46 @@
-## Graceful AI-unavailable fallback for health tools
+## Personal Healthcare Hub + Nearest Hospital Finder
 
-When the AI Gateway returns 402 (credits exhausted), 403 (`credit_limit_reached`), or 429 (rate limited), the affected tools currently fail silently or show a generic "AI error". Users can't tell whether it's their photo, their network, or a workspace-level block.
+### 1. Secret
+- Add `ORANGE_WEBHOOK_SECRET` via `add_secret` tool (user enters value in secure form). No DB table yet.
 
-### What to change
+### 2. New tile in My Health
+Edit `src/pages/MyHealth.tsx`:
+- Add tile **"Personal Healthcare"** to `healthTools` array using `HeartHandshake` (Lucide) icon.
+- On tap → `navigate("/personal-healthcare")`.
 
-**1. Shared helper**
-Add `src/lib/aiErrorMessage.ts` exporting `getAiErrorMessage(status, body?)` that maps:
-- 402 → "AI analysis is temporarily unavailable — workspace credits exhausted. Please contact your admin."
-- 403 + `credit_limit_reached` → "AI analysis is paused — workspace credit limit reached. An admin can raise the limit in workspace settings."
-- 429 → "Too many requests right now. Please try again in a minute."
-- other → "AI service unavailable. Please try again shortly."
+### 3. New page `src/pages/PersonalHealthcare.tsx`
+- Wrapped in `AppLayout`, back arrow to `/my-health`.
+- 5 tiles in a list/grid layout mirroring existing hub style:
+  - **Blood Tests** (`Droplet`) — "Soon to come" badge
+  - **Nurse-on-Call** (`Stethoscope`) — "Soon to come"
+  - **Attendant-at-Home** (`UserPlus`) — "Soon to come"
+  - **Doctor-on-Call** (`BriefcaseMedical`) — "Soon to come"
+  - **Nearest Hospital Finder** (`Hospital`) — active, navigates to `/nearest-hospitals`
+- "Soon to come" tiles show a small muted badge and toast on tap: "Coming soon with Orange Labs".
 
-**2. Edge functions — propagate structured error**
-Update these functions so they forward the upstream status and a machine-readable `code` (`credits_exhausted` | `credit_limit_reached` | `rate_limited` | `ai_error`) with the same HTTP status back to the client, instead of collapsing everything to 500:
-- `nutrition-advisor`
-- `tongue-analysis`
-- `urine-analysis`
-- `pill-identifier`
-- `doctor-visit-analysis`
-- `product-assistant`
-- `voice-agent` (if it calls the gateway)
-- `health-tools-analysis` (any sibling analyzers)
+### 4. New page `src/pages/NearestHospitals.tsx`
+- Back arrow to `/personal-healthcare`.
+- On mount: `navigator.geolocation.getCurrentPosition()` to grab user coords (with error/permission handling).
+- Call Google Places API (New) **searchNearby** twice in parallel via existing `loadGoogleMapsAPI` client (already loaded with `places` library) OR via a small edge function using the Google Maps connector gateway (`places/v1/places:searchNearby`) for hospitals + dental clinics within 5km:
+  - `includedTypes: ["hospital"]` → labeled with hospital icon
+  - `includedTypes: ["dental_clinic"]` → labeled with a tooth/dental icon (`Bluetooth`→ use custom; Lucide has no tooth — use `Smile` or lab icon `Sparkles`; best fit: import `Tooth`-like via lucide-lab, or fallback to a two-letter "DC" badge). Recommend using `Bluetooth`→ no; use small text label "Dental" + `Stethoscope` icon variant. **Decision:** use `Smile` icon tinted differently, plus a "Dental Clinic" text label under name for clarity.
+- Render each result as a Card with:
+  - Name, type badge (Hospital / Dental Clinic)
+  - Distance in km (Haversine from `src/lib/haversine.ts`)
+  - Address (`formattedAddress`)
+  - Phone (`internationalPhoneNumber`) — tap to call (`tel:`)
+  - Website (if present) — external link
+  - Rating + open-now status if available
+  - "Directions" button → `google.com/maps/dir/?api=1&destination=lat,lng`
+- Sort by distance ascending. Empty state if none found.
 
-Each already has partial 402/429 handling; standardize the response shape: `{ error, code, message }`.
+### 5. Routing
+Edit `src/App.tsx`: add `/personal-healthcare` and `/nearest-hospitals` routes (protected).
 
-**3. Frontend — surface the message**
-In each caller (primarily `NutritionAdvisor.tsx`, the health-tools components under `src/components/health-tools/`, `ProductHelpChat.tsx`), when `supabase.functions.invoke` returns a non-2xx, read the structured error and toast (or inline-render) the friendly message from `getAiErrorMessage`. For image-analysis screens, also render an inline banner in the results panel so retries are obvious.
+### 6. Back arrow on Unlock Medical Vault tile
+- Locate the Medical Vault unlock screen (`src/pages/MedicalVault.tsx` or `src/components/VaultGate.tsx`) and add a back arrow button (top-left) that navigates back to `/my-health`.
 
-**4. No changes to**
-- Business logic, prompts, or model selection.
-- The credit balance itself (that's a workspace-settings action, not code).
-
-### Notes
-- Purely presentational — no schema, RLS, or cron changes.
-- Once the workspace credit limit is raised, tools resume automatically; this change only makes the failure legible.
+### Technical notes
+- Use Google Maps connector via **gateway** in a new edge function `nearby-hospitals` (POST body `{ lat, lng }`) to avoid exposing extra API calls to the browser key beyond what's authorized. The existing `VITE_...BROWSER_KEY` is only for Maps JS + Places browser autocomplete — nearby search should go through the gateway per Google Maps connector guidance.
+- Field mask: `places.id,places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.currentOpeningHours,places.primaryType`.
+- No DB changes.
