@@ -37,6 +37,8 @@ const GuardianAppointments = lazy(() => import("./pages/GuardianAppointments"));
 const MapMyJourney = lazy(() => import("./pages/MapMyJourney"));
 const FinancialHealth = lazy(() => import("./pages/FinancialHealth"));
 const BloodBanks = lazy(() => import("./pages/BloodBanks"));
+const PersonalHealthcare = lazy(() => import("./pages/PersonalHealthcare"));
+const NearestHospitals = lazy(() => import("./pages/NearestHospitals"));
 
 // Lazy-loaded heavy / rarely-used routes
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -97,6 +99,8 @@ const App = () => (
                 <Route path="/my-health" element={<UserRoute><MyHealth /></UserRoute>} />
                 <Route path="/health-passport" element={<UserRoute><HealthPassportPage /></UserRoute>} />
                 <Route path="/financial-health" element={<UserRoute><FinancialHealth /></UserRoute>} />
+                <Route path="/personal-healthcare" element={<UserRoute><PersonalHealthcare /></UserRoute>} />
+                <Route path="/nearest-hospitals" element={<UserRoute><NearestHospitals /></UserRoute>} />
                 <Route path="/medical-vault" element={<UserRoute><MedicalVault /></UserRoute>} />
                 <Route path="/subscription" element={<UserRoute><Subscription /></UserRoute>} />
                 <Route path="/appointments" element={<UserRoute><Appointments /></UserRoute>} />

@@ -35,6 +35,7 @@ const healthTools = [
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
   { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
   { icon: Wallet, label: "Financial Healthcare", color: "bg-success/10 text-success" },
+  { icon: HeartHandshake, label: "Personal Healthcare", color: "bg-primary/10 text-primary" },
 ];
 
 const healthToolsSubItems = [
@@ -125,6 +126,8 @@ const MyHealth = () => {
       gate("Vault", () => navigate("/medical-vault"));
     } else if (label === "Financial Healthcare") {
       gate("Financial Healthcare", () => navigate("/financial-health"));
+    } else if (label === "Personal Healthcare") {
+      navigate("/personal-healthcare");
     } else {
       gate(label, () => setSelectedTool(label));
     }
