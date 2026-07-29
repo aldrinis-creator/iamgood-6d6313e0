@@ -27,6 +27,8 @@ serve(async (req) => {
 
     if (authHeader !== secret && apiKeyHeader !== secret) {
       console.error("Unauthorized request attempt");
+      console.error("Headers received:", Object.fromEntries(req.headers.entries()));
+      console.error(`Expected secret: ${secret ? 'Set' : 'NOT SET'}`);
       return new Response(JSON.stringify({ error: "Unauthorized" }), { 
         status: 401, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
