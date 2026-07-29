@@ -62,6 +62,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const CustomerService = lazy(() => import("./pages/CustomerService"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const ConnectAssistant = lazy(() => import("./pages/ConnectAssistant"));
 const ProductHelpChat = lazy(() => import("./components/ProductHelpChat"));
 
 const queryClient = new QueryClient();
@@ -121,6 +122,7 @@ const App = () => (
                 <Route path="/settings" element={<UserRoute><Settings /></UserRoute>} />
                 <Route path="/help" element={<HelpRouter />} />
                 <Route path="/support" element={<ProtectedRoute><CustomerService /></ProtectedRoute>} />
+                <Route path="/connect" element={<ProtectedRoute><ConnectAssistant /></ProtectedRoute>} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
                 <Route path="/blood-banks" element={<ProtectedRoute><GuardianWardProvider><BloodBanks /></GuardianWardProvider></ProtectedRoute>} />
