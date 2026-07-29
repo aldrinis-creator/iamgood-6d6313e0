@@ -272,6 +272,10 @@ const Help = () => {
               <SettingsIcon className="w-4 h-4 mr-2" />
               Open Full Settings
             </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate("/connect")}>
+              <HelpCircle className="w-4 h-4 mr-2" />
+              Connect an AI Assistant (ChatGPT / Claude)
+            </Button>
           </div>
         )}
 
