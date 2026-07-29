@@ -3,22 +3,52 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, api_key, x-api-key",
+    "authorization, x-client-info, apikey, content-type, x-oh-signature, x-oh-event-id",
 };
 
-async function sha256Prefix(value: string): Promise<string> {
-  try {
-    const buf = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(value),
-    );
-    return Array.from(new Uint8Array(buf))
-      .slice(0, 4)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  } catch {
-    return "err";
+function toHex(buf: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function fromHex(hex: string): Uint8Array {
+  const clean = hex.trim().toLowerCase().replace(/^0x/, "");
+  if (clean.length % 2 !== 0) return new Uint8Array();
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.substr(i * 2, 2), 16);
   }
+  return out;
+}
+
+function fromBase64(b64: string): Uint8Array {
+  try {
+    const bin = atob(b64.trim());
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return new Uint8Array();
+  }
+}
+
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length === 0 || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+async function hmacSha256(secret: string, payload: string): Promise<ArrayBuffer> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
 }
 
 serve(async (req) => {
@@ -29,44 +59,21 @@ serve(async (req) => {
   try {
     const secret = Deno.env.get("ORANGE_WEBHOOK_SECRET");
     if (!secret) {
-      console.error("Server configuration error: ORANGE_WEBHOOK_SECRET is not set");
+      console.error("ORANGE_WEBHOOK_SECRET not set");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Collect any header that could plausibly carry the shared secret.
-    const rawAuth = req.headers.get("authorization") ?? "";
-    const bearerAuth = rawAuth.toLowerCase().startsWith("bearer ")
-      ? rawAuth.slice(7).trim()
-      : "";
-    const plainAuth = rawAuth && !bearerAuth ? rawAuth.trim() : "";
+    const signature = (req.headers.get("x-oh-signature") ?? "").trim();
+    const eventId = req.headers.get("x-oh-event-id") ?? "";
+    const rawBody = await req.text();
 
-    const candidates: Array<{ source: string; value: string }> = [
-      { source: "authorization:bearer", value: bearerAuth },
-      { source: "authorization:raw", value: plainAuth },
-      { source: "api_key", value: req.headers.get("api_key") ?? "" },
-      { source: "apikey", value: req.headers.get("apikey") ?? "" },
-      { source: "x-api-key", value: req.headers.get("x-api-key") ?? "" },
-    ].filter((c) => c.value.length > 0);
-
-    const matched = candidates.find((c) => c.value === secret);
-
-    if (!matched) {
-      const secretHash = await sha256Prefix(secret);
-      const diag = await Promise.all(
-        candidates.map(async (c) => ({
-          source: c.source,
-          length: c.value.length,
-          hashPrefix: await sha256Prefix(c.value),
-        })),
-      );
-      console.error("Unauthorized request attempt", {
+    if (!signature) {
+      console.error("Missing x-oh-signature", {
         headerNames: Array.from(req.headers.keys()),
-        candidates: diag,
-        expectedLength: secret.length,
-        expectedHashPrefix: secretHash,
+        eventId,
       });
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -74,11 +81,51 @@ serve(async (req) => {
       });
     }
 
-    const body = await req.json();
-    console.log(
-      `Received Orange Health Webhook via ${matched.source}:`,
-      JSON.stringify(body, null, 2),
-    );
+    const macBuf = await hmacSha256(secret, rawBody);
+    const macHex = toHex(macBuf);
+    const macBytes = new Uint8Array(macBuf);
+
+    // Try several signature encodings Orange might use.
+    const providedHex = fromHex(signature);
+    const providedB64 = fromBase64(signature);
+    // Some vendors prefix with "sha256=" — strip and retry hex.
+    const stripped = signature.replace(/^sha256=/i, "");
+    const providedHexStripped = fromHex(stripped);
+    const providedB64Stripped = fromBase64(stripped);
+
+    const matched =
+      timingSafeEqual(macBytes, providedHex) ||
+      timingSafeEqual(macBytes, providedB64) ||
+      timingSafeEqual(macBytes, providedHexStripped) ||
+      timingSafeEqual(macBytes, providedB64Stripped) ||
+      signature.toLowerCase() === macHex ||
+      stripped.toLowerCase() === macHex;
+
+    if (!matched) {
+      console.error("Signature mismatch", {
+        eventId,
+        signatureLength: signature.length,
+        signaturePrefix: signature.slice(0, 8),
+        expectedHexPrefix: macHex.slice(0, 8),
+        bodyLength: rawBody.length,
+      });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      parsed = rawBody;
+    }
+
+    console.log("Orange webhook verified", {
+      eventId,
+      body: parsed,
+    });
 
     return new Response(
       JSON.stringify({ success: true, message: "Webhook received" }),
