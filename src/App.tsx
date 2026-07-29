@@ -122,6 +122,7 @@ const App = () => (
                 <Route path="/settings" element={<UserRoute><Settings /></UserRoute>} />
                 <Route path="/help" element={<HelpRouter />} />
                 <Route path="/support" element={<ProtectedRoute><CustomerService /></ProtectedRoute>} />
+                <Route path="/connect" element={<ProtectedRoute><ConnectAssistant /></ProtectedRoute>} />
                 <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
                 <Route path="/contact-us" element={<ProtectedRoute><ContactUs /></ProtectedRoute>} />
                 <Route path="/blood-banks" element={<ProtectedRoute><GuardianWardProvider><BloodBanks /></GuardianWardProvider></ProtectedRoute>} />
