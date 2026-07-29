@@ -61,4 +61,7 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.product-assistant]
     verify_jwt = false
+  [functions.orange-webhook]
+    verify_jwt = false
+
 
