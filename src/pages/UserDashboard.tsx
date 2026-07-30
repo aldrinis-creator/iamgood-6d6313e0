@@ -380,7 +380,7 @@ const UserDashboard = () => {
 
         {/* Medication Refill Due */}
         {refillDue && (
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-warning/30 bg-warning/5" onClick={() => navigate("/my-health?tool=Medications")}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow border-warning/30 bg-warning/5" onClick={() => navigate("/my-health?tool=Tablets&tab=refill")}>
             <CardContent className="p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
                 <Pill className="w-5 h-5 text-warning" />
