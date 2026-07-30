@@ -124,12 +124,17 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth: accept cron (service-role bearer) OR a valid user JWT (client escalation fallback)
+    // Auth: accept cron (service-role bearer or shared cron secret) OR a valid user JWT
     const authHeader = req.headers.get("Authorization") || "";
-    const isCron = authHeader === `Bearer ${serviceRoleKey}`;
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    const isCron =
+      authHeader === `Bearer ${serviceRoleKey}` ||
+      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+
     if (!isCron) {
       const token = authHeader.replace(/^Bearer\s+/i, "");
       if (!token) {
+        console.error("[check-missed-checkins] AUTH REJECTED: no bearer token — scheduled run will not process missed check-ins");
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -138,12 +143,14 @@ Deno.serve(async (req) => {
       const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
       const { data: userData, error: userErr } = await authClient.auth.getUser(token);
       if (userErr || !userData?.user) {
+        console.error("[check-missed-checkins] AUTH REJECTED: bearer token is not the service-role key and not a valid user JWT (likely an anon key from a cron job) — no check-ins will be marked missed");
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
+
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 

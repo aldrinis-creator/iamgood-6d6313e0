@@ -125,9 +125,13 @@ const useGuardianAudio = () => {
       return;
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // IST midnight (Asia/Kolkata) expressed in UTC, matching server-side logic
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(Date.now() + IST_OFFSET_MS);
+    istNow.setUTCHours(0, 0, 0, 0);
+    const todayStart = new Date(istNow.getTime() - IST_OFFSET_MS);
     const oneHourAgo = new Date(Date.now() - 3600 * 1000);
+
 
     const wardIds = wards.map((w) => w.userId);
     const { data, error } = await supabase
