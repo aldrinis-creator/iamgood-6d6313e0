@@ -106,16 +106,19 @@ const MyHealth = () => {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [selectedSubTool, setSelectedSubTool] = useState<string | null>(null);
   const [returnToRoute, setReturnToRoute] = useState<string | null>(null);
+  const [initialTab, setInitialTab] = useState<string | undefined>(undefined);
   const { canAccess, gate, upgradeDialogOpen, upgradeFeature, requiredPlan, upgradeDescription, closeUpgradeDialog } = useFeatureGate();
   const refillDue = useRefillDue();
 
   useEffect(() => {
     const tool = searchParams.get("tool");
     const rTo = searchParams.get("returnTo");
+    const tab = searchParams.get("tab");
     if (!tool) return;
     const redirected = legacyToolRedirect[tool] ?? tool;
     if (toolComponents[redirected] || HUB_TOOLS.includes(redirected)) {
       setSelectedTool(redirected);
+      if (tab) setInitialTab(tab);
       if (rTo) setReturnToRoute(`/${rTo}`);
       setSearchParams({}, { replace: true });
     }
@@ -163,7 +166,7 @@ const MyHealth = () => {
           }} className="gap-1">
             <ArrowLeft className="w-4 h-4" /> {selectedTool}
           </Button>
-          {ToolComponent && <ToolComponent />}
+          {ToolComponent && <ToolComponent initialTab={initialTab} />}
         </div>
       </AppLayout>
     );

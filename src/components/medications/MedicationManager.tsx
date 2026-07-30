@@ -23,9 +23,9 @@ export interface SelectedAlternative {
   forMedId: string;
 }
 
-const MedicationManager = () => {
+const MedicationManager = ({ initialTab }: { initialTab?: string } = {}) => {
   const { session } = useAuth();
-  const [manageTab, setManageTab] = useState("meds");
+  const [manageTab, setManageTab] = useState(initialTab || "meds");
   const [manageOpen, setManageOpen] = useState(false);
   const [altContext, setAltContext] = useState<AlternativeContext | null>(null);
   const [selectedAlt, setSelectedAlt] = useState<SelectedAlternative | null>(null);
