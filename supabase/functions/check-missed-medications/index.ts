@@ -22,10 +22,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth: accept cron (service-role bearer) OR a valid user JWT (client escalation fallback)
+    // Auth: accept cron (service-role bearer OR shared cron secret) OR a valid user JWT
     const authHeader = req.headers.get("Authorization") || "";
-    const isCron = authHeader === `Bearer ${serviceRoleKey}`;
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    const isCron =
+      authHeader === `Bearer ${serviceRoleKey}` ||
+      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
     if (!isCron) {
+
       const token = authHeader.replace(/^Bearer\s+/i, "");
       if (!token) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {

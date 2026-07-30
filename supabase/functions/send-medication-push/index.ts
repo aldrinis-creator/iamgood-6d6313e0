@@ -132,14 +132,20 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth gate: only allow service-role bearer (cron) callers
+    // Auth gate: only allow cron callers (service-role bearer or shared cron secret)
     const authHeader = req.headers.get("Authorization") || "";
-    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+    const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
+    const isCron =
+      authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` ||
+      (!!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET);
+    if (!isCron) {
+      console.error("[send-medication-push] AUTH REJECTED: caller is not the cron job");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
