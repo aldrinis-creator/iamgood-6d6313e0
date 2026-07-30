@@ -194,17 +194,16 @@ Deno.serve(async (req) => {
       .gte("scheduled_at", todayStartUTC.toISOString())
       .lte("scheduled_at", todayEndUTC.toISOString());
 
+    const hourKeyOf = (iso: string) => {
+      const d = new Date(iso);
+      return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}-${d.getUTCHours()}`;
+    };
+
     const takenSet = new Set<string>();
     if (takenLogs) {
       for (const t of takenLogs) {
         if (!t.scheduled_at) continue;
-        const d = new Date(t.scheduled_at);
-        const hourKey = ${d.getUTCFullYear()}---;
-        // Note: medication_id needs to be included in the logs select above for this to work perfectly.
-        // We will just use user_id + hourKey + medication_id if available.
-        // Wait, the main query only selects medication:medications(name) but we need medication_id.
-        // We must update the main query to select medication_id!
-        takenSet.add(${t.user_id}||);
+        takenSet.add(`${t.user_id}|${t.medication_id}|${hourKeyOf(t.scheduled_at)}`);
       }
     }
 
@@ -212,16 +211,15 @@ Deno.serve(async (req) => {
     const raceConditionSkippedIds = [];
 
     for (const l of eligibleLogs) {
-      const d = new Date(l.scheduled_at);
-      const hourKey = ${d.getUTCFullYear()}---;
-      const tKey = ${l.user_id}||;
-      
+      const tKey = `${l.user_id}|${l.medication_id}|${hourKeyOf(l.scheduled_at)}`;
+
       if (takenSet.has(tKey)) {
         raceConditionSkippedIds.push(l.id);
       } else {
         trulyEligibleLogs.push(l);
       }
     }
+
 
     // Silently mark skipped logs as alerted so we don't reprocess them forever.
     const skippedIds = logs
