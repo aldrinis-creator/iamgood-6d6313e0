@@ -76,7 +76,7 @@ const subFeatureKey: Record<string, string> = {
   "Face Scan Analysis": "Face Scan",
 };
 
-const toolComponents: Record<string, React.FC> = {
+const toolComponents: Record<string, React.FC<{ initialTab?: string }>> = {
   "Tablets": MedicationManager,
   "Ambulance": AmbulanceBooking,
   "Vitals": VitalsMonitor,
