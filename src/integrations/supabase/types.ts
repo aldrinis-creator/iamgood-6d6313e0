@@ -2820,6 +2820,10 @@ export type Database = {
         Args: { p_notifications: Json }
         Returns: undefined
       }
+      invoke_edge_fn: {
+        Args: { _body?: Json; _fn: string }
+        Returns: undefined
+      }
       is_accepted_guardian_of: { Args: { _user_id: string }; Returns: boolean }
       is_accepted_vault_nominee: {
         Args: { _guardian_id: string; _user_id: string }
