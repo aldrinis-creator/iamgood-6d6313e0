@@ -5,7 +5,6 @@ import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { playLoudAlertSequence } from "@/lib/audioAlerts";
 import { formatISTTime } from "@/lib/istTime";
-import { canFireCheckInAudio, getCheckInAudioKey, MAX_AUDIO_ALERTS } from "@/lib/checkInAudioLimiter";
 import {
   showGuardianMissedAlarm,
   hideGuardianMissedAlarm,
@@ -15,16 +14,18 @@ import {
 interface WardLite { userId: string; name: string }
 
 const POLL_MS = 60_000;
-const LOOP_MS = 12_000;
+const MAX_SHOWS = 3;
 const DISMISS_KEY = "guardian_dismissed_missed_checkins";
+const SHOWN_KEY = "guardian_shown_missed_checkins";
+
+const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 const getDismissedSet = (): Set<string> => {
   try {
     const raw = localStorage.getItem(DISMISS_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as { day: string; ids: string[] };
-    const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-    if (parsed.day !== todayIST) {
+    if (parsed.day !== todayIST()) {
       localStorage.removeItem(DISMISS_KEY);
       return new Set();
     }
@@ -37,9 +38,36 @@ const getDismissedSet = (): Set<string> => {
 const addDismissed = (ids: string[]) => {
   const existing = getDismissedSet();
   ids.forEach((id) => existing.add(id));
-  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  localStorage.setItem(DISMISS_KEY, JSON.stringify({ day: todayIST, ids: Array.from(existing) }));
+  localStorage.setItem(DISMISS_KEY, JSON.stringify({ day: todayIST(), ids: Array.from(existing) }));
 };
+
+const getShownCounts = (): Record<string, number> => {
+  try {
+    const raw = localStorage.getItem(SHOWN_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { day: string; counts: Record<string, number> };
+    if (parsed.day !== todayIST()) {
+      localStorage.removeItem(SHOWN_KEY);
+      return {};
+    }
+    return parsed.counts || {};
+  } catch {
+    return {};
+  }
+};
+
+const bumpShown = (id: string): number => {
+  const counts = getShownCounts();
+  const next = (counts[id] || 0) + 1;
+  counts[id] = next;
+  try {
+    localStorage.setItem(SHOWN_KEY, JSON.stringify({ day: todayIST(), counts }));
+  } catch {
+    // storage unavailable — in-memory guards still apply
+  }
+  return next;
+};
+
 
 const useGuardianAudio = () => {
   const { session } = useAuth();
