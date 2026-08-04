@@ -19,21 +19,6 @@ function normalizePhone(raw: string): string | null {
   return digits;
 }
 
-function formatIST(iso: string): string {
-  const d = iso ? new Date(iso) : new Date();
-  if (isNaN(d.getTime())) return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST";
-  const fmt = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return fmt.format(d) + " IST";
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -59,7 +44,6 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const wardName = String(body?.wardName ?? "").trim();
     const zoneName = String(body?.zoneName ?? "").trim();
-    const occurredAt = String(body?.occurredAt ?? "");
     const phonesIn: unknown = body?.phones;
 
     if (!wardName || !zoneName || !Array.isArray(phonesIn) || phonesIn.length === 0) {
