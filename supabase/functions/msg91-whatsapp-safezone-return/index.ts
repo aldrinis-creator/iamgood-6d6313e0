@@ -7,7 +7,7 @@ const MSG91_WA_URL =
   "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
 const INTEGRATED_NUMBER = "917045868482";
 const TEMPLATE_NAME = "safe_zone_return";
-const NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
+const NAMESPACE = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
 
 function normalizePhone(raw: string): string | null {
   if (!raw) return null;
