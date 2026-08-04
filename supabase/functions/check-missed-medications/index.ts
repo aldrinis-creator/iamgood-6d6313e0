@@ -305,8 +305,9 @@ Deno.serve(async (req) => {
       ));
       if (guardianPhones.length > 0) {
         await sendWhatsAppTemplate({
-          templateName: "guardian_missed_medication",
-          languageCode: "en_US",
+          templateName: "guardian_medication_reminder",
+          languageCode: "en_GB",
+          namespace: WA_NAMESPACE_V2,
           recipients: guardianPhones.map((p) => ({
             to: [p],
             components: { body_1: userName, body_2: medList },
