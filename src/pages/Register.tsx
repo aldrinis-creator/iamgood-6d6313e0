@@ -192,6 +192,11 @@ const Register = () => {
       return toast.error("Registration failed", { description: error.message });
     }
 
+    // Fire-and-forget WhatsApp welcome (never blocks signup)
+    supabase.functions
+      .invoke("msg91-whatsapp-welcome")
+      .catch((e) => console.error("welcome WhatsApp failed:", e));
+
     const guardiansWithEmail = guardianRows.filter(g => g.guardian_email);
     if (selectedRole === "user") {
       for (const g of guardiansWithEmail) if (g.guardian_email) sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");

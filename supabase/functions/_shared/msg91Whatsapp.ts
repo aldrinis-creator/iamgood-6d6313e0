@@ -7,6 +7,8 @@ const WA_URL =
 
 const INTEGRATED_NUMBER = "917045868482";
 const NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
+/** Namespace for the newer template set (welcome, missed check-in/medication, safe zone). */
+export const WA_NAMESPACE_V2 = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
 
 export type WaComponents = {
   body_1?: string;
@@ -37,6 +39,8 @@ export function normalizeIndianPhone(raw: string | null | undefined): string | n
 export async function sendWhatsAppTemplate(opts: {
   templateName: string;
   languageCode: string; // e.g. "en_US" | "en_GB"
+  /** Optional MSG91 namespace override (defaults to the legacy namespace). */
+  namespace?: string;
   recipients: WaRecipient[];
 }): Promise<{ ok: boolean; status: number; body: unknown }> {
   const authKey = Deno.env.get("MSG91_AUTH_KEY");
@@ -70,7 +74,7 @@ export async function sendWhatsAppTemplate(opts: {
       template: {
         name: opts.templateName,
         language: { code: opts.languageCode, policy: "deterministic" },
-        namespace: NAMESPACE,
+        namespace: opts.namespace ?? NAMESPACE,
         to_and_components: cleanRecipients.map((r) => ({
           to: r.to,
           components: componentsToObject(r.components),

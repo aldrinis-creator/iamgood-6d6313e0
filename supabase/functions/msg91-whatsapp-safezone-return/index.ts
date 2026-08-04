@@ -7,7 +7,7 @@ const MSG91_WA_URL =
   "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/";
 const INTEGRATED_NUMBER = "917045868482";
 const TEMPLATE_NAME = "safe_zone_return";
-const NAMESPACE = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
+const NAMESPACE = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
 
 function normalizePhone(raw: string): string | null {
   if (!raw) return null;
@@ -17,21 +17,6 @@ function normalizePhone(raw: string): string | null {
   if (digits.startsWith("0") && digits.length === 11) digits = "91" + digits.slice(1);
   if (digits.length < 11 || digits.length > 15) return null;
   return digits;
-}
-
-function formatIST(iso: string): string {
-  const d = iso ? new Date(iso) : new Date();
-  if (isNaN(d.getTime())) return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST";
-  const fmt = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return fmt.format(d) + " IST";
 }
 
 Deno.serve(async (req) => {
@@ -59,7 +44,6 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const wardName = String(body?.wardName ?? "").trim();
     const zoneName = String(body?.zoneName ?? "").trim();
-    const occurredAt = String(body?.occurredAt ?? "");
     const phonesIn: unknown = body?.phones;
 
     if (!wardName || !zoneName || !Array.isArray(phonesIn) || phonesIn.length === 0) {
@@ -84,8 +68,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const timeIST = formatIST(occurredAt);
-
     const payload = {
       integrated_number: INTEGRATED_NUMBER,
       content_type: "template",
@@ -94,7 +76,7 @@ Deno.serve(async (req) => {
         type: "template",
         template: {
           name: TEMPLATE_NAME,
-          language: { code: "en_GB", policy: "deterministic" },
+          language: { code: "en", policy: "deterministic" },
           namespace: NAMESPACE,
           to_and_components: [
             {
@@ -102,7 +84,6 @@ Deno.serve(async (req) => {
               components: {
                 body_1: { type: "text", value: wardName },
                 body_2: { type: "text", value: zoneName },
-                body_3: { type: "text", value: timeIST },
               },
             },
           ],
