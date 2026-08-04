@@ -203,9 +203,9 @@ const useGuardianAudio = () => {
     return () => {
       if (pollRef.current !== null) clearInterval(pollRef.current);
       document.removeEventListener("visibilitychange", onVis);
-      stopLoop();
+      closeAlarm();
     };
-  }, [scan, stopLoop]);
+  }, [scan, closeAlarm]);
 };
 
 export default useGuardianAudio;
