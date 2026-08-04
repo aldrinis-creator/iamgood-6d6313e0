@@ -37,6 +37,8 @@ export function normalizeIndianPhone(raw: string | null | undefined): string | n
 export async function sendWhatsAppTemplate(opts: {
   templateName: string;
   languageCode: string; // e.g. "en_US" | "en_GB"
+  /** Optional MSG91 namespace override (defaults to the legacy namespace). */
+  namespace?: string;
   recipients: WaRecipient[];
 }): Promise<{ ok: boolean; status: number; body: unknown }> {
   const authKey = Deno.env.get("MSG91_AUTH_KEY");
