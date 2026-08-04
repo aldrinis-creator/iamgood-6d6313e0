@@ -35,4 +35,6 @@ All four templates live in the new namespace `e67e5302_b6d0_403e_b3cc_8fa6e8accb
 
 ## Out of scope
 
-- Templates not listed (SOS, OTP, safe-zone exit, safe-zone creation, pharmacy, appointment share) are unchanged.
+- Templates not listed (SOS, OTP, safe-zone exit, safe-zone creation, pharmacy, appointment share) are unchanged.  
+Delete earlier templates, OTP, safe-zone exit, safe-zone creation, pharmacy, appointment share
+  &nbsp;
