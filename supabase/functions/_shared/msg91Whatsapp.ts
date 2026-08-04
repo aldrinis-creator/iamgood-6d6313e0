@@ -72,7 +72,7 @@ export async function sendWhatsAppTemplate(opts: {
       template: {
         name: opts.templateName,
         language: { code: opts.languageCode, policy: "deterministic" },
-        namespace: NAMESPACE,
+        namespace: opts.namespace ?? NAMESPACE,
         to_and_components: cleanRecipients.map((r) => ({
           to: r.to,
           components: componentsToObject(r.components),
