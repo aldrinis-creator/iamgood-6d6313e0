@@ -109,49 +109,26 @@ const useGuardianAudio = () => {
     return () => { cancelled = true; };
   }, [role, session?.user?.id]);
 
-  const stopLoop = useCallback(() => {
-    if (loopRef.current !== null) {
-      clearInterval(loopRef.current);
-      loopRef.current = null;
-    }
+  const closeAlarm = useCallback(() => {
     activeRef.current = false;
   }, []);
-
-  const startLoop = useCallback((items: MissedCheckinItem[]) => {
-    if (loopRef.current !== null) return;
-    activeRef.current = true;
-    const fire = (): boolean => {
-      const first = items.find((item) =>
-        canFireCheckInAudio(getCheckInAudioKey("guardian", item.id, new Date(item.scheduledAt)), MAX_AUDIO_ALERTS)
-      );
-      if (!first) return false;
-      const msg = `Attention Guardian. ${first.wardName} has missed their ${formatISTTime(new Date(first.scheduledAt))} Check-iN. Please check on them.`;
-      playLoudAlertSequence(msg);
-      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
-      return true;
-    };
-    if (!fire()) {
-      activeRef.current = false;
-      return;
-    }
-    loopRef.current = window.setInterval(() => {
-      if (!fire()) stopLoop();
-    }, LOOP_MS);
-  }, [stopLoop]);
 
   const scan = useCallback(async () => {
     if (role !== "guardian") return;
     if (loginInProgress) return;
     if (settings.guardianPersistentMissedAlarm === false) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
     if (!session?.user?.id || wards.length === 0) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
+
+    // Alarm currently on screen — don't re-trigger over it.
+    if (activeRef.current) return;
 
     // IST midnight (Asia/Kolkata) expressed in UTC, matching server-side logic
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -186,18 +163,35 @@ const useGuardianAudio = () => {
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
 
     if (items.length === 0) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
 
-    showGuardianMissedAlarm(items, () => {
-      stopLoop();
-      addDismissed(items.map((i) => i.id));
-    });
+    const primary = items[0];
+    const showNumber = bumpShown(primary.id);
+    const isFinalShow = showNumber >= MAX_SHOWS;
+    activeRef.current = true;
 
-    if (!activeRef.current) startLoop(items);
-  }, [role, loginInProgress, settings.guardianPersistentMissedAlarm, session?.user?.id, wards, startLoop, stopLoop]);
+    showGuardianMissedAlarm(
+      items,
+      () => {
+        closeAlarm();
+        addDismissed(items.map((i) => i.id));
+      },
+      {
+        // 3rd (and any later) showing stays until the guardian dismisses it.
+        autoDismiss: !isFinalShow,
+        onAutoDismiss: closeAlarm,
+      }
+    );
+
+    // One loud alert per showing.
+    const msg = `Attention Guardian. ${primary.wardName} has missed their ${formatISTTime(new Date(primary.scheduledAt))} Check-iN. Please check on them.`;
+    playLoudAlertSequence(msg);
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+  }, [role, loginInProgress, settings.guardianPersistentMissedAlarm, session?.user?.id, wards, closeAlarm]);
+
 
   useEffect(() => {
     scan();
