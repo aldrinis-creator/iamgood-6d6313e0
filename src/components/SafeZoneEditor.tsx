@@ -344,6 +344,10 @@ export default function SafeZoneEditor() {
       queryClient.invalidateQueries({ queryKey: ["safe_zones", userId] });
       setShowAdd(false);
       toast.success("Safe zone added");
+      // Best-effort WhatsApp confirmation to the user and their guardians
+      supabase.functions
+        .invoke("msg91-whatsapp-safezone-created", { body: {} })
+        .catch((e) => console.error("safe_zone_creation_user WhatsApp failed", e));
     },
     onError: () => toast.error("Failed to add safe zone"),
   });
