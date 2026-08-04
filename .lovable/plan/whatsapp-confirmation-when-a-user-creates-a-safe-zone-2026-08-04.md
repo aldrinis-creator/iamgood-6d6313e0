@@ -12,6 +12,7 @@ When a user saves a new Safe Zone, send them a WhatsApp confirmation on their ow
 ## Technical details
 
 New edge function `supabase/functions/msg91-whatsapp-safezone-created/index.ts`:
+
 - Mirrors the existing `msg91-whatsapp-safezone` function (CORS, POST-only, `MSG91_AUTH_KEY` from secrets, phone normalisation to `91XXXXXXXXXX`).
 - Validates the caller's JWT and resolves the phone number server-side from `profiles` for `auth.uid()` — the client does not pass a phone number.
 - Posts to `https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/` with:
@@ -21,6 +22,9 @@ New edge function `supabase/functions/msg91-whatsapp-safezone-created/index.ts`:
   - `to_and_components`: single entry with the user's number and empty `components: {}`
 
 Client change in `src/components/SafeZoneEditor.tsx`:
+
 - In the `addZone` mutation's `onSuccess`, call `supabase.functions.invoke("msg91-whatsapp-safezone-created")` inside a try/catch that swallows errors.
 
 No database or schema changes. No new secrets — `MSG91_AUTH_KEY` is already configured.
+
+also inform the guardian
