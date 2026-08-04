@@ -84,8 +84,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const timeIST = formatIST(occurredAt);
-
     const payload = {
       integrated_number: INTEGRATED_NUMBER,
       content_type: "template",
@@ -94,7 +92,7 @@ Deno.serve(async (req) => {
         type: "template",
         template: {
           name: TEMPLATE_NAME,
-          language: { code: "en_GB", policy: "deterministic" },
+          language: { code: "en", policy: "deterministic" },
           namespace: NAMESPACE,
           to_and_components: [
             {
@@ -102,7 +100,6 @@ Deno.serve(async (req) => {
               components: {
                 body_1: { type: "text", value: wardName },
                 body_2: { type: "text", value: zoneName },
-                body_3: { type: "text", value: timeIST },
               },
             },
           ],
