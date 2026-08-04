@@ -5,7 +5,6 @@ import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { playLoudAlertSequence } from "@/lib/audioAlerts";
 import { formatISTTime } from "@/lib/istTime";
-import { canFireCheckInAudio, getCheckInAudioKey, MAX_AUDIO_ALERTS } from "@/lib/checkInAudioLimiter";
 import {
   showGuardianMissedAlarm,
   hideGuardianMissedAlarm,
@@ -15,16 +14,18 @@ import {
 interface WardLite { userId: string; name: string }
 
 const POLL_MS = 60_000;
-const LOOP_MS = 12_000;
+const MAX_SHOWS = 3;
 const DISMISS_KEY = "guardian_dismissed_missed_checkins";
+const SHOWN_KEY = "guardian_shown_missed_checkins";
+
+const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 const getDismissedSet = (): Set<string> => {
   try {
     const raw = localStorage.getItem(DISMISS_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as { day: string; ids: string[] };
-    const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-    if (parsed.day !== todayIST) {
+    if (parsed.day !== todayIST()) {
       localStorage.removeItem(DISMISS_KEY);
       return new Set();
     }
@@ -37,9 +38,36 @@ const getDismissedSet = (): Set<string> => {
 const addDismissed = (ids: string[]) => {
   const existing = getDismissedSet();
   ids.forEach((id) => existing.add(id));
-  const todayIST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  localStorage.setItem(DISMISS_KEY, JSON.stringify({ day: todayIST, ids: Array.from(existing) }));
+  localStorage.setItem(DISMISS_KEY, JSON.stringify({ day: todayIST(), ids: Array.from(existing) }));
 };
+
+const getShownCounts = (): Record<string, number> => {
+  try {
+    const raw = localStorage.getItem(SHOWN_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { day: string; counts: Record<string, number> };
+    if (parsed.day !== todayIST()) {
+      localStorage.removeItem(SHOWN_KEY);
+      return {};
+    }
+    return parsed.counts || {};
+  } catch {
+    return {};
+  }
+};
+
+const bumpShown = (id: string): number => {
+  const counts = getShownCounts();
+  const next = (counts[id] || 0) + 1;
+  counts[id] = next;
+  try {
+    localStorage.setItem(SHOWN_KEY, JSON.stringify({ day: todayIST(), counts }));
+  } catch {
+    // storage unavailable — in-memory guards still apply
+  }
+  return next;
+};
+
 
 const useGuardianAudio = () => {
   const { session } = useAuth();
@@ -81,49 +109,26 @@ const useGuardianAudio = () => {
     return () => { cancelled = true; };
   }, [role, session?.user?.id]);
 
-  const stopLoop = useCallback(() => {
-    if (loopRef.current !== null) {
-      clearInterval(loopRef.current);
-      loopRef.current = null;
-    }
+  const closeAlarm = useCallback(() => {
     activeRef.current = false;
   }, []);
-
-  const startLoop = useCallback((items: MissedCheckinItem[]) => {
-    if (loopRef.current !== null) return;
-    activeRef.current = true;
-    const fire = (): boolean => {
-      const first = items.find((item) =>
-        canFireCheckInAudio(getCheckInAudioKey("guardian", item.id, new Date(item.scheduledAt)), MAX_AUDIO_ALERTS)
-      );
-      if (!first) return false;
-      const msg = `Attention Guardian. ${first.wardName} has missed their ${formatISTTime(new Date(first.scheduledAt))} Check-iN. Please check on them.`;
-      playLoudAlertSequence(msg);
-      if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
-      return true;
-    };
-    if (!fire()) {
-      activeRef.current = false;
-      return;
-    }
-    loopRef.current = window.setInterval(() => {
-      if (!fire()) stopLoop();
-    }, LOOP_MS);
-  }, [stopLoop]);
 
   const scan = useCallback(async () => {
     if (role !== "guardian") return;
     if (loginInProgress) return;
     if (settings.guardianPersistentMissedAlarm === false) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
     if (!session?.user?.id || wards.length === 0) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
+
+    // Alarm currently on screen — don't re-trigger over it.
+    if (activeRef.current) return;
 
     // IST midnight (Asia/Kolkata) expressed in UTC, matching server-side logic
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -158,18 +163,35 @@ const useGuardianAudio = () => {
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
 
     if (items.length === 0) {
-      stopLoop();
+      closeAlarm();
       hideGuardianMissedAlarm();
       return;
     }
 
-    showGuardianMissedAlarm(items, () => {
-      stopLoop();
-      addDismissed(items.map((i) => i.id));
-    });
+    const primary = items[0];
+    const showNumber = bumpShown(primary.id);
+    const isFinalShow = showNumber >= MAX_SHOWS;
+    activeRef.current = true;
 
-    if (!activeRef.current) startLoop(items);
-  }, [role, loginInProgress, settings.guardianPersistentMissedAlarm, session?.user?.id, wards, startLoop, stopLoop]);
+    showGuardianMissedAlarm(
+      items,
+      () => {
+        closeAlarm();
+        addDismissed(items.map((i) => i.id));
+      },
+      {
+        // 3rd (and any later) showing stays until the guardian dismisses it.
+        autoDismiss: !isFinalShow,
+        onAutoDismiss: closeAlarm,
+      }
+    );
+
+    // One loud alert per showing.
+    const msg = `Attention Guardian. ${primary.wardName} has missed their ${formatISTTime(new Date(primary.scheduledAt))} Check-iN. Please check on them.`;
+    playLoudAlertSequence(msg);
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+  }, [role, loginInProgress, settings.guardianPersistentMissedAlarm, session?.user?.id, wards, closeAlarm]);
+
 
   useEffect(() => {
     scan();
@@ -181,9 +203,9 @@ const useGuardianAudio = () => {
     return () => {
       if (pollRef.current !== null) clearInterval(pollRef.current);
       document.removeEventListener("visibilitychange", onVis);
-      stopLoop();
+      closeAlarm();
     };
-  }, [scan, stopLoop]);
+  }, [scan, closeAlarm]);
 };
 
 export default useGuardianAudio;
