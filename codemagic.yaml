@@ -34,12 +34,14 @@ workflows:
           <dict>
               <key>method</key>
               <string>app-store</string>
+              <key>teamID</key>
+              <string>3DG2YX63XL</string>
           </dict>
           </plist>
           EOF
       - name: Build ipa for distribution
         script: |
-          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates archive
+          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates DEVELOPMENT_TEAM=3DG2YX63XL archive
           xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
