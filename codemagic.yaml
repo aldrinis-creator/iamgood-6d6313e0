@@ -41,8 +41,8 @@ workflows:
           EOF
       - name: Build ipa for distribution
         script: |
-          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates DEVELOPMENT_TEAM=3DG2YX63XL archive
-          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates
+          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID} DEVELOPMENT_TEAM=3DG2YX63XL archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID}
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
     publishing:
