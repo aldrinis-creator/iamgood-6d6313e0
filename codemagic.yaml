@@ -6,8 +6,6 @@ workflows:
       node: latest
       xcode: latest
       cocoapods: default
-      groups:
-        - app_store_credentials
     integrations:
       app_store_connect: "CheckinAPI"
     triggering:
