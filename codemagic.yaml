@@ -27,10 +27,10 @@ workflows:
         script: |
           app-store-connect fetch-signing-files "com.futurewave.checkin" --type IOS_APP_STORE --create
           keychain add-certificates
-          xcode-project use-profiles --project "ios/App/App.xcodeproj"
+          xcode-project use-profiles --project "ios/App/App.xcodeproj" --export-method app-store
       - name: Build ipa for distribution
         script: |
-          xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App"
+          xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App" --export-method app-store
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
     publishing:
