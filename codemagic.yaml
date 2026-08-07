@@ -26,7 +26,22 @@ workflows:
       - name: Set up Automatic Code Signing
         script: |
           mkdir -p ~/.appstoreconnect/private_keys
-          printf "%b\n" "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
+          python3 -c "
+          import os
+          import sys
+          import base64
+          key = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '')
+          if '-----BEGIN' not in key:
+              try:
+                  key = base64.b64decode(key).decode('utf-8')
+              except:
+                  pass
+          key = key.replace('\\\\n', '\\n')
+          if not key.endswith('\\n'):
+              key += '\\n'
+          with open(sys.argv[1], 'w') as f:
+              f.write(key)
+          " ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
           cat <<EOF > export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
