@@ -25,30 +25,8 @@ workflows:
         script: npx cap sync ios
       - name: Set up Automatic Code Signing
         script: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          python3 -c "
-          import os
-          import sys
-          import base64
-          key = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '')
-          print(f'DEBUG: Key length from env is {len(key)}')
-          if not key:
-              print('ERROR: APP_STORE_CONNECT_PRIVATE_KEY is empty! The integration is not injecting the key.')
-              sys.exit(1)
-          if '-----BEGIN' not in key:
-              try:
-                  key = base64.b64decode(key).decode('utf-8')
-                  print(f'DEBUG: Successfully base64 decoded key, new length is {len(key)}')
-              except Exception as e:
-                  print(f'DEBUG: Base64 decode failed: {e}')
-          key = key.replace('\\\\n', '\\n')
-          print(f'DEBUG: Key starts with: {key[:27]}')
-          print(f'DEBUG: Key ends with: {key[-25:]}')
-          if not key.endswith('\\n'):
-              key += '\\n'
-          with open(sys.argv[1], 'w') as f:
-              f.write(key)
-          " ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
+          echo "Checking if Codemagic automatically created the key:"
+          ls -la ~/.appstoreconnect/private_keys/ || echo "Directory does not exist"
           cat <<EOF > export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
