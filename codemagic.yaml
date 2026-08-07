@@ -23,14 +23,24 @@ workflows:
         script: npm run build
       - name: Sync Capacitor iOS
         script: npx cap sync ios
-      - name: Set up code signing
+      - name: Set up Automatic Code Signing
         script: |
-          app-store-connect fetch-signing-files "com.futurewave.checkin" --type IOS_APP_STORE --create
-          keychain add-certificates
-          xcode-project use-profiles --project "ios/App/App.xcodeproj"
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo -e "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
+          cat <<EOF > export_options.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+          </dict>
+          </plist>
+          EOF
       - name: Build ipa for distribution
         script: |
-          xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App" --export-method app-store
+          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
     publishing:
