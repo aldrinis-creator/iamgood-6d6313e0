@@ -9,7 +9,7 @@ workflows:
       groups:
         - app_store_credentials
     integrations:
-      - app_store_connect
+      app_store_connect: "CheckinAPI"
     triggering:
       events:
         - push
