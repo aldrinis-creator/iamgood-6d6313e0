@@ -23,10 +23,12 @@ workflows:
         script: npm run build
       - name: Sync Capacitor iOS
         script: npx cap sync ios
-      - name: Set up Automatic Code Signing
+      - name: Set up code signing
         script: |
-          echo "Checking if Codemagic automatically created the key:"
-          ls -la ~/.appstoreconnect/private_keys/ || echo "Directory does not exist"
+          keychain initialize
+          keychain add-certificates
+          app-store-connect fetch-signing-files "com.futurewave.checkin" --type IOS_APP_STORE --create
+          xcode-project use-profiles
           cat <<EOF > export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -41,8 +43,8 @@ workflows:
           EOF
       - name: Build ipa for distribution
         script: |
-          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID} DEVELOPMENT_TEAM=3DG2YX63XL archive
-          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID}
+          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
     publishing:
