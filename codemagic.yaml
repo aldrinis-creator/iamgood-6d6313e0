@@ -31,12 +31,19 @@ workflows:
           import sys
           import base64
           key = os.environ.get('APP_STORE_CONNECT_PRIVATE_KEY', '')
+          print(f'DEBUG: Key length from env is {len(key)}')
+          if not key:
+              print('ERROR: APP_STORE_CONNECT_PRIVATE_KEY is empty! The integration is not injecting the key.')
+              sys.exit(1)
           if '-----BEGIN' not in key:
               try:
                   key = base64.b64decode(key).decode('utf-8')
-              except:
-                  pass
+                  print(f'DEBUG: Successfully base64 decoded key, new length is {len(key)}')
+              except Exception as e:
+                  print(f'DEBUG: Base64 decode failed: {e}')
           key = key.replace('\\\\n', '\\n')
+          print(f'DEBUG: Key starts with: {key[:27]}')
+          print(f'DEBUG: Key ends with: {key[-25:]}')
           if not key.endswith('\\n'):
               key += '\\n'
           with open(sys.argv[1], 'w') as f:
