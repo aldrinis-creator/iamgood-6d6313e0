@@ -37,8 +37,8 @@ workflows:
           </dict>
           </plist>
           EOF
-          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID} DEVELOPMENT_TEAM=3DG2YX63XL archive
-          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID}
+          xcodebuild -project "ios/App/App.xcodeproj" -scheme "App" -configuration Release -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath ios/App/build/ios/ipa -exportOptionsPlist export_options.plist -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8 -authenticationKeyID ${APP_STORE_CONNECT_KEY_IDENTIFIER} -authenticationKeyIssuerID ${APP_STORE_CONNECT_ISSUER_ID} DEVELOPMENT_TEAM=3DG2YX63XL
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
     publishing:
