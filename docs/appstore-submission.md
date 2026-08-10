@@ -316,7 +316,7 @@ trimmed to 30 seconds, portrait, no audio narration required.
 
 ## 5. Remaining items to supply
 
-- Demo user and guardian phone numbers with a fixed review OTP.
+- Done: demo numbers +91 98195 76467 and +91 70458 68482 with fixed OTP 420666.
 - Support URL and marketing URL for the product page.
 - Privacy policy URL (public, reachable without login).
 - Copyright line and contact person for App Review.
