@@ -111,7 +111,7 @@ async function logOtpEvent(
     request_id: requestId || null,
     status,
     failure_reason: failureReason || null,
-    otp_code: hashed,
+    otp_hash: hashed,
     expires_at: expiresAt || null,
   });
   if (error) console.error("[send-otp] Failed to log event:", error.message);
@@ -215,11 +215,11 @@ Deno.serve(async (req) => {
       // Look up the latest unexpired OTP for this phone
       const { data: otpRow, error: lookupErr } = await admin
         .from("otp_events")
-        .select("id, otp_code, expires_at")
+        .select("id, otp_hash, expires_at")
         .eq("phone", phone)
         .in("action", ["send", "resend"])
         .eq("status", "sent")
-        .not("otp_code", "is", null)
+        .not("otp_hash", "is", null)
         .gte("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(1)
@@ -231,13 +231,13 @@ Deno.serve(async (req) => {
       }
 
       const submittedHash = await sha256Hex(otp);
-      if (!otpRow || otpRow.otp_code !== submittedHash) {
+      if (!otpRow || otpRow.otp_hash !== submittedHash) {
         await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Invalid or expired OTP");
         return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
       }
 
       // Mark as verified and nullify the OTP hash
-      await admin.from("otp_events").update({ verified: true, status: "verified", otp_code: null }).eq("id", otpRow.id);
+      await admin.from("otp_events").update({ verified: true, status: "verified", otp_hash: null }).eq("id", otpRow.id);
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
 
       // Registration: just confirm
