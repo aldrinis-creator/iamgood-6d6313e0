@@ -162,16 +162,21 @@ information with a "see a doctor" prompt and make no diagnosis.
 
 SIGN IN
 Sign-in is by mobile number with a one-time password sent by SMS/WhatsApp.
-Because reviewers cannot receive an Indian SMS, please use the demo accounts
-below, which accept a fixed OTP.
+Because reviewers cannot receive an Indian SMS, the two demo numbers below are
+whitelisted on our server: no SMS is sent to them and a fixed code is accepted.
+Enter the number exactly as shown (with the +91 country code) and type the code.
+All paid features are unlocked on these accounts for the review period, so
+nothing needs to be purchased.
 
-  User account
-    Phone: <TO BE PROVIDED>
-    OTP:   <TO BE PROVIDED>
+  Demo account 1
+    Phone: +91 98195 76467
+    OTP:   420666
 
-  Guardian account (already linked to the user account above)
-    Phone: <TO BE PROVIDED>
-    OTP:   <TO BE PROVIDED>
+  Demo account 2
+    Phone: +91 70458 68482
+    OTP:   420666
+
+
 
 HOW TO TEST THE MAIN FEATURES WITHOUT WAITING
 
