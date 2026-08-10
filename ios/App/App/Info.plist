@@ -48,14 +48,30 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>This app requires access to your camera to take photos.</string>
+	<string>Check-iN uses the camera to scan prescriptions, medicines and health test strips.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app requires access to your photo library to select photos.</string>
+	<string>Check-iN lets you attach photos of prescriptions and reports to your medical vault.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app requires access to save photos to your library.</string>
+	<string>Check-iN saves your reports to your photo library when you choose to export them.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app requires access to your microphone to record audio.</string>
+	<string>Check-iN uses the microphone so you can speak to the voice assistant.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app requires access to your location to provide personalized services.</string>
+	<string>Check-iN uses your location so your guardians can find you if you send an SOS.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Check-iN uses your location in the background to alert your guardians if you leave a safe zone or send an SOS while the app is closed.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Check-iN converts your speech to text so the assistant can answer your question.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Check-iN uses motion data to detect a possible fall and ask if you are okay.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Check-iN can read your contacts so you can pick a guardian without typing their number.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Check-iN uses Face ID to unlock your medical vault.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+
 </dict>
 </plist>
