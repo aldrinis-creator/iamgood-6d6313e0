@@ -168,13 +168,14 @@ Enter the number exactly as shown (with the +91 country code) and type the code.
 All paid features are unlocked on these accounts for the review period, so
 nothing needs to be purchased.
 
-  Demo account 1
+  Demo account 1 - senior ("user" role)
     Phone: +91 98195 76467
     OTP:   420666
 
-  Demo account 2
+  Demo account 2 - guardian (carer view of the senior above)
     Phone: +91 70458 68482
     OTP:   420666
+
 
 
 

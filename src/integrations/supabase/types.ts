@@ -1802,7 +1802,7 @@ export type Database = {
           expires_at: string | null
           failure_reason: string | null
           id: string
-          otp_code: string | null
+          otp_hash: string | null
           phone: string
           request_id: string | null
           status: string
@@ -1816,7 +1816,7 @@ export type Database = {
           expires_at?: string | null
           failure_reason?: string | null
           id?: string
-          otp_code?: string | null
+          otp_hash?: string | null
           phone: string
           request_id?: string | null
           status?: string
@@ -1830,7 +1830,7 @@ export type Database = {
           expires_at?: string | null
           failure_reason?: string | null
           id?: string
-          otp_code?: string | null
+          otp_hash?: string | null
           phone?: string
           request_id?: string | null
           status?: string
