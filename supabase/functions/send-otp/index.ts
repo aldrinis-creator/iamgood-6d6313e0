@@ -24,6 +24,46 @@ function generateOtp(): string {
   return String(100000 + (arr[0] % 900000));
 }
 
+/** App Store reviewer accounts: fixed OTP, no SMS/WhatsApp dispatch, no rate limit. */
+function reviewPhones(): string[] {
+  return (Deno.env.get("REVIEW_PHONES") ?? "")
+    .split(",")
+    .map((p) => normalizePhone(p.trim()))
+    .filter((p) => p.length >= 12);
+}
+
+function isReviewPhone(phone: string): boolean {
+  return reviewPhones().includes(phone);
+}
+
+/** Give a reviewer account full premium access for 30 days if they have none active. */
+async function ensureReviewAccess(admin: ReturnType<typeof getAdminClient>, userId: string) {
+  try {
+    const { data: existing } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .gt("expires_at", new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (existing) return;
+
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await admin.from("subscriptions").insert({
+      user_id: userId,
+      plan_type: "premium",
+      billing_cycle: "monthly",
+      status: "active",
+      amount_paise: 0,
+      coupon_code: "APPSTORE_REVIEW",
+      expires_at: expires,
+    });
+  } catch (e) {
+    console.error("[send-otp] ensureReviewAccess failed:", e);
+  }
+}
+
 function getAdminClient() {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -112,6 +152,59 @@ Deno.serve(async (req) => {
     const admin = getAdminClient();
 
     console.log(`[send-otp] action=${action} phone=${phone} purpose=${purpose || "login"}`);
+
+    // ── APP STORE REVIEW BYPASS ─────────────────────────────
+    if (isReviewPhone(phone)) {
+      const reviewCode = Deno.env.get("REVIEW_OTP_CODE") ?? "";
+
+      if (action !== "verify") {
+        console.log(`[send-otp] review bypass: skipping dispatch for ${phone}`);
+        await logOtpEvent(admin, phone, "review_bypass", undefined, "sent");
+        return jsonResponse({ success: true, channels: { sms: "skipped", whatsapp: "skipped" } });
+      }
+
+      if (!reviewCode || otp !== reviewCode) {
+        await logOtpEvent(admin, phone, "review_bypass_fail", undefined, "failed", "Invalid review code");
+        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
+      }
+
+      await logOtpEvent(admin, phone, "review_bypass_verify", undefined, "verified");
+
+      if (purpose === "register") {
+        return jsonResponse({ success: true, verified: true });
+      }
+
+      const phoneWithPlus = `+${phone}`;
+      const { data: email, error: rpcError } = await admin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
+      if (rpcError || !email) {
+        return jsonResponse({ success: true, verified: true, no_account: true });
+      }
+
+      const { data: userRow } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("phone", phoneWithPlus)
+        .limit(1)
+        .maybeSingle();
+      if (userRow?.id) await ensureReviewAccess(admin, userRow.id);
+
+      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: email as string,
+      });
+      if (linkError || !linkData) {
+        console.error("[send-otp] review magic link failed:", linkError?.message);
+        return jsonResponse({ success: true, verified: true, error: "Failed to create session" });
+      }
+
+      return jsonResponse({
+        success: true,
+        verified: true,
+        token_hash: linkData.properties?.hashed_token,
+        email: email as string,
+      });
+    }
+
 
     // ── VERIFY ──────────────────────────────────────────────
     if (action === "verify") {
