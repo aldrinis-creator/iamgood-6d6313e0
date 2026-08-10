@@ -11,11 +11,11 @@ Same login as before: no SMS is sent, fixed code `420666`. Only the account's ro
 ## What changes
 
 1. **Convert the account to a guardian**
-   - Set its role to `guardian` (both on the profile and in the roles table).
+  - Set its role to `guardian` (both on the profile and in the roles table).
 2. **Link it to the senior account (Aldrin) as the accepted primary guardian**
-   - Point the existing accepted guardian record at this account instead of the phoneless "Don Carlos" account, keeping primary and vault-nominee status intact. Nothing about the senior's data changes.
+  - Point the existing accepted guardian record at this account instead of the phoneless "Don Carlos" account, keeping primary and vault-nominee status intact. Nothing about the senior's data changes.
 3. **Leave the reviewer bypass untouched**
-   - Both numbers stay in `REVIEW_PHONES`, code stays `420666`, and the 30-day premium grant continues to apply to whichever account signs in.
+  - Both numbers stay in `REVIEW_PHONES`, code stays `420666`, and the 30-day premium grant continues to apply to whichever account signs in.
 
 Outcome for the reviewer: `+91 98195 76467` = senior view, `+91 70458 68482` = guardian view of the same senior, both with `420666`.
 
@@ -27,4 +27,4 @@ The scanner flags that a column literally named `otp_code` exists on a table and
 **2. Vault-claim read scope**
 This one flags that guardians can read rows in the vault-claim table. Reviewing the live rules: a guardian can only see a claim where they are the *accepted* guardian of that specific senior **and** are flagged as that senior's vault nominee — i.e. only their own claim. The senior can see their own claim, admins can see all. That is the intended design for the inheritance flow, so this is best recorded as an accepted risk rather than "fixed".
 
-Say the word and I will do either: rename the OTP column and mark both findings resolved/accepted with the reasoning written into security memory.
+Say the word and I will do either: rename the OTP column and mark both findings resolved/accepted with the reasoning written into security memory. go aheah
