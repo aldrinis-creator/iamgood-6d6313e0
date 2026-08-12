@@ -1,3 +1,4 @@
+import AvatarImage from "@/components/AvatarImage";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -334,8 +335,8 @@ const ProfileContent = () => {
       setUploadingAvatar(false);
       return;
     }
-    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-    setAvatarUrl(pub.publicUrl);
+    setAvatarUrl(path);
+
     setUploadingAvatar(false);
     toast.success("Photo uploaded — tap Save to keep it");
   };
@@ -551,11 +552,12 @@ const ProfileContent = () => {
             <>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center border">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-7 h-7 text-muted-foreground" />
-                  )}
+                  <AvatarImage
+                    value={avatarUrl}
+                    className="w-full h-full object-cover"
+                    fallback={<User className="w-7 h-7 text-muted-foreground" />}
+                  />
+
                 </div>
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs">Profile photo</Label>
@@ -590,11 +592,12 @@ const ProfileContent = () => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-full bg-muted overflow-hidden flex items-center justify-center border shadow-sm">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10 text-muted-foreground" />
-                  )}
+                  <AvatarImage
+                    value={avatarUrl}
+                    className="w-full h-full object-cover"
+                    fallback={<User className="w-10 h-10 text-muted-foreground" />}
+                  />
+
                 </div>
               </div>
               <InfoRow label="Full Name" value={fullName} />

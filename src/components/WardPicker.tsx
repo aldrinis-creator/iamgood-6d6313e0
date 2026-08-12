@@ -7,6 +7,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Users } from "lucide-react";
+import AvatarImage from "@/components/AvatarImage";
+
 
 const WardPicker = () => {
   const { wards, selectedWard, setSelectedWard } = useGuardianWard();
@@ -15,13 +17,14 @@ const WardPicker = () => {
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg">
-      {selectedWard?.avatarUrl ? (
-        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 shadow-sm border border-border">
-          <img src={selectedWard.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <Users className="w-4 h-4 text-primary shrink-0" />
-      )}
+      <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
+        <AvatarImage
+          value={selectedWard?.avatarUrl}
+          className="w-full h-full object-cover"
+          fallback={<Users className="w-4 h-4 text-primary shrink-0" />}
+        />
+      </div>
+
       <Select
         value={selectedWard?.userId || ""}
         onValueChange={(uid) => {
@@ -36,11 +39,12 @@ const WardPicker = () => {
           {wards.map((w) => (
             <SelectItem key={w.userId} value={w.userId}>
               <div className="flex items-center gap-2">
-                {w.avatarUrl ? (
-                  <img src={w.avatarUrl} className="w-4 h-4 rounded-full object-cover" alt="" />
-                ) : (
-                  <Users className="w-3 h-3 text-muted-foreground" />
-                )}
+                <AvatarImage
+                  value={w.avatarUrl}
+                  className="w-4 h-4 rounded-full object-cover"
+                  fallback={<Users className="w-3 h-3 text-muted-foreground" />}
+                />
+
                 {w.name}
               </div>
             </SelectItem>

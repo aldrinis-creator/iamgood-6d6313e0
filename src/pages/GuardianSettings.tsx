@@ -1,3 +1,4 @@
+import AvatarImage from "@/components/AvatarImage";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
@@ -166,8 +167,8 @@ const GuardianSettings = () => {
       setUploadingAvatar(false);
       return;
     }
-    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-    setAvatarUrl(pub.publicUrl);
+    setAvatarUrl(path);
+
     setUploadingAvatar(false);
     toast.success("Photo uploaded — tap Save Profile to keep it");
   };
@@ -217,11 +218,12 @@ const GuardianSettings = () => {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 rounded-full bg-muted overflow-hidden flex items-center justify-center border">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <ShieldCheck className="w-7 h-7 text-muted-foreground" />
-                  )}
+                  <AvatarImage
+                    value={avatarUrl}
+                    className="w-full h-full object-cover"
+                    fallback={<ShieldCheck className="w-7 h-7 text-muted-foreground" />}
+                  />
+
                 </div>
                 <div className="flex-1 space-y-1">
                   <Label className="text-xs">Profile photo</Label>

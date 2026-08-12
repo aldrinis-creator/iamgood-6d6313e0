@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getISTHour } from "@/lib/istTime";
+import AvatarImage from "@/components/AvatarImage";
+
 
 const AppHeader = () => {
   const { userName, role } = useApp();
@@ -34,11 +36,12 @@ const AppHeader = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-10 h-10 rounded-full bg-navy-card border border-white/5 flex items-center justify-center overflow-hidden shadow-sm relative">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-5 h-5 text-muted-foreground" />
-                )}
+                <AvatarImage
+                  value={avatarUrl}
+                  className="w-full h-full object-cover"
+                  fallback={<User className="w-5 h-5 text-muted-foreground" />}
+                />
+
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
