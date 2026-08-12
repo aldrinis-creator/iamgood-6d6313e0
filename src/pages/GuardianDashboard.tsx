@@ -917,6 +917,24 @@ const GuardianDashboard = () => {
     }
   };
 
+  if (!wardsLoading && wards.length === 0) {
+    return (
+      <AppLayout>
+        <div className="p-4">
+          <Card>
+            <CardContent className="p-6 text-center space-y-2">
+              <h2 className="text-lg font-semibold">No wards linked to this account yet</h2>
+              <p className="text-base text-muted-foreground">
+                You'll see their check-ins, medications and alerts here once someone nominates you
+                as their guardian and you accept the invitation.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <WardMissedEventPopup alert={missedEventAlert} wardName={wardName} onClose={() => setMissedEventAlert(null)} />
