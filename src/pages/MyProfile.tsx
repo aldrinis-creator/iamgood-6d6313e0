@@ -1,3 +1,4 @@
+import AvatarImage from "@/components/AvatarImage";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
