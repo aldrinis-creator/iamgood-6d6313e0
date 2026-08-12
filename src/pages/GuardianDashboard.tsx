@@ -296,7 +296,7 @@ const GuardianDashboard = () => {
   const [wardName, setWardName] = useState("User");
   const [wardUserId, setWardUserId] = useState<string | null>(null);
   const [wardPhone, setWardPhone] = useState<string | null>(null);
-  const { selectedWard } = useGuardianWard();
+  const { selectedWard, wards, loading: wardsLoading } = useGuardianWard();
   const [wardPauseMode, setWardPauseMode] = useState<string>("active");
   const [wardPauseDetails, setWardPauseDetails] = useState<{ sleepTo?: string; endsAt?: string; reason?: string }>({});
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
@@ -916,6 +916,24 @@ const GuardianDashboard = () => {
       setWardLocation({ lat: lastSOS[0].latitude, lng: lastSOS[0].longitude });
     }
   };
+
+  if (!wardsLoading && wards.length === 0) {
+    return (
+      <AppLayout>
+        <div className="p-4">
+          <Card>
+            <CardContent className="p-6 text-center space-y-2">
+              <h2 className="text-lg font-semibold">No wards linked to this account yet</h2>
+              <p className="text-base text-muted-foreground">
+                You'll see their check-ins, medications and alerts here once someone nominates you
+                as their guardian and you accept the invitation.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
