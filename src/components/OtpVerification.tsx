@@ -3,14 +3,6 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { auth } from "@/integrations/firebase/client";
-import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
-
-declare global {
-  interface Window {
-    recaptchaVerifier: any;
-  }
-}
 
 interface OtpVerificationProps {
   phone: string;
@@ -27,10 +19,11 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
   const [sendState, setSendState] = useState<SendState>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(30);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [hasSent, setHasSent] = useState(false);
 
   useEffect(() => {
-    sendOtp();
+    sendOtp("send");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -39,66 +32,78 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
     return () => clearTimeout(t);
   }, [resendTimer]);
 
-  const sendOtp = async () => {
+  const sendOtp = async (action: "send" | "resend" = "send") => {
     setSendState("sending");
     setLastError(null);
     try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-          size: "invisible",
-        });
+      const { data, error } = await supabase.functions.invoke("send-otp", {
+        body: { phone, action, purpose },
+      });
+
+      let payload: any = data;
+      if (error) {
+        const ctx = (error as any).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const res = typeof ctx.clone === "function" ? ctx.clone() : ctx;
+            payload = await res.json();
+          } catch { /* ignore */ }
+        }
       }
 
-      const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
-      setConfirmationResult(result);
+      if (payload?.rate_limited) {
+        setSendState("rate_limited");
+        setLastError(payload.error || "Too many OTP requests. Please wait 10 minutes.");
+        return;
+      }
+
+      if (error || !payload?.success) {
+        const msg = payload?.error || (error as any)?.message || "Could not send WhatsApp OTP.";
+        setSendState("failed");
+        setLastError(msg);
+        toast.error("Failed to send OTP", { description: msg });
+        return;
+      }
+
+      setHasSent(true);
       setSendState("sent");
-      toast.success(`OTP sent to ${phone}`);
+      toast.success(`OTP sent on WhatsApp to ${phone}`);
       setResendTimer(30);
     } catch (err: any) {
-      console.error(err);
       setSendState("failed");
-      setLastError(err.message || "Could not send SMS. Please try again.");
-      toast.error("Failed to send OTP", { description: err.message || "Please try again." });
+      setLastError(err?.message || "Could not send WhatsApp OTP. Please try again.");
+      toast.error("Failed to send OTP", { description: err?.message || "Please try again." });
     }
   };
 
   const verifyOtp = async () => {
-    if (otp.length !== 6 || !confirmationResult) return;
+    if (otp.length !== 6 || !hasSent) return;
     setLoading(true);
     try {
-      // 1. Verify OTP with Firebase
-      const result = await confirmationResult.confirm(otp);
-      const idToken = await result.user.getIdToken();
-
-      // 2. Hand over to Supabase Edge Function to get a native session
-      const { data, error } = await supabase.functions.invoke("firebase-auth", {
-        body: { idToken },
+      const { data, error } = await supabase.functions.invoke("send-otp", {
+        body: { action: "verify", phone, otp, purpose },
       });
 
-      if (error || !data?.success) {
-        let errorMessage = data?.error || "Failed to create session.";
-        
-        // Supabase-js sometimes hides the 400 JSON body inside error.context
-        if (error) {
-          const ctx = (error as any).context;
-          let contextError = ctx?.error;
-          if (!contextError && ctx && typeof ctx.json === 'function') {
-            try {
-              const res = typeof ctx.clone === 'function' ? ctx.clone() : ctx;
-              const j = await res.json();
-              contextError = j?.error;
-            } catch (e) {}
-          }
-          errorMessage = contextError || (error as any).message || errorMessage;
+      let payload: any = data;
+      if (error) {
+        const ctx = (error as any).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const res = typeof ctx.clone === "function" ? ctx.clone() : ctx;
+            payload = await res.json();
+          } catch { /* ignore */ }
         }
-
-        console.error("firebase-auth session exchange failed:", errorMessage);
-        toast.error("Authentication failed", { description: errorMessage });
-
-      } else {
-        toast.success("Phone verified!");
-        onVerified(data);
       }
+
+      if (!payload?.success || !payload?.verified) {
+        const msg = payload?.error || "Invalid or expired OTP";
+        toast.error("Invalid OTP", { description: msg });
+        setLoading(false);
+        return;
+      }
+
+      toast.success("Phone verified!");
+      onVerified(payload);
     } catch (err: any) {
       toast.error("Invalid OTP", { description: "Please check the code and try again." });
     }
@@ -106,15 +111,16 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
   };
 
   const resendOtp = async () => {
-    sendOtp();
+    sendOtp("resend");
   };
+
 
   return (
     <div className="flex flex-col">
       <div className="bg-auth-green-glow/20 border border-auth-green/30 rounded-xl p-3 mb-5 flex items-start gap-2.5">
         <div className="text-[18px] shrink-0 mt-[1px]">💬</div>
         <div className="text-[13px] text-auth-text-2 leading-relaxed">
-          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> from your SMS. Code is valid for <strong className="text-auth-green font-bold">10 minutes.</strong></>}
+          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> sent on <strong className="text-auth-green font-bold">WhatsApp</strong>. Code is valid for <strong className="text-auth-green font-bold">5 minutes.</strong></>}
         </div>
       </div>
 
