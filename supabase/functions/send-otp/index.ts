@@ -11,11 +11,16 @@ const RATE_LIMIT_MAX = 3;
 const OTP_EXPIRY_MIN = 5;
 
 function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[\s\-\(\)]/g, "");
-  if (digits.startsWith("+")) return digits.slice(1);
+  const cleaned = raw.replace(/[\s\-()]/g, "");
+  // Explicit country code wins — never re-prefix an international number.
+  if (cleaned.startsWith("+")) return cleaned.slice(1).replace(/[^\d]/g, "");
+  const digits = cleaned.replace(/[^\d]/g, "");
   if (digits.startsWith("91") && digits.length >= 12) return digits;
-  return `91${digits}`;
+  // Bare 10-digit national number: assume India (legacy default).
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
 }
+
 
 function generateOtp(): string {
   const arr = new Uint32Array(1);
