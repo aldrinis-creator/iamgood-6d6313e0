@@ -9,6 +9,8 @@ import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
+import { isValidE164, toE164 } from "@/lib/countryCodes";
+
 
 // Only allow same-origin relative paths as post-login redirect targets.
 const sanitizeNext = (raw: string | null): string | null => {
@@ -28,11 +30,8 @@ const GoogleIcon = () => (
 
 const isPhoneInput = (value: string) => /^\+?\d[\d\s-]{5,}$/.test(value.trim());
 
-const formatPhone = (value: string) => {
-  const digits = value.replace(/[\s-]/g, "");
-  if (digits.startsWith("+")) return digits;
-  return `+91${digits}`;
-};
+const formatPhone = (value: string) => toE164(value);
+
 
 const REMEMBER_KEY = "checkin_remember_id";
 
@@ -155,10 +154,10 @@ const Login = () => {
           </div>
 
           {!otpPhone ? (() => {
-            const digitCount = identifier.replace(/[^\d]/g, "").length;
             const hasInput = identifier.trim().length > 0;
-            const isValid = digitCount >= 10;
+            const isValid = isValidE164(identifier);
             return (
+
               <>
                 <div className="mb-6 mt-2">
                   <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Enter your<br/>phone number</h1>
@@ -176,7 +175,7 @@ const Login = () => {
                     />
                   </div>
                   {hasInput && !isValid && (
-                    <p className="text-[11px] text-auth-red mt-1.5">Enter at least 10 digits</p>
+                    <p className="text-[11px] text-auth-red mt-1.5">Enter a valid number with country code</p>
                   )}
                 </div>
 

@@ -7,8 +7,10 @@ import { lovable } from "@/integrations/lovable/index";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
+import { isValidE164, toE164 } from "@/lib/countryCodes";
 
-const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
+
+
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] shrink-0" aria-hidden="true">
@@ -115,11 +117,11 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
-  const isPhoneValid = getDigitCount(phone) >= 10;
+  const isPhoneValid = isValidE164(phone);
 
   const handleDetailsNext = () => {
     if (!fullName) return toast.error("Please enter your name");
-    if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+    if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter a valid number including the country code." });
     if (email && !password) return toast.error("Password is required when email is provided");
     setStep(3);
   };
@@ -129,8 +131,9 @@ const Register = () => {
     if (selectedRole === "user") {
       setStep(4);
     } else {
-      const cleanPhone = phone.replace(/[\s\-\+]/g, "");
+      const cleanPhone = toE164(phone).replace(/\+/g, "");
       const { data: hasNomination } = await supabase.rpc("check_guardian_nomination" as any, { _phone: cleanPhone });
+
       if (!hasNomination) {
         setNominationBlocked(true);
         return;
@@ -168,9 +171,9 @@ const Register = () => {
     
     if (selectedRole === "user") {
       for (const g of guardians.filter(g => g.phone)) {
-        if (getDigitCount(g.phone) < 10) return toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has fewer than 10 digits.` });
+        if (!isValidE164(g.phone)) return toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has an invalid number. Include the country code.` });
         
-        const cleanGPhone = g.phone.replace(/[\s\-\+]/g, "");
+        const cleanGPhone = toE164(g.phone).replace(/\+/g, "");
         const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
         if (typeof phoneCount === "number" && phoneCount >= 3) return toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users.` });
         
@@ -181,12 +184,14 @@ const Register = () => {
       }
     }
 
-    const guardianRows = selectedRole === "user" ? guardians.filter(g => g.name && g.phone).map((g, i) => ({ guardian_name: g.name.trim(), guardian_phone: g.phone.replace(/\s/g, ""), guardian_email: g.email?.trim() || null, relation: g.relation || null, is_primary: i === 0 })) : [];
-    const emailToUse = email.trim() || `${phone.replace(/[\s\-\+]/g, "")}@phone.checkin.app`;
+    const guardianRows = selectedRole === "user" ? guardians.filter(g => g.name && g.phone).map((g, i) => ({ guardian_name: g.name.trim(), guardian_phone: toE164(g.phone), guardian_email: g.email?.trim() || null, relation: g.relation || null, is_primary: i === 0 })) : [];
+    const e164Phone = toE164(phone);
+    const emailToUse = email.trim() || `${e164Phone.replace(/\+/g, "")}@phone.checkin.app`;
     const passwordToUse = password || crypto.randomUUID();
 
     setLoading(true);
-    const { data, error } = await signUp(emailToUse, passwordToUse, { full_name: fullName, app_role: selectedRole || "user", phone: phone.replace(/\s/g, ""), date_of_birth: dob || "", guardians: guardianRows });
+    const { data, error } = await signUp(emailToUse, passwordToUse, { full_name: fullName, app_role: selectedRole || "user", phone: e164Phone, date_of_birth: dob || "", guardians: guardianRows });
+
     if (error) {
       setLoading(false);
       return toast.error("Registration failed", { description: error.message });
@@ -473,7 +478,7 @@ const Register = () => {
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">Verify your<br/>phone</h1>
           <div className="text-[14px] text-auth-text-2 mb-5">We sent a 6-digit code to<br/><strong className="text-auth-text-1">{phone}</strong></div>
-          <OtpVerification phone={phone.replace(/[\s\-\+]/g, "")} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
+          <OtpVerification phone={toE164(phone)} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
         </div>
       </div>
     );
