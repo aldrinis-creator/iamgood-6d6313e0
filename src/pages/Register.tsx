@@ -117,11 +117,11 @@ const Register = () => {
     setGuardians(guardians.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
   };
 
-  const isPhoneValid = getDigitCount(phone) >= 10;
+  const isPhoneValid = isValidE164(phone);
 
   const handleDetailsNext = () => {
     if (!fullName) return toast.error("Please enter your name");
-    if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter at least 10 digits." });
+    if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter a valid number including the country code." });
     if (email && !password) return toast.error("Password is required when email is provided");
     setStep(3);
   };
@@ -131,8 +131,9 @@ const Register = () => {
     if (selectedRole === "user") {
       setStep(4);
     } else {
-      const cleanPhone = phone.replace(/[\s\-\+]/g, "");
+      const cleanPhone = toE164(phone).replace(/\+/g, "");
       const { data: hasNomination } = await supabase.rpc("check_guardian_nomination" as any, { _phone: cleanPhone });
+
       if (!hasNomination) {
         setNominationBlocked(true);
         return;
