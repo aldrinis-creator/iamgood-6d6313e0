@@ -9,7 +9,7 @@ import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 
-const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
+
 
 
 const GoogleIcon = () => (
@@ -478,7 +478,7 @@ const Register = () => {
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">Verify your<br/>phone</h1>
           <div className="text-[14px] text-auth-text-2 mb-5">We sent a 6-digit code to<br/><strong className="text-auth-text-1">{phone}</strong></div>
-          <OtpVerification phone={phone.replace(/[\s\-\+]/g, "")} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
+          <OtpVerification phone={toE164(phone)} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
         </div>
       </div>
     );
