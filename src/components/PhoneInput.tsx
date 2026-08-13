@@ -1,14 +1,10 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-
-const COUNTRY_CODES = [
-  { code: "+91", label: "🇮🇳 +91" },
-  { code: "+1", label: "🇺🇸 +1" },
-  { code: "+44", label: "🇬🇧 +44" },
-  { code: "+971", label: "🇦🇪 +971" },
-  { code: "+65", label: "🇸🇬 +65" },
-  { code: "+61", label: "🇦🇺 +61" },
-];
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { COUNTRIES, DEFAULT_DIAL, findCountryByPhone, type Country } from "@/lib/countryCodes";
 
 interface PhoneInputProps {
   value: string;
@@ -17,43 +13,73 @@ interface PhoneInputProps {
   className?: string;
 }
 
-const parsePhone = (value: string): { code: string; number: string } => {
-  if (!value) return { code: "+91", number: "" };
-  for (const { code } of COUNTRY_CODES) {
-    if (value.startsWith(code)) {
-      return { code, number: value.slice(code.length).trim() };
-    }
+const parsePhone = (value: string): { country: Country | undefined; dial: string; number: string } => {
+  if (!value) return { country: COUNTRIES.find((c) => c.dial === DEFAULT_DIAL), dial: DEFAULT_DIAL, number: "" };
+  const country = findCountryByPhone(value);
+  const cleaned = value.replace(/[()\-]/g, "");
+  if (country) {
+    return { country, dial: country.dial, number: cleaned.slice(country.dial.length).trim() };
   }
-  // If no code found, check if starts with +
-  const match = value.match(/^(\+\d{1,4})\s*(.*)/);
-  if (match) return { code: match[1], number: match[2] };
-  return { code: "+91", number: value };
+  const match = cleaned.match(/^(\+\d{1,4})\s*(.*)$/);
+  if (match) return { country: undefined, dial: match[1], number: match[2] };
+  return { country: COUNTRIES.find((c) => c.dial === DEFAULT_DIAL), dial: DEFAULT_DIAL, number: cleaned };
 };
 
 const PhoneInput = ({ value, onChange, placeholder = "98765 43210", className }: PhoneInputProps) => {
-  const { code, number } = parsePhone(value);
+  const [open, setOpen] = useState(false);
+  const { country, dial, number } = useMemo(() => parsePhone(value), [value]);
 
-  const handleCodeChange = (newCode: string) => {
-    onChange(`${newCode} ${number}`.trim());
+  const handleCodeChange = (newDial: string) => {
+    onChange(`${newDial} ${number}`.trim());
+    setOpen(false);
   };
 
   const handleNumberChange = (num: string) => {
     const cleaned = num.replace(/[^\d\s]/g, "");
-    onChange(`${code} ${cleaned}`.trim());
+    onChange(`${dial} ${cleaned}`.trim());
   };
 
   return (
     <div className={`flex gap-2 ${className || ""}`}>
-      <Select value={code} onValueChange={handleCodeChange}>
-        <SelectTrigger className="w-[100px] shrink-0 text-base">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {COUNTRY_CODES.map((c) => (
-            <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label="Select country code"
+            className="w-[110px] shrink-0 justify-between px-2 text-base font-normal"
+          >
+            <span className="truncate">{country ? `${country.flag} ${country.dial}` : dial}</span>
+            <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[280px] p-0 z-50 bg-popover" align="start">
+          <Command
+            filter={(itemValue, search) => (itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
+          >
+            <CommandInput placeholder="Search country or code..." />
+            <CommandList>
+              <CommandEmpty>No country found.</CommandEmpty>
+              <CommandGroup>
+                {COUNTRIES.map((c) => (
+                  <CommandItem
+                    key={`${c.iso}-${c.dial}`}
+                    value={`${c.name} ${c.dial} ${c.iso}`}
+                    onSelect={() => handleCodeChange(c.dial)}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${country?.iso === c.iso ? "opacity-100" : "opacity-0"}`} />
+                    <span className="mr-2">{c.flag}</span>
+                    <span className="flex-1 truncate">{c.name}</span>
+                    <span className="text-muted-foreground ml-2">{c.dial}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       <Input
         value={number}
         onChange={(e) => handleNumberChange(e.target.value)}
