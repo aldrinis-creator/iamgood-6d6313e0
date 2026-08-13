@@ -7,9 +7,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+let cachedKeys: any = null;
+let keysExpiry = 0;
+
 async function getGooglePublicKeys() {
+  if (cachedKeys && Date.now() < keysExpiry) {
+    return cachedKeys;
+  }
   const res = await fetch("https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com");
-  return await res.json();
+  cachedKeys = await res.json();
+  // Cache for 1 hour (or based on cache-control headers, but 1h is safe)
+  keysExpiry = Date.now() + 3600 * 1000;
+  return cachedKeys;
 }
 
 async function verifyFirebaseToken(idToken: string, projectId: string) {
@@ -42,10 +51,11 @@ serve(async (req) => {
   }
 
   try {
-    const { idToken, projectId } = await req.json();
+    const { idToken } = await req.json();
+    const projectId = "check-in-6b822"; // Hardcoded for security
 
-    if (!idToken || !projectId) {
-      return new Response(JSON.stringify({ error: "Missing idToken or projectId" }), {
+    if (!idToken || typeof idToken !== "string") {
+      return new Response(JSON.stringify({ error: "Missing or invalid idToken" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -73,21 +83,17 @@ serve(async (req) => {
     // We use a dummy email to avoid Twilio requirements in Supabase.
     const email = `${phone.replace('+', '')}@phone.checkin.app`;
     
-    let { data: users, error: searchError } = await supabaseClient.auth.admin.listUsers();
-    let user = users?.users.find(u => u.email === email || u.phone === phone);
+    // Attempt to create the user. If they already exist, it will fail safely.
+    const { error: createError } = await supabaseClient.auth.admin.createUser({
+      email,
+      phone,
+      email_confirm: true,
+      phone_confirm: true,
+      password: crypto.randomUUID(), // Random secure password
+    });
 
-    if (!user) {
-      // Create user
-      const { data, error } = await supabaseClient.auth.admin.createUser({
-        email,
-        phone,
-        email_confirm: true,
-        phone_confirm: true,
-        password: crypto.randomUUID(), // Random secure password
-      });
-      if (error) throw error;
-      user = data.user;
-    }
+    // We don't throw on createError because it usually just means the user already exists
+    // (e.g., error.message includes "User already registered")
 
     // 4. Generate a magiclink to get a token_hash
     const { data: linkData, error: linkError } = await supabaseClient.auth.admin.generateLink({

@@ -72,7 +72,7 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
 
       // 2. Hand over to Supabase Edge Function to get a native session
       const { data, error } = await supabase.functions.invoke("firebase-auth", {
-        body: { idToken, projectId: "check-in-6b822" },
+        body: { idToken },
       });
 
       if (error || !data?.success) {
