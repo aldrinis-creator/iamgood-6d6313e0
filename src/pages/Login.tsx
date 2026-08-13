@@ -9,6 +9,8 @@ import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
+import { isValidE164, toE164 } from "@/lib/countryCodes";
+
 
 // Only allow same-origin relative paths as post-login redirect targets.
 const sanitizeNext = (raw: string | null): string | null => {
@@ -152,10 +154,10 @@ const Login = () => {
           </div>
 
           {!otpPhone ? (() => {
-            const digitCount = identifier.replace(/[^\d]/g, "").length;
             const hasInput = identifier.trim().length > 0;
-            const isValid = digitCount >= 10;
+            const isValid = isValidE164(identifier);
             return (
+
               <>
                 <div className="mb-6 mt-2">
                   <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Enter your<br/>phone number</h1>
