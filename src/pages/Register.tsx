@@ -7,8 +7,10 @@ import { lovable } from "@/integrations/lovable/index";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
+import { isValidE164, toE164 } from "@/lib/countryCodes";
 
 const getDigitCount = (val: string) => val.replace(/[^\d]/g, "").length;
+
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] shrink-0" aria-hidden="true">
