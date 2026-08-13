@@ -285,103 +285,40 @@ Deno.serve(async (req) => {
     const otpCode = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 
-    // Send via MSG91 Flow API (SMS) + WhatsApp in parallel
-    const flowPayload = {
-      template_id: templateId,
-      recipients: [{ mobiles: phone, var1: otpCode }],
-    };
-
+    // WhatsApp-only delivery (SMS/Flow channel intentionally disabled)
     const waTemplate = Deno.env.get("MSG91_WA_OTP_TEMPLATE_NAME") ?? "verification_otp";
     const waLanguage = Deno.env.get("MSG91_WA_OTP_LANGUAGE") ?? "en";
 
-    console.log(`[send-otp] Dispatching SMS + WhatsApp for phone=${phone} (wa=${!!waTemplate})`);
+    console.log(`[send-otp] Dispatching WhatsApp OTP for phone=${phone} template=${waTemplate}`);
 
-    const smsPromise = fetch(FLOW_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        authkey: authKey,
-        accept: "application/json",
-      },
-      body: JSON.stringify(flowPayload),
-    }).then(async (res) => {
-      const text = await res.text();
-      let parsed: any;
-      try { parsed = JSON.parse(text); } catch { parsed = { type: "error", message: text }; }
-      return { status: res.status, text, result: parsed };
-    });
+    const waResult = await sendWhatsAppTemplate({
+      templateName: waTemplate,
+      languageCode: waLanguage,
+      recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
+    }).catch((e) => ({ ok: false, status: 0, body: { error: String(e) } }));
 
-    const waPromise = waTemplate
-      ? sendWhatsAppTemplate({
-          templateName: waTemplate,
-          languageCode: waLanguage,
-          recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
-        })
-      : Promise.resolve({ ok: false, status: 0, body: { skipped: "no template" } });
+    const waSuccess = waResult.ok;
+    const waErrorMsg = waSuccess ? undefined : JSON.stringify(waResult.body).slice(0, 300);
 
-    const [smsSettled, waSettled] = await Promise.allSettled([smsPromise, waPromise]);
-
-    // ── SMS result ──
-    let smsSuccess = false;
-    let smsRequestId: string | null = null;
-    let smsErrorMsg: string | undefined;
-    let smsRaw: any = null;
-    if (smsSettled.status === "fulfilled") {
-      smsRaw = smsSettled.value.result;
-      smsSuccess = smsRaw?.type === "success";
-      smsRequestId = smsRaw?.request_id || null;
-      if (!smsSuccess) smsErrorMsg = smsRaw?.message || smsSettled.value.text;
-      console.log(`[send-otp] SMS (${smsSettled.value.status}):`, smsSettled.value.text);
-    } else {
-      smsErrorMsg = String(smsSettled.reason);
-      console.error("[send-otp] SMS threw:", smsSettled.reason);
-    }
-
-    // ── WhatsApp result ──
-    let waSuccess = false;
-    let waStatus: "sent" | "failed" | "skipped" = "skipped";
-    let waErrorMsg: string | undefined;
-    if (!waTemplate) {
-      waStatus = "skipped";
-    } else if (waSettled.status === "fulfilled") {
-      waSuccess = waSettled.value.ok;
-      waStatus = waSuccess ? "sent" : "failed";
-      if (!waSuccess) waErrorMsg = JSON.stringify(waSettled.value.body);
-    } else {
-      waStatus = "failed";
-      waErrorMsg = String(waSettled.reason);
-    }
-
-    // Persist OTP hash + log per-channel
     await logOtpEvent(
       admin,
       phone,
       action,
-      smsRequestId || undefined,
-      smsSuccess ? "sent" : "failed",
-      smsSuccess ? undefined : smsErrorMsg,
-      (smsSuccess || waSuccess) ? otpCode : undefined,
-      (smsSuccess || waSuccess) ? expiresAt : undefined,
+      undefined,
+      waSuccess ? "sent" : "failed",
+      waErrorMsg,
+      waSuccess ? otpCode : undefined,
+      waSuccess ? expiresAt : undefined,
     );
 
-    if (waTemplate) {
-      await logOtpEvent(
-        admin,
-        phone,
-        `${action}_wa`,
-        undefined,
-        waSuccess ? "sent" : "failed",
-        waSuccess ? undefined : waErrorMsg,
-      );
+    const channels = { sms: "disabled", whatsapp: waSuccess ? "sent" : "failed" };
+
+    if (!waSuccess) {
+      return jsonResponse({ success: false, channels, error: waErrorMsg || "WhatsApp OTP delivery failed" }, 400);
     }
 
-    const channels = { sms: smsSuccess ? "sent" : "failed", whatsapp: waStatus };
+    return jsonResponse({ success: true, channels });
 
-    if (!smsSuccess && !waSuccess) {
-      return jsonResponse({ success: false, channels, error: smsErrorMsg || waErrorMsg || "OTP delivery failed" }, 400);
-    }
-
-    return jsonResponse({ success: true, channels, result: smsRaw });
   } catch (err) {
     console.error("[send-otp] Unhandled error:", err);
     return jsonResponse({ error: String(err) }, 500);
