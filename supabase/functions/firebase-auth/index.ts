@@ -28,7 +28,7 @@ async function getGooglePublicKeys(): Promise<Record<string, string>> {
 async function verifyFirebaseToken(idToken: string) {
   try {
     let keys = await getGooglePublicKeys();
-    const { header } = jose.decodeProtectedHeader(idToken);
+    const header = jose.decodeProtectedHeader(idToken);
     if (!header.kid) throw new Error("Missing kid in token header");
 
     if (!keys[header.kid]) {
