@@ -43,11 +43,18 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
     setSendState("sending");
     setLastError(null);
     try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-          size: "invisible",
-        });
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.error("Error clearing recaptcha", e);
+        }
+        window.recaptchaVerifier = undefined;
       }
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+        size: "invisible",
+      });
 
       const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
       setConfirmationResult(result);
@@ -144,7 +151,6 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & continue ›"}
         </button>
       </div>
-      <div id="recaptcha-container"></div>
     </div>
   );
 };
