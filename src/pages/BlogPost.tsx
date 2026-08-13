@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import JsonLd from "@/components/JsonLd";
 import { ArrowLeft, Clock } from "lucide-react";
 import SeoMeta from "@/components/SeoMeta";
 import { Button } from "@/components/ui/button";
@@ -60,10 +60,8 @@ const BlogPost = () => {
         ogType="article"
         canonicalPath={`/blog/${post.slug}`}
       />
-      <Helmet>
-        <script type="application/ld+json">{JSON.stringify(articleLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(faqLd)}</script>
-      </Helmet>
+      <JsonLd id="article" data={articleLd} />
+      <JsonLd id="faq" data={faqLd} />
 
       <div className="max-w-[800px] mx-auto px-4 py-6">
         <Button asChild variant="ghost" size="sm" className="mb-4">
