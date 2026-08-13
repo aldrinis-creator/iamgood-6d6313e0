@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FLOW_URL = "https://control.msg91.com/api/v5/flow";
 const RATE_LIMIT_WINDOW_MIN = 10;
 const RATE_LIMIT_MAX = 3;
 const OTP_EXPIRY_MIN = 5;
