@@ -43,18 +43,11 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
     setSendState("sending");
     setLastError(null);
     try {
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.error("Error clearing recaptcha", e);
-        }
-        window.recaptchaVerifier = undefined;
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+        });
       }
-
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-        size: "invisible",
-      });
 
       const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
       setConfirmationResult(result);
