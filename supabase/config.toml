@@ -65,7 +65,5 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.firebase-auth]
     verify_jwt = false
-  [functions.firebase-auth]
-    verify_jwt = false
 
 
