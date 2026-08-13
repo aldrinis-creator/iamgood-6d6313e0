@@ -175,7 +175,7 @@ const Login = () => {
                     />
                   </div>
                   {hasInput && !isValid && (
-                    <p className="text-[11px] text-auth-red mt-1.5">Enter at least 10 digits</p>
+                    <p className="text-[11px] text-auth-red mt-1.5">Enter a valid number with country code</p>
                   )}
                 </div>
 
