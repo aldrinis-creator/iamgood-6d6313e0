@@ -84,14 +84,17 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
           let contextError = ctx?.error;
           if (!contextError && ctx && typeof ctx.json === 'function') {
             try {
-              const j = await ctx.json();
+              const res = typeof ctx.clone === 'function' ? ctx.clone() : ctx;
+              const j = await res.json();
               contextError = j?.error;
             } catch (e) {}
           }
           errorMessage = contextError || (error as any).message || errorMessage;
         }
 
+        console.error("firebase-auth session exchange failed:", errorMessage);
         toast.error("Authentication failed", { description: errorMessage });
+
       } else {
         toast.success("Phone verified!");
         onVerified(data);
