@@ -76,7 +76,8 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
       });
 
       if (error || !data?.success) {
-        toast.error("Authentication failed", { description: "Failed to create session." });
+        const errorMessage = data?.error || error?.message || "Failed to create session.";
+        toast.error("Authentication failed", { description: errorMessage });
       } else {
         toast.success("Phone verified!");
         onVerified(data);
