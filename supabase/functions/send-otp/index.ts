@@ -131,12 +131,12 @@ Deno.serve(async (req) => {
 
   try {
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    const templateId = Deno.env.get("MSG91_OTP_TEMPLATE_ID");
 
-    if (!authKey || !templateId) {
-      console.error("[send-otp] Missing config — AUTH_KEY:", !!authKey, "TEMPLATE:", !!templateId);
+    if (!authKey) {
+      console.error("[send-otp] Missing config — MSG91_AUTH_KEY");
       return jsonResponse({ error: "OTP service not configured" }, 500);
     }
+
 
     const body = await req.json();
     const action = body.action || "send";
