@@ -76,7 +76,21 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
       });
 
       if (error || !data?.success) {
-        const errorMessage = data?.error || error?.message || "Failed to create session.";
+        let errorMessage = data?.error || "Failed to create session.";
+        
+        // Supabase-js sometimes hides the 400 JSON body inside error.context
+        if (error) {
+          const ctx = (error as any).context;
+          let contextError = ctx?.error;
+          if (!contextError && ctx && typeof ctx.json === 'function') {
+            try {
+              const j = await ctx.json();
+              contextError = j?.error;
+            } catch (e) {}
+          }
+          errorMessage = contextError || (error as any).message || errorMessage;
+        }
+
         toast.error("Authentication failed", { description: errorMessage });
       } else {
         toast.success("Phone verified!");
