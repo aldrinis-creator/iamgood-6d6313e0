@@ -45,9 +45,9 @@ async function verifyFirebaseToken(idToken: string) {
       audience: FIREBASE_PROJECT_ID,
     });
     return payload; // contains phone_number
-  } catch (error) {
+  } catch (error: any) {
     console.error("Firebase token verification failed:", error);
-    return null;
+    return { error: error.message || "Unknown JWT Error" };
   }
 }
 
@@ -61,17 +61,24 @@ serve(async (req) => {
     const idToken = body?.idToken;
 
     if (typeof idToken !== "string" || idToken.trim().length === 0) {
-      return new Response(JSON.stringify({ error: "Missing or invalid idToken" }), {
+      return new Response(JSON.stringify({ success: false, error: "Missing or invalid idToken" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: 200,
       });
     }
 
     const decodedToken = await verifyFirebaseToken(idToken.trim());
-    if (!decodedToken || !decodedToken.phone_number) {
-      return new Response(JSON.stringify({ error: "Invalid token or missing phone number" }), {
+    if (decodedToken && decodedToken.error) {
+      return new Response(JSON.stringify({ success: false, error: `JWT Verification Failed: ${decodedToken.error}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
+        status: 200,
+      });
+    }
+
+    if (!decodedToken || !decodedToken.phone_number) {
+      return new Response(JSON.stringify({ success: false, error: "Invalid token or missing phone number" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
       });
     }
 
