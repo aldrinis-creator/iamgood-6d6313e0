@@ -171,9 +171,9 @@ const Register = () => {
     
     if (selectedRole === "user") {
       for (const g of guardians.filter(g => g.phone)) {
-        if (getDigitCount(g.phone) < 10) return toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has fewer than 10 digits.` });
+        if (!isValidE164(g.phone)) return toast.error("Invalid guardian phone", { description: `${g.name || "A guardian"} has an invalid number. Include the country code.` });
         
-        const cleanGPhone = g.phone.replace(/[\s\-\+]/g, "");
+        const cleanGPhone = toE164(g.phone).replace(/\+/g, "");
         const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanGPhone });
         if (typeof phoneCount === "number" && phoneCount >= 3) return toast.error("Guardian limit reached", { description: `${g.name || g.phone} already monitors 3 users.` });
         
@@ -184,12 +184,14 @@ const Register = () => {
       }
     }
 
-    const guardianRows = selectedRole === "user" ? guardians.filter(g => g.name && g.phone).map((g, i) => ({ guardian_name: g.name.trim(), guardian_phone: g.phone.replace(/\s/g, ""), guardian_email: g.email?.trim() || null, relation: g.relation || null, is_primary: i === 0 })) : [];
-    const emailToUse = email.trim() || `${phone.replace(/[\s\-\+]/g, "")}@phone.checkin.app`;
+    const guardianRows = selectedRole === "user" ? guardians.filter(g => g.name && g.phone).map((g, i) => ({ guardian_name: g.name.trim(), guardian_phone: toE164(g.phone), guardian_email: g.email?.trim() || null, relation: g.relation || null, is_primary: i === 0 })) : [];
+    const e164Phone = toE164(phone);
+    const emailToUse = email.trim() || `${e164Phone.replace(/\+/g, "")}@phone.checkin.app`;
     const passwordToUse = password || crypto.randomUUID();
 
     setLoading(true);
-    const { data, error } = await signUp(emailToUse, passwordToUse, { full_name: fullName, app_role: selectedRole || "user", phone: phone.replace(/\s/g, ""), date_of_birth: dob || "", guardians: guardianRows });
+    const { data, error } = await signUp(emailToUse, passwordToUse, { full_name: fullName, app_role: selectedRole || "user", phone: e164Phone, date_of_birth: dob || "", guardians: guardianRows });
+
     if (error) {
       setLoading(false);
       return toast.error("Registration failed", { description: error.message });
