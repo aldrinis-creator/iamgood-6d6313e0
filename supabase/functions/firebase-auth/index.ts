@@ -85,42 +85,53 @@ serve(async (req) => {
     // Deterministic placeholder email keyed on the verified phone number.
     const email = `${phone.replace("+", "")}@phone.checkin.app`;
 
-    // Create-if-absent. A duplicate error means the account already exists,
-    // which is the normal returning-user path — no paged listUsers scan needed.
-    const { error: createError } = await supabaseClient.auth.admin.createUser({
+    // Attempt to create the user. If they already exist, it will fail safely.
+    const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
       email,
       phone,
       email_confirm: true,
       phone_confirm: true,
-      password: crypto.randomUUID(),
+      password: crypto.randomUUID(), // Random secure password
     });
 
-    if (createError) {
-      const msg = (createError.message || "").toLowerCase();
-      const alreadyExists =
-        msg.includes("already") || msg.includes("duplicate") || createError.status === 422;
-      if (!alreadyExists) throw createError;
+    if (createError && createError.message.includes("phone number")) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: "This phone number is already registered to another account (likely your email). Please log in with email instead." 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
-    // Mint a magiclink and hand back the token_hash for the client to verify.
+    // 4. Generate a magiclink to get a token_hash
     const { data: linkData, error: linkError } = await supabaseClient.auth.admin.generateLink({
-      type: "magiclink",
-      email,
+      type: 'magiclink',
+      email: email,
     });
-    if (linkError) throw linkError;
 
-    const url = new URL(linkData.properties.action_link);
-    const token_hash = url.searchParams.get("token");
-    if (!token_hash) throw new Error("Could not extract token_hash from generated link");
+    if (linkError) {
+      console.error("Link Error", linkError);
+      return new Response(JSON.stringify({ success: false, error: linkError.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
-    return new Response(JSON.stringify({ success: true, token_hash, email }), {
+    // 5. Return the token_hash to the client
+    return new Response(JSON.stringify({ 
+      success: true, 
+      token_hash: linkData.properties?.action_link?.match(/token=([^&]+)/)?.[1],
+      email: email 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
     });
-  } catch (error) {
-    console.error("Error processing firebase auth:", error);
-    return new Response(
-      JSON.stringify({ error: (error as Error).message || "Internal Server Error" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
-    );
+  } catch (err: any) {
+    console.error("Unexpected error:", err);
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   }
 });
