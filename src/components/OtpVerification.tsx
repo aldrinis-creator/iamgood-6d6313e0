@@ -120,7 +120,7 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
       <div className="bg-auth-green-glow/20 border border-auth-green/30 rounded-xl p-3 mb-5 flex items-start gap-2.5">
         <div className="text-[18px] shrink-0 mt-[1px]">💬</div>
         <div className="text-[13px] text-auth-text-2 leading-relaxed">
-          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> from your SMS. Code is valid for <strong className="text-auth-green font-bold">10 minutes.</strong></>}
+          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> sent on <strong className="text-auth-green font-bold">WhatsApp</strong>. Code is valid for <strong className="text-auth-green font-bold">5 minutes.</strong></>}
         </div>
       </div>
 
