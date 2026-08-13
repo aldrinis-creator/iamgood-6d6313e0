@@ -1,35 +1,47 @@
-# Restore WhatsApp OTP on login
+# firebase-auth: what the logs actually say, and the fix
 
-## Why it stopped
+## What I checked just now
 
-Login was switched to Firebase phone auth. The sign-in screen now calls Firebase directly (`signInWithPhoneNumber` + reCAPTCHA) and then exchanges the Firebase ID token via the `firebase-auth` function. The MSG91 `send-otp` function — the only thing that sends the WhatsApp `verification_otp` template — is no longer called at all. The OTP event log confirms this: the last entries are from 12 Aug, before the switch, and nothing since.
-
-Firebase sends SMS only and never exposes its code, so it can't be mirrored to WhatsApp.
-
-## What changes
-
-Make MSG91 the primary OTP channel again (SMS + WhatsApp), with Firebase SMS kept as an automatic fallback.
-
-Flow on the login screen:
+Live logs for `firebase-auth`:
 
 ```text
-Enter phone
-  -> call send-otp (MSG91: SMS + WhatsApp verification_otp)
-       success -> user types 6-digit code -> send-otp verify -> session
-       failure -> fall back to Firebase phone auth (reCAPTCHA + SMS)
-                  -> user types code -> firebase-auth -> session
+13:04:52Z LOG   booted (time: 40ms)
+13:04:52Z INFO  Listening on http://localhost:9999/
+13:04:52Z ERROR Firebase token verification failed:
+                TypeError: Cannot read properties of undefined (reading 'kid')
+                  at verifyFirebaseToken (.../firebase-auth/index.ts:27:17)
+                  at async Server.<anonymous> (.../firebase-auth/index.ts:65:26)
+                  at async Server.#respond (https://deno.land/std@0.168.0/http/server.ts:221:18)
+13:05:58Z LOG   shutdown
 ```
 
-- No reCAPTCHA on the normal path (faster, fewer failures on mobile).
-- Reviewer bypass numbers keep working exactly as today (fixed code, no dispatch).
-- Resend uses the same channel that was used to send.
+Direct calls to the deployed endpoint:
 
-## Technical detail
+- empty body -> **HTTP 400**, body `{"error":"Missing or invalid idToken"}`
+- garbage token -> **HTTP 401**, body `{"error":"Invalid token or missing phone number"}`
 
-- `src/components/OtpVerification.tsx`: restore the `send-otp` invoke path for send/resend/verify (verify returns `token_hash` + `email`, consumed with `verifyOtp({ type: 'magiclink' })` as before). Keep the existing Firebase code path intact and enter it only when `send-otp` returns a non-success (or throws). Track which channel is active so verify routes to the right backend.
-- No changes to `supabase/functions/send-otp` logic; it already sends both SMS (Flow) and WhatsApp (`verification_otp`, language `en`).
-- No changes to `firebase-auth`.
+## Diagnosis
 
-## Verification
+It is **not** a deploy failure and **not** a boot crash — the function boots in ~40ms and answers every request. Your Deno imports are fine.
 
-After the change, request an OTP for a real number and confirm: a `send`/`send_wa` pair appears in the OTP event log with status `sent`, and the WhatsApp message arrives. If `send_wa` logs `failed`, the cause is on the MSG91 template/number side and I'll report the exact error returned.
+The problem is that **the code running in the cloud is not the code in the repo**. Three independent signals:
+
+1. The repo version returns `status: 200` with `{ success:false, error }` on every failure path. The live version returns raw **400 / 401** with `{ error }` — a different response shape.
+2. The stack trace shows `verifyFirebaseToken` at **line 27** and the request handler at **line 65**; in the repo file those are line 31 and line 69.
+3. The trace shows the request served by `deno.land/std@0.168.0/http/server.ts`, i.e. an old `serve()` entrypoint. The repo file uses `Deno.serve`.
+
+So an older revision is live. And because that older revision replies with 400/401, the client's `supabase.functions.invoke("firebase-auth")` throws `FunctionsHttpError: Edge Function returned a non-2xx status code` — exactly the message you see — before your code can read the `error` field. The GitHub sync did not reach the deployed function.
+
+The `reading 'kid'` TypeError is the old revision's key-lookup path, not a runtime bug in the current source.
+
+## Plan
+
+1. Redeploy `firebase-auth` from the current repo source so the hardened `Deno.serve` version is what actually runs.
+2. Re-run the two probes and confirm the shape changes to **HTTP 200** with `{"success":false,"error":"..."}` for both the empty body and the garbage-token case, and that the stack line numbers in any new log entry match the repo file.
+3. Make the client resilient regardless of status: in `src/components/OtpVerification.tsx`, when `invoke` returns a `FunctionsHttpError`, read the JSON body from `error.context` and surface the real server message instead of the generic "non-2xx" string. This way a future stale deploy shows a diagnosable message rather than a dead end.
+4. Check logs once more after a real device login attempt to confirm the token verifies and a `token_hash` is issued.
+
+## Technical notes
+
+- No change to the function's logic or imports is needed; the source is already correct.
+- Step 3 is the only source-code edit, and it is confined to error handling in the OTP component. The success path and response contract (`{ success, token_hash, email }`) stay identical.
