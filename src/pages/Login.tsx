@@ -28,11 +28,8 @@ const GoogleIcon = () => (
 
 const isPhoneInput = (value: string) => /^\+?\d[\d\s-]{5,}$/.test(value.trim());
 
-const formatPhone = (value: string) => {
-  const digits = value.replace(/[\s-]/g, "");
-  if (digits.startsWith("+")) return digits;
-  return `+91${digits}`;
-};
+const formatPhone = (value: string) => toE164(value);
+
 
 const REMEMBER_KEY = "checkin_remember_id";
 
