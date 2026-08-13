@@ -3,6 +3,14 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { auth } from "@/integrations/firebase/client";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+
+declare global {
+  interface Window {
+    recaptchaVerifier: any;
+  }
+}
 
 interface OtpVerificationProps {
   phone: string;
@@ -19,6 +27,7 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
   const [sendState, setSendState] = useState<SendState>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(30);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   useEffect(() => {
     sendOtp();
@@ -34,89 +43,52 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
     setSendState("sending");
     setLastError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { action: "send", phone },
-      });
-      if (error) {
-        setSendState("failed");
-        setLastError("Network error. Please try again.");
-        toast.error("Failed to send OTP");
-        return;
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+        });
       }
-      if (data?.rate_limited) {
-        setSendState("rate_limited");
-        setLastError("Too many attempts. Please wait 10 minutes.");
-        toast.error("Too many OTP requests");
-        return;
-      }
-      if (!data?.success) {
-        setSendState("failed");
-        setLastError(data?.error || data?.result?.message || "Could not send SMS. Please try again.");
-        toast.error("Failed to send OTP", { description: data?.error || "Please try again." });
-        return;
-      }
+
+      const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
+      setConfirmationResult(result);
       setSendState("sent");
       toast.success(`OTP sent to ${phone}`);
       setResendTimer(30);
-    } catch {
+    } catch (err: any) {
+      console.error(err);
       setSendState("failed");
-      setLastError("Unexpected error sending OTP.");
-      toast.error("Error sending OTP");
+      setLastError(err.message || "Could not send SMS. Please try again.");
+      toast.error("Failed to send OTP", { description: err.message || "Please try again." });
     }
   };
 
   const verifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 6 || !confirmationResult) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { action: "verify", phone, otp, purpose },
+      // 1. Verify OTP with Firebase
+      const result = await confirmationResult.confirm(otp);
+      const idToken = await result.user.getIdToken();
+
+      // 2. Hand over to Supabase Edge Function to get a native session
+      const { data, error } = await supabase.functions.invoke("firebase-auth", {
+        body: { idToken, projectId: "check-in-6b822" },
       });
+
       if (error || !data?.success) {
-        toast.error("Invalid OTP", { description: "Please check the code and try again." });
+        toast.error("Authentication failed", { description: "Failed to create session." });
       } else {
         toast.success("Phone verified!");
         onVerified(data);
       }
-    } catch {
-      toast.error("Verification failed");
+    } catch (err: any) {
+      toast.error("Invalid OTP", { description: "Please check the code and try again." });
     }
     setLoading(false);
   };
 
   const resendOtp = async () => {
-    setSendState("sending");
-    setLastError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { action: "resend", phone },
-      });
-      if (error) {
-        setSendState("failed");
-        setLastError("Network error. Please try again.");
-        toast.error("Failed to resend OTP");
-        return;
-      }
-      if (data?.rate_limited) {
-        setSendState("rate_limited");
-        setLastError("Too many attempts. Please wait 10 minutes.");
-        toast.error("Too many OTP requests");
-        return;
-      }
-      if (!data?.success) {
-        setSendState("failed");
-        setLastError(data?.error || "Could not resend SMS.");
-        toast.error("Failed to resend OTP");
-        return;
-      }
-      setSendState("sent");
-      toast.success("OTP resent");
-      setResendTimer(30);
-    } catch {
-      setSendState("failed");
-      setLastError("Resend failed");
-      toast.error("Resend failed");
-    }
+    sendOtp();
   };
 
   return (
@@ -172,6 +144,7 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & continue ›"}
         </button>
       </div>
+      <div id="recaptcha-container"></div>
     </div>
   );
 };
