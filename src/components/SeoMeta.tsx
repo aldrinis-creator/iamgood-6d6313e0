@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet-async";
+import { useEffect } from "react";
 
 interface SeoMetaProps {
   title: string;
@@ -11,6 +11,26 @@ interface SeoMetaProps {
 
 const BASE_URL = "https://iamgood.lovable.app";
 
+const setMeta = (attr: "name" | "property", key: string, content: string) => {
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+};
+
+const setLink = (rel: string, href: string) => {
+  let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", rel);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("href", href);
+};
+
 export const SeoMeta = ({
   title,
   description,
@@ -22,22 +42,24 @@ export const SeoMeta = ({
   const fullTitle = title.includes("Check-iN") ? title : `${title} — Check-iN`;
   const canonical = canonicalPath ? `${BASE_URL}${canonicalPath}` : undefined;
 
-  return (
-    <Helmet>
-      <title>{fullTitle}</title>
-      <meta name="description" content={description} />
-      {keywords && <meta name="keywords" content={keywords} />}
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:type" content={ogType} />
-      <meta property="og:image" content={ogImage} />
-      {canonical && <link rel="canonical" href={canonical} />}
-      {canonical && <meta property="og:url" content={canonical} />}
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={ogImage} />
-    </Helmet>
-  );
+  useEffect(() => {
+    document.title = fullTitle;
+    setMeta("name", "description", description);
+    if (keywords) setMeta("name", "keywords", keywords);
+    setMeta("property", "og:title", fullTitle);
+    setMeta("property", "og:description", description);
+    setMeta("property", "og:type", ogType);
+    setMeta("property", "og:image", ogImage);
+    setMeta("name", "twitter:title", fullTitle);
+    setMeta("name", "twitter:description", description);
+    setMeta("name", "twitter:image", ogImage);
+    if (canonical) {
+      setLink("canonical", canonical);
+      setMeta("property", "og:url", canonical);
+    }
+  }, [fullTitle, description, keywords, ogType, ogImage, canonical]);
+
+  return null;
 };
 
 export default SeoMeta;
