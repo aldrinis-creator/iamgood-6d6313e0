@@ -67,12 +67,18 @@ const GuardianInvitationEmail = ({
           </Section>
 
           <Section style={infoBox}>
-            <Text style={infoTitle}>📱 Install the Check-iN app</Text>
+            <Text style={infoTitle}>📱 Install the Check-iN Guardian app</Text>
             <Text style={infoText}>
-              After accepting, install Check-iN on your phone so you receive SOS alerts and check-in updates instantly — even when the app is closed.
+              Install Check-iN on your phone so you receive SOS alerts and check-in updates instantly — even when the app is closed.
             </Text>
             <Text style={bulletItem}><strong>iPhone:</strong> Open the link in Safari → Share → Add to Home Screen</Text>
             <Text style={bulletItem}><strong>Android:</strong> Open the link in Chrome → tap "Install app" when prompted</Text>
+          </Section>
+
+          <Section style={buttonSection}>
+            <Button href={install} style={acceptButton}>
+              📲 Install the Guardian app
+            </Button>
           </Section>
 
           <Section style={warningBox}>
@@ -87,6 +93,7 @@ const GuardianInvitationEmail = ({
               ✅ Accept & Create Account
             </Button>
           </Section>
+
 
           {rejectLink && (
             <Section style={buttonSection}>
