@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If rejected, create notification for the User
+    // Notify the ward either way
     if (action === "reject") {
       await supabase.rpc("insert_notification_deduped", {
         p_user_id: guardian.user_id,
@@ -82,7 +82,16 @@ Deno.serve(async (req) => {
         p_type: "nomination_rejected",
         p_guardian_id: guardian.id,
       });
+    } else {
+      await supabase.rpc("insert_notification_deduped", {
+        p_user_id: guardian.user_id,
+        p_title: "Guardian Accepted",
+        p_message: `${guardian.guardian_name} has accepted your guardian nomination and is now connected to you.`,
+        p_type: "nomination_accepted",
+        p_guardian_id: guardian.id,
+      });
     }
+
 
     return new Response(
       JSON.stringify({ success: true, status: newStatus }),
