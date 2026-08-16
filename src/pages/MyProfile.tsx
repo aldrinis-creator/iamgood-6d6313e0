@@ -203,6 +203,10 @@ const ProfileContent = () => {
   const [gEmail, setGEmail] = useState("");
   const [gRelation, setGRelation] = useState("");
   const [addingGuardian, setAddingGuardian] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [primaryCandidate, setPrimaryCandidate] = useState<any | null>(null);
+  const [settingPrimary, setSettingPrimary] = useState(false);
+
 
   // Persona fields (from nutrition_personas)
   const [bloodGroup, setBloodGroup] = useState("");
