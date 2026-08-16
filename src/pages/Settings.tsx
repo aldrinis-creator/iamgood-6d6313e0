@@ -423,7 +423,7 @@ const Settings = () => {
       guardianEmail: newEmail || null,
       relation: newRelation || null,
       isPrimary: guardians.length === 0,
-      userName: profileName || session.user.email || "Your ward",
+      userName: session.user.email || "Your ward",
     });
     if (error) {
       toast.error("Failed to add guardian");
