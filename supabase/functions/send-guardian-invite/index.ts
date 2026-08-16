@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     }
 
     // Record the dispatch so re-sends are rate-limited (best-effort).
-    if (recipientKey && (result.email === "sent" || result.sms === "sent")) {
+    if (recipientKey && (result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent")) {
       try {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent", ...result }),
+      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent", ...result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
