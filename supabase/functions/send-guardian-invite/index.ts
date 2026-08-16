@@ -36,15 +36,21 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Rate-limit: check if invite was sent < 1 hour ago
-    if (guardian_email || guardian_phone) {
+    // Rate-limit re-sends: at most one invite dispatch per recipient per hour.
+    // NOTE: this is tracked in notification_logs, NOT on guardians.nominated_at —
+    // a freshly-nominated guardian always has a recent nominated_at, which used to
+    // rate-limit the very first invite and silently drop it.
+    const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
+    if (recipientKey) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      let query = supabase.from("guardians").select("nominated_at").gte("nominated_at", oneHourAgo);
-      if (guardian_email) query = query.eq("guardian_email", guardian_email);
-      else query = query.eq("guardian_phone", guardian_phone);
-
-      const { data: recentInvites } = await query;
-      if (recentInvites && recentInvites.length > 0) {
+      const { data: recentSends } = await supabase
+        .from("notification_logs")
+        .select("id")
+        .eq("type", "guardian_invite")
+        .eq("channel", recipientKey)
+        .gte("created_at", oneHourAgo)
+        .limit(1);
+      if (recentSends && recentSends.length > 0) {
         return new Response(
           JSON.stringify({ message: "Invite already sent recently. Please wait before re-sending.", rate_limited: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -54,8 +60,16 @@ Deno.serve(async (req) => {
 
     const relationText = relation ? ` (${relation})` : "";
     const baseUrl = "https://iamgood.lovable.app";
-    const acceptLink = nomination_token ? `${baseUrl}/register?nomination=accept&token=${nomination_token}` : `${baseUrl}/register`;
+    const acceptLink = nomination_token
+      ? `${baseUrl}/register?nomination=accept&token=${nomination_token}`
+      : (accept_link || `${baseUrl}/register`);
     const rejectLink = nomination_token ? `${baseUrl}/register?nomination=reject&token=${nomination_token}` : "";
+    const result: { email: string; sms: string; rate_limited: boolean } = {
+      email: "skipped",
+      sms: "skipped",
+      rate_limited: false,
+    };
+
 
     // Send email via transactional email queue
     if (guardian_email) {
