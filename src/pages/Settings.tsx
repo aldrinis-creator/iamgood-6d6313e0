@@ -32,6 +32,8 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import VaultNomineeRecoveryDialog from "@/components/vault/VaultNomineeRecoveryDialog";
 import { getGuardianLimit } from "@/lib/featureGating";
 import { requestMotionPermission } from "@/hooks/useFallDetection";
+import { addGuardianWithInvite, resendGuardianInvite, setPrimaryGuardian } from "@/lib/guardianInvite";
+
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
