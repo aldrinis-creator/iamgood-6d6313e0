@@ -147,9 +147,13 @@ Deno.serve(async (req) => {
                 guardian_name,
                 user_name,
                 relation: relationText,
-                accept_link: acceptLink,
+                // Install-first: the page explains how to add the Guardian app,
+                // then continues to the accept flow with the same token.
+                accept_link: installLink,
+                install_link: installLink,
                 reject_link: rejectLink || "",
               }],
+
             }),
           });
           const inviteBody = await inviteRes.text();
