@@ -67,38 +67,60 @@ Deno.serve(async (req) => {
       ? `${baseUrl}/register?nomination=accept&token=${nomination_token}`
       : (accept_link || `${baseUrl}/register`);
     const rejectLink = nomination_token ? `${baseUrl}/register?nomination=reject&token=${nomination_token}` : "";
-    const result: { email: string; sms: string; rate_limited: boolean } = {
+    // Install-first link: the install page explains how to add the app, then
+    // hands the guardian straight to the accept flow with the same token.
+    const installLink = nomination_token
+      ? `${baseUrl}/install?g=${nomination_token}`
+      : `${baseUrl}/install`;
+    const reminderNumber = Number(reminder_number) || 0;
+    const result: { email: string; sms: string; rate_limited: boolean; email_error?: string } = {
       email: "skipped",
       sms: "skipped",
       rate_limited: false,
     };
 
 
-    // Send email via transactional email queue
+    // Send email via transactional email queue.
+    // Called over HTTP (not functions.invoke) so the real error body is visible in logs.
     if (guardian_email) {
       try {
-        const { error: mailErr } = await supabase.functions.invoke("send-transactional-email", {
-          body: {
+        const mailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
             templateName: "guardian-invitation",
             recipientEmail: guardian_email,
-            idempotencyKey: `guardian-invite-${guardian_email}-${nomination_token || Date.now()}`,
+            idempotencyKey: `guardian-invite-${guardian_email}-${nomination_token || Date.now()}${reminderNumber ? `-r${reminderNumber}` : ""}`,
             templateData: {
               guardianName: guardian_name,
               userName: user_name,
               relation: relationText,
               acceptLink,
               rejectLink,
+              installLink,
+              reminderNumber,
             },
-          },
+          }),
         });
-        if (mailErr) throw mailErr;
-        result.email = "sent";
-        console.log("Guardian invitation email queued for:", guardian_email);
+        const mailBody = await mailRes.text();
+        if (!mailRes.ok) {
+          result.email = "failed";
+          result.email_error = `${mailRes.status}: ${mailBody.slice(0, 300)}`;
+          console.error("[send-guardian-invite] email send failed", mailRes.status, mailBody.slice(0, 600));
+        } else {
+          result.email = "sent";
+          console.log("[send-guardian-invite] email queued for", guardian_email, mailBody.slice(0, 300));
+        }
       } catch (emailErr) {
         result.email = "failed";
-        console.error("Email queue error:", emailErr);
+        result.email_error = String(emailErr);
+        console.error("[send-guardian-invite] email queue error:", emailErr);
       }
     }
+
 
     // Send WhatsApp/SMS via MSG91 if phone provided
     if (guardian_phone) {
