@@ -19,3 +19,5 @@ Services page lives at /services (user role) accessed from profile dropdown menu
 - [Tongue Analysis](mem://features/tongue-analysis) — Photo-based tongue screening with coating/colour/surface analysis and guardian alerts on red flags
 - [MMJ Safety Net](mem://features/mmj-safety-net) — Map My Journey safety: low-battery guardian alert, auto-SOS escalation on unanswered route deviation, public live-tracking share link.
 - [Guardian Settings & Help](mem://features/guardian-settings-help) — Dedicated /guardian-settings & /guardian-help pages; /help auto-routes by role; guardians table semantics (user_id=ward, guardian_user_id=guardian)
+- [Guardian Invite Escalation](mem://features/guardian-invite-escalation) — Install-first invite links, accept/install confirmations to ward, 3 daily reminders then ward alert
+
