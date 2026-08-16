@@ -924,26 +924,33 @@ const Settings = () => {
                           onCheckedChange={() => toggleVaultNominee(g.id, g.is_vault_nominee)}
                         />
                       </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {!g.is_primary && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs gap-1"
+                          onClick={async () => {
+                            if (!session?.user?.id) return;
+                            const ok = await setPrimaryGuardian(session.user.id, g.id);
+                            if (ok) {
+                              setGuardians(guardians.map((x) => ({ ...x, is_primary: x.id === g.id })));
+                            }
+                          }}
+                        >
+                          <ShieldCheck className="w-3 h-3" /> Make Primary
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         className="text-xs gap-1"
-                        onClick={() => {
-                          supabase.functions.invoke("send-guardian-invite", {
-                            body: { guardian_name: g.guardian_name, user_name: session?.user?.email, relation: g.relation, guardian_phone: g.guardian_phone, guardian_email: g.guardian_email },
-                          }).then(({ data }) => {
-                            if (data?.rate_limited) {
-                              toast.info("Invite was already sent recently. Please wait.");
-                            } else {
-                              toast.success(`Invite re-sent to ${g.guardian_name}`);
-                            }
-                          }).catch(() => toast.error("Failed to re-send"));
-                        }}
+                        onClick={() => resendGuardianInvite(g.id, session?.user?.email || "Your ward")}
                       >
                         <Mail className="w-3 h-3" /> Re-send Invite
                       </Button>
                     </div>
+
                     </div>
                   </div>
                 ))}
