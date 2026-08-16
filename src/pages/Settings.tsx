@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell, ShieldCheck
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SafeZoneEditor from "@/components/SafeZoneEditor";
@@ -32,6 +32,8 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import VaultNomineeRecoveryDialog from "@/components/vault/VaultNomineeRecoveryDialog";
 import { getGuardianLimit } from "@/lib/featureGating";
 import { requestMotionPermission } from "@/hooks/useFallDetection";
+import { addGuardianWithInvite, resendGuardianInvite, setPrimaryGuardian } from "@/lib/guardianInvite";
+
 
 type SettingsTab = "alerts" | "checkin" | "appts" | "guardians" | "safety" | "language" | "access" | "privacy";
 
@@ -414,51 +416,27 @@ const Settings = () => {
         return;
       }
     }
-    const { data: insertData, error } = await supabase.from("guardians").insert({
-      user_id: session.user.id,
-      guardian_name: newName,
-      guardian_phone: newPhone,
-      guardian_email: newEmail || null,
+    const { error } = await addGuardianWithInvite({
+      userId: session.user.id,
+      guardianName: newName,
+      guardianPhone: newPhone,
+      guardianEmail: newEmail || null,
       relation: newRelation || null,
-      is_primary: guardians.length === 0,
-      status: "pending",
-      nominated_at: new Date().toISOString(),
-      is_vault_nominee: false,
-    } as any).select("nomination_token").single();
+      isPrimary: guardians.length === 0,
+      userName: session.user.email || "Your ward",
+    });
     if (error) {
       toast.error("Failed to add guardian");
     } else {
-      const token = (insertData as any)?.nomination_token;
       toast.success(`${newName} added as Guardian (pending — awaiting acceptance)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
-      // Send branded invite email if email provided
-      const baseUrl = "https://iamgood.lovable.app";
-      const acceptLink = token ? `${baseUrl}/register?nomination=accept&token=${token}` : `${baseUrl}/register`;
-      if (newEmail) {
-        supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "guardian-invitation",
-            recipientEmail: newEmail,
-            idempotencyKey: `guardian-invite-${newEmail}-${Date.now()}`,
-            templateData: {
-              guardianName: newName,
-              userName: session.user.email,
-              relation: newRelation,
-              acceptLink,
-            },
-          },
-        }).catch(() => {});
-      }
-      // Also trigger MSG91 SMS/WhatsApp with invite link
-      supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_name: newName, user_name: session.user.email, relation: newRelation, guardian_phone: newPhone, accept_link: acceptLink },
-      }).catch(() => {});
       // Refresh
       const { data: refreshed } = await supabase.from("guardians").select("*").eq("user_id", session.user.id).order("created_at");
       if (refreshed) setGuardians(refreshed as unknown as Guardian[]);
     }
   };
+
 
   const removeGuardian = async (id: string) => {
     const { error } = await supabase.from("guardians").delete().eq("id", id);
@@ -946,26 +924,33 @@ const Settings = () => {
                           onCheckedChange={() => toggleVaultNominee(g.id, g.is_vault_nominee)}
                         />
                       </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {!g.is_primary && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs gap-1"
+                          onClick={async () => {
+                            if (!session?.user?.id) return;
+                            const ok = await setPrimaryGuardian(session.user.id, g.id);
+                            if (ok) {
+                              setGuardians(guardians.map((x) => ({ ...x, is_primary: x.id === g.id })));
+                            }
+                          }}
+                        >
+                          <ShieldCheck className="w-3 h-3" /> Make Primary
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         className="text-xs gap-1"
-                        onClick={() => {
-                          supabase.functions.invoke("send-guardian-invite", {
-                            body: { guardian_name: g.guardian_name, user_name: session?.user?.email, relation: g.relation, guardian_phone: g.guardian_phone, guardian_email: g.guardian_email },
-                          }).then(({ data }) => {
-                            if (data?.rate_limited) {
-                              toast.info("Invite was already sent recently. Please wait.");
-                            } else {
-                              toast.success(`Invite re-sent to ${g.guardian_name}`);
-                            }
-                          }).catch(() => toast.error("Failed to re-send"));
-                        }}
+                        onClick={() => resendGuardianInvite(g.id, session?.user?.email || "Your ward")}
                       >
                         <Mail className="w-3 h-3" /> Re-send Invite
                       </Button>
                     </div>
+
                     </div>
                   </div>
                 ))}

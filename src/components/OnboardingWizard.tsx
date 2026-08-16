@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { addGuardianWithInvite } from "@/lib/guardianInvite";
 import { useAuth } from "@/contexts/AuthContext";
 import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
@@ -106,25 +107,22 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
       toast.error("Name and phone are required");
       return;
     }
-    const { error } = await supabase.from("guardians").insert({
-      user_id: session.user.id,
-      guardian_name: gName.trim(),
-      guardian_phone: gPhone.trim(),
-      guardian_email: gEmail.trim() || null,
-      relation: gRelation.trim() || null,
-      is_primary: true,
+    const { error } = await addGuardianWithInvite({
+      userId: session.user.id,
+      guardianName: gName,
+      guardianPhone: gPhone,
+      guardianEmail: gEmail || null,
+      relation: gRelation || null,
+      isPrimary: true,
+      userName: userName || "Your ward",
     });
     if (error) {
       toast.error("Failed to add guardian");
     } else {
       toast.success("Guardian added!");
-      if (gEmail.trim()) {
-        supabase.functions.invoke("send-guardian-invite", {
-          body: { guardian_name: gName, user_name: userName, relation: gRelation, guardian_phone: gPhone, guardian_email: gEmail },
-        }).catch(() => {});
-      }
       handleNext();
     }
+
   };
 
   const saveMedication = async () => {

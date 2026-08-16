@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link } = await req.json();
 
     if (!guardian_name || !user_name) {
       return new Response(
@@ -36,15 +36,21 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Rate-limit: check if invite was sent < 1 hour ago
-    if (guardian_email || guardian_phone) {
+    // Rate-limit re-sends: at most one invite dispatch per recipient per hour.
+    // NOTE: this is tracked in notification_logs, NOT on guardians.nominated_at —
+    // a freshly-nominated guardian always has a recent nominated_at, which used to
+    // rate-limit the very first invite and silently drop it.
+    const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
+    if (recipientKey) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      let query = supabase.from("guardians").select("nominated_at").gte("nominated_at", oneHourAgo);
-      if (guardian_email) query = query.eq("guardian_email", guardian_email);
-      else query = query.eq("guardian_phone", guardian_phone);
-
-      const { data: recentInvites } = await query;
-      if (recentInvites && recentInvites.length > 0) {
+      const { data: recentSends } = await supabase
+        .from("notification_logs")
+        .select("id")
+        .eq("type", "guardian_invite")
+        .eq("channel", recipientKey)
+        .gte("created_at", oneHourAgo)
+        .limit(1);
+      if (recentSends && recentSends.length > 0) {
         return new Response(
           JSON.stringify({ message: "Invite already sent recently. Please wait before re-sending.", rate_limited: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -54,13 +60,21 @@ Deno.serve(async (req) => {
 
     const relationText = relation ? ` (${relation})` : "";
     const baseUrl = "https://iamgood.lovable.app";
-    const acceptLink = nomination_token ? `${baseUrl}/register?nomination=accept&token=${nomination_token}` : `${baseUrl}/register`;
+    const acceptLink = nomination_token
+      ? `${baseUrl}/register?nomination=accept&token=${nomination_token}`
+      : (accept_link || `${baseUrl}/register`);
     const rejectLink = nomination_token ? `${baseUrl}/register?nomination=reject&token=${nomination_token}` : "";
+    const result: { email: string; sms: string; rate_limited: boolean } = {
+      email: "skipped",
+      sms: "skipped",
+      rate_limited: false,
+    };
+
 
     // Send email via transactional email queue
     if (guardian_email) {
       try {
-        await supabase.functions.invoke("send-transactional-email", {
+        const { error: mailErr } = await supabase.functions.invoke("send-transactional-email", {
           body: {
             templateName: "guardian-invitation",
             recipientEmail: guardian_email,
@@ -74,8 +88,11 @@ Deno.serve(async (req) => {
             },
           },
         });
+        if (mailErr) throw mailErr;
+        result.email = "sent";
         console.log("Guardian invitation email queued for:", guardian_email);
       } catch (emailErr) {
+        result.email = "failed";
         console.error("Email queue error:", emailErr);
       }
     }
@@ -85,8 +102,14 @@ Deno.serve(async (req) => {
       const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
       const msg91InviteTemplate = Deno.env.get("MSG91_INVITE_TEMPLATE_ID");
       if (msg91AuthKey && msg91InviteTemplate) {
-        const clean = guardian_phone.replace(/[^0-9]/g, "");
-        const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+        // Respect an explicit country code; only bare 10-digit numbers default to India.
+        const raw = String(guardian_phone).replace(/[\s\-()]/g, "");
+        const digits = raw.replace(/[^\d]/g, "");
+        const mobile = raw.startsWith("+")
+          ? digits
+          : digits.length === 10
+            ? `91${digits}`
+            : digits;
         try {
           const inviteRes = await fetch("https://control.msg91.com/api/v5/flow", {
             method: "POST",
@@ -112,13 +135,16 @@ Deno.serve(async (req) => {
             templateId: msg91InviteTemplate,
             body: inviteBody.slice(0, 600),
           });
+          result.sms = inviteRes.ok ? "sent" : "failed";
           if (!inviteRes.ok) {
             console.error("[send-guardian-invite] MSG91 returned non-OK status", inviteRes.status, inviteBody);
           }
         } catch (e) {
+          result.sms = "failed";
           console.error("[send-guardian-invite] MSG91 invite error:", e);
         }
       } else {
+        result.sms = "failed";
         // Fallback: log WhatsApp link
         const whatsappMsg = encodeURIComponent(
           `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
@@ -127,10 +153,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Record the dispatch so re-sends are rate-limited (best-effort).
+    if (recipientKey && (result.email === "sent" || result.sms === "sent")) {
+      try {
+        await supabase.from("notification_logs").insert({
+          type: "guardian_invite",
+          channel: recipientKey,
+          status: `${result.email}/${result.sms}`,
+          metadata: { guardian_name, has_token: !!nomination_token },
+        });
+      } catch (logErr) {
+        console.error("[send-guardian-invite] log insert failed:", logErr);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ sent: true }),
+      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent", ...result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (err) {
     console.error("Error:", err);
     return new Response(

@@ -26,6 +26,12 @@ import PastMedicalHistory from "@/components/PastMedicalHistory";
 import IdInsuranceSection from "@/components/profile/IdInsuranceSection";
 import GuardianBlockedSection from "@/components/profile/GuardianBlockedSection";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { addGuardianWithInvite, resendGuardianInvite, setPrimaryGuardian } from "@/lib/guardianInvite";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
@@ -197,6 +203,10 @@ const ProfileContent = () => {
   const [gEmail, setGEmail] = useState("");
   const [gRelation, setGRelation] = useState("");
   const [addingGuardian, setAddingGuardian] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [primaryCandidate, setPrimaryCandidate] = useState<any | null>(null);
+  const [settingPrimary, setSettingPrimary] = useState(false);
+
 
   // Persona fields (from nutrition_personas)
   const [bloodGroup, setBloodGroup] = useState("");
@@ -805,37 +815,71 @@ const ProfileContent = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           {guardians.length > 0 ? guardians.map((g) => (
-            <div key={g.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="font-medium text-sm">{g.guardian_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
-                </p>
-                {g.guardian_email && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Mail className="w-3 h-3" />{g.guardian_email}
+            <div key={g.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">{g.guardian_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
                   </p>
-                )}
+                  {g.guardian_email && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3" />{g.guardian_email}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {g.is_primary && (
+                    <Badge className="text-xs">Primary</Badge>
+                  )}
+                  {g.status && g.status !== "accepted" && (
+                    <Badge variant="outline" className="text-[10px] capitalize">{g.status}</Badge>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
+                    <a href={`tel:${g.guardian_phone}`}><Phone className="w-3.5 h-3.5 text-primary" /></a>
+                  </Button>
+                  {!g.is_primary && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive"
+                      onClick={async () => {
+                        const { error } = await supabase.from("guardians").delete().eq("id", g.id);
+                        if (error) toast.error("Failed to remove guardian");
+                        else { toast.success("Guardian removed"); loadData(); }
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {g.is_primary && (
-                  <Badge className="text-xs">Primary</Badge>
-                )}
-                <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
-                  <a href={`tel:${g.guardian_phone}`}><Phone className="w-3.5 h-3.5 text-primary" /></a>
-                </Button>
+              <div className="flex flex-wrap gap-2">
                 {!g.is_primary && (
                   <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-destructive"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1 h-7"
+                    onClick={() => setPrimaryCandidate(g)}
+                  >
+                    <ShieldCheck className="w-3 h-3" /> Make Primary
+                  </Button>
+                )}
+                {g.status !== "accepted" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1 h-7"
+                    disabled={resendingId === g.id}
                     onClick={async () => {
-                      const { error } = await supabase.from("guardians").delete().eq("id", g.id);
-                      if (error) toast.error("Failed to remove guardian");
-                      else { toast.success("Guardian removed"); loadData(); }
+                      setResendingId(g.id);
+                      await resendGuardianInvite(g.id, fullName || "Your ward");
+                      setResendingId(null);
                     }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {resendingId === g.id
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <Mail className="w-3 h-3" />} Re-send invite
                   </Button>
                 )}
               </div>
@@ -843,6 +887,7 @@ const ProfileContent = () => {
           )) : (
             <p className="text-sm text-muted-foreground text-center py-2">No guardians added yet</p>
           )}
+
 
           {showGuardianForm ? (
             <div className="space-y-3 p-3 rounded-lg border border-border">
@@ -870,13 +915,14 @@ const ProfileContent = () => {
                       return;
                     }
                     setAddingGuardian(true);
-                    const { error } = await supabase.from("guardians").insert({
-                      user_id: userId!,
-                      guardian_name: gName.trim(),
-                      guardian_phone: gPhone.trim(),
-                      guardian_email: gEmail.trim(),
-                      relation: gRelation || null,
-                      is_primary: guardians.length === 0,
+                    const { error } = await addGuardianWithInvite({
+                      userId: userId!,
+                      guardianName: gName,
+                      guardianPhone: gPhone,
+                      guardianEmail: gEmail,
+                      relation: gRelation,
+                      isPrimary: guardians.length === 0,
+                      userName: fullName || "Your ward",
                     });
                     if (error) toast.error("Failed to add guardian");
                     else {
@@ -886,6 +932,7 @@ const ProfileContent = () => {
                       loadData();
                     }
                     setAddingGuardian(false);
+
                   }}
                 >
                   {addingGuardian && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
@@ -905,6 +952,39 @@ const ProfileContent = () => {
           </p>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!primaryCandidate} onOpenChange={(o) => !o && setPrimaryCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Primary Guardian?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {primaryCandidate?.guardian_name} will become your Primary Guardian
+              {guardians.find((x) => x.is_primary)
+                ? `, and ${guardians.find((x) => x.is_primary)?.guardian_name} will become a secondary guardian.`
+                : "."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={settingPrimary}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={settingPrimary}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!userId || !primaryCandidate) return;
+                setSettingPrimary(true);
+                const ok = await setPrimaryGuardian(userId, primaryCandidate.id);
+                setSettingPrimary(false);
+                setPrimaryCandidate(null);
+                if (ok) loadData();
+              }}
+            >
+              {settingPrimary && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Make Primary
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* Current Medications (read-only from medications table) */}
       <Card>
