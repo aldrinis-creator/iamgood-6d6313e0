@@ -953,6 +953,39 @@ const ProfileContent = () => {
         </CardContent>
       </Card>
 
+      <AlertDialog open={!!primaryCandidate} onOpenChange={(o) => !o && setPrimaryCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Primary Guardian?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {primaryCandidate?.guardian_name} will become your Primary Guardian
+              {guardians.find((x) => x.is_primary)
+                ? `, and ${guardians.find((x) => x.is_primary)?.guardian_name} will become a secondary guardian.`
+                : "."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={settingPrimary}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={settingPrimary}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!userId || !primaryCandidate) return;
+                setSettingPrimary(true);
+                const ok = await setPrimaryGuardian(userId, primaryCandidate.id);
+                setSettingPrimary(false);
+                setPrimaryCandidate(null);
+                if (ok) loadData();
+              }}
+            >
+              {settingPrimary && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Make Primary
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       {/* Current Medications (read-only from medications table) */}
       <Card>
         <CardHeader className="pb-3">
