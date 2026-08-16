@@ -805,37 +805,71 @@ const ProfileContent = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           {guardians.length > 0 ? guardians.map((g) => (
-            <div key={g.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="font-medium text-sm">{g.guardian_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
-                </p>
-                {g.guardian_email && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <Mail className="w-3 h-3" />{g.guardian_email}
+            <div key={g.id} className="p-3 rounded-lg bg-muted/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">{g.guardian_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
                   </p>
-                )}
+                  {g.guardian_email && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3" />{g.guardian_email}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {g.is_primary && (
+                    <Badge className="text-xs">Primary</Badge>
+                  )}
+                  {g.status && g.status !== "accepted" && (
+                    <Badge variant="outline" className="text-[10px] capitalize">{g.status}</Badge>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
+                    <a href={`tel:${g.guardian_phone}`}><Phone className="w-3.5 h-3.5 text-primary" /></a>
+                  </Button>
+                  {!g.is_primary && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive"
+                      onClick={async () => {
+                        const { error } = await supabase.from("guardians").delete().eq("id", g.id);
+                        if (error) toast.error("Failed to remove guardian");
+                        else { toast.success("Guardian removed"); loadData(); }
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {g.is_primary && (
-                  <Badge className="text-xs">Primary</Badge>
-                )}
-                <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
-                  <a href={`tel:${g.guardian_phone}`}><Phone className="w-3.5 h-3.5 text-primary" /></a>
-                </Button>
+              <div className="flex flex-wrap gap-2">
                 {!g.is_primary && (
                   <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-destructive"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1 h-7"
+                    onClick={() => setPrimaryCandidate(g)}
+                  >
+                    <ShieldCheck className="w-3 h-3" /> Make Primary
+                  </Button>
+                )}
+                {g.status !== "accepted" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1 h-7"
+                    disabled={resendingId === g.id}
                     onClick={async () => {
-                      const { error } = await supabase.from("guardians").delete().eq("id", g.id);
-                      if (error) toast.error("Failed to remove guardian");
-                      else { toast.success("Guardian removed"); loadData(); }
+                      setResendingId(g.id);
+                      await resendGuardianInvite(g.id, fullName || "Your ward");
+                      setResendingId(null);
                     }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {resendingId === g.id
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <Mail className="w-3 h-3" />} Re-send invite
                   </Button>
                 )}
               </div>
@@ -843,6 +877,7 @@ const ProfileContent = () => {
           )) : (
             <p className="text-sm text-muted-foreground text-center py-2">No guardians added yet</p>
           )}
+
 
           {showGuardianForm ? (
             <div className="space-y-3 p-3 rounded-lg border border-border">
