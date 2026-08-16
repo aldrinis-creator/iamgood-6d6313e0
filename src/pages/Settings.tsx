@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell, ShieldCheck
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SafeZoneEditor from "@/components/SafeZoneEditor";
