@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { addGuardianWithInvite } from "@/lib/guardianInvite";
 import { useAuth } from "@/contexts/AuthContext";
 import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
