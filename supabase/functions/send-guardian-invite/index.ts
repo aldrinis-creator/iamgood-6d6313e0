@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     // Send email via transactional email queue
     if (guardian_email) {
       try {
-        await supabase.functions.invoke("send-transactional-email", {
+        const { error: mailErr } = await supabase.functions.invoke("send-transactional-email", {
           body: {
             templateName: "guardian-invitation",
             recipientEmail: guardian_email,
@@ -88,8 +88,11 @@ Deno.serve(async (req) => {
             },
           },
         });
+        if (mailErr) throw mailErr;
+        result.email = "sent";
         console.log("Guardian invitation email queued for:", guardian_email);
       } catch (emailErr) {
+        result.email = "failed";
         console.error("Email queue error:", emailErr);
       }
     }
@@ -99,8 +102,14 @@ Deno.serve(async (req) => {
       const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
       const msg91InviteTemplate = Deno.env.get("MSG91_INVITE_TEMPLATE_ID");
       if (msg91AuthKey && msg91InviteTemplate) {
-        const clean = guardian_phone.replace(/[^0-9]/g, "");
-        const mobile = clean.startsWith("91") ? clean : `91${clean}`;
+        // Respect an explicit country code; only bare 10-digit numbers default to India.
+        const raw = String(guardian_phone).replace(/[\s\-()]/g, "");
+        const digits = raw.replace(/[^\d]/g, "");
+        const mobile = raw.startsWith("+")
+          ? digits
+          : digits.length === 10
+            ? `91${digits}`
+            : digits;
         try {
           const inviteRes = await fetch("https://control.msg91.com/api/v5/flow", {
             method: "POST",
@@ -126,13 +135,16 @@ Deno.serve(async (req) => {
             templateId: msg91InviteTemplate,
             body: inviteBody.slice(0, 600),
           });
+          result.sms = inviteRes.ok ? "sent" : "failed";
           if (!inviteRes.ok) {
             console.error("[send-guardian-invite] MSG91 returned non-OK status", inviteRes.status, inviteBody);
           }
         } catch (e) {
+          result.sms = "failed";
           console.error("[send-guardian-invite] MSG91 invite error:", e);
         }
       } else {
+        result.sms = "failed";
         // Fallback: log WhatsApp link
         const whatsappMsg = encodeURIComponent(
           `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
@@ -141,10 +153,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Record the dispatch so re-sends are rate-limited (best-effort).
+    if (recipientKey && (result.email === "sent" || result.sms === "sent")) {
+      try {
+        await supabase.from("notification_logs").insert({
+          type: "guardian_invite",
+          channel: recipientKey,
+          status: `${result.email}/${result.sms}`,
+          metadata: { guardian_name, has_token: !!nomination_token },
+        });
+      } catch (logErr) {
+        console.error("[send-guardian-invite] log insert failed:", logErr);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ sent: true }),
+      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent", ...result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (err) {
     console.error("Error:", err);
     return new Response(
