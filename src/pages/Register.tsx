@@ -31,8 +31,8 @@ const Register = () => {
   const { canInstall, installApp, isInstalled } = usePwaInstall();
   const [searchParams] = useSearchParams();
 
-  const [step, setStep] = useState<number>(1);
-  const [selectedRole, setSelectedRole] = useState<SelectedRole>(null);
+  const [step, setStep] = useState<number>(2);
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>("user");
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -72,15 +72,6 @@ const Register = () => {
     }
   }, [searchParams]);
 
-  const handleRoleSelect = (role: SelectedRole) => {
-    setSelectedRole(role);
-    if (role === "guardian") {
-      // Don't auto-advance for guardian, force them to read the warning and click next
-    } else {
-      setStep(2);
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     const { error } = await lovable.auth.signInWithOAuth("google", {
@@ -94,8 +85,7 @@ const Register = () => {
 
   const handleBack = () => {
     if (step === 2) {
-      setStep(1);
-      setSelectedRole(null);
+      navigate(-1);
     } else if (step === 3) {
       setStep(2);
     } else if (step === 4) {
@@ -323,63 +313,6 @@ const Register = () => {
                 Install app on this phone
               </button>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- STEP 1: ROLE ---
-  if (step === 1) {
-    return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
-        <div className="w-full max-w-[320px] flex flex-col">
-          <div className="text-[11px] text-auth-text-3 font-semibold tracking-widest uppercase text-center mb-2">Create account</div>
-          <h1 className="text-[22px] font-bold text-center tracking-tight mb-6">How will you use<br/>Check-iN?</h1>
-
-          <button 
-            onClick={() => handleRoleSelect("user")}
-            className={`w-full bg-navy-card border-[1.5px] rounded-2xl p-4 mb-2.5 flex items-start gap-3.5 transition-colors text-left ${selectedRole === "user" ? "border-auth-green bg-auth-green-glow/20" : "border-auth-border hover:border-auth-green hover:bg-auth-green-glow/5"}`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-navy-soft flex items-center justify-center text-[20px] shrink-0">🧓</div>
-            <div>
-              <div className="text-[15px] font-semibold text-auth-text-1 mb-[3px]">To protect myself</div>
-              <div className="text-[12px] text-auth-text-2 leading-relaxed mb-1.5">Set up daily check-ins and invite family to watch over me</div>
-              <div className="text-[11px] italic text-auth-green">← Seniors & lone dwellers tap here</div>
-            </div>
-          </button>
-
-          <button 
-            onClick={() => handleRoleSelect("guardian")}
-            className={`w-full bg-navy-card border-[1.5px] rounded-2xl p-4 mb-2.5 flex items-start gap-3.5 transition-colors text-left ${selectedRole === "guardian" ? "border-auth-green bg-auth-green-glow/20" : "border-auth-border hover:border-auth-green hover:bg-auth-green-glow/5"}`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-navy-soft flex items-center justify-center text-[20px] shrink-0">👨‍👧</div>
-            <div>
-              <div className="text-[15px] font-semibold text-auth-text-1 mb-[3px]">To protect someone I love</div>
-              <div className="text-[12px] text-auth-text-2 leading-relaxed mb-1.5">Monitor a family member or ward as their Guardian</div>
-              {selectedRole === "guardian" && <div className="text-[11px] italic text-auth-green">← Selected</div>}
-              {selectedRole !== "guardian" && <div className="text-[11px] italic text-auth-text-3">← Family & caregivers tap here</div>}
-            </div>
-          </button>
-
-          {selectedRole === "guardian" && (
-            <div className="bg-auth-amber-soft border border-[#F5A62340] rounded-[10px] p-3 mb-4 flex items-start gap-2.5 mt-2 animate-in fade-in slide-in-from-top-4">
-              <div className="text-[16px] shrink-0 mt-[1px]">⚠️</div>
-              <div className="text-[12px] text-[#E8C27A] leading-relaxed">
-                <strong className="text-auth-amber">You'll need an invitation</strong> from the person you're protecting before you can create a Guardian account. Ask them to add your phone in Settings → Guardians.
-              </div>
-            </div>
-          )}
-
-          <div className="mt-auto pt-6 flex flex-col gap-3">
-            {selectedRole === "guardian" && (
-              <button onClick={() => setStep(2)} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl">
-                I have an invitation — continue ›
-              </button>
-            )}
-            <div className="text-center text-[13px] text-auth-text-3 cursor-pointer" onClick={() => navigate("/login")}>
-              Already have an account? <span className="text-auth-green font-semibold">Sign in</span>
-            </div>
           </div>
         </div>
       </div>

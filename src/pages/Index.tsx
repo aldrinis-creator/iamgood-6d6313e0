@@ -43,47 +43,29 @@ const Index = () => {
         </div>
 
         {/* CARDS */}
-        <div className="bg-navy-card border border-auth-border-hi rounded-2xl p-3.5 mb-2.5">
-          <div className="flex items-center gap-2.5 mb-2">
+        <div className="bg-navy-card border border-auth-border-hi rounded-2xl p-3.5 mb-[6vh]">
+          <div className="flex items-center gap-2.5 mb-3">
             <div className="w-8 h-8 rounded-lg bg-auth-green-glow flex items-center justify-center text-[15px] shrink-0">🛡️</div>
             <div className="text-sm font-semibold text-auth-text-1 flex items-center">
-              For Seniors & Lone Dwellers
-              <span className="text-[11px] font-medium text-auth-green bg-auth-green-glow px-2 py-0.5 rounded-full ml-1.5">For you</span>
+              Personal Health & Safety
             </div>
           </div>
-          <ul className="flex flex-col gap-1.5 list-none">
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
+          <ul className="flex flex-col gap-2 list-none">
+            <li className="text-[13px] text-auth-text-2 flex items-center gap-2.5">
               <div className="w-[5px] h-[5px] rounded-full bg-auth-green opacity-70 shrink-0"></div>
               Scheduled safety check-ins
             </li>
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
+            <li className="text-[13px] text-auth-text-2 flex items-center gap-2.5">
               <div className="w-[5px] h-[5px] rounded-full bg-auth-green opacity-70 shrink-0"></div>
               One-tap SOS & live location
             </li>
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
+            <li className="text-[13px] text-auth-text-2 flex items-center gap-2.5">
               <div className="w-[5px] h-[5px] rounded-full bg-auth-green opacity-70 shrink-0"></div>
               Medication reminders & vault
             </li>
-          </ul>
-        </div>
-
-        <div className="bg-navy-card border border-auth-border-hi rounded-2xl p-3.5 mb-[5vh]">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-[#4682DC26] flex items-center justify-center text-[15px] shrink-0">👁️</div>
-            <div className="text-sm font-semibold text-auth-text-1">For Guardians & Family</div>
-          </div>
-          <ul className="flex flex-col gap-1.5 list-none">
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
-              <div className="w-[5px] h-[5px] rounded-full bg-[#4682DC] opacity-70 shrink-0"></div>
-              Real-time dashboard & map
-            </li>
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
-              <div className="w-[5px] h-[5px] rounded-full bg-[#4682DC] opacity-70 shrink-0"></div>
-              Instant SOS & missed check-in alerts
-            </li>
-            <li className="text-[13px] text-auth-text-2 flex items-center gap-2">
-              <div className="w-[5px] h-[5px] rounded-full bg-[#4682DC] opacity-70 shrink-0"></div>
-              WhatsApp + email notifications
+            <li className="text-[13px] text-auth-text-2 flex items-center gap-2.5">
+              <div className="w-[5px] h-[5px] rounded-full bg-auth-green opacity-70 shrink-0"></div>
+              Invite your family to watch over you
             </li>
           </ul>
         </div>
@@ -102,7 +84,9 @@ const Index = () => {
           >
             Sign in
           </button>
-          <div className="text-center text-[11px] text-auth-text-3 mt-1">Protecting seniors across India 🇮🇳</div>
+          <div className="text-center text-[11px] text-auth-text-3 mt-4">
+            Are you a Guardian? Please tap the link sent to you via SMS/WhatsApp to join.
+          </div>
         </div>
 
       </div>
