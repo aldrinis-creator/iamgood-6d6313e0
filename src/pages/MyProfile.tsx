@@ -26,6 +26,12 @@ import PastMedicalHistory from "@/components/PastMedicalHistory";
 import IdInsuranceSection from "@/components/profile/IdInsuranceSection";
 import GuardianBlockedSection from "@/components/profile/GuardianBlockedSection";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { addGuardianWithInvite, resendGuardianInvite, setPrimaryGuardian } from "@/lib/guardianInvite";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const BMI_CATEGORIES = [
   { max: 18.5, label: "Underweight", color: "text-blue-500" },
