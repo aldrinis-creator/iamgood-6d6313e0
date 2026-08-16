@@ -13,13 +13,17 @@ interface GuardianInvitationProps {
   relation?: string
   acceptLink?: string
   rejectLink?: string
+  installLink?: string
+  reminderNumber?: number
 }
 
 const GuardianInvitationEmail = ({
-  guardianName, userName, relation, acceptLink, rejectLink,
+  guardianName, userName, relation, acceptLink, rejectLink, installLink, reminderNumber,
 }: GuardianInvitationProps) => {
   const relationText = relation ? ` (${relation})` : ''
   const defaultAcceptLink = 'https://iamgood.lovable.app/register'
+  const install = installLink || 'https://iamgood.lovable.app/install'
+  const isReminder = !!reminderNumber && reminderNumber > 0
 
   return (
     <Html lang="en" dir="ltr">
@@ -31,15 +35,24 @@ const GuardianInvitationEmail = ({
             <div style={logoBadge}>C-iN</div>
           </Section>
 
-          <Heading style={h1}>You've Been Nominated as a Guardian</Heading>
+          <Heading style={h1}>
+            {isReminder ? 'Reminder: Your Guardian Nomination' : "You've Been Nominated as a Guardian"}
+          </Heading>
 
           <Text style={text}>
             Hi {guardianName || 'there'},
           </Text>
 
+          {isReminder && (
+            <Text style={text}>
+              This is reminder {reminderNumber} of 3 — your nomination is still waiting for a response.
+            </Text>
+          )}
+
           <Text style={text}>
             <strong>{userName || 'A user'}</strong>{relationText} has nominated you as their <strong>Guardian</strong> on <strong>{SITE_NAME}</strong> — a personal emergency response app.
           </Text>
+
 
           <Section style={infoBox}>
             <Text style={infoTitle}>What does this mean?</Text>
