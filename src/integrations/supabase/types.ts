@@ -916,14 +916,18 @@ export type Database = {
           guardian_phone: string
           guardian_user_id: string | null
           id: string
+          install_confirmed_at: string | null
           is_primary: boolean
           is_vault_nominee: boolean
+          last_reminder_at: string | null
           nominated_at: string
           nomination_expires_at: string | null
           nomination_token: string | null
           relation: string | null
+          reminder_count: number
           status: string
           user_id: string
+          ward_notified_unaccepted: boolean
         }
         Insert: {
           created_at?: string
@@ -932,14 +936,18 @@ export type Database = {
           guardian_phone: string
           guardian_user_id?: string | null
           id?: string
+          install_confirmed_at?: string | null
           is_primary?: boolean
           is_vault_nominee?: boolean
+          last_reminder_at?: string | null
           nominated_at?: string
           nomination_expires_at?: string | null
           nomination_token?: string | null
           relation?: string | null
+          reminder_count?: number
           status?: string
           user_id: string
+          ward_notified_unaccepted?: boolean
         }
         Update: {
           created_at?: string
@@ -948,14 +956,18 @@ export type Database = {
           guardian_phone?: string
           guardian_user_id?: string | null
           id?: string
+          install_confirmed_at?: string | null
           is_primary?: boolean
           is_vault_nominee?: boolean
+          last_reminder_at?: string | null
           nominated_at?: string
           nomination_expires_at?: string | null
           nomination_token?: string | null
           relation?: string | null
+          reminder_count?: number
           status?: string
           user_id?: string
+          ward_notified_unaccepted?: boolean
         }
         Relationships: []
       }

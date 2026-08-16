@@ -12,18 +12,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    {
+    const cronSecret = req.headers.get("x-cron-secret");
+    const isCron = !!cronSecret && cronSecret === Deno.env.get("CRON_SECRET");
+    if (!isCron) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const _userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _userClient.auth.getUser();
       if (_e || !_u?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number } = await req.json();
+
 
     if (!guardian_name || !user_name) {
       return new Response(
@@ -64,38 +67,60 @@ Deno.serve(async (req) => {
       ? `${baseUrl}/register?nomination=accept&token=${nomination_token}`
       : (accept_link || `${baseUrl}/register`);
     const rejectLink = nomination_token ? `${baseUrl}/register?nomination=reject&token=${nomination_token}` : "";
-    const result: { email: string; sms: string; rate_limited: boolean } = {
+    // Install-first link: the install page explains how to add the app, then
+    // hands the guardian straight to the accept flow with the same token.
+    const installLink = nomination_token
+      ? `${baseUrl}/install?g=${nomination_token}`
+      : `${baseUrl}/install`;
+    const reminderNumber = Number(reminder_number) || 0;
+    const result: { email: string; sms: string; rate_limited: boolean; email_error?: string } = {
       email: "skipped",
       sms: "skipped",
       rate_limited: false,
     };
 
 
-    // Send email via transactional email queue
+    // Send email via transactional email queue.
+    // Called over HTTP (not functions.invoke) so the real error body is visible in logs.
     if (guardian_email) {
       try {
-        const { error: mailErr } = await supabase.functions.invoke("send-transactional-email", {
-          body: {
+        const mailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
             templateName: "guardian-invitation",
             recipientEmail: guardian_email,
-            idempotencyKey: `guardian-invite-${guardian_email}-${nomination_token || Date.now()}`,
+            idempotencyKey: `guardian-invite-${guardian_email}-${nomination_token || Date.now()}${reminderNumber ? `-r${reminderNumber}` : ""}`,
             templateData: {
               guardianName: guardian_name,
               userName: user_name,
               relation: relationText,
               acceptLink,
               rejectLink,
+              installLink,
+              reminderNumber,
             },
-          },
+          }),
         });
-        if (mailErr) throw mailErr;
-        result.email = "sent";
-        console.log("Guardian invitation email queued for:", guardian_email);
+        const mailBody = await mailRes.text();
+        if (!mailRes.ok) {
+          result.email = "failed";
+          result.email_error = `${mailRes.status}: ${mailBody.slice(0, 300)}`;
+          console.error("[send-guardian-invite] email send failed", mailRes.status, mailBody.slice(0, 600));
+        } else {
+          result.email = "sent";
+          console.log("[send-guardian-invite] email queued for", guardian_email, mailBody.slice(0, 300));
+        }
       } catch (emailErr) {
         result.email = "failed";
-        console.error("Email queue error:", emailErr);
+        result.email_error = String(emailErr);
+        console.error("[send-guardian-invite] email queue error:", emailErr);
       }
     }
+
 
     // Send WhatsApp/SMS via MSG91 if phone provided
     if (guardian_phone) {
@@ -122,9 +147,13 @@ Deno.serve(async (req) => {
                 guardian_name,
                 user_name,
                 relation: relationText,
-                accept_link: acceptLink,
+                // Install-first: the page explains how to add the Guardian app,
+                // then continues to the accept flow with the same token.
+                accept_link: installLink,
+                install_link: installLink,
                 reject_link: rejectLink || "",
               }],
+
             }),
           });
           const inviteBody = await inviteRes.text();
@@ -147,7 +176,7 @@ Deno.serve(async (req) => {
         result.sms = "failed";
         // Fallback: log WhatsApp link
         const whatsappMsg = encodeURIComponent(
-          `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
+          `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n📲 Install the Guardian app: ${installLink}\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
         );
         console.log(`WhatsApp link: https://wa.me/${guardian_phone.replace(/[^0-9]/g, "")}?text=${whatsappMsg}`);
       }
