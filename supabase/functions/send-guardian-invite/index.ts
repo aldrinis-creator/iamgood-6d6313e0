@@ -12,18 +12,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    {
+    const cronSecret = req.headers.get("x-cron-secret");
+    const isCron = !!cronSecret && cronSecret === Deno.env.get("CRON_SECRET");
+    if (!isCron) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const _userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _userClient.auth.getUser();
       if (_e || !_u?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number } = await req.json();
+
 
     if (!guardian_name || !user_name) {
       return new Response(
