@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link } = await req.json();
 
     if (!guardian_name || !user_name) {
       return new Response(
