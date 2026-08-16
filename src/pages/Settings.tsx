@@ -414,51 +414,27 @@ const Settings = () => {
         return;
       }
     }
-    const { data: insertData, error } = await supabase.from("guardians").insert({
-      user_id: session.user.id,
-      guardian_name: newName,
-      guardian_phone: newPhone,
-      guardian_email: newEmail || null,
+    const { error } = await addGuardianWithInvite({
+      userId: session.user.id,
+      guardianName: newName,
+      guardianPhone: newPhone,
+      guardianEmail: newEmail || null,
       relation: newRelation || null,
-      is_primary: guardians.length === 0,
-      status: "pending",
-      nominated_at: new Date().toISOString(),
-      is_vault_nominee: false,
-    } as any).select("nomination_token").single();
+      isPrimary: guardians.length === 0,
+      userName: profileName || session.user.email || "Your ward",
+    });
     if (error) {
       toast.error("Failed to add guardian");
     } else {
-      const token = (insertData as any)?.nomination_token;
       toast.success(`${newName} added as Guardian (pending — awaiting acceptance)`);
       setNewName(""); setNewPhone(""); setNewEmail(""); setNewRelation("");
       setShowAddForm(false);
-      // Send branded invite email if email provided
-      const baseUrl = "https://iamgood.lovable.app";
-      const acceptLink = token ? `${baseUrl}/register?nomination=accept&token=${token}` : `${baseUrl}/register`;
-      if (newEmail) {
-        supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "guardian-invitation",
-            recipientEmail: newEmail,
-            idempotencyKey: `guardian-invite-${newEmail}-${Date.now()}`,
-            templateData: {
-              guardianName: newName,
-              userName: session.user.email,
-              relation: newRelation,
-              acceptLink,
-            },
-          },
-        }).catch(() => {});
-      }
-      // Also trigger MSG91 SMS/WhatsApp with invite link
-      supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_name: newName, user_name: session.user.email, relation: newRelation, guardian_phone: newPhone, accept_link: acceptLink },
-      }).catch(() => {});
       // Refresh
       const { data: refreshed } = await supabase.from("guardians").select("*").eq("user_id", session.user.id).order("created_at");
       if (refreshed) setGuardians(refreshed as unknown as Guardian[]);
     }
   };
+
 
   const removeGuardian = async (id: string) => {
     const { error } = await supabase.from("guardians").delete().eq("id", id);
