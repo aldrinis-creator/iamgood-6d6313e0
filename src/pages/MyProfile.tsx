@@ -915,13 +915,14 @@ const ProfileContent = () => {
                       return;
                     }
                     setAddingGuardian(true);
-                    const { error } = await supabase.from("guardians").insert({
-                      user_id: userId!,
-                      guardian_name: gName.trim(),
-                      guardian_phone: gPhone.trim(),
-                      guardian_email: gEmail.trim(),
-                      relation: gRelation || null,
-                      is_primary: guardians.length === 0,
+                    const { error } = await addGuardianWithInvite({
+                      userId: userId!,
+                      guardianName: gName,
+                      guardianPhone: gPhone,
+                      guardianEmail: gEmail,
+                      relation: gRelation,
+                      isPrimary: guardians.length === 0,
+                      userName: fullName || "Your ward",
                     });
                     if (error) toast.error("Failed to add guardian");
                     else {
@@ -931,6 +932,7 @@ const ProfileContent = () => {
                       loadData();
                     }
                     setAddingGuardian(false);
+
                   }}
                 >
                   {addingGuardian && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
