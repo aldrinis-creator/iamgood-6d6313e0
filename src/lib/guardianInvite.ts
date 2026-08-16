@@ -4,6 +4,7 @@ import { toast } from "@/components/ui/sonner";
 export type InviteChannels = {
   email?: "sent" | "failed" | "skipped";
   sms?: "sent" | "failed" | "skipped";
+  whatsapp?: "sent" | "failed" | "skipped";
   rate_limited?: boolean;
 };
 
@@ -20,7 +21,8 @@ function describe(res: InviteChannels | null): string {
   if (!res) return "";
   const ok: string[] = [];
   if (res.email === "sent") ok.push("email");
-  if (res.sms === "sent") ok.push("SMS/WhatsApp");
+  if (res.whatsapp === "sent") ok.push("WhatsApp");
+  if (res.sms === "sent") ok.push("SMS");
   return ok.length ? `Invite sent by ${ok.join(" and ")}.` : "";
 }
 

@@ -26,4 +26,6 @@ The response returned to the app gains a `whatsapp` channel status alongside `em
 
 ## One thing to confirm
 
-Because the template has no variables, every guardian receives the same generic text. If you would rather the WhatsApp message name the ward and carry the personal accept link, the template needs re-approval with body variables and a dynamic URL button — say the word and I will plan that instead.
+Because the template has no variables, every guardian receives the same generic text. If you would rather the WhatsApp message name the ward and carry the personal accept link, the template needs re-approval with body variables and a dynamic URL button — say the word and I will plan that instead. ok , go ahead
+
+&nbsp;

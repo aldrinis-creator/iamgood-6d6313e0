@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,11 +74,35 @@ Deno.serve(async (req) => {
       ? `${baseUrl}/install?g=${nomination_token}`
       : `${baseUrl}/install`;
     const reminderNumber = Number(reminder_number) || 0;
-    const result: { email: string; sms: string; rate_limited: boolean; email_error?: string } = {
+    const result: { email: string; sms: string; whatsapp: string; rate_limited: boolean; email_error?: string } = {
       email: "skipped",
       sms: "skipped",
+      whatsapp: "skipped",
       rate_limited: false,
     };
+
+    // WhatsApp: approved "download the Guardian app" template (no variables).
+    if (guardian_phone) {
+      const digitsOnly = String(guardian_phone).replace(/[^\d]/g, "");
+      const waTo = normalizeIndianPhone(guardian_phone) ?? (digitsOnly.length >= 10 ? digitsOnly : null);
+      if (waTo) {
+        try {
+          const wa = await sendWhatsAppTemplate({
+            templateName: "guardian_invite_app_downlaod",
+            languageCode: "en",
+            namespace: WA_NAMESPACE_V2,
+            recipients: [{ to: [waTo], components: {} }],
+          });
+          result.whatsapp = wa.ok ? "sent" : "failed";
+        } catch (waErr) {
+          result.whatsapp = "failed";
+          console.error("[send-guardian-invite] WhatsApp template error:", waErr);
+        }
+      } else {
+        result.whatsapp = "failed";
+        console.error("[send-guardian-invite] could not normalise phone for WhatsApp:", guardian_phone);
+      }
+    }
 
 
     // Send email via transactional email queue.
@@ -183,7 +208,7 @@ Deno.serve(async (req) => {
     }
 
     // Record the dispatch so re-sends are rate-limited (best-effort).
-    if (recipientKey && (result.email === "sent" || result.sms === "sent")) {
+    if (recipientKey && (result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent")) {
       try {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
@@ -197,7 +222,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent", ...result }),
+      JSON.stringify({ sent: result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent", ...result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
