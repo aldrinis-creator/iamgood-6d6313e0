@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
 
 
     if (!guardian_name || !user_name) {
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     // a freshly-nominated guardian always has a recent nominated_at, which used to
     // rate-limit the very first invite and silently drop it.
     const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
-    if (recipientKey) {
+    if (recipientKey && !force) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { data: recentSends } = await supabase
         .from("notification_logs")
@@ -74,14 +74,14 @@ Deno.serve(async (req) => {
       ? `${baseUrl}/install?g=${nomination_token}`
       : `${baseUrl}/install`;
     const reminderNumber = Number(reminder_number) || 0;
-    const result: { email: string; sms: string; whatsapp: string; rate_limited: boolean; email_error?: string } = {
+    const result: { email: string; sms: string; whatsapp: string; rate_limited: boolean; email_error?: string; whatsapp_detail?: unknown } = {
       email: "skipped",
       sms: "skipped",
       whatsapp: "skipped",
       rate_limited: false,
     };
 
-    // WhatsApp: approved "download the Guardian app" template (no variables).
+    // WhatsApp: personalised "download the Guardian app" template.
     if (guardian_phone) {
       const digitsOnly = String(guardian_phone).replace(/[^\d]/g, "");
       const waTo = normalizeIndianPhone(guardian_phone) ?? (digitsOnly.length >= 10 ? digitsOnly : null);
@@ -102,8 +102,18 @@ Deno.serve(async (req) => {
             }],
           });
           result.whatsapp = wa.ok ? "sent" : "failed";
+          result.whatsapp_detail = { status: wa.status, body: wa.body };
+          console.log("[send-guardian-invite] WhatsApp MSG91 response", JSON.stringify({
+            to: waTo,
+            template: "guardian_invite_app_downlaod",
+            namespace: WA_NAMESPACE_V2,
+            status: wa.status,
+            ok: wa.ok,
+            body: wa.body,
+          }));
         } catch (waErr) {
           result.whatsapp = "failed";
+          result.whatsapp_detail = { error: String(waErr) };
           console.error("[send-guardian-invite] WhatsApp template error:", waErr);
         }
       } else {
@@ -111,6 +121,7 @@ Deno.serve(async (req) => {
         console.error("[send-guardian-invite] could not normalise phone for WhatsApp:", guardian_phone);
       }
     }
+
 
 
     // Send email via transactional email queue.
@@ -155,8 +166,12 @@ Deno.serve(async (req) => {
     }
 
 
-    // Send WhatsApp/SMS via MSG91 if phone provided
-    if (guardian_phone) {
+    // Legacy Flow SMS — DISABLED by default: the approved MSG91 SMS template still
+    // carries an outdated link. Email + WhatsApp both carry the correct
+    // /install?g=<token> link. Set GUARDIAN_INVITE_SMS_ENABLED=true to re-enable
+    // once the Flow template is re-approved with the install_link variable.
+    const smsEnabled = (Deno.env.get("GUARDIAN_INVITE_SMS_ENABLED") || "").toLowerCase() === "true";
+    if (guardian_phone && smsEnabled) {
       const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
       const msg91InviteTemplate = Deno.env.get("MSG91_INVITE_TEMPLATE_ID");
       if (msg91AuthKey && msg91InviteTemplate) {
@@ -221,8 +236,8 @@ Deno.serve(async (req) => {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
           channel: recipientKey,
-          status: `${result.email}/${result.sms}`,
-          metadata: { guardian_name, has_token: !!nomination_token },
+          status: `${result.email}/${result.sms}/${result.whatsapp}`,
+          metadata: { guardian_name, has_token: !!nomination_token, whatsapp: result.whatsapp_detail ?? null },
         });
       } catch (logErr) {
         console.error("[send-guardian-invite] log insert failed:", logErr);
