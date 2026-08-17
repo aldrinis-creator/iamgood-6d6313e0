@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number } = await req.json();
+    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
 
 
     if (!guardian_name || !user_name) {
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     // a freshly-nominated guardian always has a recent nominated_at, which used to
     // rate-limit the very first invite and silently drop it.
     const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
-    if (recipientKey) {
+    if (recipientKey && !force) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { data: recentSends } = await supabase
         .from("notification_logs")
