@@ -74,14 +74,14 @@ Deno.serve(async (req) => {
       ? `${baseUrl}/install?g=${nomination_token}`
       : `${baseUrl}/install`;
     const reminderNumber = Number(reminder_number) || 0;
-    const result: { email: string; sms: string; whatsapp: string; rate_limited: boolean; email_error?: string } = {
+    const result: { email: string; sms: string; whatsapp: string; rate_limited: boolean; email_error?: string; whatsapp_detail?: unknown } = {
       email: "skipped",
       sms: "skipped",
       whatsapp: "skipped",
       rate_limited: false,
     };
 
-    // WhatsApp: approved "download the Guardian app" template (no variables).
+    // WhatsApp: personalised "download the Guardian app" template.
     if (guardian_phone) {
       const digitsOnly = String(guardian_phone).replace(/[^\d]/g, "");
       const waTo = normalizeIndianPhone(guardian_phone) ?? (digitsOnly.length >= 10 ? digitsOnly : null);
@@ -102,8 +102,18 @@ Deno.serve(async (req) => {
             }],
           });
           result.whatsapp = wa.ok ? "sent" : "failed";
+          result.whatsapp_detail = { status: wa.status, body: wa.body };
+          console.log("[send-guardian-invite] WhatsApp MSG91 response", JSON.stringify({
+            to: waTo,
+            template: "guardian_invite_app_downlaod",
+            namespace: WA_NAMESPACE_V2,
+            status: wa.status,
+            ok: wa.ok,
+            body: wa.body,
+          }));
         } catch (waErr) {
           result.whatsapp = "failed";
+          result.whatsapp_detail = { error: String(waErr) };
           console.error("[send-guardian-invite] WhatsApp template error:", waErr);
         }
       } else {
@@ -111,6 +121,7 @@ Deno.serve(async (req) => {
         console.error("[send-guardian-invite] could not normalise phone for WhatsApp:", guardian_phone);
       }
     }
+
 
 
     // Send email via transactional email queue.
