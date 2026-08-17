@@ -91,7 +91,15 @@ Deno.serve(async (req) => {
             templateName: "guardian_invite_app_downlaod",
             languageCode: "en",
             namespace: WA_NAMESPACE_V2,
-            recipients: [{ to: [waTo], components: {} }],
+            recipients: [{
+              to: [waTo],
+              components: {
+                body_1: String(guardian_name),
+                body_2: String(user_name),
+                body_3: (relation && String(relation).trim()) || "Guardian",
+                body_4: installLink,
+              },
+            }],
           });
           result.whatsapp = wa.ok ? "sent" : "failed";
         } catch (waErr) {

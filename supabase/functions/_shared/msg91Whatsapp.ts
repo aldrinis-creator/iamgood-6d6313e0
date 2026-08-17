@@ -14,6 +14,7 @@ export type WaComponents = {
   body_1?: string;
   body_2?: string;
   body_3?: string;
+  body_4?: string;
   /** URL button variable (e.g. OTP code for copy-code button templates). */
   button_1_url?: string;
 };
@@ -61,6 +62,7 @@ export async function sendWhatsAppTemplate(opts: {
     if (c.body_1 !== undefined) out.body_1 = { type: "text", value: c.body_1 };
     if (c.body_2 !== undefined) out.body_2 = { type: "text", value: c.body_2 };
     if (c.body_3 !== undefined) out.body_3 = { type: "text", value: c.body_3 };
+    if (c.body_4 !== undefined) out.body_4 = { type: "text", value: c.body_4 };
     if (c.button_1_url !== undefined) out.button_1 = { subtype: "url", type: "text", value: c.button_1_url };
     return out;
   };
