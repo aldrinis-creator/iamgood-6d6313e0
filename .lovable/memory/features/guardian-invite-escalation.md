@@ -10,3 +10,5 @@ type: feature
 - `guardian-invite-reminders` edge function + pg_cron `guardian-invite-reminders-daily` (10:00 IST) sends up to 3 daily reminders; after the 3rd, the ward gets a `nomination_unaccepted` notification once (`ward_notified_unaccepted` flag).
 - Ward confirmations: `nomination_accepted` notification on accept, and `guardian_installed` when `link_guardian_user_id()` first links the guardian's account (sets `install_confirmed_at`).
 - Tracking columns on `guardians`: `reminder_count`, `last_reminder_at`, `ward_notified_unaccepted`, `install_confirmed_at`.
+- Legacy MSG91 Flow SMS for invites is DISABLED (its approved template carries an outdated link). Re-enable only by setting `GUARDIAN_INVITE_SMS_ENABLED=true` after the Flow template is re-approved with an `install_link` variable.
+- `send-guardian-invite` accepts `force: true` to bypass the 1-hour re-send rate limit, logs the full MSG91 WhatsApp response, and records `email/sms/whatsapp` status plus the WhatsApp request_id in `notification_logs`.
