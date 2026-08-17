@@ -166,8 +166,12 @@ Deno.serve(async (req) => {
     }
 
 
-    // Send WhatsApp/SMS via MSG91 if phone provided
-    if (guardian_phone) {
+    // Legacy Flow SMS — DISABLED by default: the approved MSG91 SMS template still
+    // carries an outdated link. Email + WhatsApp both carry the correct
+    // /install?g=<token> link. Set GUARDIAN_INVITE_SMS_ENABLED=true to re-enable
+    // once the Flow template is re-approved with the install_link variable.
+    const smsEnabled = (Deno.env.get("GUARDIAN_INVITE_SMS_ENABLED") || "").toLowerCase() === "true";
+    if (guardian_phone && smsEnabled) {
       const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
       const msg91InviteTemplate = Deno.env.get("MSG91_INVITE_TEMPLATE_ID");
       if (msg91AuthKey && msg91InviteTemplate) {
