@@ -236,8 +236,8 @@ Deno.serve(async (req) => {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
           channel: recipientKey,
-          status: `${result.email}/${result.sms}`,
-          metadata: { guardian_name, has_token: !!nomination_token },
+          status: `${result.email}/${result.sms}/${result.whatsapp}`,
+          metadata: { guardian_name, has_token: !!nomination_token, whatsapp: result.whatsapp_detail ?? null },
         });
       } catch (logErr) {
         console.error("[send-guardian-invite] log insert failed:", logErr);
