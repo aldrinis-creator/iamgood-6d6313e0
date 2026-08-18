@@ -1,61 +1,72 @@
-# New MSG91 WhatsApp template for the Guardian app invite
+# DLT + MSG91 SMS template for the Guardian app invite
 
-Replace the current `guardian_invite_app_downlaod` template with a clean, correctly-spelled one built the way Meta expects: personalised body variables plus a **dynamic URL button** carrying the nomination token. The current template puts the link inside the body, which is the most likely reason MSG91 accepts the send but Meta rejects it at delivery.
+Goal: an approved, DLT-compliant SMS template so the invite has a reliable text fallback that WhatsApp alone can't guarantee. Keep the link personal via a MSG91 Flow variable, never a hardcoded URL.
 
-## Template to submit in MSG91
+## DLT (operator) side — register the template
 
 | Field | Value |
 |---|---|
-| Name | `guardian_invite_download` |
-| Category | UTILITY |
-| Language | `en` (English) |
-| Namespace | same WA business namespace (`e67e5302_b6d0_403e_b3cc_8fa6e8accb01`) |
-| Header | Text: `Guardian invitation — Check-iN` |
-| Buttons | 1 × Visit website (dynamic URL) |
+| Sender ID | `CHKIIN` (same registered sender as your OTP SMS) |
+| Category | Transactional |
+| DLT Template ID | (issued by your DLT portal after approval — keep handy) |
+| Template Type | Service Implicit (no explicit opt-in required) |
 
-**Body**
+**Template text (submit verbatim — DLT is character-exact)**
 
 ```text
-Hi {{1}},
+Dear {#var#},
 
-{{2}} has nominated you as their Guardian on Check-iN ({{3}}).
+{#var#} has nominated you as their Guardian on Check-iN. As Guardian, you will receive their daily check-in status, missed medication alerts and SOS emergencies.
 
-As their Guardian you will receive their daily check-in status, missed-medication alerts and SOS emergencies.
+Install the Guardian app and accept the nomination:
+{#var#}
 
-Tap below to install the Check-iN Guardian app and accept the nomination. The link expires in 4 days.
+This link expires in 4 days. Check-iN - Personal Emergency Response System.
 ```
 
-**Footer**
+That is exactly three `{#var#}` placeholders: guardian_name, user_name, install_link.
+
+## MSG91 side — create the Flow template
+
+| Field | Value |
+|---|---|
+| Flow Name | `Guardian Invite App Download` |
+| Flow ID / Template ID | (MSG91 assigns it — set it as `MSG91_INVITE_TEMPLATE_ID`) |
+| Sender ID | `CHKIIN` |
+| Channel | SMS |
+| DLT Template ID | the ID issued above |
+
+**Flow body (mirrors the DLT text)**
 
 ```text
-Check-iN — Personal Emergency Response System
+Dear ##guardian_name##,
+
+##user_name## has nominated you as their Guardian on Check-iN. As Guardian, you will receive their daily check-in status, missed medication alerts and SOS emergencies.
+
+Install the Guardian app and accept the nomination:
+##install_link##
+
+This link expires in 4 days. Check-iN - Personal Emergency Response System.
 ```
 
-**Button**
+## How the code calls it
 
-- Type: Visit website → Dynamic
-- Text: `Install & Accept`
-- URL: `https://iamgood.lovable.app/install?g={{1}}`
+`send-guardian-invite` already sends this Flow with the right variables; the only change is re-enabling the SMS path once the template is approved.
 
-**Sample values for approval**
+- `supabase/functions/send-guardian-invite/index.ts`: keep the existing SMS block; set `GUARDIAN_INVITE_SMS_ENABLED=true` once the DLT + Flow templates are both approved.
+- Variables passed today: `guardian_name`, `user_name`, `relation`, `accept_link`, `install_link`, `reject_link`. After approval, `install_link` should equal `https://iamgood.lovable.app/install?g=<nomination_token>`.
+- Once live, the function logs the MSG91 Flow response and records it as `result.sms`.
 
-- {{1}} body = `Lira Alphonso`, {{2}} = `Aldrin Alphonso`, {{3}} = `Daughter`
-- {{1}} button = `46ec46f5c1d24f0aa4d1b2c3d4e5f6a7`
+## Why these choices
 
-## Why this shape
+- Single short URL (`install_link`) keeps the SMS under the 160→306 char split.
+- The `/install?g=<token>` URL carries the nomination token, so the guardian installs → accepts in one flow tied to the right ward.
+- No hardcoded URL — the link is always the current `installLink`, so future domain changes need no template re-approval.
+- 4-day expiry note matches the nomination expiry in the database (4 days), so the message can't mislead.
 
-- Meta rejects/blocks UTILITY templates that carry raw URLs as body text far more often than button URLs; moving the install link to a dynamic URL button removes that failure mode.
-- The token is the only button variable, so the same approved template serves every guardian and every reminder.
-- Relation is a plain body variable with a `Guardian` fallback, so a blank relation never breaks the send.
+## Pre-flight checks before going live
 
-## Code changes once it is approved
-
-- `supabase/functions/send-guardian-invite/index.ts`: switch `templateName` to `guardian_invite_download`, send `body_1/2/3` (guardian name, ward name, relation) and `button_1_url` set to the **token only** (not the full URL — MSG91 appends it to the approved prefix). Keep the existing full `installLink` for email.
-- `supabase/functions/_shared/msg91Whatsapp.ts`: already supports `button_1_url`; no change needed.
-- `guardian-invite-reminders` picks the new template up automatically.
-- Keep the old template name as a fallback for one release, and log the MSG91 response as we do today.
-- No schema change, no new secrets.
-
-## One check after approval
-
-Send one invite and read the function log: MSG91 must return `success`, and the recipient should see the button. If MSG91 errors on component count, the button URL prefix in the approved template does not match `…/install?g=` and needs correcting there.
+- DLT approval status: APPROVED (send a test to a non-DND number).
+- MSG91 Flow status: APPROVED.
+- Sender ID `CHKIIN` active on the route.
+- Test send to +91 99671 34652 and confirm the link is clickable and lands on `/install?g=<token>`.
