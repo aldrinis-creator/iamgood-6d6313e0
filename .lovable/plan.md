@@ -1,38 +1,61 @@
-# Which MSG91 template should carry the Guardian app invite
+# New MSG91 WhatsApp template for the Guardian app invite
 
-## What is confirmed in the code
+Replace the current `guardian_invite_app_downlaod` template with a clean, correctly-spelled one built the way Meta expects: personalised body variables plus a **dynamic URL button** carrying the nomination token. The current template puts the link inside the body, which is the most likely reason MSG91 accepts the send but Meta rejects it at delivery.
 
-- The invite currently sends the WhatsApp template `guardian_invite_app_downlaod` on namespace `e67e5302_b6d0_403e_b3cc_8fa6e8accb01`, language `en`, with four body params (guardian name, ward name, relation, install link) — `supabase/functions/send-guardian-invite/index.ts`.
-- MSG91 **accepted** the last send (`status: success`, request_id `ed52c4ef…`), so the name/namespace pair is valid; the message failed later, at delivery.
-- The legacy MSG91 **Flow SMS** invite template is disabled in code because its approved copy carries an outdated hardcoded link.
+## Template to submit in MSG91
 
-## The honest answer
+| Field | Value |
+|---|---|
+| Name | `guardian_invite_download` |
+| Category | UTILITY |
+| Language | `en` (English) |
+| Namespace | same WA business namespace (`e67e5302_b6d0_403e_b3cc_8fa6e8accb01`) |
+| Header | Text: `Guardian invitation — Check-iN` |
+| Buttons | 1 × Visit website (dynamic URL) |
 
-Which template is "correct" cannot be settled from the code alone — the deciding facts live in the MSG91 account: the exact approved template name (note the misspelling `downlaod`), its approved language code (`en` vs `en_US`), and whether its 4th value is a **body variable** or a **URL button** variable. A body param sent against a button-variable template is accepted at submit time and then fails at delivery, which matches exactly what we are seeing.
+**Body**
 
-So the plan is: read the approved template definition first, then lock the payload to it.
+```text
+Hi {{1}},
 
-## Plan
+{{2}} has nominated you as their Guardian on Check-iN ({{3}}).
 
-1. **Read the approved template from MSG91**
-   - Extend the existing diagnostic function `msg91-template-info` to list WhatsApp templates for the integrated number (`917045868482`) instead of only fetching by id, and run it.
-   - Output we need: the template's exact `name`, `language`, `namespace`, `status` (APPROVED / REJECTED / PAUSED / DISABLED), body variable count, and button type.
+As their Guardian you will receive their daily check-in status, missed-medication alerts and SOS emergencies.
 
-2. **Pull the delivery report for the failed send**
-   - Add `msg91-wa-report` (service-role / cron-secret guarded) that queries MSG91's WhatsApp report endpoint for `ed52c4ef46a14a8f8a4c7d8f4db14873` and returns the literal per-recipient failure code.
-   - This tells us whether the rejection was template-level (language/params) or recipient-level (not on WhatsApp / opted out).
+Tap below to install the Check-iN Guardian app and accept the nomination. The link expires in 4 days.
+```
 
-3. **Align `send-guardian-invite` to whatever step 1 and 2 report**
-   - Language mismatch: change `languageCode` to the approved code.
-   - Link is a URL button: move `installLink` from `body_4` to `button_1_url` (the shared helper already supports it).
-   - Template not approved/usable: fall back to the plain approved `welcome`-style invite template, or re-enable the Flow SMS after its link variable is fixed.
+**Footer**
 
-4. **Make delivery visible**
-   - Persist the delivery-report status into `notification_logs.metadata` after each invite, and show a "WhatsApp not delivered" state on the ward's guardian card, with a one-tap "share invite link" fallback so the ward can send `https://iamgood.lovable.app/install?g=<token>` themselves.
+```text
+Check-iN — Personal Emergency Response System
+```
 
-## Technical notes
+**Button**
 
-- Edited: `supabase/functions/msg91-template-info/index.ts` (add template-list endpoints), `supabase/functions/send-guardian-invite/index.ts` (payload alignment + store delivery status).
-- New: `supabase/functions/msg91-wa-report/index.ts`.
-- `supabase/functions/_shared/msg91Whatsapp.ts` changes only if the button-variable path is needed.
+- Type: Visit website → Dynamic
+- Text: `Install & Accept`
+- URL: `https://iamgood.lovable.app/install?g={{1}}`
+
+**Sample values for approval**
+
+- {{1}} body = `Lira Alphonso`, {{2}} = `Aldrin Alphonso`, {{3}} = `Daughter`
+- {{1}} button = `46ec46f5c1d24f0aa4d1b2c3d4e5f6a7`
+
+## Why this shape
+
+- Meta rejects/blocks UTILITY templates that carry raw URLs as body text far more often than button URLs; moving the install link to a dynamic URL button removes that failure mode.
+- The token is the only button variable, so the same approved template serves every guardian and every reminder.
+- Relation is a plain body variable with a `Guardian` fallback, so a blank relation never breaks the send.
+
+## Code changes once it is approved
+
+- `supabase/functions/send-guardian-invite/index.ts`: switch `templateName` to `guardian_invite_download`, send `body_1/2/3` (guardian name, ward name, relation) and `button_1_url` set to the **token only** (not the full URL — MSG91 appends it to the approved prefix). Keep the existing full `installLink` for email.
+- `supabase/functions/_shared/msg91Whatsapp.ts`: already supports `button_1_url`; no change needed.
+- `guardian-invite-reminders` picks the new template up automatically.
+- Keep the old template name as a fallback for one release, and log the MSG91 response as we do today.
 - No schema change, no new secrets.
+
+## One check after approval
+
+Send one invite and read the function log: MSG91 must return `success`, and the recipient should see the button. If MSG91 errors on component count, the button URL prefix in the approved template does not match `…/install?g=` and needs correcting there.
