@@ -31,6 +31,7 @@ const FREQUENCIES = [
   { value: "once_daily", label: "Once daily" },
   { value: "twice_daily", label: "Twice daily" },
   { value: "three_daily", label: "Three times daily" },
+  { value: "once_weekly", label: "Once a week" },
   { value: "as_needed", label: "As needed" },
 ];
 
