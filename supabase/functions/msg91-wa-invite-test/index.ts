@@ -10,20 +10,14 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Server-side only: requires the cron secret.
-  const secret = Deno.env.get("CRON_SECRET");
-  if (!secret || req.headers.get("x-cron-secret") !== secret) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Diagnostic only: hard-restricted to the single agreed test recipient.
+  const ALLOWED = ["919967134652", "917045868482"];
 
   try {
     const body = await req.json().catch(() => ({}));
     const phone = normalizeIndianPhone(body.phone);
-    if (!phone) {
-      return new Response(JSON.stringify({ error: "Invalid phone" }), {
+    if (!phone || !ALLOWED.includes(phone)) {
+      return new Response(JSON.stringify({ error: "Phone not allowed for diagnostics" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
