@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getISTDateString, getISTHour } from "@/lib/istTime";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 interface Props {
   wardUserId: string;

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Pill } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 interface WardMedicationStatusProps {
   wardUserId: string;
@@ -62,7 +63,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
     const now = new Date();
     const slots: DoseSlot[] = [];
 
-    for (const med of meds as Medication[]) {
+    for (const med of (meds as Medication[]).filter((m) => isMedScheduledToday(m as any))) {
       for (const t of med.schedule_times) {
         const [hStr, mStr] = t.split(":");
         const h = parseInt(hStr, 10);

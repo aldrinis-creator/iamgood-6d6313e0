@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 export function useLiveDashboardStats() {
   const { session } = useAuth();

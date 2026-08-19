@@ -60,7 +60,7 @@ const useMedicationAlarms = () => {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    const medIds = meds.map((m) => m.id);
+    const medIds = scheduledMeds.map((m: any) => m.id);
     const { data: allLogs } = await supabase
       .from("medication_logs")
       .select("id, status, scheduled_at, medication_id")
@@ -80,7 +80,7 @@ const useMedicationAlarms = () => {
     const firedMedNames: string[] = [];
     let newMissedLogsWritten = false; // FIX D: track whether we need to invoke server escalation
 
-    for (const med of meds) {
+    for (const med of scheduledMeds) {
       for (const timeStr of med.schedule_times) {
         const [h, m] = timeStr.split(":").map(Number);
         const scheduledAt = new Date(now);
