@@ -1600,6 +1600,7 @@ export type Database = {
           name: string
           refill_reminder: boolean
           remaining_quantity: number
+          schedule_days: number[] | null
           schedule_times: string[]
           start_date: string
           total_quantity: number
@@ -1619,6 +1620,7 @@ export type Database = {
           name: string
           refill_reminder?: boolean
           remaining_quantity?: number
+          schedule_days?: number[] | null
           schedule_times?: string[]
           start_date?: string
           total_quantity?: number
@@ -1638,6 +1640,7 @@ export type Database = {
           name?: string
           refill_reminder?: boolean
           remaining_quantity?: number
+          schedule_days?: number[] | null
           schedule_times?: string[]
           start_date?: string
           total_quantity?: number
