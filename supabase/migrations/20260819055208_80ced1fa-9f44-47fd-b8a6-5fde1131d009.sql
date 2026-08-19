@@ -1,0 +1,2 @@
+ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS schedule_days smallint[];
+COMMENT ON COLUMN public.medications.schedule_days IS 'Weekdays the medication is taken (0=Sunday..6=Saturday). NULL or empty = every day.';

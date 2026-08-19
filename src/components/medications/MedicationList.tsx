@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, Pill, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { formatScheduleTime, getISTDateString } from "@/lib/istTime";
+import { WEEKDAYS, getISTWeekday, scheduleDaysLabel } from "@/lib/medSchedule";
 
 interface Medication {
   id: string;
@@ -23,6 +24,7 @@ interface Medication {
   remaining_quantity: number;
   low_stock_threshold: number;
   schedule_times: string[];
+  schedule_days: number[] | null;
   start_date: string;
   end_date: string | null;
 }
@@ -44,6 +46,7 @@ const emptyForm = {
   remaining_quantity: "30",
   low_stock_threshold: "5",
   schedule_times: ["08:00"],
+  schedule_days: [] as number[],
   start_date: new Date().toISOString().split("T")[0],
   end_date: "",
 };
@@ -97,6 +100,7 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
       remaining_quantity: String(med.remaining_quantity),
       low_stock_threshold: String(med.low_stock_threshold),
       schedule_times: med.schedule_times,
+      schedule_days: (med.schedule_days || []) as number[],
       start_date: med.start_date,
       end_date: med.end_date || "",
     });
@@ -130,6 +134,11 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
       return;
     }
 
+    if (form.frequency === "once_weekly" && form.schedule_days.length === 0) {
+      toast.error("Please select the day of the week");
+      return;
+    }
+
     const payload = {
       user_id: session.user.id,
       name: form.name.trim(),
@@ -140,6 +149,7 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
       remaining_quantity: remainingQty,
       low_stock_threshold: threshold,
       schedule_times: form.schedule_times,
+      schedule_days: form.frequency === "once_weekly" && form.schedule_days.length > 0 ? form.schedule_days : null,
       start_date: form.start_date,
       end_date: form.end_date || null,
     };
@@ -265,6 +275,7 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
                 <p className="text-sm font-medium truncate">{med.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {med.dosage} · {med.schedule_times.map((t) => formatScheduleTime(t)).join(", ")}
+                  {scheduleDaysLabel(med.schedule_days) ? ` · ${scheduleDaysLabel(med.schedule_days)} only` : ""}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-muted-foreground">
@@ -306,7 +317,7 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
             </div>
             <div>
               <Label className="text-sm">Frequency</Label>
-              <Select value={form.frequency} onValueChange={(v) => setForm((f) => ({ ...f, frequency: v }))}>
+              <Select value={form.frequency} onValueChange={(v) => setForm((f) => ({ ...f, frequency: v, schedule_days: v === "once_weekly" ? (f.schedule_days.length ? f.schedule_days : [getISTWeekday()]) : [] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FREQUENCIES.map((fr) => (
@@ -315,6 +326,24 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
                 </SelectContent>
               </Select>
             </div>
+            {form.frequency === "once_weekly" && (
+              <div>
+                <Label className="text-sm">Day of the Week *</Label>
+                <div className="grid grid-cols-4 gap-1.5 mt-1">
+                  {WEEKDAYS.map((d) => (
+                    <Button
+                      key={d.value}
+                      type="button"
+                      size="sm"
+                      variant={form.schedule_days.includes(d.value) ? "default" : "outline"}
+                      onClick={() => setForm((f) => ({ ...f, schedule_days: [d.value] }))}
+                    >
+                      {d.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <Label className="text-sm">Instructions</Label>
               <Input value={form.instructions} onChange={(e) => setForm((f) => ({ ...f, instructions: e.target.value }))} placeholder="e.g. Take after food" />

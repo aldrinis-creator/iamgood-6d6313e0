@@ -9,6 +9,7 @@ import { Clock, AlertTriangle, Sun, CloudSun, Moon, Timer, ChevronDown, ChevronU
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 interface Medication {
   id: string;
@@ -123,7 +124,7 @@ const TodaySchedule = () => {
     const todayStr = format(now, "yyyy-MM-dd");
     const { data: meds, error: medErr } = await supabase
       .from("medications")
-      .select("id, name, dosage, instructions, schedule_times, remaining_quantity")
+      .select("id, name, dosage, instructions, schedule_times, schedule_days, remaining_quantity")
       .eq("user_id", userId)
       .lte("start_date", todayStr)
       .or(`end_date.is.null,end_date.gte.${todayStr}`);
@@ -140,6 +141,7 @@ const TodaySchedule = () => {
     const slots: DoseSlot[] = [];
 
     for (const med of meds) {
+      if (!isMedScheduledToday(med as any)) continue;
       for (const timeStr of med.schedule_times) {
         const [hh, mm] = timeStr.split(":").map(Number);
         const scheduledAt = new Date(now);

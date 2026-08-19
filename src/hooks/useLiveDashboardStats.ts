@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 export function useLiveDashboardStats() {
   const { session } = useAuth();
@@ -37,7 +38,7 @@ export function useLiveDashboardStats() {
           .lt("scheduled_at", tomorrow.toISOString()),
         supabase
           .from("medications")
-          .select("schedule_times, start_date, end_date")
+          .select("schedule_times, schedule_days, start_date, end_date")
           .eq("user_id", session.user.id)
           .lte("start_date", todayStr),
         supabase
@@ -57,7 +58,7 @@ export function useLiveDashboardStats() {
 
       // Total scheduled doses today = sum of schedule_times across active medications
       const activeMeds = (medsRes.data ?? []).filter((m: any) =>
-        !m.end_date || m.end_date >= todayStr
+        (!m.end_date || m.end_date >= todayStr) && isMedScheduledToday(m)
       );
       const mTotal = activeMeds.reduce(
         (sum: number, m: any) => sum + (Array.isArray(m.schedule_times) ? m.schedule_times.length : 0),

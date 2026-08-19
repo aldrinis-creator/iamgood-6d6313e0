@@ -6,6 +6,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged, clearReminderAcknowledgement } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 const PRE_ALERT_MIN = 5;        // browser notification 5 min before
 const POPUP_DELAY_MIN = 5;      // first popup 5 min after scheduled time
@@ -47,11 +48,12 @@ const useMedicationAlarms = () => {
 
     const { data: meds } = await supabase
       .from("medications")
-      .select("id, name, dosage, alarm_enabled, alarm_mode, schedule_times")
+      .select("id, name, dosage, alarm_enabled, alarm_mode, schedule_times, schedule_days")
       .eq("user_id", session.user.id)
       .eq("alarm_enabled", true);
 
-    if (!meds || meds.length === 0) return;
+    const scheduledMeds = (meds ?? []).filter((m: any) => isMedScheduledToday(m));
+    if (scheduledMeds.length === 0) return;
 
     // Pre-fetch all medication logs for today
     const todayStart = new Date(now);
@@ -59,7 +61,7 @@ const useMedicationAlarms = () => {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
 
-    const medIds = meds.map((m) => m.id);
+    const medIds = scheduledMeds.map((m: any) => m.id);
     const { data: allLogs } = await supabase
       .from("medication_logs")
       .select("id, status, scheduled_at, medication_id")
@@ -79,7 +81,7 @@ const useMedicationAlarms = () => {
     const firedMedNames: string[] = [];
     let newMissedLogsWritten = false; // FIX D: track whether we need to invoke server escalation
 
-    for (const med of meds) {
+    for (const med of scheduledMeds) {
       for (const timeStr of med.schedule_times) {
         const [h, m] = timeStr.split(":").map(Number);
         const scheduledAt = new Date(now);

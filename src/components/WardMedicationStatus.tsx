@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Pill } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 interface WardMedicationStatusProps {
   wardUserId: string;
@@ -47,7 +48,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
     const [{ data: meds }, { data: logs }] = await Promise.all([
       supabase
         .from("medications")
-        .select("id, name, dosage, schedule_times")
+        .select("id, name, dosage, schedule_times, schedule_days")
         .eq("user_id", wardUserId),
       supabase
         .from("medication_logs")
@@ -62,7 +63,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
     const now = new Date();
     const slots: DoseSlot[] = [];
 
-    for (const med of meds as Medication[]) {
+    for (const med of (meds as Medication[]).filter((m) => isMedScheduledToday(m as any))) {
       for (const t of med.schedule_times) {
         const [hStr, mStr] = t.split(":");
         const h = parseInt(hStr, 10);

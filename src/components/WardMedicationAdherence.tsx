@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getISTDateString, getISTHour } from "@/lib/istTime";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 interface Props {
   wardUserId: string;
@@ -38,7 +39,7 @@ const WardMedicationAdherence = ({ wardUserId, wardName }: Props) => {
       const [{ data: meds }, { data: logs }] = await Promise.all([
         supabase
           .from("medications")
-          .select("id, schedule_times")
+          .select("id, schedule_times, schedule_days")
           .eq("user_id", wardUserId),
         supabase
           .from("medication_logs")
@@ -49,9 +50,9 @@ const WardMedicationAdherence = ({ wardUserId, wardName }: Props) => {
 
       // Today's scheduled doses so far (only count slots whose time has passed)
       const currentISTHour = getISTHour();
-      const allScheduleTimes: string[] = (meds || []).flatMap(
-        (m: any) => (m.schedule_times as string[]) || []
-      );
+      const allScheduleTimes: string[] = (meds || [])
+        .filter((m: any) => isMedScheduledToday(m))
+        .flatMap((m: any) => (m.schedule_times as string[]) || []);
       const dosesScheduledByNowToday = allScheduleTimes.filter((t) => {
         const h = parseInt((t || "00:00").split(":")[0], 10);
         return !Number.isNaN(h) && h <= currentISTHour;
