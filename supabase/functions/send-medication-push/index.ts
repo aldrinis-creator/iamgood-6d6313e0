@@ -167,7 +167,7 @@ serve(async (req) => {
     // Get all medications with alarms enabled
     const { data: medications, error: medErr } = await supabase
       .from("medications")
-      .select("id, user_id, name, dosage, schedule_times, alarm_enabled")
+      .select("id, user_id, name, dosage, schedule_times, schedule_days, alarm_enabled")
       .eq("alarm_enabled", true);
 
     if (medErr) {
@@ -195,6 +195,8 @@ serve(async (req) => {
     // AND have not been taken yet for that specific schedule_time.
     const matchingMeds = (medications || []).filter((med: any) => {
       if (!med.schedule_times || !Array.isArray(med.schedule_times)) return false;
+      const istWeekday = Number(new Date().toLocaleString("en-US", { weekday: "numeric" as any, timeZone: "Asia/Kolkata" })) || new Date(new Date().getTime() + 5.5 * 3600000).getUTCDay();
+      if (Array.isArray(med.schedule_days) && med.schedule_days.length > 0 && !med.schedule_days.map(Number).includes(istWeekday)) return false;
       return med.schedule_times.some((t: string) => {
         if (!validTimes.includes(t)) return false;
         

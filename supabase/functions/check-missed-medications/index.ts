@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     // Get all active medications
     const { data: activeMeds, error: medError } = await supabase
       .from("medications")
-      .select("id, user_id, name, schedule_times")
+      .select("id, user_id, name, schedule_times, schedule_days")
       .eq("alarm_enabled", true);
 
     if (medError) {
@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
         }
 
         const logsToInsert = [];
+        const istWeekday = istNow.getUTCDay();
         for (const med of activeMeds) {
+          const days = (med as any).schedule_days;
+          if (Array.isArray(days) && days.length > 0 && !days.map(Number).includes(istWeekday)) continue;
           for (const timeStr of med.schedule_times) {
             const [h, m] = timeStr.split(":").map(Number);
             const slotIST = new Date(istMidnight);

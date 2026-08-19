@@ -26,11 +26,13 @@ var list_medications_today_default = defineTool({
     }
     const supabase = supabaseForUser(ctx);
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const { data, error } = await supabase.from("medications").select("id, name, dosage, frequency, schedule_times, instructions, start_date, end_date").eq("user_id", ctx.getUserId()).lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("name");
+    const { data, error } = await supabase.from("medications").select("id, name, dosage, frequency, schedule_times, schedule_days, instructions, start_date, end_date").eq("user_id", ctx.getUserId()).lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("name");
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
-    const rows = data ?? [];
+    const istWeekday = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
+    const weekdayNum = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[istWeekday] ?? (/* @__PURE__ */ new Date()).getDay();
+    const rows = (data ?? []).filter((m) => !Array.isArray(m.schedule_days) || m.schedule_days.length === 0 || m.schedule_days.map(Number).includes(weekdayNum));
     return {
       content: [{ type: "text", text: rows.length ? JSON.stringify(rows, null, 2) : "No active medications for today." }],
       structuredContent: { medications: rows, count: rows.length }

@@ -6,6 +6,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged, clearReminderAcknowledgement } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 const PRE_ALERT_MIN = 5;        // browser notification 5 min before
 const POPUP_DELAY_MIN = 5;      // first popup 5 min after scheduled time
