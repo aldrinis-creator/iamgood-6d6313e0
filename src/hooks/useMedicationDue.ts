@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { isMedScheduledToday } from "@/lib/medSchedule";
 
 const useMedicationDue = (): boolean => {
   const { session } = useAuth();
@@ -16,7 +17,7 @@ const useMedicationDue = (): boolean => {
     const [{ data: meds }, { data: logs }] = await Promise.all([
       supabase
         .from("medications")
-        .select("id, schedule_times, start_date, end_date")
+        .select("id, schedule_times, schedule_days, start_date, end_date")
         .eq("user_id", session.user.id)
         .lte("start_date", todayStr),
       supabase
@@ -27,7 +28,7 @@ const useMedicationDue = (): boolean => {
         .lte("scheduled_at", todayEnd.toISOString()),
     ]);
 
-    const active = (meds ?? []).filter((m: any) => !m.end_date || m.end_date >= todayStr);
+    const active = (meds ?? []).filter((m: any) => (!m.end_date || m.end_date >= todayStr) && isMedScheduledToday(m));
     const nowMin = now.getHours() * 60 + now.getMinutes();
 
     let anyDue = false;

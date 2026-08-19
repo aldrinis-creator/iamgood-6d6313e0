@@ -47,7 +47,7 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
     const [{ data: meds }, { data: logs }] = await Promise.all([
       supabase
         .from("medications")
-        .select("id, name, dosage, schedule_times")
+        .select("id, name, dosage, schedule_times, schedule_days")
         .eq("user_id", wardUserId),
       supabase
         .from("medication_logs")

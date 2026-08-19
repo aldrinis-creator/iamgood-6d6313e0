@@ -47,11 +47,12 @@ const useMedicationAlarms = () => {
 
     const { data: meds } = await supabase
       .from("medications")
-      .select("id, name, dosage, alarm_enabled, alarm_mode, schedule_times")
+      .select("id, name, dosage, alarm_enabled, alarm_mode, schedule_times, schedule_days")
       .eq("user_id", session.user.id)
       .eq("alarm_enabled", true);
 
-    if (!meds || meds.length === 0) return;
+    const scheduledMeds = (meds ?? []).filter((m: any) => isMedScheduledToday(m));
+    if (scheduledMeds.length === 0) return;
 
     // Pre-fetch all medication logs for today
     const todayStart = new Date(now);
