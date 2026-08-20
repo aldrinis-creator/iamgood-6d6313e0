@@ -306,8 +306,17 @@ Deno.serve(async (req) => {
           .map((gd) => normalizeIndianPhone(gd.guardian_phone))
           .filter((p): p is string => !!p),
       ));
-      if (guardianPhones.length > 0) {
-        await sendWhatsAppTemplate({
+      if (guardianPhones.length === 0) {
+        console.log(`missed meds ${g.user_id} ${g.hourKey}: skipped, no guardian phone`);
+        await supabase.from("notification_logs").insert({
+          user_id: g.user_id,
+          type: "missed_medication",
+          channel: "whatsapp",
+          status: "skipped_no_recipient",
+          metadata: { hour_key: g.hourKey, medications: medList },
+        });
+      } else {
+        const wa = await sendWhatsAppTemplate({
           templateName: "guardian_medication_reminder",
           languageCode: "en_GB",
           namespace: WA_NAMESPACE_V2,
@@ -315,6 +324,20 @@ Deno.serve(async (req) => {
             to: [p],
             components: { body_1: userName, body_2: medList },
           })),
+        });
+
+        await supabase.from("notification_logs").insert({
+          user_id: g.user_id,
+          type: "missed_medication",
+          channel: "whatsapp",
+          status: wa.ok ? "accepted" : "failed",
+          metadata: {
+            hour_key: g.hourKey,
+            template: "guardian_medication_reminder",
+            recipients: guardianPhones,
+            request_id: (wa.body as any)?.data?.request_id ?? null,
+            response: wa.body,
+          },
         });
 
         // Deduped in-app notification per guardian
@@ -326,7 +349,26 @@ Deno.serve(async (req) => {
           type: "medication_missed",
         }));
         await supabase.rpc("insert_notifications_deduped", { p_notifications: notifications });
+
+        // If WhatsApp was rejected, un-stamp so a later run retries — bounded
+        // to 3 failed attempts per (user, slot) so we never loop forever.
+        if (!wa.ok) {
+          const { count } = await supabase
+            .from("notification_logs")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", g.user_id)
+            .eq("type", "missed_medication")
+            .eq("status", "failed")
+            .gte("created_at", todayStartUTC.toISOString());
+          if ((count ?? 0) < 3) {
+            await supabase
+              .from("medication_logs")
+              .update({ whatsapp_alerted_at: null })
+              .in("id", g.logIds);
+          }
+        }
       }
+
 
       sent++;
     }

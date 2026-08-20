@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
+import { sendSmsFlow } from "../_shared/msg91Sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -530,7 +531,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ── ONE-SHOT WhatsApp alerts (user + guardians) at T+60min ──
+        // ── ONE-SHOT WhatsApp alerts (user + guardians) at T+60min, SMS fallback ──
         try {
           const { data: userProfile } = await supabase
             .from("profiles")
@@ -551,8 +552,17 @@ Deno.serve(async (req) => {
               .map((g) => normalizeIndianPhone(g.guardian_phone))
               .filter((p): p is string => !!p),
           ));
-          if (guardianPhones.length > 0) {
-            await sendWhatsAppTemplate({
+          if (guardianPhones.length === 0) {
+            console.log(`missed check-in ${checkIn.id}: skipped, no guardian phone`);
+            await supabase.from("notification_logs").insert({
+              user_id: checkIn.user_id,
+              type: "missed_checkin",
+              channel: "whatsapp",
+              status: "skipped_no_recipient",
+              metadata: { check_in_id: checkIn.id },
+            });
+          } else {
+            const wa = await sendWhatsAppTemplate({
               templateName: "ward_missed_check_in",
               languageCode: "en_GB",
               namespace: WA_NAMESPACE_V2,
@@ -561,10 +571,56 @@ Deno.serve(async (req) => {
                 components: { body_1: userName, body_2: timeStr },
               })),
             });
+
+            await supabase.from("notification_logs").insert({
+              user_id: checkIn.user_id,
+              type: "missed_checkin",
+              channel: "whatsapp",
+              status: wa.ok ? "accepted" : "failed",
+              metadata: {
+                check_in_id: checkIn.id,
+                template: "ward_missed_check_in",
+                recipients: guardianPhones,
+                request_id: (wa.body as any)?.data?.request_id ?? null,
+                response: wa.body,
+              },
+            });
+
+            // SMS fallback — only when WhatsApp was not accepted, so guardians
+            // never get the same alert twice.
+            if (!wa.ok) {
+              const smsTemplateId = Deno.env.get("MSG91_MISSED_CHECKIN_TEMPLATE_ID");
+              if (smsTemplateId) {
+                const sms = await sendSmsFlow({
+                  templateId: smsTemplateId,
+                  recipients: guardianPhones.map((p) => ({
+                    mobiles: p,
+                    var1: userName,
+                    var2: timeStr,
+                  })),
+                });
+                await supabase.from("notification_logs").insert({
+                  user_id: checkIn.user_id,
+                  type: "missed_checkin",
+                  channel: "sms",
+                  status: sms.ok ? "accepted" : "failed",
+                  metadata: {
+                    check_in_id: checkIn.id,
+                    template_id: smsTemplateId,
+                    recipients: guardianPhones,
+                    request_id: sms.requestId ?? null,
+                    response: sms.body,
+                  },
+                });
+              } else {
+                console.error("MSG91_MISSED_CHECKIN_TEMPLATE_ID not set — no SMS fallback");
+              }
+            }
           }
         } catch (waErr) {
-          console.error("WhatsApp missed check-in send error:", waErr);
+          console.error("WhatsApp/SMS missed check-in send error:", waErr);
         }
+
       }
     }
 
