@@ -87,8 +87,10 @@ Deno.serve(async (req) => {
       const waTo = normalizeIndianPhone(guardian_phone) ?? (digitsOnly.length >= 10 ? digitsOnly : null);
       if (waTo) {
         try {
+          // Verified-delivering shape: 2 body vars + dynamic URL button carrying
+          // the FULL install URL (suffix-only values are rejected by WhatsApp).
           const wa = await sendWhatsAppTemplate({
-            templateName: "guardian_invite_app_downlaod",
+            templateName: "guardian_app_downlaod",
             languageCode: "en",
             namespace: WA_NAMESPACE_V2,
             recipients: [{
@@ -96,8 +98,7 @@ Deno.serve(async (req) => {
               components: {
                 body_1: String(guardian_name),
                 body_2: String(user_name),
-                body_3: (relation && String(relation).trim()) || "Guardian",
-                body_4: installLink,
+                button_1_url: installLink,
               },
             }],
           });
@@ -105,7 +106,7 @@ Deno.serve(async (req) => {
           result.whatsapp_detail = { status: wa.status, body: wa.body };
           console.log("[send-guardian-invite] WhatsApp MSG91 response", JSON.stringify({
             to: waTo,
-            template: "guardian_invite_app_downlaod",
+            template: "guardian_app_downlaod",
             namespace: WA_NAMESPACE_V2,
             status: wa.status,
             ok: wa.ok,
