@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
           components: {
             body_1: String(body.guardian_name || "Guardian"),
             body_2: String(body.user_name || "Your ward"),
-            body_3: String(body.relation || "Guardian"),
+            ...(body.no_body_3 === true ? {} : { body_3: String(body.relation || "Guardian") }),
             ...(body.body_4 ? { body_4: String(body.body_4) } : {}),
             ...(noButton ? {} : { button_1_url: token }),
           },
