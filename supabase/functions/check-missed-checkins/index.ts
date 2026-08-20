@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
+import { sendSmsFlow } from "../_shared/msg91Sms.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
