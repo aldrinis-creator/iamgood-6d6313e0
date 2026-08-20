@@ -1,43 +1,36 @@
-# Missed check-in / missed medication WhatsApp alerts not arriving
+# Missed check-in alerts: add SMS via MSG91 Flow `6a1e71f9b779054ff40a5e93`
 
-## What the data actually shows
+## What is confirmed
 
-Verified just now in the backend:
+- Template ID `6a1e71f9b779054ff40a5e93` is an **SMS Flow** template, not a WhatsApp one: `control.msg91.com/api/v5/flow/6a1e71f9b779054ff40a5e93` returns `type: success`, while both WhatsApp template endpoints return "Route Missing".
+- Both alert crons are alive and succeeding (`check-missed-checkins` every 10 min, `check-missed-medications` every 5 min; latest runs today, all `succeeded`) and both functions boot and exit without errors.
+- Missed medication rows are being stamped `whatsapp_alerted_at` (05:00 today, 17:00 and 09:30 yesterday), but they belong to a ward (`625e8bbe…`) that has **no profile row** — no phone, no guardians — so nothing was ever sent for them.
+- Aldrin (`8d12aed0…`) responded to every check-in for the last three days and took every dose, so no missed-alert was legitimately due for him. His one accepted guardian is James Bond (+91 70458 68482).
+- Nothing records whether a WhatsApp/SMS send succeeded — the code stamps first and ignores the MSG91 response, so failures are invisible.
 
-- Both crons are alive and succeeding: `check-missed-checkins` every 10 min, `check-missed-medications` every 5 min. Latest runs 07:30 UTC today, all `succeeded`.
-- Both functions boot and exit cleanly — no errors in their logs.
-- Alerts *are* being processed: missed medication rows are getting stamped with `whatsapp_alerted_at` (e.g. 05:00 today, 17:00 and 09:30 yesterday).
-- The ward those stamped rows belong to (`625e8bbe…`) has **no profile row at all** — so no phone, no guardians. The function stamps the rows and sends nothing, silently.
-- Aldrin (`8d12aed0…`) has responded to every check-in for the last three days and taken/late-taken his medications, so no missed-alert was ever legitimately due for him.
-- Nothing anywhere records whether a WhatsApp send succeeded — the code stamps first and ignores the MSG91 response.
+## Step 1 — Live test of the flow
 
-So there are two separate problems: alerts that never had a valid recipient, and no visibility into whether the ones that do get sent are actually delivered. Whether MSG91 is additionally rejecting the guardian templates (the V2 namespace templates failed in the earlier guardian-invite diagnosis) is **not yet confirmed** — that is step 1.
+Send one SMS through the existing `msg91-send` function to **+91 98195 76467** with `template_id: 6a1e71f9b779054ff40a5e93` and the ward name "Aldrin". The exact DLT variable key is not yet known, so the test sends the value under the common Flow key shapes (`VAR1` / `var1` / named key) one at a time until MSG91 accepts and the SMS lands, then locks that key in.
 
-## Step 1 — Confirm delivery at MSG91 (before changing template logic)
+## Step 2 — Wire it into missed check-in alerts
 
-Use the existing `msg91-wa-report` diagnostic to pull the last 7 days of delivery rows for `ward_missed_check_in`, `guardian_medication_reminder`, `user_missed_checkin` and `user_missed_medication`, and send one controlled test of each template to a known-good number. Outcome decides:
+In `check-missed-checkins`, alongside the existing WhatsApp `ward_missed_check_in` message to guardians:
 
-- Accepted + delivered: the templates are fine, and the whole issue is "no eligible recipient" (Step 2 / Step 3).
-- Rejected with a template/parameter/namespace error: fix name, language code (`en` vs `en_GB`) and namespace to match what MSG91 reports as approved.
+- Send this SMS flow to every accepted guardian of the ward, with the confirmed variable(s) (ward name, and the missed slot time if the DLT text has a second variable).
+- SMS is sent as a **fallback**, only when the WhatsApp send did not come back accepted, so guardians do not get duplicate alerts. If the flow text is meant to always accompany WhatsApp, that switches to always-send — decided after Step 1 shows the actual message body.
 
-## Step 2 — Stop losing alerts silently
+## Step 3 — Stop losing alerts silently
 
-In `check-missed-checkins` and `check-missed-medications`:
+- Only stamp `whatsapp_alerted_at` once a channel actually accepted the message; on total failure, leave it for the next run with a bounded attempt count so one bad response is not permanent silence.
+- Log every attempt into `notification_logs` (channel, template, recipient, MSG91 status, request id, error) the way the guardian-invite path already does.
+- Log "skipped: no recipient" explicitly when a ward has no phone/profile or no accepted guardian, instead of stamping it as alerted.
 
-- Stop stamping `whatsapp_alerted_at` when the send did not happen. Record the outcome instead: only mark as alerted when MSG91 accepted the message; on failure, record the failure and let the next run retry with a bounded attempt count so a transient error is not permanent silence.
-- Write one row per alert into `notification_logs` (template, recipient, MSG91 status, request id, error) exactly as the guardian-invite path already does, so "was it sent" is answerable.
-- When a ward has no phone, no profile, or no accepted guardian, log that explicitly as `skipped: no recipient` rather than stamping it as alerted.
+## Step 4 — Clean up the phantom ward
 
-## Step 3 — Handle the orphaned ward data
-
-`625e8bbe…` has medication logs and no profile. Decide with a query whether that account still exists in auth; if it is a deleted account, its medications/logs should be cleaned up so the cron stops manufacturing phantom missed alerts every 5 minutes.
-
-## Step 4 — Prove it end to end
-
-With one live ward: skip a scheduled check-in and a scheduled dose, wait out the 60-minute grace, and confirm (a) the ward's WhatsApp, (b) the guardian's WhatsApp, and (c) a `notification_logs` row with an MSG91 request id and a delivered status.
+`625e8bbe…` has medication rows but no profile. Confirm whether the auth account still exists; if it is deleted, remove its medications/logs so the cron stops manufacturing missed alerts that can never be delivered.
 
 ## Technical notes
 
-- Files: `supabase/functions/check-missed-checkins/index.ts`, `supabase/functions/check-missed-medications/index.ts`, `supabase/functions/_shared/msg91Whatsapp.ts` (return the request id so it can be logged), `supabase/functions/msg91-wa-report/index.ts` (query by template name/date range).
-- Possible small migration: an attempt counter / last-error column on `check_ins` and `medication_logs`, or reuse `notification_logs` alone — decided after Step 1.
-- No new secrets; `MSG91_AUTH_KEY` is already set.
+- Files: `supabase/functions/check-missed-checkins/index.ts` (SMS fallback + outcome logging), `supabase/functions/_shared/msg91Whatsapp.ts` (return request id), possibly a small shared `msg91Sms.ts` helper wrapping the Flow API, `supabase/functions/check-missed-medications/index.ts` (same logging fix).
+- New secret `MSG91_MISSED_CHECKIN_TEMPLATE_ID` holding `6a1e71f9b779054ff40a5e93`, so the ID is not hard-coded.
+- Optional small migration for an attempt counter / last-error column on `check_ins` and `medication_logs`; may be unnecessary if `notification_logs` alone is enough.
