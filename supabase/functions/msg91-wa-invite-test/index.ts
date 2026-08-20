@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
     const templateName = String(body.template || "guardian_app_downlaod");
     const token = String(body.token || "test-token");
 
+    const noButton = body.no_button === true;
     const result = await sendWhatsAppTemplate({
       templateName,
       languageCode: String(body.language || "en"),
@@ -37,11 +38,13 @@ Deno.serve(async (req) => {
             body_1: String(body.guardian_name || "Guardian"),
             body_2: String(body.user_name || "Your ward"),
             body_3: String(body.relation || "Guardian"),
-            button_1_url: token,
+            ...(body.body_4 ? { body_4: String(body.body_4) } : {}),
+            ...(noButton ? {} : { button_1_url: token }),
           },
         },
       ],
     });
+
 
     return new Response(JSON.stringify({ phone, templateName, result }, null, 2), {
       status: 200,
