@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const result = await sendWhatsAppTemplate({
       templateName,
       languageCode: String(body.language || "en"),
-      namespace: WA_NAMESPACE_V2,
+      namespace: body.namespace === null ? undefined : (body.namespace ? String(body.namespace) : WA_NAMESPACE_V2),
       recipients: [
         {
           to: [phone],
