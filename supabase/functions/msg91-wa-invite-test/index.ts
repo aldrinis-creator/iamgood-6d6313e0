@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Diagnostic only: hard-restricted to the single agreed test recipient.
-  const ALLOWED = ["919967134652", "917045868482"];
+  const ALLOWED = ["919967134652", "917045868482", "919819576467"];
 
   try {
     const body = await req.json().catch(() => ({}));
