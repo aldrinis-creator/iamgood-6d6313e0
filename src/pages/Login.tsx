@@ -170,7 +170,7 @@ const Login = () => {
                     <PhoneInput
                       value={identifier}
                       onChange={setIdentifier}
-                      placeholder="98765 43210"
+                      placeholder="xxxxx xxxxx"
                       className="border-0 shadow-none bg-transparent h-12"
                     />
                   </div>

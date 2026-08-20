@@ -25,7 +25,7 @@ const parsePhone = (value: string): { country: Country | undefined; dial: string
   return { country: COUNTRIES.find((c) => c.dial === DEFAULT_DIAL), dial: DEFAULT_DIAL, number: cleaned };
 };
 
-const PhoneInput = ({ value, onChange, placeholder = "98765 43210", className }: PhoneInputProps) => {
+const PhoneInput = ({ value, onChange, placeholder = "xxxxx xxxxx", className }: PhoneInputProps) => {
   const [open, setOpen] = useState(false);
   const { country, dial, number } = useMemo(() => parsePhone(value), [value]);
 

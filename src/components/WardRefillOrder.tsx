@@ -531,7 +531,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
               </div>
               {editingPharmacy ? (
                 <>
-                  <Input placeholder="+91 98765 43210" value={pharmacyNumber} onChange={(e) => setPharmacyNumber(e.target.value)} className="text-base" />
+                  <Input placeholder="+91 xxxxx xxxxx" value={pharmacyNumber} onChange={(e) => setPharmacyNumber(e.target.value)} className="text-base" />
                   <p className="text-xs text-muted-foreground">Include country code (e.g., +91).</p>
                   <Button variant="outline" size="sm" className="w-full" disabled={!pharmacyNumber.trim()} onClick={() => { localStorage.setItem(PHARMACY_STORAGE_KEY, pharmacyNumber); setEditingPharmacy(false); toast.success("Pharmacy number saved"); }}>
                     <CheckCircle className="w-3.5 h-3.5 mr-1" /> Save Number
