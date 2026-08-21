@@ -159,17 +159,34 @@ const Register = () => {
 
   const handleOtpCancel = () => setStep(2);
 
-  const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
+  /**
+   * Dispatch nomination invites for the guardians created during signup.
+   * The invite MUST carry the real nomination_token — without it the guardian
+   * receives a generic User install/registration link and ends up creating a
+   * regular user account.
+   */
+  const dispatchGuardianInvites = async (userId: string, userName: string) => {
     try {
-      await supabase.functions.invoke("send-transactional-email", {
-        body: { templateName: "guardian-invitation", recipientEmail: guardianEmail, idempotencyKey: `guardian-invite-${guardianEmail}-${Date.now()}`, templateData: { guardianName, userName, relation, acceptLink: `https://iamgood.lovable.app/register` } },
-      });
-      await supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_name: guardianName, user_name: userName, relation },
-      });
+      const { data: rows } = await supabase
+        .from("guardians")
+        .select("guardian_name, guardian_phone, guardian_email, relation, nomination_token")
+        .eq("user_id", userId);
+      for (const g of rows || []) {
+        await supabase.functions.invoke("send-guardian-invite", {
+          body: {
+            guardian_name: g.guardian_name,
+            guardian_phone: g.guardian_phone,
+            guardian_email: g.guardian_email,
+            relation: g.relation,
+            user_name: userName,
+            nomination_token: (g as { nomination_token?: string }).nomination_token ?? null,
+          },
+        });
+      }
     } catch (e) {
       console.error("Failed to send guardian invite:", e);
     }
+
   };
 
   const handleSubmit = async () => {
