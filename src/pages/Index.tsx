@@ -2,6 +2,7 @@ import { useApp } from "@/contexts/AppContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import SeoMeta from "@/components/SeoMeta";
+import { captureNominationFromSearch, getPendingNominationToken } from "@/lib/pendingNomination";
 
 const Index = () => {
   const { isLoggedIn, role } = useApp();
@@ -10,8 +11,17 @@ const Index = () => {
   useEffect(() => {
     if (isLoggedIn) {
       navigate(role === "user" ? "/dashboard" : "/guardian");
+      return;
+    }
+    // The installed PWA starts at "/", which drops ?g=<token>. Resume any
+    // pending Guardian nomination instead of showing the User sign-up.
+    captureNominationFromSearch(window.location.search);
+    const pending = getPendingNominationToken();
+    if (pending) {
+      navigate(`/register?nomination=accept&token=${pending}`, { replace: true });
     }
   }, [isLoggedIn, role, navigate]);
+
 
   return (
     <div className="min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center">
