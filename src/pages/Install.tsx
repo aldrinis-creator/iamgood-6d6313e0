@@ -8,6 +8,7 @@ import SeoMeta from "@/components/SeoMeta";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { clearPendingNomination, stashNominationToken } from "@/lib/pendingNomination";
 import { useEffect } from "react";
 
 const Install = () => {
