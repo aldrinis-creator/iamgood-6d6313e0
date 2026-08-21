@@ -26,7 +26,7 @@ const TOTAL_STEPS_USER = 4;
 const TOTAL_STEPS_GUARDIAN = 3;
 
 const Register = () => {
-  const { signUp } = useAuth();
+  const { signUp, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { canInstall, installApp, isInstalled } = usePwaInstall();
   const [searchParams] = useSearchParams();
@@ -56,9 +56,29 @@ const Register = () => {
   const progressPercent = (step / totalSteps) * 100;
 
   useEffect(() => {
+    if (authLoading) return;
     const nomination = searchParams.get("nomination");
     const token = searchParams.get("token");
     if (nomination === "accept" && token) {
+      if (session) {
+        // User is already logged in, auto-accept and link
+        const acceptExisting = async () => {
+          setLoading(true);
+          try {
+            await supabase.rpc("link_guardian_user_id");
+            await supabase.functions.invoke("guardian-nomination-response", { body: { token, action: "accept" } });
+            toast.success("Guardian invitation accepted successfully!");
+            navigate("/guardian");
+          } catch (e) {
+            console.error(e);
+            toast.error("Failed to accept invitation");
+          } finally {
+            setLoading(false);
+          }
+        };
+        acceptExisting();
+        return;
+      }
       setIsInviteLink(true);
       setSelectedRole("guardian");
       setStep(2);
@@ -70,7 +90,7 @@ const Register = () => {
           }
         });
     }
-  }, [searchParams]);
+  }, [searchParams, session, authLoading, navigate]);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);

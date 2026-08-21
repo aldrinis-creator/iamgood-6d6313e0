@@ -1,15 +1,36 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck } from "lucide-react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import AppLayout from "@/components/AppLayout";
 import SeoMeta from "@/components/SeoMeta";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useEffect } from "react";
 
 const Install = () => {
   const { canInstall, installApp, isInstalled } = usePwaInstall();
   const [searchParams] = useSearchParams();
   const guardianToken = searchParams.get("g");
+  const { session, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (authLoading || !session || !guardianToken) return;
+    const acceptExisting = async () => {
+      try {
+        await supabase.rpc("link_guardian_user_id");
+        await supabase.functions.invoke("guardian-nomination-response", { body: { token: guardianToken, action: "accept" } });
+        toast.success("Guardian invitation accepted successfully!");
+        navigate("/guardian");
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    acceptExisting();
+  }, [guardianToken, session, authLoading, navigate]);
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
