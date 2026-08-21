@@ -60,6 +60,8 @@ const Register = () => {
     if (authLoading) return;
     const nomination = searchParams.get("nomination");
     const token = searchParams.get("token");
+    if (nomination && token) stashNominationToken(token);
+    if (nomination === "reject" && token) clearPendingNomination();
     if (nomination === "accept" && token) {
       if (session) {
         // User is already logged in, auto-accept and link
