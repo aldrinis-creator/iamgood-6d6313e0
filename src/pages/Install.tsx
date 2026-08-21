@@ -17,12 +17,18 @@ const Install = () => {
   const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  // Survive the PWA install (start_url is "/", which drops the token).
+  useEffect(() => {
+    stashNominationToken(guardianToken);
+  }, [guardianToken]);
+
   useEffect(() => {
     if (authLoading || !session || !guardianToken) return;
     const acceptExisting = async () => {
       try {
         await supabase.rpc("link_guardian_user_id");
         await supabase.functions.invoke("guardian-nomination-response", { body: { token: guardianToken, action: "accept" } });
+        clearPendingNomination();
         toast.success("Guardian invitation accepted successfully!");
         navigate("/guardian");
       } catch (e) {
@@ -37,19 +43,23 @@ const Install = () => {
   return (
     <AppLayout>
       <SeoMeta
-        title="Install Check-iN"
+        title={guardianToken ? "Set up your Guardian account" : "Install Check-iN"}
         description="Install Check-iN as a PWA on your phone for instant access to India's medication reminder, elderly care & emergency alert app. Works offline with push notifications."
         canonicalPath="/install"
       />
       <div className="p-4 space-y-6">
         <div className="text-center space-y-2">
-          <Smartphone className="w-12 h-12 mx-auto text-primary" />
+          {guardianToken ? (
+            <ShieldCheck className="w-12 h-12 mx-auto text-primary" />
+          ) : (
+            <Smartphone className="w-12 h-12 mx-auto text-primary" />
+          )}
           <h1 className="text-2xl font-bold text-foreground">
-            {guardianToken ? "Install the Guardian app" : "Install Check-iN"}
+            {guardianToken ? "Set up your Guardian account" : "Install Check-iN"}
           </h1>
           <p className="text-muted-foreground text-sm">
             {guardianToken
-              ? "You've been nominated as a Guardian. Install Check-iN on your phone first, then accept the nomination to start receiving alerts."
+              ? "You've been nominated as a Guardian on Check-iN. Accept your nomination first — this creates your Guardian account, not a regular user account."
               : "Add Check-iN to your home screen for instant access, offline support, and push notifications."}
           </p>
         </div>
@@ -59,10 +69,10 @@ const Install = () => {
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Step 2 — Accept your nomination</p>
+                <p className="text-sm font-semibold text-foreground">Step 1 — Accept your nomination</p>
               </div>
               <p className="text-xs text-muted-foreground">
-                Once the app is installed, tap below to accept and create your Guardian account.
+                Tap below to accept and create your Guardian account. You'll start receiving your ward's check-in, medication and SOS alerts.
               </p>
               <Button asChild className="w-full h-12 text-base font-semibold">
                 <Link to={`/register?nomination=accept&token=${guardianToken}`}>
@@ -75,6 +85,13 @@ const Install = () => {
             </CardContent>
           </Card>
         )}
+
+        {guardianToken && (
+          <p className="text-center text-sm font-semibold text-foreground">
+            Step 2 — Add the app to your home screen
+          </p>
+        )}
+
 
 
         {isInstalled && (
