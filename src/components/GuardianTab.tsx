@@ -84,15 +84,15 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
   const handleResendInvite = async (g: Guardian) => {
     setResending(g.id);
     try {
-      await supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_name: g.guardian_name, user_name: "User", relation: g.relation, guardian_phone: g.guardian_phone, guardian_email: g.guardian_email },
-      });
-      toast.success(`Invite re-sent to ${g.guardian_name}`);
+      // Must go through resendGuardianInvite so the live nomination_token is
+      // included — a tokenless invite sends the plain User install link.
+      await resendGuardianInvite(g.id, "Your ward");
     } catch {
       toast.error("Failed to re-send invite");
     }
     setResending(null);
   };
+
 
   const handleAdd = async () => {
     if (!userId || !name.trim() || !phone.trim() || !email.trim()) {
