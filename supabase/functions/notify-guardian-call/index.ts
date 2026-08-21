@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       // Realtime broadcast — instant ring for guardians with the app open
       try {
         const channel = admin.channel(`guardian-call:${guardianUserId}`, {
-          config: { broadcast: { ack: false } },
+          config: { private: true, broadcast: { ack: false } },
         });
         await channel.subscribe();
         await channel.send({

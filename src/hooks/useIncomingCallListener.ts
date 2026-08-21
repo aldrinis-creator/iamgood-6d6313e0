@@ -29,7 +29,7 @@ export const useIncomingCallListener = () => {
 
     // 1) Realtime broadcast channel (foreground / backgrounded tab)
     const channel = supabase
-      .channel(`guardian-call:${uid}`, { config: { broadcast: { ack: false } } })
+      .channel(`guardian-call:${uid}`, { config: { private: true, broadcast: { ack: false } } })
       .on("broadcast", { event: "incoming_call" }, ({ payload }) => handlePayload(payload))
       .subscribe();
 
