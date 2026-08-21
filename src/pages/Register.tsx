@@ -70,6 +70,7 @@ const Register = () => {
           try {
             await supabase.rpc("link_guardian_user_id");
             await supabase.functions.invoke("guardian-nomination-response", { body: { token, action: "accept" } });
+            clearPendingNomination();
             toast.success("Guardian invitation accepted successfully!");
             navigate("/guardian");
           } catch (e) {
@@ -242,7 +243,10 @@ const Register = () => {
       await supabase.rpc("link_guardian_user_id");
       const nominationToken = searchParams.get("token");
       if (nominationToken) {
-        try { await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } }); } catch (e) { console.error(e); }
+        try {
+          await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } });
+          clearPendingNomination();
+        } catch (e) { console.error(e); }
       }
     }
     setLoading(false);
