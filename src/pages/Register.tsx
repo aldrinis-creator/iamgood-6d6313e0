@@ -229,11 +229,11 @@ const Register = () => {
       .invoke("msg91-whatsapp-welcome")
       .catch((e) => console.error("welcome WhatsApp failed:", e));
 
-    const guardiansWithEmail = guardianRows.filter(g => g.guardian_email);
-    if (selectedRole === "user") {
-      for (const g of guardiansWithEmail) if (g.guardian_email) sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
+    if (selectedRole === "user" && data?.user?.id) {
+      dispatchGuardianInvites(data.user.id, fullName);
     }
-    setSentGuardianCount(guardiansWithEmail.length);
+    setSentGuardianCount(guardianRows.length);
+
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
