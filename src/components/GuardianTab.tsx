@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { resendGuardianInvite } from "@/lib/guardianInvite";
 import { toast } from "sonner";
 import PhoneInput from "@/components/PhoneInput";
 import { useSubscription } from "@/hooks/useSubscription";
