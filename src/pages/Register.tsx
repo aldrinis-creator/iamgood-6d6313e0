@@ -8,6 +8,7 @@ import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
+import { resendGuardianInvite } from "@/lib/guardianInvite";
 
 
 
@@ -159,18 +160,7 @@ const Register = () => {
 
   const handleOtpCancel = () => setStep(2);
 
-  const sendGuardianInvite = async (guardianEmail: string, guardianName: string, userName: string, relation: string) => {
-    try {
-      await supabase.functions.invoke("send-transactional-email", {
-        body: { templateName: "guardian-invitation", recipientEmail: guardianEmail, idempotencyKey: `guardian-invite-${guardianEmail}-${Date.now()}`, templateData: { guardianName, userName, relation, acceptLink: `https://iamgood.lovable.app/register` } },
-      });
-      await supabase.functions.invoke("send-guardian-invite", {
-        body: { guardian_name: guardianName, user_name: userName, relation },
-      });
-    } catch (e) {
-      console.error("Failed to send guardian invite:", e);
-    }
-  };
+
 
   const handleSubmit = async () => {
     if (!fullName) return toast.error("Please fill in all required fields");
@@ -212,11 +202,22 @@ const Register = () => {
       .invoke("msg91-whatsapp-welcome")
       .catch((e) => console.error("welcome WhatsApp failed:", e));
 
-    const guardiansWithEmail = guardianRows.filter(g => g.guardian_email);
-    if (selectedRole === "user") {
-      for (const g of guardiansWithEmail) if (g.guardian_email) sendGuardianInvite(g.guardian_email, g.guardian_name, fullName, g.relation || "");
+    if (selectedRole === "user" && data?.user?.id) {
+      // Query the newly inserted guardians for this user
+      // Delay slightly to ensure trigger has completed
+      await new Promise(r => setTimeout(r, 500));
+      const { data: insertedGuardians } = await supabase
+        .from("guardians")
+        .select("id")
+        .eq("user_id", data.user.id);
+      
+      if (insertedGuardians) {
+        for (const g of insertedGuardians) {
+          await resendGuardianInvite(g.id, fullName);
+        }
+      }
+      setSentGuardianCount(insertedGuardians?.length || 0);
     }
-    setSentGuardianCount(guardiansWithEmail.length);
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
