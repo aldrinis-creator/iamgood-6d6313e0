@@ -8,11 +8,8 @@ import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
-<<<<<<< HEAD
 import { resendGuardianInvite } from "@/lib/guardianInvite";
-=======
 import { clearPendingNomination, stashNominationToken } from "@/lib/pendingNomination";
->>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
 
 
