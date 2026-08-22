@@ -167,39 +167,6 @@ const Register = () => {
 
   const handleOtpCancel = () => setStep(2);
 
-<<<<<<< HEAD
-
-=======
-  /**
-   * Dispatch nomination invites for the guardians created during signup.
-   * The invite MUST carry the real nomination_token — without it the guardian
-   * receives a generic User install/registration link and ends up creating a
-   * regular user account.
-   */
-  const dispatchGuardianInvites = async (userId: string, userName: string) => {
-    try {
-      const { data: rows } = await supabase
-        .from("guardians")
-        .select("guardian_name, guardian_phone, guardian_email, relation, nomination_token")
-        .eq("user_id", userId);
-      for (const g of rows || []) {
-        await supabase.functions.invoke("send-guardian-invite", {
-          body: {
-            guardian_name: g.guardian_name,
-            guardian_phone: g.guardian_phone,
-            guardian_email: g.guardian_email,
-            relation: g.relation,
-            user_name: userName,
-            nomination_token: (g as { nomination_token?: string }).nomination_token ?? null,
-          },
-        });
-      }
-    } catch (e) {
-      console.error("Failed to send guardian invite:", e);
-    }
-
-  };
->>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
   const handleSubmit = async () => {
     if (!fullName) return toast.error("Please fill in all required fields");
