@@ -2886,6 +2886,10 @@ export type Database = {
         Returns: number
       }
       sos_dispatch_safety_net: { Args: never; Returns: number }
+      vault_claim_keys_unchanged: {
+        Args: { _guardian_id: string; _id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "guardian"

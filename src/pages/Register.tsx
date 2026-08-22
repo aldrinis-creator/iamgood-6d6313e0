@@ -8,7 +8,11 @@ import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
+<<<<<<< HEAD
 import { resendGuardianInvite } from "@/lib/guardianInvite";
+=======
+import { clearPendingNomination, stashNominationToken } from "@/lib/pendingNomination";
+>>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
 
 
@@ -60,6 +64,8 @@ const Register = () => {
     if (authLoading) return;
     const nomination = searchParams.get("nomination");
     const token = searchParams.get("token");
+    if (nomination && token) stashNominationToken(token);
+    if (nomination === "reject" && token) clearPendingNomination();
     if (nomination === "accept" && token) {
       if (session) {
         // User is already logged in, auto-accept and link
@@ -68,6 +74,7 @@ const Register = () => {
           try {
             await supabase.rpc("link_guardian_user_id");
             await supabase.functions.invoke("guardian-nomination-response", { body: { token, action: "accept" } });
+            clearPendingNomination();
             toast.success("Guardian invitation accepted successfully!");
             navigate("/guardian");
           } catch (e) {
@@ -160,7 +167,39 @@ const Register = () => {
 
   const handleOtpCancel = () => setStep(2);
 
+<<<<<<< HEAD
 
+=======
+  /**
+   * Dispatch nomination invites for the guardians created during signup.
+   * The invite MUST carry the real nomination_token — without it the guardian
+   * receives a generic User install/registration link and ends up creating a
+   * regular user account.
+   */
+  const dispatchGuardianInvites = async (userId: string, userName: string) => {
+    try {
+      const { data: rows } = await supabase
+        .from("guardians")
+        .select("guardian_name, guardian_phone, guardian_email, relation, nomination_token")
+        .eq("user_id", userId);
+      for (const g of rows || []) {
+        await supabase.functions.invoke("send-guardian-invite", {
+          body: {
+            guardian_name: g.guardian_name,
+            guardian_phone: g.guardian_phone,
+            guardian_email: g.guardian_email,
+            relation: g.relation,
+            user_name: userName,
+            nomination_token: (g as { nomination_token?: string }).nomination_token ?? null,
+          },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to send guardian invite:", e);
+    }
+
+  };
+>>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
   const handleSubmit = async () => {
     if (!fullName) return toast.error("Please fill in all required fields");
@@ -203,6 +242,7 @@ const Register = () => {
       .catch((e) => console.error("welcome WhatsApp failed:", e));
 
     if (selectedRole === "user" && data?.user?.id) {
+<<<<<<< HEAD
       // Query the newly inserted guardians for this user
       // Delay slightly to ensure trigger has completed
       await new Promise(r => setTimeout(r, 500));
@@ -218,12 +258,21 @@ const Register = () => {
       }
       setSentGuardianCount(insertedGuardians?.length || 0);
     }
+=======
+      dispatchGuardianInvites(data.user.id, fullName);
+    }
+    setSentGuardianCount(guardianRows.length);
+
+>>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
       const nominationToken = searchParams.get("token");
       if (nominationToken) {
-        try { await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } }); } catch (e) { console.error(e); }
+        try {
+          await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } });
+          clearPendingNomination();
+        } catch (e) { console.error(e); }
       }
     }
     setLoading(false);
