@@ -242,7 +242,6 @@ const Register = () => {
       .catch((e) => console.error("welcome WhatsApp failed:", e));
 
     if (selectedRole === "user" && data?.user?.id) {
-<<<<<<< HEAD
       // Query the newly inserted guardians for this user
       // Delay slightly to ensure trigger has completed
       await new Promise(r => setTimeout(r, 500));
@@ -250,7 +249,7 @@ const Register = () => {
         .from("guardians")
         .select("id")
         .eq("user_id", data.user.id);
-      
+
       if (insertedGuardians) {
         for (const g of insertedGuardians) {
           await resendGuardianInvite(g.id, fullName);
@@ -258,12 +257,7 @@ const Register = () => {
       }
       setSentGuardianCount(insertedGuardians?.length || 0);
     }
-=======
-      dispatchGuardianInvites(data.user.id, fullName);
-    }
-    setSentGuardianCount(guardianRows.length);
 
->>>>>>> 50ebeaa73bee971e80da60f20617df000b550017
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
