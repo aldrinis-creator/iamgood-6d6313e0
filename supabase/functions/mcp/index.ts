@@ -6,7 +6,7 @@
 import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
 
 // src/lib/mcp/tools/list-medications-today.ts
-import { createClient } from "npm:@supabase/supabase-js@^2.108.2";
+import { createClient } from "npm:@supabase/supabase-js@^2.112.3";
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
 function supabaseForUser(ctx) {
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
@@ -41,7 +41,7 @@ var list_medications_today_default = defineTool({
 });
 
 // src/lib/mcp/tools/list-appointments.ts
-import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.108.2";
+import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.112.3";
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
 import { z } from "npm:zod@^4.4.3";
 function supabaseForUser2(ctx) {
@@ -77,7 +77,7 @@ var list_appointments_default = defineTool2({
 });
 
 // src/lib/mcp/tools/get-health-status.ts
-import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.108.2";
+import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.112.3";
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
 function supabaseForUser3(ctx) {
   return createClient3(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
