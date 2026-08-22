@@ -161,8 +161,8 @@ Deno.serve(async (req) => {
     const vapidSubject = "mailto:alerts@check-in.app";
 
     const now = new Date();
-    // 35-minute grace: matches T+35 escalation
-    const graceMs = 35 * 60 * 1000;
+    // 60-minute grace: matches T+60 escalation
+    const graceMs = 60 * 60 * 1000;
     const graceCutoff = new Date(now.getTime() - graceMs);
     const veryLateCutoff = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -410,13 +410,25 @@ Deno.serve(async (req) => {
 
       const userName = profile?.full_name || "Your ward";
 
-      const { data: guardians } = await supabase
+      let { data: guardians } = await supabase
         .from("guardians")
         .select("id, guardian_name, guardian_email, guardian_phone")
         .eq("user_id", checkIn.user_id)
         .eq("status", "accepted");
 
       if (guardians && guardians.length > 0) {
+        // Deduplicate guardians by phone to prevent multiple alerts if the ward added them multiple times
+        const uniqueGuardians = [];
+        const seenPhones = new Set<string>();
+        for (const g of guardians) {
+          const normPhone = normalizeIndianPhone(g.guardian_phone);
+          if (normPhone && !seenPhones.has(normPhone)) {
+            seenPhones.add(normPhone);
+            uniqueGuardians.push(g);
+          }
+        }
+        guardians = uniqueGuardians;
+
         const scheduledTime = new Date(checkIn.scheduled_at);
         // Convert to IST manually (UTC+5:30) for reliable formatting
         const istMs = scheduledTime.getTime() + (5.5 * 60 * 60 * 1000);

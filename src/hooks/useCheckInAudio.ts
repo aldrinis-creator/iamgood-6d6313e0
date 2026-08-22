@@ -183,8 +183,8 @@ const useCheckInAudio = () => {
               slotKey: `checkin-${dateKey}-${h}`,
             });
           }
-        } else if (state.count >= MAX_POPUPS && minSinceLast >= POPUP_INTERVAL_MIN) {
-          // Final escalation — T+35: NO audio (hard cap at MAX_POPUPS), overlay + server only
+        } else if (state.count >= MAX_POPUPS && diffMin >= 60) {
+          // Final escalation — T+60: NO audio (hard cap at MAX_POPUPS), overlay + server only
           missedSentRef.current.add(missedKey);
 
           const tsf = formatISTDateTime(now);
