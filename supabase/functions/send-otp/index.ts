@@ -289,36 +289,73 @@ Deno.serve(async (req) => {
     const otpCode = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 
-    // WhatsApp-only delivery (SMS/Flow channel intentionally disabled)
-    const waTemplate = Deno.env.get("MSG91_WA_OTP_TEMPLATE_NAME") ?? "verification_otp";
-    const waLanguage = Deno.env.get("MSG91_WA_OTP_LANGUAGE") ?? "en";
+    // MSG91 Flow Delivery (handles WhatsApp with SMS Fallback natively)
+    console.log(`[send-otp] Dispatching MSG91 otp-fallback Flow for phone=${phone}`);
 
-    console.log(`[send-otp] Dispatching WhatsApp OTP for phone=${phone} template=${waTemplate}`);
+    const flowPayload = {
+      data: {
+        sendTo: [
+          {
+            to: [
+              {
+                mobiles: phone,
+                variables: {
+                  body_1: { type: "text", value: otpCode },
+                  button_1: { type: "text", subtype: "url", value: otpCode },
+                  var1: { value: otpCode }
+                }
+              }
+            ],
+            variables: {
+              body_1: { type: "text", value: otpCode },
+              button_1: { type: "text", subtype: "url", value: otpCode },
+              var1: { value: otpCode }
+            }
+          }
+        ]
+      }
+    };
 
-    const waResult = await sendWhatsAppTemplate({
-      templateName: waTemplate,
-      languageCode: waLanguage,
-      recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
-    }).catch((e) => ({ ok: false, status: 0, body: { error: String(e) } }));
+    let flowSuccess = false;
+    let flowErrorMsg: string | undefined;
 
-    const waSuccess = waResult.ok;
-    const waErrorMsg = waSuccess ? undefined : JSON.stringify(waResult.body).slice(0, 300);
+    try {
+      const flowRes = await fetch("https://control.msg91.com/api/v5/oneapi/api/flow/otp-fallback/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          authkey: authKey,
+        },
+        body: JSON.stringify(flowPayload),
+      });
+
+      const body = await flowRes.json().catch(() => ({}));
+      if (flowRes.ok && body.type !== "error") {
+        flowSuccess = true;
+      } else {
+        flowErrorMsg = JSON.stringify(body).slice(0, 300);
+        console.error(`[send-otp] Flow failed: ${flowRes.status}`, flowErrorMsg);
+      }
+    } catch (e) {
+      flowErrorMsg = String(e);
+      console.error(`[send-otp] Flow error:`, e);
+    }
 
     await logOtpEvent(
       admin,
       phone,
       action,
       undefined,
-      waSuccess ? "sent" : "failed",
-      waErrorMsg,
-      waSuccess ? otpCode : undefined,
-      waSuccess ? expiresAt : undefined,
+      flowSuccess ? "sent" : "failed",
+      flowErrorMsg,
+      flowSuccess ? otpCode : undefined,
+      flowSuccess ? expiresAt : undefined,
     );
 
-    const channels = { sms: "disabled", whatsapp: waSuccess ? "sent" : "failed" };
+    const channels = { flow: flowSuccess ? "sent" : "failed" };
 
-    if (!waSuccess) {
-      return jsonResponse({ success: false, channels, error: waErrorMsg || "WhatsApp OTP delivery failed" }, 400);
+    if (!flowSuccess) {
+      return jsonResponse({ success: false, channels, error: flowErrorMsg || "OTP delivery failed" }, 400);
     }
 
     return jsonResponse({ success: true, channels });

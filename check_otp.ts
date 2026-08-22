@@ -1,0 +1,1 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'; const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')); const { data } = await supabase.from('otp_events').select('*').like('phone', '%8757176428%').order('created_at', { ascending: false }).limit(5); console.log(JSON.stringify(data, null, 2));
