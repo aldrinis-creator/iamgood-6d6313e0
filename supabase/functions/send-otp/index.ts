@@ -157,6 +157,29 @@ Deno.serve(async (req) => {
 
     console.log(`[send-otp] action=${action} phone=${phone} purpose=${purpose || "login"}`);
 
+    // A short-lived, phone-bound status check lets the client distinguish
+    // provider acceptance from actual delivery without exposing OTP data.
+    if (action === "status") {
+      const requestId = typeof body.request_id === "string" ? body.request_id : "";
+      if (!requestId || requestId.length > 200) {
+        return jsonResponse({ error: "request_id is required" }, 400);
+      }
+      const { data: event } = await admin
+        .from("otp_events")
+        .select("delivery_status, failure_reason")
+        .eq("phone", phone)
+        .eq("request_id", requestId)
+        .in("action", ["send", "resend"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return jsonResponse({
+        success: true,
+        delivery_status: event?.delivery_status ?? "pending",
+        failure_reason: event?.failure_reason ?? null,
+      });
+    }
+
     // ── APP STORE REVIEW BYPASS ─────────────────────────────
     if (isReviewPhone(phone)) {
       const reviewCode = Deno.env.get("REVIEW_OTP_CODE") ?? "";
@@ -352,10 +375,14 @@ Deno.serve(async (req) => {
       const resBody: any = await flowRes.json().catch(() => ({}));
       console.log(`[send-otp] MSG91 flow response (${flowRes.status}):`, JSON.stringify(resBody).slice(0, 500));
 
+      const responseData = typeof resBody?.data === "string"
+        ? (() => { try { return JSON.parse(resBody.data); } catch { return {}; } })()
+        : resBody?.data;
       flowRequestId =
-        resBody?.data?.request_id ||
-        resBody?.data?.[0]?.requestId ||
-        resBody?.data?.requestId ||
+        responseData?.request_id ||
+        responseData?.data?.request_id ||
+        responseData?.[0]?.requestId ||
+        responseData?.requestId ||
         resBody?.request_id ||
         (typeof resBody?.message === "string" ? resBody.message : undefined);
 

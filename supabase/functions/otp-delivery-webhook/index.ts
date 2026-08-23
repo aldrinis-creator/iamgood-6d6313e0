@@ -1,9 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { z } from "npm:zod@3.23.8";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const PayloadSchema = z.record(z.unknown());
+
+function firstString(...values: unknown[]): string | null {
+  return values.find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
+}
+
+function normalizeStatus(raw: string | null): string {
+  const status = (raw || "unknown").toLowerCase();
+  if (["delivered", "read", "success", "sent"].includes(status)) return status === "read" ? "read" : "delivered";
+  if (["failed", "failure", "rejected", "undelivered", "expired"].includes(status)) return "failed";
+  return "pending";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,14 +21,32 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const payload = await req.json();
+    const expectedSecret = Deno.env.get("CRON_SECRET");
+    const suppliedSecret = req.headers.get("x-webhook-secret");
+    if (!expectedSecret || suppliedSecret !== expectedSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const parsed = PayloadSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: "Invalid payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const payload = parsed.data;
     console.log("[otp-delivery-webhook] Received:", JSON.stringify(payload));
 
-    const requestId = payload.requestId || payload.request_id;
-    const status = payload.status || payload.report_status;
-    const failureReason = payload.failureReason || payload.desc || null;
-    const deliveryTime = payload.deliveryTime || payload.sentTime || null;
-    const telNum = payload.telNum || payload.mobile || null;
+    const nested = typeof payload.data === "object" && payload.data !== null ? payload.data as Record<string, unknown> : {};
+    const requestId = firstString(payload.requestId, payload.request_id, nested.requestId, nested.request_id);
+    const rawStatus = firstString(payload.status, payload.report_status, payload.event, nested.status, nested.report_status);
+    const status = normalizeStatus(rawStatus);
+    const failureReason = firstString(payload.failureReason, payload.failure_reason, payload.desc, payload.reason, nested.failureReason, nested.desc);
+    const deliveryTime = firstString(payload.deliveryTime, payload.delivery_time, payload.sentTime, payload.timestamp, nested.deliveryTime);
+    const telNum = firstString(payload.telNum, payload.mobile, payload.phone, payload.to, nested.telNum, nested.mobile);
 
     if (!requestId && !telNum) {
       console.log("[otp-delivery-webhook] No requestId or telNum, ignoring");

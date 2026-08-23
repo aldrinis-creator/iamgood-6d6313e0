@@ -1,10 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { z } from "npm:zod@3.23.8";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+const RequestSchema = z.object({
+  token: z.string().uuid(),
+  action: z.enum(["lookup", "accept", "reject"]),
+});
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,14 +20,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { token, action } = await req.json();
-
-    if (!token || !["accept", "reject"].includes(action)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid token or action" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const parsed = RequestSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return jsonResponse({ error: "Invalid token or action" }, 400);
     }
+    const { token, action } = parsed.data;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -28,22 +33,12 @@ Deno.serve(async (req) => {
     // Find guardian record by nomination token
     const { data: guardian, error: findError } = await supabase
       .from("guardians")
-      .select("id, user_id, guardian_name, status, nomination_expires_at")
+      .select("id, user_id, guardian_name, guardian_phone, status, nomination_expires_at")
       .eq("nomination_token", token)
       .single();
 
     if (findError || !guardian) {
-      return new Response(
-        JSON.stringify({ error: "Nomination not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (guardian.status !== "pending") {
-      return new Response(
-        JSON.stringify({ error: "Nomination already processed", status: guardian.status }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Nomination not found" }, 404);
     }
 
     // Check if nomination has expired
@@ -53,10 +48,24 @@ Deno.serve(async (req) => {
         .from("guardians")
         .update({ status: "expired" })
         .eq("id", guardian.id);
-      return new Response(
-        JSON.stringify({ error: "Nomination has expired. Ask your ward to re-send the invite.", status: "expired" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Nomination has expired. Ask your ward to re-send the invite.", status: "expired" }, 400);
+    }
+
+    if (action === "lookup") {
+      if (guardian.status !== "pending") {
+        return jsonResponse({ error: "Nomination already processed", status: guardian.status }, 400);
+      }
+      return jsonResponse({
+        success: true,
+        guardian_name: guardian.guardian_name,
+        guardian_phone: guardian.guardian_phone,
+        status: guardian.status,
+        nomination_expires_at: guardian.nomination_expires_at,
+      });
+    }
+
+    if (guardian.status !== "pending") {
+      return jsonResponse({ error: "Nomination already processed", status: guardian.status }, 400);
     }
 
     const newStatus = action === "accept" ? "accepted" : "rejected";
@@ -67,10 +76,7 @@ Deno.serve(async (req) => {
       .eq("id", guardian.id);
 
     if (updateError) {
-      return new Response(
-        JSON.stringify({ error: "Failed to update nomination" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Failed to update nomination" }, 500);
     }
 
     // Notify the ward either way
@@ -93,15 +99,9 @@ Deno.serve(async (req) => {
     }
 
 
-    return new Response(
-      JSON.stringify({ success: true, status: newStatus }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, status: newStatus });
   } catch (err) {
     console.error("Error:", err);
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Unable to process nomination" }, 500);
   }
 });

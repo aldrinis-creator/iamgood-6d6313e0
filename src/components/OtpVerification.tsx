@@ -31,6 +31,8 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
   const [resendTimer, setResendTimer] = useState(30);
   const [hasSent, setHasSent] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
 
   // Check if it's an Indian number (+91)
   const isIndianNumber = phone.replace(/\s+/g, "").startsWith("+91");
@@ -45,6 +47,23 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     const t = setTimeout(() => setResendTimer((v) => v - 1), 1000);
     return () => clearTimeout(t);
   }, [resendTimer]);
+
+  useEffect(() => {
+    if (!requestId || !isIndianNumber || sendState !== "sent") return;
+    const timer = window.setTimeout(async () => {
+      const { data } = await supabase.functions.invoke("send-otp", {
+        body: { phone, action: "status", request_id: requestId },
+      });
+      if (data?.delivery_status === "failed") {
+        setDeliveryNote("WhatsApp could not deliver this code. Please tap Resend OTP after the timer ends.");
+      } else if (data?.delivery_status === "delivered" || data?.delivery_status === "read") {
+        setDeliveryNote("The code was delivered on WhatsApp.");
+      } else {
+        setDeliveryNote("The provider accepted the request, but delivery is still pending. You can resend after the timer ends.");
+      }
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [requestId, isIndianNumber, phone, sendState]);
 
   /** Turn a raw server/provider error into something an elderly user can act on. */
   const friendlyError = (raw?: string | null): string => {
@@ -64,6 +83,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
   const sendOtp = async (action: "send" | "resend" = "send") => {
     setSendState("sending");
     setLastError(null);
+    setDeliveryNote(null);
 
     if (isIndianNumber) {
       // ── MSG91 WHATSAPP ROUTE (INDIA) ──
@@ -99,7 +119,8 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
 
         setHasSent(true);
         setSendState("sent");
-        toast.success(`OTP sent on WhatsApp to ${phone}`);
+        setRequestId(typeof payload.request_id === "string" ? payload.request_id : null);
+        toast.success(`OTP request accepted for ${phone}`);
         setResendTimer(30);
       } catch (err: any) {
         const msg = friendlyError(err?.message);
@@ -256,6 +277,12 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
           </InputOTPGroup>
         </InputOTP>
       </div>
+
+      {deliveryNote && (
+        <div className="rounded-xl bg-navy-mid border border-auth-border-hi px-3 py-3 mb-4 text-[13px] text-auth-text-2 leading-relaxed">
+          {deliveryNote}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-2 mb-6">
         <div className="text-[13px] text-auth-text-3">
