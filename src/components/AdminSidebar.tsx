@@ -1,4 +1,4 @@
-import { Ticket, Users, MessageSquare, Mail, LogOut } from "lucide-react";
+import { Ticket, Users, MessageSquare, Mail, MessageCircleCode, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ const items = [
   { title: "Waitlist", url: "/admin/waitlist", icon: Users },
   { title: "Contact Submissions", url: "/admin/contacts", icon: MessageSquare },
   { title: "Email Monitoring", url: "/admin/emails", icon: Mail },
+  { title: "OTP Delivery Log", url: "/admin/otp-log", icon: MessageCircleCode },
 ];
 
 export function AdminSidebar() {

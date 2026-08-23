@@ -46,6 +46,21 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     return () => clearTimeout(t);
   }, [resendTimer]);
 
+  /** Turn a raw server/provider error into something an elderly user can act on. */
+  const friendlyError = (raw?: string | null): string => {
+    const msg = (raw || "").toLowerCase();
+    if (!msg) return "We couldn't send the code just now. Please tap Resend OTP in a moment.";
+    if (msg.includes("invite was sent to")) return raw!; // already plain language + masked number
+    if (msg.includes("rate") || msg.includes("too many")) return "Too many code requests. Please wait 10 minutes and try again.";
+    if (msg.includes("invalid number") || msg.includes("not reachable") || msg.includes("invalid mobile"))
+      return "This number doesn't look reachable on WhatsApp or SMS. Please check the number and try again.";
+    if (msg.includes("not configured") || msg.includes("auth_key") || msg.includes("authkey"))
+      return "Our messaging service is temporarily unavailable. Please try again shortly.";
+    if (msg.includes("network") || msg.includes("failed to fetch"))
+      return "No internet connection. Please check your network and tap Resend OTP.";
+    return `We couldn't send the code: ${raw}`;
+  };
+
   const sendOtp = async (action: "send" | "resend" = "send") => {
     setSendState("sending");
     setLastError(null);
@@ -70,15 +85,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
 
         if (payload?.rate_limited) {
           setSendState("rate_limited");
-          setLastError(payload.error || "Too many OTP requests. Please wait 10 minutes.");
+          setLastError(friendlyError(payload.error || "too many requests"));
           return;
         }
 
         if (error || !payload?.success) {
-          const msg = payload?.error || (error as any)?.message || "Could not send WhatsApp OTP.";
+          const msg = friendlyError(payload?.error || (error as any)?.message);
           setSendState("failed");
           setLastError(msg);
-          toast.error("Failed to send OTP", { description: msg });
+          toast.error("Couldn't send the code", { description: msg });
           return;
         }
 
@@ -87,9 +102,10 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         toast.success(`OTP sent on WhatsApp to ${phone}`);
         setResendTimer(30);
       } catch (err: any) {
+        const msg = friendlyError(err?.message);
         setSendState("failed");
-        setLastError(err?.message || "Could not send WhatsApp OTP. Please try again.");
-        toast.error("Failed to send OTP", { description: err?.message || "Please try again." });
+        setLastError(msg);
+        toast.error("Couldn't send the code", { description: msg });
       }
     } else {
       // ── FIREBASE PHONE AUTH ROUTE (INTERNATIONAL) ──
@@ -215,9 +231,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
       </div>
 
       {(sendState === "failed" || sendState === "rate_limited") && lastError && (
-        <div className="flex items-center gap-2 rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 text-[13px] text-auth-red mb-5">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{lastError}</span>
+        <div className="rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 mb-5">
+          <div className="flex items-start gap-2 text-[13px] text-auth-red">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-[2px]" />
+            <span>{lastError}</span>
+          </div>
+          <div className="text-[12px] text-auth-text-3 mt-2 pl-6">
+            Still no code? {resendTimer > 0 ? `Try again in ${resendTimer}s, or write` : "Tap Resend OTP, or write"} to{" "}
+            <a href="mailto:support@futurewave.in" className="text-auth-green font-semibold">support@futurewave.in</a>.
+          </div>
         </div>
       )}
 

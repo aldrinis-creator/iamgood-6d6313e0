@@ -57,6 +57,7 @@ const AdminVerify = lazy(() => import("./pages/AdminVerify"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminVaultClaims = lazy(() => import("./pages/AdminVaultClaims"));
 const AdminEmails = lazy(() => import("./pages/AdminEmails"));
+const AdminOtpLog = lazy(() => import("./pages/AdminOtpLog"));
 const VaultClaim = lazy(() => import("./pages/VaultClaim"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
@@ -144,6 +145,7 @@ const App = () => (
                 <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
                 <Route path="/admin/vault-claims" element={<AdminRoute><AdminVaultClaims /></AdminRoute>} />
                 <Route path="/admin/emails" element={<AdminRoute><AdminEmails /></AdminRoute>} />
+                <Route path="/admin/otp-log" element={<AdminRoute><AdminOtpLog /></AdminRoute>} />
                 <Route path="/vault-claim/:token" element={<VaultClaim />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
