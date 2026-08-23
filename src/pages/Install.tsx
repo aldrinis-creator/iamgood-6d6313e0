@@ -60,40 +60,10 @@ const Install = () => {
           </h1>
           <p className="text-muted-foreground text-sm">
             {guardianToken
-              ? "You've been nominated as a Guardian on Check-iN. Accept your nomination first — this creates your Guardian account, not a regular user account."
+              ? "You've been nominated as a Guardian on Check-iN. Add the app to your home screen, then open it to register and connect with your ward."
               : "Add Check-iN to your home screen for instant access, offline support, and push notifications."}
           </p>
         </div>
-
-        {guardianToken && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="pt-6 space-y-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Step 1 — Accept your nomination</p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Tap below to accept and create your Guardian account. You'll start receiving your ward's check-in, medication and SOS alerts.
-              </p>
-              <Button asChild className="w-full h-12 text-base font-semibold">
-                <Link to={`/register?nomination=accept&token=${guardianToken}`}>
-                  Accept &amp; Create Guardian Account
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to={`/register?nomination=reject&token=${guardianToken}`}>Reject nomination</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {guardianToken && (
-          <p className="text-center text-sm font-semibold text-foreground">
-            Step 2 — Add the app to your home screen
-          </p>
-        )}
-
-
 
         {isInstalled && (
           <Card className="border-success/30 bg-success/5">
