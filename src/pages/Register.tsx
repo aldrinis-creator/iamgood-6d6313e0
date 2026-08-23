@@ -375,10 +375,23 @@ const Register = () => {
 
             <div>
               <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Your phone number *</label>
-              <div className="bg-navy-mid border border-auth-border-hi rounded-xl p-1">
-                <PhoneInput value={phone} onChange={setPhone} placeholder="xxxxx xxxxx" className="border-0 shadow-none bg-transparent h-12" />
-              </div>
-              {selectedRole === "guardian" && <div className="text-[11px] text-auth-text-2 mt-1.5">Must match the number the ward invited</div>}
+              {isInviteLink && phone ? (
+                <>
+                  <div className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] opacity-80">
+                    {phone}
+                  </div>
+                  <div className="text-[11px] text-auth-text-2 mt-1.5">
+                    This is the number your ward invited. If it is wrong, ask them to correct it and re-send the invite.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-navy-mid border border-auth-border-hi rounded-xl p-1">
+                    <PhoneInput value={phone} onChange={setPhone} placeholder="xxxxx xxxxx" className="border-0 shadow-none bg-transparent h-12" />
+                  </div>
+                  {selectedRole === "guardian" && <div className="text-[11px] text-auth-text-2 mt-1.5">Must match the number the ward invited</div>}
+                </>
+              )}
             </div>
 
             {selectedRole === "user" && (
