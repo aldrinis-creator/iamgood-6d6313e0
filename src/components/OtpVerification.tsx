@@ -85,15 +85,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
 
         if (payload?.rate_limited) {
           setSendState("rate_limited");
-          setLastError(payload.error || "Too many OTP requests. Please wait 10 minutes.");
+          setLastError(friendlyError(payload.error || "too many requests"));
           return;
         }
 
         if (error || !payload?.success) {
-          const msg = payload?.error || (error as any)?.message || "Could not send WhatsApp OTP.";
+          const msg = friendlyError(payload?.error || (error as any)?.message);
           setSendState("failed");
           setLastError(msg);
-          toast.error("Failed to send OTP", { description: msg });
+          toast.error("Couldn't send the code", { description: msg });
           return;
         }
 
@@ -102,9 +102,10 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         toast.success(`OTP sent on WhatsApp to ${phone}`);
         setResendTimer(30);
       } catch (err: any) {
+        const msg = friendlyError(err?.message);
         setSendState("failed");
-        setLastError(err?.message || "Could not send WhatsApp OTP. Please try again.");
-        toast.error("Failed to send OTP", { description: err?.message || "Please try again." });
+        setLastError(msg);
+        toast.error("Couldn't send the code", { description: msg });
       }
     } else {
       // ── FIREBASE PHONE AUTH ROUTE (INTERNATIONAL) ──
