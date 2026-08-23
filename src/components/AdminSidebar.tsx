@@ -19,6 +19,7 @@ const items = [
   { title: "Waitlist", url: "/admin/waitlist", icon: Users },
   { title: "Contact Submissions", url: "/admin/contacts", icon: MessageSquare },
   { title: "Email Monitoring", url: "/admin/emails", icon: Mail },
+  { title: "OTP Delivery Log", url: "/admin/otp-log", icon: MessageCircleCode },
 ];
 
 export function AdminSidebar() {
