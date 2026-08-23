@@ -9,7 +9,7 @@ import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 import { resendGuardianInvite } from "@/lib/guardianInvite";
-import { clearPendingNomination, stashNominationToken } from "@/lib/pendingNomination";
+import { clearPendingNomination, stashNominationToken, getPendingNominationToken } from "@/lib/pendingNomination";
 
 
 
