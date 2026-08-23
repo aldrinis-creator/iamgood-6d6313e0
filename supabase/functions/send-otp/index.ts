@@ -280,6 +280,25 @@ Deno.serve(async (req) => {
     }
 
     // ── SEND / RESEND ───────────────────────────────────────
+    // Guardian invite path: never dispatch to a number the ward did not invite.
+    const nominationToken = typeof body.nomination_token === "string" ? body.nomination_token : null;
+    if (nominationToken) {
+      const { data: nom } = await admin
+        .from("guardians")
+        .select("guardian_phone")
+        .eq("nomination_token", nominationToken)
+        .maybeSingle();
+      const invited = nom?.guardian_phone ? normalizePhone(nom.guardian_phone) : null;
+      if (invited && invited !== phone) {
+        const masked = `+${invited.slice(0, 4)}\u2026${invited.slice(-3)}`;
+        console.warn(`[send-otp] nomination phone mismatch: typed=${phone} invited=${invited}`);
+        return jsonResponse(
+          { error: `This invite was sent to ${masked}. Please use that number, or ask your ward to re-send the invite.` },
+          400,
+        );
+      }
+    }
+
     if (await isRateLimited(admin, phone)) {
       console.log(`[send-otp] Rate limited: ${phone}`);
       return jsonResponse({ error: "Too many OTP requests. Please wait 10 minutes before trying again.", rate_limited: true }, 429);
