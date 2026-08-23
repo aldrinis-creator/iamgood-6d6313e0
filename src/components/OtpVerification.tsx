@@ -54,7 +54,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
       // ── MSG91 WHATSAPP ROUTE (INDIA) ──
       try {
         const { data, error } = await supabase.functions.invoke("send-otp", {
-          body: { phone, action, purpose },
+          body: { phone, action, purpose, nomination_token: nominationToken || undefined },
         });
 
         let payload: any = data;
