@@ -57,6 +57,7 @@ const AdminVerify = lazy(() => import("./pages/AdminVerify"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminVaultClaims = lazy(() => import("./pages/AdminVaultClaims"));
 const AdminEmails = lazy(() => import("./pages/AdminEmails"));
+const AdminOtpLog = lazy(() => import("./pages/AdminOtpLog"));
 const VaultClaim = lazy(() => import("./pages/VaultClaim"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
