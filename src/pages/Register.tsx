@@ -452,7 +452,13 @@ const Register = () => {
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">Verify your<br/>phone</h1>
           <div className="text-[14px] text-auth-text-2 mb-5">We sent a 6-digit code to<br/><strong className="text-auth-text-1">{phone}</strong></div>
-          <OtpVerification phone={toE164(phone)} purpose="register" onVerified={handleOtpVerified} onCancel={handleOtpCancel} />
+          <OtpVerification
+            phone={toE164(phone)}
+            purpose="register"
+            nominationToken={searchParams.get("token") || getPendingNominationToken()}
+            onVerified={handleOtpVerified}
+            onCancel={handleOtpCancel}
+          />
         </div>
       </div>
     );
