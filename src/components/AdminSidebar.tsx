@@ -1,4 +1,4 @@
-import { Ticket, Users, MessageSquare, Mail, LogOut } from "lucide-react";
+import { Ticket, Users, MessageSquare, Mail, MessageCircleCode, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
