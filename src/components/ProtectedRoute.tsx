@@ -24,7 +24,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 export const UserRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, profile, loading } = useAuth();
 
-  if (loading) {
+  // Wait for BOTH session and profile — rendering user screens before the
+  // profile resolves lets guardian accounts briefly land on the user app
+  // (which creates check-ins and fires user alerts for them).
+  if (loading || (session && !profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -43,6 +46,7 @@ export const UserRoute = ({ children }: { children: React.ReactNode }) => {
 
   return <>{children}</>;
 };
+
 
 /** Only allows users with role='guardian'. Redirects users to /dashboard */
 export const GuardianRoute = ({ children }: { children: React.ReactNode }) => {
