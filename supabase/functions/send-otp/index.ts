@@ -390,7 +390,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, channels, error: flowErrorMsg || "OTP delivery failed" }, 400);
     }
 
-    return jsonResponse({ success: true, channels });
+    return jsonResponse({ success: true, channels, request_id: flowRequestId ?? null });
 
   } catch (err) {
     console.error("[send-otp] Unhandled error:", err);
