@@ -353,6 +353,7 @@ Deno.serve(async (req) => {
       console.log(`[send-otp] MSG91 flow response (${flowRes.status}):`, JSON.stringify(resBody).slice(0, 500));
 
       flowRequestId =
+        resBody?.data?.request_id ||
         resBody?.data?.[0]?.requestId ||
         resBody?.data?.requestId ||
         resBody?.request_id ||
