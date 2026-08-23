@@ -15,13 +15,15 @@ declare global {
 interface OtpVerificationProps {
   phone: string;
   purpose?: "login" | "register";
+  /** Guardian invite token — server rejects sends to a number the ward did not invite. */
+  nominationToken?: string | null;
   onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
   onCancel: () => void;
 }
 
 type SendState = "idle" | "sending" | "sent" | "failed" | "rate_limited";
 
-const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: OtpVerificationProps) => {
+const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified, onCancel }: OtpVerificationProps) => {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [sendState, setSendState] = useState<SendState>("idle");
@@ -52,7 +54,7 @@ const OtpVerification = ({ phone, purpose = "login", onVerified, onCancel }: Otp
       // ── MSG91 WHATSAPP ROUTE (INDIA) ──
       try {
         const { data, error } = await supabase.functions.invoke("send-otp", {
-          body: { phone, action, purpose },
+          body: { phone, action, purpose, nomination_token: nominationToken || undefined },
         });
 
         let payload: any = data;

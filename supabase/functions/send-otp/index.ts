@@ -280,6 +280,25 @@ Deno.serve(async (req) => {
     }
 
     // ── SEND / RESEND ───────────────────────────────────────
+    // Guardian invite path: never dispatch to a number the ward did not invite.
+    const nominationToken = typeof body.nomination_token === "string" ? body.nomination_token : null;
+    if (nominationToken) {
+      const { data: nom } = await admin
+        .from("guardians")
+        .select("guardian_phone")
+        .eq("nomination_token", nominationToken)
+        .maybeSingle();
+      const invited = nom?.guardian_phone ? normalizePhone(nom.guardian_phone) : null;
+      if (invited && invited !== phone) {
+        const masked = `+${invited.slice(0, 4)}\u2026${invited.slice(-3)}`;
+        console.warn(`[send-otp] nomination phone mismatch: typed=${phone} invited=${invited}`);
+        return jsonResponse(
+          { error: `This invite was sent to ${masked}. Please use that number, or ask your ward to re-send the invite.` },
+          400,
+        );
+      }
+    }
+
     if (await isRateLimited(admin, phone)) {
       console.log(`[send-otp] Rate limited: ${phone}`);
       return jsonResponse({ error: "Too many OTP requests. Please wait 10 minutes before trying again.", rate_limited: true }, 429);
@@ -318,6 +337,7 @@ Deno.serve(async (req) => {
 
     let flowSuccess = false;
     let flowErrorMsg: string | undefined;
+    let flowRequestId: string | undefined;
 
     try {
       const flowRes = await fetch("https://control.msg91.com/api/v5/oneapi/api/flow/otp-fallback/run", {
@@ -329,11 +349,24 @@ Deno.serve(async (req) => {
         body: JSON.stringify(flowPayload),
       });
 
-      const body = await flowRes.json().catch(() => ({}));
-      if (flowRes.ok && body.type !== "error") {
+      const resBody: any = await flowRes.json().catch(() => ({}));
+      console.log(`[send-otp] MSG91 flow response (${flowRes.status}):`, JSON.stringify(resBody).slice(0, 500));
+
+      flowRequestId =
+        resBody?.data?.request_id ||
+        resBody?.data?.[0]?.requestId ||
+        resBody?.data?.requestId ||
+        resBody?.request_id ||
+        (typeof resBody?.message === "string" ? resBody.message : undefined);
+
+      if (flowRes.ok && resBody?.type !== "error") {
         flowSuccess = true;
+        if (!flowRequestId) {
+          // Accepted but no tracking id returned — keep the send, but record it.
+          flowErrorMsg = `no request_id: ${JSON.stringify(resBody).slice(0, 200)}`;
+        }
       } else {
-        flowErrorMsg = JSON.stringify(body).slice(0, 300);
+        flowErrorMsg = JSON.stringify(resBody).slice(0, 300);
         console.error(`[send-otp] Flow failed: ${flowRes.status}`, flowErrorMsg);
       }
     } catch (e) {
@@ -345,7 +378,7 @@ Deno.serve(async (req) => {
       admin,
       phone,
       action,
-      undefined,
+      flowRequestId,
       flowSuccess ? "sent" : "failed",
       flowErrorMsg,
       flowSuccess ? otpCode : undefined,
@@ -358,7 +391,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, channels, error: flowErrorMsg || "OTP delivery failed" }, 400);
     }
 
-    return jsonResponse({ success: true, channels });
+    return jsonResponse({ success: true, channels, request_id: flowRequestId ?? null });
 
   } catch (err) {
     console.error("[send-otp] Unhandled error:", err);
