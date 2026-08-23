@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { isValidE164, toE164 } from "@/lib/countryCodes";
 
 export type InviteChannels = {
   email?: "sent" | "failed" | "skipped";
@@ -67,12 +68,17 @@ export async function addGuardianWithInvite(params: {
   isPrimary: boolean;
   userName: string;
 }): Promise<{ error: unknown | null }> {
+  const normalizedPhone = toE164(params.guardianPhone);
+  if (!isValidE164(normalizedPhone)) {
+    return { error: new Error("Enter a valid guardian phone number including the country code.") };
+  }
+
   const { data, error } = await supabase
     .from("guardians")
     .insert({
       user_id: params.userId,
       guardian_name: params.guardianName.trim(),
-      guardian_phone: params.guardianPhone.trim(),
+      guardian_phone: normalizedPhone,
       guardian_email: params.guardianEmail?.trim() || null,
       relation: params.relation?.trim() || null,
       is_primary: params.isPrimary,
@@ -86,7 +92,7 @@ export async function addGuardianWithInvite(params: {
 
   await sendGuardianInvite({
     guardian_name: params.guardianName.trim(),
-    guardian_phone: params.guardianPhone.trim(),
+    guardian_phone: normalizedPhone,
     guardian_email: params.guardianEmail?.trim() || null,
     relation: params.relation?.trim() || null,
     user_name: params.userName,

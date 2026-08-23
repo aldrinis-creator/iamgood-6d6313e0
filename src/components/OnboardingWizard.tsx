@@ -10,6 +10,7 @@ import { addGuardianWithInvite } from "@/lib/guardianInvite";
 import { useAuth } from "@/contexts/AuthContext";
 import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
+import { isValidE164 } from "@/lib/countryCodes";
 
 interface OnboardingWizardProps {
   open: boolean;
@@ -105,6 +106,10 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const saveGuardian = async () => {
     if (!session?.user?.id || !gName.trim() || !gPhone.trim()) {
       toast.error("Name and phone are required");
+      return;
+    }
+    if (!isValidE164(gPhone)) {
+      toast.error("Enter a valid phone number", { description: "Include the country code and full mobile number." });
       return;
     }
     const { error } = await addGuardianWithInvite({
@@ -256,7 +261,7 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
               <Input value={gRelation} onChange={(e) => setGRelation(e.target.value)} placeholder="e.g. Daughter" className="text-base" />
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={saveGuardian} disabled={!gName.trim() || !gPhone.trim()}>
+              <Button className="flex-1" onClick={saveGuardian} disabled={!gName.trim() || !isValidE164(gPhone)}>
                 <Check className="w-4 h-4 mr-1" /> Save Guardian
               </Button>
               <Button variant="ghost" className="flex-1" onClick={handleSkip}>Skip</Button>

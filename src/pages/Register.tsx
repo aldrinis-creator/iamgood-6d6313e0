@@ -51,11 +51,33 @@ const Register = () => {
   
   const [nominationBlocked, setNominationBlocked] = useState(false);
   const [isInviteLink, setIsInviteLink] = useState(false);
+  const [inviteLookupState, setInviteLookupState] = useState<"idle" | "loading" | "loaded" | "failed">("idle");
+  const [inviteLookupError, setInviteLookupError] = useState("");
   const [showEmailSection, setShowEmailSection] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_STEPS_USER;
   const progressPercent = (step / totalSteps) * 100;
+
+  const loadInvitation = async (token: string) => {
+    setInviteLookupState("loading");
+    setInviteLookupError("");
+    const { data, error } = await supabase.functions.invoke("guardian-nomination-response", {
+      body: { token, action: "lookup" },
+    });
+
+    const invitedPhone = typeof data?.guardian_phone === "string" ? toE164(data.guardian_phone) : "";
+    if (error || !data?.success || !isValidE164(invitedPhone)) {
+      setPhone("");
+      setInviteLookupState("failed");
+      setInviteLookupError(data?.error || "We could not load the phone number from this invitation.");
+      return;
+    }
+
+    setFullName(typeof data.guardian_name === "string" ? data.guardian_name : "");
+    setPhone(invitedPhone);
+    setInviteLookupState("loaded");
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -87,13 +109,7 @@ const Register = () => {
       setIsInviteLink(true);
       setSelectedRole("guardian");
       setStep(2);
-      supabase.from("guardians").select("guardian_name, guardian_phone").eq("nomination_token", token).maybeSingle()
-        .then(({ data }) => {
-          if (data) {
-            setFullName(data.guardian_name || "");
-            if (data.guardian_phone) setPhone(data.guardian_phone);
-          }
-        });
+      void loadInvitation(token);
     }
   }, [searchParams, session, authLoading, navigate]);
 
@@ -135,6 +151,7 @@ const Register = () => {
   const isPhoneValid = isValidE164(phone);
 
   const handleDetailsNext = () => {
+    if (isInviteLink && inviteLookupState !== "loaded") return toast.error("Please wait for the invitation to load");
     if (!fullName) return toast.error("Please enter your name");
     if (!isPhoneValid) return toast.error("Invalid phone number", { description: "Enter a valid number including the country code." });
     if (email && !password) return toast.error("Password is required when email is provided");
@@ -375,7 +392,11 @@ const Register = () => {
 
             <div>
               <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Your phone number *</label>
-              {isInviteLink && phone ? (
+              {isInviteLink && inviteLookupState === "loading" ? (
+                <div className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-2 text-[16px]">
+                  Loading invited number…
+                </div>
+              ) : isInviteLink && inviteLookupState === "loaded" && isPhoneValid ? (
                 <>
                   <div className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] opacity-80">
                     {phone}
@@ -384,6 +405,20 @@ const Register = () => {
                     This is the number your ward invited. If it is wrong, ask them to correct it and re-send the invite.
                   </div>
                 </>
+              ) : isInviteLink ? (
+                <div className="rounded-[10px] border border-auth-red/30 bg-auth-red/10 p-3">
+                  <div className="text-[13px] text-auth-red leading-relaxed">{inviteLookupError || "The invitation could not be loaded."}</div>
+                  <button
+                    type="button"
+                    className="mt-2 text-[13px] font-semibold text-auth-green"
+                    onClick={() => {
+                      const token = searchParams.get("token") || getPendingNominationToken();
+                      if (token) void loadInvitation(token);
+                    }}
+                  >
+                    Retry invitation
+                  </button>
+                </div>
               ) : (
                 <>
                   <div className="bg-navy-mid border border-auth-border-hi rounded-xl p-1">
@@ -435,7 +470,7 @@ const Register = () => {
                 </button>
               </>
             )}
-            <button onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl mt-0.5">
+            <button disabled={isInviteLink && inviteLookupState !== "loaded"} onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
               Next — Verify phone ›
             </button>
           </div>
