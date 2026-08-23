@@ -337,6 +337,7 @@ Deno.serve(async (req) => {
 
     let flowSuccess = false;
     let flowErrorMsg: string | undefined;
+    let flowRequestId: string | undefined;
 
     try {
       const flowRes = await fetch("https://control.msg91.com/api/v5/oneapi/api/flow/otp-fallback/run", {
@@ -348,11 +349,23 @@ Deno.serve(async (req) => {
         body: JSON.stringify(flowPayload),
       });
 
-      const body = await flowRes.json().catch(() => ({}));
-      if (flowRes.ok && body.type !== "error") {
+      const resBody: any = await flowRes.json().catch(() => ({}));
+      console.log(`[send-otp] MSG91 flow response (${flowRes.status}):`, JSON.stringify(resBody).slice(0, 500));
+
+      flowRequestId =
+        resBody?.data?.[0]?.requestId ||
+        resBody?.data?.requestId ||
+        resBody?.request_id ||
+        (typeof resBody?.message === "string" ? resBody.message : undefined);
+
+      if (flowRes.ok && resBody?.type !== "error") {
         flowSuccess = true;
+        if (!flowRequestId) {
+          // Accepted but no tracking id returned — keep the send, but record it.
+          flowErrorMsg = `no request_id: ${JSON.stringify(resBody).slice(0, 200)}`;
+        }
       } else {
-        flowErrorMsg = JSON.stringify(body).slice(0, 300);
+        flowErrorMsg = JSON.stringify(resBody).slice(0, 300);
         console.error(`[send-otp] Flow failed: ${flowRes.status}`, flowErrorMsg);
       }
     } catch (e) {
@@ -364,7 +377,7 @@ Deno.serve(async (req) => {
       admin,
       phone,
       action,
-      undefined,
+      flowRequestId,
       flowSuccess ? "sent" : "failed",
       flowErrorMsg,
       flowSuccess ? otpCode : undefined,
