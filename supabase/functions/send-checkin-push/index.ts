@@ -161,7 +161,28 @@ serve(async (req) => {
         continue;
       }
 
-      const userIds = [...new Set(checkIns.map((ci: any) => ci.user_id))];
+      const allUserIds = [...new Set(checkIns.map((ci: any) => ci.user_id))];
+
+      // Guardian-role accounts must never receive ward (user) check-in pushes
+      const { data: guardianRoleRows } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .in("user_id", allUserIds)
+        .eq("role", "guardian");
+      const { data: guardianProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .in("id", allUserIds)
+        .eq("role", "guardian");
+      const guardianIds = new Set([
+        ...(guardianRoleRows || []).map((r: any) => r.user_id),
+        ...(guardianProfiles || []).map((p: any) => p.id),
+      ]);
+      const userIds = allUserIds.filter((id) => !guardianIds.has(id));
+      if (userIds.length === 0) {
+        waveCounts[wave.key] = 0;
+        continue;
+      }
 
       // Honor pause / checked-out state
       const { data: settingsData } = await supabase
@@ -170,6 +191,7 @@ serve(async (req) => {
         .in("user_id", userIds);
 
       const activeUserIds = new Set(userIds);
+
       const nowMs = now.getTime();
       if (settingsData) {
         for (const row of settingsData) {
