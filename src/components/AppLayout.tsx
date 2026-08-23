@@ -52,10 +52,16 @@ const GuardianOnlyHooks = () => {
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
-  const { loginInProgress } = useAuth();
+  const { loginInProgress, session, profile } = useAuth();
+  // Role is only trustworthy once the profile has loaded; before that the
+  // default is "user", which would fire user alerts on guardian accounts.
+  const roleResolved = !session || !!profile;
+  const isUser = roleResolved && role === "user";
+  const isGuardian = roleResolved && role === "guardian";
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
   useAutoPauseModes();
+
 
   useEffect(() => {
     const onOnline = () => setOffline(false);
