@@ -12,3 +12,5 @@ type: feature
 - Tracking columns on `guardians`: `reminder_count`, `last_reminder_at`, `ward_notified_unaccepted`, `install_confirmed_at`.
 - Legacy MSG91 Flow SMS for invites is DISABLED (its approved template carries an outdated link). Re-enable only by setting `GUARDIAN_INVITE_SMS_ENABLED=true` after the Flow template is re-approved with an `install_link` variable.
 - `send-guardian-invite` accepts `force: true` to bypass the 1-hour re-send rate limit, logs the full MSG91 WhatsApp response, and records `email/sms/whatsapp` status plus the WhatsApp request_id in `notification_logs`.
+- Guardian OTP: on an invite link the phone field is read-only (prefilled from the nomination record) and `send-otp` rejects a send when a supplied `nomination_token` maps to a different phone — a mistyped number was silently swallowing OTPs.
+- `send-otp` stores the MSG91 `data.request_id` in `otp_events.request_id`; a 200 with no request_id is still sent but recorded in `failure_reason`.
