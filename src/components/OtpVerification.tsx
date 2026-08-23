@@ -231,9 +231,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
       </div>
 
       {(sendState === "failed" || sendState === "rate_limited") && lastError && (
-        <div className="flex items-center gap-2 rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 text-[13px] text-auth-red mb-5">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{lastError}</span>
+        <div className="rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 mb-5">
+          <div className="flex items-start gap-2 text-[13px] text-auth-red">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-[2px]" />
+            <span>{lastError}</span>
+          </div>
+          <div className="text-[12px] text-auth-text-3 mt-2 pl-6">
+            Still no code? {resendTimer > 0 ? `Try again in ${resendTimer}s, or write` : "Tap Resend OTP, or write"} to{" "}
+            <a href="mailto:support@futurewave.in" className="text-auth-green font-semibold">support@futurewave.in</a>.
+          </div>
         </div>
       )}
 
