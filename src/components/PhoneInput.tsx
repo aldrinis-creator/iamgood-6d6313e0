@@ -80,13 +80,44 @@ const PhoneInput = ({ value, onChange, placeholder = "xxxxx xxxxx", className }:
           </Command>
         </PopoverContent>
       </Popover>
-      <Input
-        value={number}
-        onChange={(e) => handleNumberChange(e.target.value)}
-        placeholder={placeholder}
-        className="flex-1 text-base"
-        inputMode="tel"
-      />
+      <div className="relative flex-1">
+        <Input
+          value={number}
+          onChange={(e) => handleNumberChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full text-base pr-10"
+          inputMode="tel"
+        />
+        {'contacts' in navigator && 'ContactsManager' in window && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-primary"
+            onClick={async () => {
+              try {
+                const props = ['tel'];
+                const opts = { multiple: false };
+                const contacts = await (navigator as any).contacts.select(props, opts);
+                if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+                  let selectedPhone = contacts[0].tel[0];
+                  // If it has a country code, re-parse the entire string
+                  if (selectedPhone.startsWith('+')) {
+                    onChange(selectedPhone);
+                  } else {
+                    handleNumberChange(selectedPhone);
+                  }
+                }
+              } catch (ex) {
+                console.error("Contact picker failed:", ex);
+              }
+            }}
+            title="Choose from Contacts"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

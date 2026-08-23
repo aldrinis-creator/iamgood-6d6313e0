@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Pill, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Pill, AlertTriangle, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatScheduleTime, getISTDateString } from "@/lib/istTime";
 import { WEEKDAYS, getISTWeekday, scheduleDaysLabel } from "@/lib/medSchedule";
@@ -61,11 +61,53 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
   const [endedMeds, setEndedMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [scanningPrescription, setScanningPrescription] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Medication | null>(null);
   const [continueTarget, setContinueTarget] = useState<Medication | null>(null);
   const [continueDate, setContinueDate] = useState<string>("");
+
+  const handleScanPrescription = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanningPrescription(true);
+    toast.info("Scanning prescription...");
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        
+        const { data, error } = await supabase.functions.invoke("extract-prescription", {
+          body: { imageBase64: base64String }
+        });
+
+        if (error || !data) throw error || new Error("Failed to process image");
+        
+        if (data.error) {
+          toast.error(data.error);
+          return;
+        }
+
+        if (data.drugName) {
+          setForm(f => ({ ...f, name: data.drugName }));
+          toast.success(`Found: ${data.drugName}`);
+        } else {
+          toast.error("Could not extract medication name. Please type it manually.");
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Error scanning prescription");
+    } finally {
+      // Small delay to prevent jitter
+      setTimeout(() => setScanningPrescription(false), 500);
+      e.target.value = ''; // Reset input
+    }
+  };
 
   const loadMeds = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -307,6 +349,26 @@ const MedicationList = ({ onChange }: MedicationListProps = {}) => {
             <DialogTitle>{editId ? "Edit Medication" : "Add Medication"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {!editId && (
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex flex-col items-center justify-center gap-2 mb-2">
+                <Label htmlFor="prescription-upload" className="cursor-pointer w-full">
+                  <div className="flex items-center justify-center gap-2 text-primary font-medium py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+                    {scanningPrescription ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                    {scanningPrescription ? "Extracting info..." : "Scan Prescription"}
+                  </div>
+                </Label>
+                <input
+                  id="prescription-upload"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleScanPrescription}
+                  disabled={scanningPrescription}
+                />
+                <p className="text-xs text-center text-muted-foreground">Automatically extracts the drug name from a photo.</p>
+              </div>
+            )}
             <div>
               <Label className="text-sm">Name *</Label>
               <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Metformin 500mg" />
