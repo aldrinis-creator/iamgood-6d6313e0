@@ -46,6 +46,21 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     return () => clearTimeout(t);
   }, [resendTimer]);
 
+  /** Turn a raw server/provider error into something an elderly user can act on. */
+  const friendlyError = (raw?: string | null): string => {
+    const msg = (raw || "").toLowerCase();
+    if (!msg) return "We couldn't send the code just now. Please tap Resend OTP in a moment.";
+    if (msg.includes("invite was sent to")) return raw!; // already plain language + masked number
+    if (msg.includes("rate") || msg.includes("too many")) return "Too many code requests. Please wait 10 minutes and try again.";
+    if (msg.includes("invalid number") || msg.includes("not reachable") || msg.includes("invalid mobile"))
+      return "This number doesn't look reachable on WhatsApp or SMS. Please check the number and try again.";
+    if (msg.includes("not configured") || msg.includes("auth_key") || msg.includes("authkey"))
+      return "Our messaging service is temporarily unavailable. Please try again shortly.";
+    if (msg.includes("network") || msg.includes("failed to fetch"))
+      return "No internet connection. Please check your network and tap Resend OTP.";
+    return `We couldn't send the code: ${raw}`;
+  };
+
   const sendOtp = async (action: "send" | "resend" = "send") => {
     setSendState("sending");
     setLastError(null);
