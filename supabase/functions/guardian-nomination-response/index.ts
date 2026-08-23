@@ -3,7 +3,9 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
 
 const RequestSchema = z.object({
-  token: z.string().uuid(),
+  // Existing nomination tokens are 32-character hex strings; allow UUIDs too
+  // for backwards-compatible rotation without accepting arbitrary input.
+  token: z.string().regex(/^(?:[a-f0-9]{32}|[a-f0-9-]{36})$/i),
   action: z.enum(["lookup", "accept", "reject"]),
 });
 
