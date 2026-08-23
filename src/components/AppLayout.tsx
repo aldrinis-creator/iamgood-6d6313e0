@@ -52,10 +52,16 @@ const GuardianOnlyHooks = () => {
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role } = useApp();
-  const { loginInProgress } = useAuth();
+  const { loginInProgress, session, profile } = useAuth();
+  // Role is only trustworthy once the profile has loaded; before that the
+  // default is "user", which would fire user alerts on guardian accounts.
+  const roleResolved = !session || !!profile;
+  const isUser = roleResolved && role === "user";
+  const isGuardian = roleResolved && role === "guardian";
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
   useAutoPauseModes();
+
 
   useEffect(() => {
     const onOnline = () => setOffline(false);
@@ -80,8 +86,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg relative">
-        {role === "user" && !loginInProgress && <UserOnlyHooks />}
-        {role === "guardian" && !loginInProgress && <GuardianOnlyHooks />}
+        {isUser && !loginInProgress && <UserOnlyHooks />}
+        {isGuardian && !loginInProgress && <GuardianOnlyHooks />}
         {offline && (
           <div className="bg-warning text-warning-foreground text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
             <WifiOff className="w-3.5 h-3.5" /> You're offline — SOS will queue and send when reconnected
@@ -133,17 +139,17 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </footer>
         </main>
         <NavTabs />
-        {role === "user" && <SOSButton />}
+        {isUser && <SOSButton />}
         {!loginInProgress && <EmergencyModeOverlay />}
-        {role === "user" && !loginInProgress && <FallDetectionOverlay />}
-        {role === "user" && !loginInProgress && <BatteryWarning />}
+        {isUser && !loginInProgress && <FallDetectionOverlay />}
+        {isUser && !loginInProgress && <BatteryWarning />}
         {!loginInProgress && <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />}
         {!loginInProgress && <ReminderOverlay />}
-        {role === "user" && !loginInProgress && <MorningBriefingOverlay />}
-        {role === "user" && !loginInProgress && <GuardianPingOverlay />}
-        {role === "guardian" && !loginInProgress && <UserPingOverlay />}
-        {role === "guardian" && !loginInProgress && <GuardianMissedAlarmOverlay />}
-        {role === "guardian" && !loginInProgress && <GuardianSafeZoneOverlay />}
+        {isUser && !loginInProgress && <MorningBriefingOverlay />}
+        {isUser && !loginInProgress && <GuardianPingOverlay />}
+        {isGuardian && !loginInProgress && <UserPingOverlay />}
+        {isGuardian && !loginInProgress && <GuardianMissedAlarmOverlay />}
+        {isGuardian && !loginInProgress && <GuardianSafeZoneOverlay />}
       </div>
     </div>
   );
