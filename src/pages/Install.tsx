@@ -41,6 +41,24 @@ const Install = () => {
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
+  // WhatsApp / Instagram / Facebook webviews cannot install a PWA and often block
+  // the OTP autofill, so the guardian must be moved to Chrome or Safari first.
+  const ua = navigator.userAgent || "";
+  const isInAppBrowser = /\bFB[AV]V\b|FBAN|FB_IAB|Instagram|Line\/|WhatsApp|GSA\/|; wv\)/i.test(ua);
+  const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  const openInSystemBrowser = () => {
+    if (isIOS) {
+      // Safari handles this scheme; the user can also use the "Open in Safari" menu.
+      window.location.href = currentUrl.replace(/^https?:/, "x-safari-https:");
+      return;
+    }
+    const noScheme = currentUrl.replace(/^https?:\/\//, "");
+    window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.android.chrome;end`;
+  };
+
+
+
   return (
     <AppLayout>
       <SeoMeta
