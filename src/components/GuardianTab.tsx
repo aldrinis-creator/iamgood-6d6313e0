@@ -110,12 +110,27 @@ const GuardianTab = ({ userId }: GuardianTabProps) => {
     }
     // Check 3-ward limit by phone
     const cleanPhone = phone.trim().replace(/[\s\-\+]/g, "");
+    // Nobody can be their own guardian — that produces self-addressed alerts.
+    const { data: ownProfile } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", userId)
+      .maybeSingle();
+    const ownDigits = (ownProfile?.phone || "").replace(/\D/g, "").slice(-10);
+    const newDigits = cleanPhone.replace(/\D/g, "").slice(-10);
+    if (ownDigits && newDigits && ownDigits === newDigits) {
+      toast.error("You cannot add yourself as a guardian", {
+        description: "Enter the phone number of the person who will watch over you.",
+      });
+      return;
+    }
     const { data: phoneCount } = await supabase.rpc("guardian_ward_count_by_phone" as any, { _phone: cleanPhone });
     if (typeof phoneCount === "number" && phoneCount >= 3) {
       toast.error("Guardian limit reached", { description: `${name.trim()} already monitors 3 users (maximum).` });
       setAdding(false);
       return;
     }
+
     if (email.trim()) {
       const { data: emailCount } = await supabase.rpc("guardian_ward_count", { _guardian_email: email.trim() });
       if (typeof emailCount === "number" && emailCount >= 3) {

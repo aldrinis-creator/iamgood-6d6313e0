@@ -176,18 +176,46 @@ Deno.serve(async (req) => {
 
     // ── Server-side check-in pre-population ──
     // Get all users with 'user' role from both profiles and user_roles
-    const [profilesRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("id").eq("role", "user"),
+    const [profilesRes, rolesRes, guardianRoleRes, guardianProfileRes] = await Promise.all([
+      supabase.from("profiles").select("id, phone").eq("role", "user"),
       supabase.from("user_roles").select("user_id").eq("role", "user"),
+      supabase.from("user_roles").select("user_id").eq("role", "guardian"),
+      supabase.from("profiles").select("id").eq("role", "guardian"),
+    ]);
+
+    // Accounts that hold the guardian role (in either table) are never wards.
+    const guardianAccountIds = new Set<string>([
+      ...((guardianRoleRes.data || []) as any[]).map((r) => r.user_id),
+      ...((guardianProfileRes.data || []) as any[]).map((p) => p.id),
     ]);
 
     const userIdsSet = new Set<string>();
     if (profilesRes.data) {
-      profilesRes.data.forEach((p: any) => userIdsSet.add(p.id));
+      (profilesRes.data as any[]).forEach((p) => userIdsSet.add(p.id));
     }
     if (rolesRes.data) {
-      rolesRes.data.forEach((r: any) => userIdsSet.add(r.user_id));
+      (rolesRes.data as any[]).forEach((r) => userIdsSet.add(r.user_id));
     }
+
+    // A ward with no phone on its profile can never be alerted about — and is
+    // almost always a stray/duplicate sign-up. Skip those, and any guardian.
+    const phoneById = new Map<string, string | null>();
+    ((profilesRes.data || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
+    const missingPhoneIds = [...userIdsSet].filter((id) => !phoneById.has(id));
+    if (missingPhoneIds.length > 0) {
+      const { data: extraProfiles } = await supabase
+        .from("profiles")
+        .select("id, phone")
+        .in("id", missingPhoneIds);
+      ((extraProfiles || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
+    }
+    for (const id of [...userIdsSet]) {
+      const phone = phoneById.get(id);
+      if (guardianAccountIds.has(id) || !phone || String(phone).trim() === "") {
+        userIdsSet.delete(id);
+      }
+    }
+
 
     if (profilesRes.error) {
       console.error("Error fetching profiles for pre-population:", profilesRes.error);
@@ -195,6 +223,7 @@ Deno.serve(async (req) => {
     if (rolesRes.error) {
       console.error("Error fetching user roles for pre-population:", rolesRes.error);
     }
+
 
     if (userIdsSet.size > 0) {
       // Find which slots today have passed the grace period
@@ -256,15 +285,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Filter out guardian-role users — they should not have check-ins tracked ──
+    // ── Filter out guardian accounts and phone-less accounts — they are not wards ──
     const userIds = [...new Set(pendingCheckIns.map((ci) => ci.user_id))];
-    const { data: guardianRoles } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .in("user_id", userIds)
-      .eq("role", "guardian");
+    const [guardianRolesRes, wardProfilesRes] = await Promise.all([
+      supabase.from("user_roles").select("user_id").in("user_id", userIds).eq("role", "guardian"),
+      supabase.from("profiles").select("id, phone, role").in("id", userIds),
+    ]);
 
-    const guardianUserIds = new Set((guardianRoles || []).map((r) => r.user_id));
+    const guardianUserIds = new Set((guardianRolesRes.data || []).map((r: any) => r.user_id));
+    const profileById = new Map<string, any>();
+    ((wardProfilesRes.data || []) as any[]).forEach((p) => profileById.set(p.id, p));
+    for (const id of userIds) {
+      const p = profileById.get(id);
+      if (!p || p.role === "guardian" || !p.phone || String(p.phone).trim() === "") {
+        guardianUserIds.add(id);
+      }
+    }
+
 
     // Silently mark guardian check-ins as missed (no alerts)
     const guardianCheckInIds = pendingCheckIns

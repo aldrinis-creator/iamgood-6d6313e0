@@ -153,14 +153,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Filter out guardian-role users + paused users (same rules as check-ins).
+    // Filter out guardian accounts, phone-less accounts + paused users (same rules as check-ins).
     const userIds = [...new Set(logs.map((l) => l.user_id))];
-    const { data: roleRows } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .in("user_id", userIds)
-      .eq("role", "guardian");
-    const guardianUserIds = new Set((roleRows || []).map((r) => r.user_id));
+    const [roleRowsRes, wardProfilesRes] = await Promise.all([
+      supabase.from("user_roles").select("user_id").in("user_id", userIds).eq("role", "guardian"),
+      supabase.from("profiles").select("id, phone, role").in("id", userIds),
+    ]);
+    const guardianUserIds = new Set((roleRowsRes.data || []).map((r: any) => r.user_id));
+    const wardProfileById = new Map<string, any>();
+    ((wardProfilesRes.data || []) as any[]).forEach((p) => wardProfileById.set(p.id, p));
+    for (const id of userIds) {
+      const p = wardProfileById.get(id);
+      if (!p || p.role === "guardian" || !p.phone || String(p.phone).trim() === "") {
+        guardianUserIds.add(id);
+      }
+    }
+
 
     const { data: settingsData } = await supabase
       .from("user_settings")
