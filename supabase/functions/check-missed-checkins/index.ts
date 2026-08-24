@@ -189,11 +189,6 @@ Deno.serve(async (req) => {
       ...((guardianProfileRes.data || []) as any[]).map((p) => p.id),
     ]);
 
-    // A ward with no phone on its profile can never be alerted about — and is
-    // almost always a stray/duplicate sign-up. Skip those too.
-    const phoneById = new Map<string, string | null>();
-    ((profilesRes.data || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
-
     const userIdsSet = new Set<string>();
     if (profilesRes.data) {
       (profilesRes.data as any[]).forEach((p) => userIdsSet.add(p.id));
@@ -201,12 +196,26 @@ Deno.serve(async (req) => {
     if (rolesRes.data) {
       (rolesRes.data as any[]).forEach((r) => userIdsSet.add(r.user_id));
     }
+
+    // A ward with no phone on its profile can never be alerted about — and is
+    // almost always a stray/duplicate sign-up. Skip those, and any guardian.
+    const phoneById = new Map<string, string | null>();
+    ((profilesRes.data || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
+    const missingPhoneIds = [...userIdsSet].filter((id) => !phoneById.has(id));
+    if (missingPhoneIds.length > 0) {
+      const { data: extraProfiles } = await supabase
+        .from("profiles")
+        .select("id, phone")
+        .in("id", missingPhoneIds);
+      ((extraProfiles || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
+    }
     for (const id of [...userIdsSet]) {
       const phone = phoneById.get(id);
       if (guardianAccountIds.has(id) || !phone || String(phone).trim() === "") {
         userIdsSet.delete(id);
       }
     }
+
 
     if (profilesRes.error) {
       console.error("Error fetching profiles for pre-population:", profilesRes.error);
