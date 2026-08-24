@@ -83,6 +83,29 @@ const Install = () => {
           </p>
         </div>
 
+        {isInAppBrowser && !isInstalled && (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="pt-6 space-y-3">
+              <p className="text-sm font-semibold text-foreground">
+                Open this page in {isIOS ? "Safari" : "Chrome"} to continue
+              </p>
+              <p className="text-xs text-muted-foreground">
+                You opened the link inside WhatsApp. Installing the app and receiving the verification code
+                only work in your phone's main browser.
+              </p>
+              <Button onClick={openInSystemBrowser} className="w-full h-12 text-base font-semibold">
+                Open in {isIOS ? "Safari" : "Chrome"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {guardianToken && !isInAppBrowser && (
+          <Button asChild variant="outline" className="w-full h-12 text-base font-semibold">
+            <Link to={`/register?nomination=accept&token=${guardianToken}`}>Continue to verification</Link>
+          </Button>
+        )}
+
         {isInstalled && (
           <Card className="border-success/30 bg-success/5">
             <CardContent className="pt-6 text-center">
