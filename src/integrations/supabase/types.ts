@@ -2798,6 +2798,7 @@ export type Database = {
       expire_stale_nominations: { Args: never; Returns: number }
       expire_stale_subscriptions: { Args: never; Returns: number }
       get_email_by_phone: { Args: { _phone: string }; Returns: string }
+      get_emergency_profile: { Args: { _token: string }; Returns: Json }
       get_public_journey: {
         Args: { _token: string }
         Returns: {
