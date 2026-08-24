@@ -43,27 +43,16 @@ const EmergencyProfile = () => {
     const fetchProfile = async () => {
       if (!token) { setNotFound(true); setLoading(false); return; }
 
-      // Look up token via secure RPC (prevents token enumeration)
-      const { data: tokenResult, error: tokenErr } = await supabase
-        .rpc("lookup_emergency_token" as any, { _token: token })
-        .maybeSingle();
+      // Single token-gated RPC: the server validates the share token and returns
+      // only the safe emergency fields. No anon table reads.
+      const { data: res, error } = await supabase.rpc("get_emergency_profile" as any, { _token: token });
 
-      if (tokenErr || !tokenResult) { setNotFound(true); setLoading(false); return; }
-      const userId = (tokenResult as any).user_id as string;
+      if (error || !res) { setNotFound(true); setLoading(false); return; }
 
-      // Fetch all data in parallel (anon RLS allows it for active tokens)
-      const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const [profileRes, healthRes, medsRes, guardiansRes, historyRes, logsRes] = await Promise.all([
-        supabase.from("profiles").select("full_name, date_of_birth, gender, phone").eq("id", userId).maybeSingle(),
-        supabase.from("health_profile").select("blood_group, allergies, chronic_conditions, emergency_notes, family_doctor_name, family_doctor_phone").eq("user_id", userId).maybeSingle(),
-        supabase.from("medications").select("name, dosage").eq("user_id", userId),
-        supabase.from("guardians_emergency_safe" as any).select("guardian_name, guardian_phone, relation, is_primary").eq("user_id", userId).order("is_primary", { ascending: false }),
-        supabase.from("medical_history").select("type, reason, hospital_name, doctor_name, start_date, end_date, treatment").eq("user_id", userId).order("start_date", { ascending: false }),
-        supabase.from("medication_logs").select("taken_at, medications(name, dosage)").eq("user_id", userId).gte("scheduled_at", last24h).in("status", ["taken", "taken_late"]).order("taken_at", { ascending: false }),
-      ]);
-
-      const p = profileRes.data;
-      const h = healthRes.data;
+      const payload = res as any;
+      const p = payload.profile || null;
+      const h = payload.health || null;
+      const history: any[] = payload.medical_history || [];
 
       setData({
         name: p?.full_name || "Unknown",
@@ -76,17 +65,18 @@ const EmergencyProfile = () => {
         emergency_notes: h?.emergency_notes || null,
         family_doctor_name: h?.family_doctor_name || null,
         family_doctor_phone: h?.family_doctor_phone || null,
-        medications: (medsRes.data || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
-        recently_taken_meds: (logsRes.data || []).map((l: any) => ({ name: l.medications?.name || "Unknown", dosage: l.medications?.dosage || "", taken_at: l.taken_at })),
-        guardians: (guardiansRes.data || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation, is_primary: !!g.is_primary })),
-        hospitalizations: (historyRes.data || []).filter((h: any) => h.type === "hospitalization").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, start_date: h.start_date, end_date: h.end_date, treatment: h.treatment })),
-        surgeries: (historyRes.data || []).filter((h: any) => h.type === "surgery").map((h: any) => ({ reason: h.reason, hospital_name: h.hospital_name, doctor_name: h.doctor_name, start_date: h.start_date })),
+        medications: (payload.medications || []).map((m: any) => ({ name: m.name, dosage: m.dosage })),
+        recently_taken_meds: (payload.recent_meds || []).map((l: any) => ({ name: l.name || "Unknown", dosage: l.dosage || "", taken_at: l.taken_at })),
+        guardians: (payload.guardians || []).map((g: any) => ({ name: g.guardian_name, phone: g.guardian_phone, relation: g.relation, is_primary: !!g.is_primary })),
+        hospitalizations: history.filter((x) => x.type === "hospitalization").map((x) => ({ reason: x.reason, hospital_name: x.hospital_name, start_date: x.start_date, end_date: x.end_date, treatment: x.treatment })),
+        surgeries: history.filter((x) => x.type === "surgery").map((x) => ({ reason: x.reason, hospital_name: x.hospital_name, doctor_name: x.doctor_name, start_date: x.start_date })),
       });
       setLoading(false);
     };
 
     fetchProfile();
   }, [token]);
+
 
   if (loading) {
     return (
