@@ -176,17 +176,36 @@ Deno.serve(async (req) => {
 
     // ── Server-side check-in pre-population ──
     // Get all users with 'user' role from both profiles and user_roles
-    const [profilesRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("id").eq("role", "user"),
+    const [profilesRes, rolesRes, guardianRoleRes, guardianProfileRes] = await Promise.all([
+      supabase.from("profiles").select("id, phone").eq("role", "user"),
       supabase.from("user_roles").select("user_id").eq("role", "user"),
+      supabase.from("user_roles").select("user_id").eq("role", "guardian"),
+      supabase.from("profiles").select("id").eq("role", "guardian"),
     ]);
+
+    // Accounts that hold the guardian role (in either table) are never wards.
+    const guardianAccountIds = new Set<string>([
+      ...((guardianRoleRes.data || []) as any[]).map((r) => r.user_id),
+      ...((guardianProfileRes.data || []) as any[]).map((p) => p.id),
+    ]);
+
+    // A ward with no phone on its profile can never be alerted about — and is
+    // almost always a stray/duplicate sign-up. Skip those too.
+    const phoneById = new Map<string, string | null>();
+    ((profilesRes.data || []) as any[]).forEach((p) => phoneById.set(p.id, p.phone));
 
     const userIdsSet = new Set<string>();
     if (profilesRes.data) {
-      profilesRes.data.forEach((p: any) => userIdsSet.add(p.id));
+      (profilesRes.data as any[]).forEach((p) => userIdsSet.add(p.id));
     }
     if (rolesRes.data) {
-      rolesRes.data.forEach((r: any) => userIdsSet.add(r.user_id));
+      (rolesRes.data as any[]).forEach((r) => userIdsSet.add(r.user_id));
+    }
+    for (const id of [...userIdsSet]) {
+      const phone = phoneById.get(id);
+      if (guardianAccountIds.has(id) || !phone || String(phone).trim() === "") {
+        userIdsSet.delete(id);
+      }
     }
 
     if (profilesRes.error) {
@@ -195,6 +214,7 @@ Deno.serve(async (req) => {
     if (rolesRes.error) {
       console.error("Error fetching user roles for pre-population:", rolesRes.error);
     }
+
 
     if (userIdsSet.size > 0) {
       // Find which slots today have passed the grace period
