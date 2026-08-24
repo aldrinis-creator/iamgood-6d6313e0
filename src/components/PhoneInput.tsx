@@ -5,6 +5,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { COUNTRIES, DEFAULT_DIAL, findCountryByPhone, type Country } from "@/lib/countryCodes";
+import { Capacitor } from '@capacitor/core';
+import { Contacts } from '@capacitor-community/contacts';
 
 interface PhoneInputProps {
   value: string;
@@ -88,7 +90,7 @@ const PhoneInput = ({ value, onChange, placeholder = "xxxxx xxxxx", className }:
           className="w-full text-base pr-10"
           inputMode="tel"
         />
-        {'contacts' in navigator && 'ContactsManager' in window && (
+        {(Capacitor.isNativePlatform() || ('contacts' in navigator && 'ContactsManager' in window)) && (
           <Button
             type="button"
             variant="ghost"
@@ -96,11 +98,30 @@ const PhoneInput = ({ value, onChange, placeholder = "xxxxx xxxxx", className }:
             className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-primary"
             onClick={async () => {
               try {
-                const props = ['tel'];
-                const opts = { multiple: false };
-                const contacts = await (navigator as any).contacts.select(props, opts);
-                if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
-                  let selectedPhone = contacts[0].tel[0];
+                let selectedPhone: string | undefined;
+
+                if (Capacitor.isNativePlatform()) {
+                  // Native Capacitor Contacts Plugin
+                  const permission = await Contacts.requestPermissions();
+                  if (permission.contacts !== 'granted') {
+                    console.warn('Contacts permission denied');
+                    return;
+                  }
+                  const result = await Contacts.pickContact({ projection: { name: false, phones: true } });
+                  if (result.contact?.phones && result.contact.phones.length > 0) {
+                    selectedPhone = result.contact.phones[0].number;
+                  }
+                } else {
+                  // Web Fallback
+                  const props = ['tel'];
+                  const opts = { multiple: false };
+                  const contacts = await (navigator as any).contacts.select(props, opts);
+                  if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+                    selectedPhone = contacts[0].tel[0];
+                  }
+                }
+
+                if (selectedPhone) {
                   // If it has a country code, re-parse the entire string
                   if (selectedPhone.startsWith('+')) {
                     onChange(selectedPhone);
