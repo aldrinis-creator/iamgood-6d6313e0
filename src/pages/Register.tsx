@@ -128,11 +128,14 @@ const Register = () => {
     if (step === 2) {
       navigate(-1);
     } else if (step === 3) {
-      setStep(2);
+      // On the invite path step 2 auto-advances, so going back there would loop.
+      if (isInviteLink) navigate(-1);
+      else setStep(2);
     } else if (step === 4) {
       setStep(3);
     }
   };
+
 
   const addGuardian = () => {
     if (guardians.length < 5) {
@@ -149,6 +152,16 @@ const Register = () => {
   };
 
   const isPhoneValid = isValidE164(phone);
+
+  // Invite path: the name and number come from the ward's nomination, so skip
+  // straight to phone verification instead of asking the guardian to re-type them.
+  useEffect(() => {
+    if (isInviteLink && inviteLookupState === "loaded" && step === 2 && fullName && isPhoneValid) {
+      setStep(3);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInviteLink, inviteLookupState, step, fullName, isPhoneValid]);
+
 
   const handleDetailsNext = () => {
     if (isInviteLink && inviteLookupState !== "loaded") return toast.error("Please wait for the invitation to load");

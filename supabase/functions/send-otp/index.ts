@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { sendWhatsAppTemplate } from "../_shared/msg91Whatsapp.ts";
+import { sendWhatsAppTemplate, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +7,16 @@ const corsHeaders = {
 };
 
 const RATE_LIMIT_WINDOW_MIN = 10;
-const RATE_LIMIT_MAX = 3;
-const OTP_EXPIRY_MIN = 5;
+const RATE_LIMIT_MAX = 4;
+/** Codes stay valid for 10 minutes — WhatsApp/SMS fallback can be slow. */
+const OTP_EXPIRY_MIN = 10;
+/** Wrong-code tries allowed against a single code before it is burned. */
+const MAX_VERIFY_ATTEMPTS = 5;
+/** WhatsApp OTP template (MSG91). */
+const WA_OTP_TEMPLATE = "verification_otp";
+/** MSG91 SMS Flow template for OTP delivery. */
+const SMS_OTP_TEMPLATE_ID = "69ce5c76e1a28470900ffe46";
+
 
 function normalizePhone(raw: string): string {
   const cleaned = raw.replace(/[\s\-()]/g, "");
@@ -105,7 +113,8 @@ async function logOtpEvent(
   status = "sent",
   failureReason?: string,
   otpCode?: string,
-  expiresAt?: string
+  expiresAt?: string,
+  channel?: string,
 ) {
   // Store only a SHA-256 hash of the OTP — never the plaintext code.
   const hashed = otpCode ? await sha256Hex(otpCode) : null;
@@ -117,9 +126,11 @@ async function logOtpEvent(
     failure_reason: failureReason || null,
     otp_hash: hashed,
     expires_at: expiresAt || null,
+    channel: channel || null,
   });
   if (error) console.error("[send-otp] Failed to log event:", error.message);
 }
+
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -239,33 +250,63 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Valid 6-digit OTP is required" }, 400);
       }
 
-      // Look up the latest unexpired OTP for this phone
-      const { data: otpRow, error: lookupErr } = await admin
+      // Accept ANY unexpired, unused code for this phone — a resend must not
+      // invalidate the code already sitting in the guardian's WhatsApp/SMS.
+      const { data: liveRows, error: lookupErr } = await admin
         .from("otp_events")
-        .select("id, otp_hash, expires_at")
+        .select("id, otp_hash, expires_at, attempts")
         .eq("phone", phone)
         .in("action", ["send", "resend"])
         .eq("status", "sent")
         .not("otp_hash", "is", null)
         .gte("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
 
       if (lookupErr) {
         console.error("[send-otp] OTP lookup error:", lookupErr.message);
         return jsonResponse({ success: false, error: "Verification failed" }, 500);
       }
 
-      const submittedHash = await sha256Hex(otp);
-      if (!otpRow || otpRow.otp_hash !== submittedHash) {
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Invalid or expired OTP");
-        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
+      const rows = liveRows ?? [];
+      if (rows.length === 0) {
+        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "No live OTP");
+        return jsonResponse(
+          { success: false, code: "expired", error: "This code has expired. Please request a new one." },
+          400,
+        );
       }
 
-      // Mark as verified and nullify the OTP hash
-      await admin.from("otp_events").update({ verified: true, status: "verified", otp_hash: null }).eq("id", otpRow.id);
+      const usable = rows.filter((r) => (r.attempts ?? 0) < MAX_VERIFY_ATTEMPTS);
+      if (usable.length === 0) {
+        return jsonResponse(
+          { success: false, code: "too_many_attempts", error: "Too many incorrect attempts. Please request a new code." },
+          400,
+        );
+      }
+
+      const submittedHash = await sha256Hex(otp);
+      const otpRow = usable.find((r) => r.otp_hash === submittedHash);
+
+      if (!otpRow) {
+        // Burn one attempt on every live code so brute force is bounded.
+        for (const r of usable) {
+          await admin.from("otp_events").update({ attempts: (r.attempts ?? 0) + 1 }).eq("id", r.id);
+        }
+        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Wrong code");
+        return jsonResponse(
+          { success: false, code: "wrong_code", error: "That code is not correct. Please re-check the latest message." },
+          400,
+        );
+      }
+
+      // Mark as verified and nullify every live hash for this phone.
+      await admin
+        .from("otp_events")
+        .update({ verified: true, status: "verified", otp_hash: null })
+        .in("id", rows.map((r) => r.id));
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
+
 
       // Registration: just confirm
       if (purpose === "register") {
@@ -322,6 +363,38 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Channel choice: the guardian/user picks WhatsApp or SMS on the screen.
+    const channel: "sms" | "whatsapp" = body.channel === "sms" ? "sms" : "whatsapp";
+
+    // Reuse a live code on a plain "send" (screen re-entry / auto-request) so we
+    // never invalidate a code that is already on its way to the phone.
+    if (action === "send") {
+      const { data: live } = await admin
+        .from("otp_events")
+        .select("id, request_id, expires_at, channel")
+        .eq("phone", phone)
+        .in("action", ["send", "resend"])
+        .eq("status", "sent")
+        .not("otp_hash", "is", null)
+        .gte("expires_at", new Date().toISOString())
+        .eq("channel", channel)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (live) {
+        const secondsLeft = Math.max(0, Math.floor((new Date(live.expires_at).getTime() - Date.now()) / 1000));
+        console.log(`[send-otp] reusing live code for ${phone} (${secondsLeft}s left)`);
+        return jsonResponse({
+          success: true,
+          reused: true,
+          channel,
+          channels: { [channel]: "reused" },
+          request_id: live.request_id ?? null,
+          expires_in: secondsLeft,
+        });
+      }
+    }
+
     if (await isRateLimited(admin, phone)) {
       console.log(`[send-otp] Rate limited: ${phone}`);
       return jsonResponse({ error: "Too many OTP requests. Please wait 10 minutes before trying again.", rate_limited: true }, 429);
@@ -331,94 +404,85 @@ Deno.serve(async (req) => {
     const otpCode = generateOtp();
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 
-    // MSG91 Flow Delivery (handles WhatsApp with SMS Fallback natively)
-    console.log(`[send-otp] Dispatching MSG91 otp-fallback Flow for phone=${phone}`);
+    let sendSuccess = false;
+    let sendErrorMsg: string | undefined;
+    let sendRequestId: string | undefined;
 
-    const flowPayload = {
-      data: {
-        sendTo: [
-          {
-            to: [
-              {
-                mobiles: phone,
-                variables: {
-                  body_1: { type: "text", value: otpCode },
-                  button_1: { type: "text", subtype: "url", value: otpCode },
-                  var1: { value: otpCode }
-                }
-              }
-            ],
-            variables: {
-              body_1: { type: "text", value: otpCode },
-              button_1: { type: "text", subtype: "url", value: otpCode },
-              var1: { value: otpCode }
-            }
-          }
-        ]
-      }
-    };
-
-    let flowSuccess = false;
-    let flowErrorMsg: string | undefined;
-    let flowRequestId: string | undefined;
-
-    try {
-      const flowRes = await fetch("https://control.msg91.com/api/v5/oneapi/api/flow/otp-fallback/run", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          authkey: authKey,
-        },
-        body: JSON.stringify(flowPayload),
-      });
-
-      const resBody: any = await flowRes.json().catch(() => ({}));
-      console.log(`[send-otp] MSG91 flow response (${flowRes.status}):`, JSON.stringify(resBody).slice(0, 500));
-
-      const responseData = typeof resBody?.data === "string"
-        ? (() => { try { return JSON.parse(resBody.data); } catch { return {}; } })()
-        : resBody?.data;
-      flowRequestId =
-        responseData?.request_id ||
-        responseData?.data?.request_id ||
-        responseData?.[0]?.requestId ||
-        responseData?.requestId ||
-        resBody?.request_id ||
-        (typeof resBody?.message === "string" ? resBody.message : undefined);
-
-      if (flowRes.ok && resBody?.type !== "error") {
-        flowSuccess = true;
-        if (!flowRequestId) {
-          // Accepted but no tracking id returned — keep the send, but record it.
-          flowErrorMsg = `no request_id: ${JSON.stringify(resBody).slice(0, 200)}`;
+    if (channel === "sms") {
+      // ── MSG91 SMS FLOW ───────────────────────────────────
+      console.log(`[send-otp] Dispatching MSG91 SMS flow for phone=${phone}`);
+      try {
+        const smsRes = await fetch("https://control.msg91.com/api/v5/flow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", authkey: authKey },
+          body: JSON.stringify({
+            template_id: SMS_OTP_TEMPLATE_ID,
+            short_url: "0",
+            recipients: [{ mobiles: phone, otp: otpCode, var1: otpCode, OTP: otpCode }],
+          }),
+        });
+        const resBody: any = await smsRes.json().catch(() => ({}));
+        console.log(`[send-otp] MSG91 SMS response (${smsRes.status}):`, JSON.stringify(resBody).slice(0, 400));
+        sendRequestId = resBody?.request_id || (typeof resBody?.message === "string" ? resBody.message : undefined);
+        if (smsRes.ok && resBody?.type !== "error") {
+          sendSuccess = true;
+        } else {
+          sendErrorMsg = JSON.stringify(resBody).slice(0, 300);
         }
-      } else {
-        flowErrorMsg = JSON.stringify(resBody).slice(0, 300);
-        console.error(`[send-otp] Flow failed: ${flowRes.status}`, flowErrorMsg);
+      } catch (e) {
+        sendErrorMsg = String(e);
+        console.error("[send-otp] SMS flow error:", e);
       }
-    } catch (e) {
-      flowErrorMsg = String(e);
-      console.error(`[send-otp] Flow error:`, e);
+    } else {
+      // ── MSG91 WHATSAPP TEMPLATE ──────────────────────────
+      console.log(`[send-otp] Dispatching MSG91 WhatsApp template ${WA_OTP_TEMPLATE} for phone=${phone}`);
+      try {
+        const wa = await sendWhatsAppTemplate({
+          templateName: WA_OTP_TEMPLATE,
+          languageCode: "en",
+          namespace: WA_NAMESPACE_V2,
+          recipients: [{ to: [phone], components: { body_1: otpCode, button_1_url: otpCode } }],
+        });
+        const waBody: any = wa.body;
+        sendRequestId =
+          waBody?.data?.request_id ||
+          waBody?.request_id ||
+          (typeof waBody?.message === "string" ? waBody.message : undefined);
+        sendSuccess = wa.ok;
+        if (!wa.ok) sendErrorMsg = JSON.stringify(waBody).slice(0, 300);
+        console.log(`[send-otp] WhatsApp OTP response (${wa.status}):`, JSON.stringify(waBody).slice(0, 400));
+      } catch (e) {
+        sendErrorMsg = String(e);
+        console.error("[send-otp] WhatsApp OTP error:", e);
+      }
     }
 
     await logOtpEvent(
       admin,
       phone,
       action,
-      flowRequestId,
-      flowSuccess ? "sent" : "failed",
-      flowErrorMsg,
-      flowSuccess ? otpCode : undefined,
-      flowSuccess ? expiresAt : undefined,
+      sendRequestId,
+      sendSuccess ? "sent" : "failed",
+      sendErrorMsg,
+      sendSuccess ? otpCode : undefined,
+      sendSuccess ? expiresAt : undefined,
+      channel,
     );
 
-    const channels = { flow: flowSuccess ? "sent" : "failed" };
+    const channels = { [channel]: sendSuccess ? "sent" : "failed" };
 
-    if (!flowSuccess) {
-      return jsonResponse({ success: false, channels, error: flowErrorMsg || "OTP delivery failed" }, 400);
+    if (!sendSuccess) {
+      return jsonResponse({ success: false, channel, channels, error: sendErrorMsg || "OTP delivery failed" }, 400);
     }
 
-    return jsonResponse({ success: true, channels, request_id: flowRequestId ?? null });
+    return jsonResponse({
+      success: true,
+      channel,
+      channels,
+      request_id: sendRequestId ?? null,
+      expires_in: OTP_EXPIRY_MIN * 60,
+    });
+
 
   } catch (err) {
     console.error("[send-otp] Unhandled error:", err);

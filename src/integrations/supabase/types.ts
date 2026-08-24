@@ -1811,6 +1811,8 @@ export type Database = {
       otp_events: {
         Row: {
           action: string
+          attempts: number
+          channel: string | null
           created_at: string
           delivery_status: string | null
           delivery_time: string | null
@@ -1825,6 +1827,8 @@ export type Database = {
         }
         Insert: {
           action?: string
+          attempts?: number
+          channel?: string | null
           created_at?: string
           delivery_status?: string | null
           delivery_time?: string | null
@@ -1839,6 +1843,8 @@ export type Database = {
         }
         Update: {
           action?: string
+          attempts?: number
+          channel?: string | null
           created_at?: string
           delivery_status?: string | null
           delivery_time?: string | null
