@@ -150,6 +150,16 @@ const Register = () => {
 
   const isPhoneValid = isValidE164(phone);
 
+  // Invite path: the name and number come from the ward's nomination, so skip
+  // straight to phone verification instead of asking the guardian to re-type them.
+  useEffect(() => {
+    if (isInviteLink && inviteLookupState === "loaded" && step === 2 && fullName && isPhoneValid) {
+      setStep(3);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInviteLink, inviteLookupState, step, fullName, isPhoneValid]);
+
+
   const handleDetailsNext = () => {
     if (isInviteLink && inviteLookupState !== "loaded") return toast.error("Please wait for the invitation to load");
     if (!fullName) return toast.error("Please enter your name");
