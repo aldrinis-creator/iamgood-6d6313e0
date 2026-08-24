@@ -128,11 +128,14 @@ const Register = () => {
     if (step === 2) {
       navigate(-1);
     } else if (step === 3) {
-      setStep(2);
+      // On the invite path step 2 auto-advances, so going back there would loop.
+      if (isInviteLink) navigate(-1);
+      else setStep(2);
     } else if (step === 4) {
       setStep(3);
     }
   };
+
 
   const addGuardian = () => {
     if (guardians.length < 5) {
