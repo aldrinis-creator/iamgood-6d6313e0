@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,12 +33,19 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
+  const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
+  const [expiresIn, setExpiresIn] = useState(0);
+  const autoSubmitted = useRef(false);
+  const sentOnce = useRef(false);
 
   // Check if it's an Indian number (+91)
   const isIndianNumber = phone.replace(/\s+/g, "").startsWith("+91");
 
   useEffect(() => {
-    sendOtp("send");
+    // StrictMode / re-entry guard: never fire two OTP requests for one screen.
+    if (sentOnce.current) return;
+    sentOnce.current = true;
+    sendOtp("send", "whatsapp");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,21 +56,29 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
   }, [resendTimer]);
 
   useEffect(() => {
-    if (!requestId || !isIndianNumber || sendState !== "sent") return;
+    if (expiresIn <= 0) return;
+    const t = setTimeout(() => setExpiresIn((v) => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [expiresIn]);
+
+
+  useEffect(() => {
+    if (!requestId || !isIndianNumber || sendState !== "sent" || channel !== "whatsapp") return;
     const timer = window.setTimeout(async () => {
       const { data } = await supabase.functions.invoke("send-otp", {
         body: { phone, action: "status", request_id: requestId },
       });
       if (data?.delivery_status === "failed") {
-        setDeliveryNote("WhatsApp could not deliver this code. Please tap Resend OTP after the timer ends.");
+        setDeliveryNote("WhatsApp could not deliver this code. Tap \u201cGet code by SMS\u201d instead.");
       } else if (data?.delivery_status === "delivered" || data?.delivery_status === "read") {
         setDeliveryNote("The code was delivered on WhatsApp.");
       } else {
-        setDeliveryNote("The provider accepted the request, but delivery is still pending. You can resend after the timer ends.");
+        setDeliveryNote("Still waiting for WhatsApp delivery. You can tap \u201cGet code by SMS\u201d instead.");
       }
     }, 15000);
     return () => window.clearTimeout(timer);
-  }, [requestId, isIndianNumber, phone, sendState]);
+  }, [requestId, isIndianNumber, phone, sendState, channel]);
+
 
   /** Turn a raw server/provider error into something an elderly user can act on. */
   const friendlyError = (raw?: string | null): string => {
@@ -80,16 +95,18 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     return `We couldn't send the code: ${raw}`;
   };
 
-  const sendOtp = async (action: "send" | "resend" = "send") => {
+  const sendOtp = async (action: "send" | "resend" = "send", via: "whatsapp" | "sms" = channel) => {
     setSendState("sending");
     setLastError(null);
     setDeliveryNote(null);
+    setChannel(via);
+    autoSubmitted.current = false;
 
     if (isIndianNumber) {
-      // ── MSG91 WHATSAPP ROUTE (INDIA) ──
+      // ── MSG91 ROUTE (INDIA): guardian/user picks WhatsApp or SMS ──
       try {
         const { data, error } = await supabase.functions.invoke("send-otp", {
-          body: { phone, action, purpose, nomination_token: nominationToken || undefined },
+          body: { phone, action, purpose, channel: via, nomination_token: nominationToken || undefined },
         });
 
         let payload: any = data;
@@ -120,10 +137,16 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         setHasSent(true);
         setSendState("sent");
         setRequestId(typeof payload.request_id === "string" ? payload.request_id : null);
-        toast.success(`OTP request accepted for ${phone}`);
+        setExpiresIn(typeof payload.expires_in === "number" ? payload.expires_in : 600);
+        if (payload.reused) {
+          setDeliveryNote("The code we already sent is still valid — please use the latest message.");
+        } else {
+          toast.success(`Code sent on ${via === "sms" ? "SMS" : "WhatsApp"} to ${phone}`);
+        }
         setResendTimer(30);
       } catch (err: any) {
         const msg = friendlyError(err?.message);
+
         setSendState("failed");
         setLastError(msg);
         toast.error("Couldn't send the code", { description: msg });
@@ -175,8 +198,19 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         }
 
         if (!payload?.success || !payload?.verified) {
-          const msg = payload?.error || "Invalid or expired OTP";
-          toast.error("Invalid OTP", { description: msg });
+          const code = payload?.code;
+          const msg =
+            code === "expired"
+              ? "That code has expired. Tap Resend OTP to get a fresh one."
+              : code === "too_many_attempts"
+                ? "Too many incorrect attempts. Tap Resend OTP to get a fresh code."
+                : code === "wrong_code"
+                  ? "That code is not correct. Please check the latest WhatsApp or SMS message."
+                  : payload?.error || "Invalid or expired OTP";
+          toast.error("Couldn't verify the code", { description: msg });
+          setLastError(msg);
+          setOtp("");
+          autoSubmitted.current = false;
           setLoading(false);
           return;
         }
@@ -186,6 +220,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
       } catch (err: any) {
         toast.error("Invalid OTP", { description: "Please check the code and try again." });
       }
+
       setLoading(false);
     } else {
       // ── FIREBASE VERIFY (INTERNATIONAL) ──
@@ -242,14 +277,43 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     sendOtp("resend");
   };
 
+  // Auto-verify as soon as all 6 digits are present (typed, pasted, or filled by
+  // the phone's SMS autofill) so the guardian never has to hunt for a button.
+  useEffect(() => {
+    if (otp.length === 6 && hasSent && !loading && !autoSubmitted.current) {
+      autoSubmitted.current = true;
+      verifyOtp();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, hasSent, loading]);
+
+  const mm = Math.floor(expiresIn / 60);
+  const ss = String(expiresIn % 60).padStart(2, "0");
+
   return (
     <div className="flex flex-col">
       <div className="bg-auth-green-glow/20 border border-auth-green/30 rounded-xl p-3 mb-5 flex items-start gap-2.5">
         <div className="text-[18px] shrink-0 mt-[1px]">💬</div>
         <div className="text-[13px] text-auth-text-2 leading-relaxed">
-          {sendState === "sending" ? "Sending code..." : <>Enter the <strong className="text-auth-green font-bold">6-digit code</strong> sent on <strong className="text-auth-green font-bold">{isIndianNumber ? "WhatsApp" : "SMS"}</strong>. Code is valid for <strong className="text-auth-green font-bold">{isIndianNumber ? "5" : "10"} minutes.</strong></>}
+          {sendState === "sending" ? (
+            "Sending code..."
+          ) : (
+            <>
+              Enter the <strong className="text-auth-green font-bold">6-digit code</strong> sent on{" "}
+              <strong className="text-auth-green font-bold">
+                {isIndianNumber ? (channel === "sms" ? "SMS" : "WhatsApp") : "SMS"}
+              </strong>
+              .{" "}
+              {expiresIn > 0 ? (
+                <>Expires in <strong className="text-auth-green font-bold">{mm}:{ss}</strong>.</>
+              ) : (
+                <>Code is valid for <strong className="text-auth-green font-bold">10 minutes.</strong></>
+              )}
+            </>
+          )}
         </div>
       </div>
+
 
       {(sendState === "failed" || sendState === "rate_limited") && lastError && (
         <div className="rounded-xl bg-auth-red/10 border border-auth-red/20 px-3 py-3 mb-5">
@@ -265,7 +329,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
       )}
 
       <div className="flex justify-between w-full mb-5">
-        <InputOTP maxLength={6} value={otp} onChange={setOtp} containerClassName="flex w-full gap-2 justify-between">
+        <InputOTP
+          maxLength={6}
+          value={otp}
+          onChange={setOtp}
+          autoFocus
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          containerClassName="flex w-full gap-2 justify-between"
+        >
           <InputOTPGroup className="flex w-full gap-2">
             {[0, 1, 2, 3, 4, 5].map((idx) => (
               <InputOTPSlot 
@@ -283,6 +355,28 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
           {deliveryNote}
         </div>
       )}
+
+      {isIndianNumber && (
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => sendOtp("resend", "whatsapp")}
+            disabled={sendState === "sending" || sendState === "rate_limited"}
+            className="text-[13px] font-semibold text-auth-green border border-auth-green/40 rounded-xl py-3 disabled:opacity-50"
+          >
+            Get code on WhatsApp
+          </button>
+          <button
+            type="button"
+            onClick={() => sendOtp("resend", "sms")}
+            disabled={sendState === "sending" || sendState === "rate_limited"}
+            className="text-[13px] font-semibold text-auth-text-2 border border-auth-border-hi rounded-xl py-3 disabled:opacity-50"
+          >
+            Get code by SMS
+          </button>
+        </div>
+      )}
+
 
       <div className="flex items-center justify-between mt-2 mb-6">
         <div className="text-[13px] text-auth-text-3">
