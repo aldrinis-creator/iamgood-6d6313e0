@@ -285,15 +285,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Filter out guardian-role users — they should not have check-ins tracked ──
+    // ── Filter out guardian accounts and phone-less accounts — they are not wards ──
     const userIds = [...new Set(pendingCheckIns.map((ci) => ci.user_id))];
-    const { data: guardianRoles } = await supabase
-      .from("user_roles")
-      .select("user_id")
-      .in("user_id", userIds)
-      .eq("role", "guardian");
+    const [guardianRolesRes, wardProfilesRes] = await Promise.all([
+      supabase.from("user_roles").select("user_id").in("user_id", userIds).eq("role", "guardian"),
+      supabase.from("profiles").select("id, phone, role").in("id", userIds),
+    ]);
 
-    const guardianUserIds = new Set((guardianRoles || []).map((r) => r.user_id));
+    const guardianUserIds = new Set((guardianRolesRes.data || []).map((r: any) => r.user_id));
+    const profileById = new Map<string, any>();
+    ((wardProfilesRes.data || []) as any[]).forEach((p) => profileById.set(p.id, p));
+    for (const id of userIds) {
+      const p = profileById.get(id);
+      if (!p || p.role === "guardian" || !p.phone || String(p.phone).trim() === "") {
+        guardianUserIds.add(id);
+      }
+    }
+
 
     // Silently mark guardian check-ins as missed (no alerts)
     const guardianCheckInIds = pendingCheckIns
