@@ -71,9 +71,12 @@ const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: st
   identity: IdCard,
   email: Mail,
   bank: Landmark,
+  investment: TrendingUp,
+  social: Share2,
   insurance: ShieldAlert,
   will: Scroll,
 };
+
 
 const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) => {
   const [docs, setDocs] = useState<DocRow[]>([]);
