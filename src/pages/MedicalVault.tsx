@@ -634,32 +634,71 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
           <Shield className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Medical Vault</h1>
-          <p className="text-xs text-muted-foreground">Your encrypted health records & documents</p>
+          <h1 className="text-xl font-bold text-foreground">Secure Vault</h1>
+          <p className="text-xs text-muted-foreground">Your encrypted health records & personal data</p>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-5">
-          <TabsTrigger value="records" className="text-xs gap-1">
-            <FileText className="w-3 h-3" /> Records
-          </TabsTrigger>
-          <TabsTrigger value="visual" className="text-xs gap-1">
-            <Eye className="w-3 h-3" /> Visual
-          </TabsTrigger>
-          <TabsTrigger value="doctor-report" className="text-xs gap-1">
-            <FileText className="w-3 h-3" /> Dr Report
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="text-xs gap-1">
-            <Heart className="w-3 h-3" /> Profile
-          </TabsTrigger>
-          <TabsTrigger value="vault" className="text-xs gap-1">
-            <Lock className="w-3 h-3" /> Vault
-          </TabsTrigger>
-        </TabsList>
+      {/* ========== TILES ========== */}
+      {!section && (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => { setSection("medical"); setSubview(null); }}
+            className="flex flex-col items-center gap-2 p-6 rounded-xl border border-border hover:border-primary/30 transition-all"
+          >
+            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <Heart className="w-6 h-6" />
+            </div>
+            <span className="text-sm font-medium">Medical Vault</span>
+            <span className="text-[11px] text-muted-foreground text-center">Records & Dr. Reports</span>
+          </button>
+          <button
+            onClick={() => { setSection("data"); setDataCategory(null); }}
+            className="flex flex-col items-center gap-2 p-6 rounded-xl border border-border hover:border-primary/30 transition-all"
+          >
+            <div className="w-12 h-12 rounded-full bg-success/10 text-success flex items-center justify-center">
+              <Lock className="w-6 h-6" />
+            </div>
+            <span className="text-sm font-medium">Data Vault</span>
+            <span className="text-[11px] text-muted-foreground text-center">IDs, banks, investments & more</span>
+          </button>
+        </div>
+      )}
 
-        {/* ========== RECORDS TAB ========== */}
-        <TabsContent value="records" className="space-y-3 mt-4">
+      {/* ========== MEDICAL VAULT ========== */}
+      {section === "medical" && (
+        <div className="space-y-4">
+          <Button variant="ghost" size="sm" className="gap-1 -ml-2"
+            onClick={() => { if (subview) setSubview(null); else setSection(null); }}>
+            <ArrowLeft className="w-4 h-4" /> {subview ? "Medical Vault" : "Secure Vault"}
+          </Button>
+
+          {!subview && (
+            <div className="space-y-2">
+              {[
+                { key: "records" as const, label: "Records", desc: "Uploaded reports, scans & vaccination records", icon: FileText },
+                { key: "doctor-report" as const, label: "Dr. Reports", desc: "Doctor visit summaries & diagnoses", icon: Stethoscope },
+              ].map((item) => (
+                <Card key={item.key} className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSubview(item.key)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <item.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{item.desc}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {subview === "records" && (
+            <div className="space-y-3">
+
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
