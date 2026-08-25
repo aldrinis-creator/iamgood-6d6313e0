@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
 
       // Check if already sent this week
       const { data: alreadySent } = await supabase
-        .from("transactional_email_log")
+        .from("email_send_log")
         .select("id")
         .eq("idempotency_key", idempotencyKey)
         .maybeSingle();
@@ -214,28 +214,25 @@ Deno.serve(async (req) => {
         const subject = `📊 ${wardName}'s Weekly Check-iN Report — ${label}`;
 
         // ── Send via send-transactional-email (direct fetch to surface real errors) ──
-        const sendRes = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            },
-            body: JSON.stringify({
-              templateName: "weekly-guardian-report",
-              recipientEmail: g.guardian_email,
-              idempotencyKey,
-              templateData: {
-                guardianName: g.guardian_name,
-                wardName,
-                weekLabel: label,
-                relation: g.relation || "Ward",
-                ...stats,
-              },
-            }),
+        const sendRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
           },
-        );
+          body: JSON.stringify({
+            templateName: "weekly-guardian-report",
+            recipientEmail: g.guardian_email,
+            idempotencyKey,
+            templateData: {
+              guardianName: g.guardian_name,
+              wardName,
+              weekLabel: label,
+              relation: g.relation || "Ward",
+              ...stats,
+            },
+          }),
+        });
 
         if (!sendRes.ok) {
           const errBody = await sendRes.text();
