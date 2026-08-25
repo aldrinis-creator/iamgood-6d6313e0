@@ -31,6 +31,7 @@ import {
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
   Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard, Download,
+  TrendingUp, Share2,
 } from "lucide-react";
 
 
@@ -40,12 +41,14 @@ import { encrypt, decrypt, encryptBytes, decryptBytes } from "@/lib/encryption";
 import {
   VAULT_CATEGORIES, type VaultCategory,
   type EmailEntry, type BankEntry, type InsuranceEntry, type WillEntry, type IdentityEntry,
+  type InvestmentEntry, type SocialEntry,
   type InsuranceCategory, type VaultAttachment, computeInsuranceReminderTier, computeWillReviewFireAt,
   formatReminderLabel,
 } from "@/lib/vaultCategories";
 import VaultAttachmentField from "./VaultAttachmentField";
 
-type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InsuranceEntry | WillEntry;
+type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InvestmentEntry | SocialEntry | InsuranceEntry | WillEntry;
+
 
 interface DocRow {
   id: string;
@@ -68,9 +71,12 @@ const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: st
   identity: IdCard,
   email: Mail,
   bank: Landmark,
+  investment: TrendingUp,
+  social: Share2,
   insurance: ShieldAlert,
   will: Scroll,
 };
+
 
 const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) => {
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -131,7 +137,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   // ---------- Group by category (legacy rows with NULL category fall under "identity") ----------
   const grouped = useMemo(() => {
     const out: Record<VaultCategory, DocRow[]> = {
-      identity: [], email: [], bank: [], insurance: [], will: [],
+      identity: [], email: [], bank: [], investment: [], social: [], insurance: [], will: [],
     };
     for (const d of docs) {
       const cat = (d.category as VaultCategory) || "identity";
@@ -518,7 +524,12 @@ function blankDraft(category: VaultCategory): AnyEntry {
     case "email":    return { label: "", email: "", password: "", recovery_email: "", notes: "" };
     case "bank":     return { label: "", bank_name: "", account_number: "", ifsc: "", account_type: "savings",
                               nominee_name: "", nominee_relation: "", nominee_phone: "", branch: "", notes: "" };
+    case "investment": return { label: "", platform: "", account_id: "", demat_number: "", linked_pan: "",
+                               login_id: "", password: "", notes: "" };
+    case "social":   return { label: "", platform: "", username_email: "", phone_number: "",
+                              password: "", recovery_email: "", notes: "" };
     case "insurance":return { label: "", category: "health", company: "", policy_number: "", sum_assured: "",
+
                               nominee_name: "", nominee_relation: "", nominee_phone: "",
                               premium_amount: "", premium_frequency: "yearly",
                               start_date: "", renewal_date: "", expiry_date: "", notes: "" };
@@ -547,7 +558,18 @@ function validateDraft(category: VaultCategory, draft: AnyEntry): boolean {
       if (!b.bank_name?.trim() || !b.account_number?.trim()) { toast.error("Bank & account required"); return false; }
       break;
     }
+    case "investment": {
+      const v = draft as InvestmentEntry;
+      if (!v.platform?.trim()) { toast.error("Platform / Broker is required"); return false; }
+      break;
+    }
+    case "social": {
+      const s = draft as SocialEntry;
+      if (!s.platform?.trim()) { toast.error("Platform is required"); return false; }
+      break;
+    }
     case "insurance": {
+
       const i = draft as InsuranceEntry;
       if (!i.company?.trim() || !i.policy_number?.trim()) { toast.error("Company & policy number required"); return false; }
       break;
@@ -682,6 +704,30 @@ function EntryPreview({ category, entry, reveal, pin }: { category: VaultCategor
       </div>
     );
   }
+  if (category === "investment") {
+    const e = entry as InvestmentEntry;
+    return (
+      <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+        <div>{e.platform}{e.account_id ? ` · ${e.account_id}` : ""}</div>
+        {e.demat_number && <div>Demat: <Mask value={e.demat_number} reveal={reveal} /></div>}
+        {e.linked_pan && <div>PAN: <Mask value={e.linked_pan} reveal={reveal} /></div>}
+        {e.login_id && <div>Login: {e.login_id}</div>}
+        {e.password && <div>Pwd: <Mask value={e.password} reveal={reveal} /></div>}
+      </div>
+    );
+  }
+  if (category === "social") {
+    const e = entry as SocialEntry;
+    return (
+      <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+        <div>{e.platform}{e.username_email ? ` · ${e.username_email}` : e.phone_number ? ` · ${e.phone_number}` : ""}</div>
+        {e.phone_number && <div>Phone: {e.phone_number}</div>}
+        {e.password && <div>Pwd: <Mask value={e.password} reveal={reveal} /></div>}
+        {e.recovery_email && <div>Recovery: {e.recovery_email}</div>}
+      </div>
+    );
+  }
+
   if (category === "insurance") {
     const e = entry as InsuranceEntry;
     return (
@@ -758,10 +804,17 @@ function EntryForm({
   return (
     <div className="space-y-3 py-2">
       <div>
-        <Label>Label *</Label>
+        <Label>{category === "investment" || category === "social" ? "Title *" : "Label *"}</Label>
         <Input value={(draft as any).label || ""} onChange={(e) => set({ label: e.target.value } as any)}
-          placeholder="A short nickname e.g. Personal Gmail" />
+          placeholder={
+            category === "social"
+              ? "WhatsApp, Email, Messaging Services"
+              : category === "investment"
+                ? "e.g., HDFC Securities Demat"
+                : "A short nickname e.g. Personal Gmail"
+          } />
       </div>
+
 
       {category === "identity" && (
         <>
@@ -951,7 +1004,35 @@ function EntryForm({
         );
       })()}
 
+      {category === "investment" && (() => {
+        const e = draft as InvestmentEntry;
+        return (
+          <>
+            <div><Label>Platform / Broker *</Label><Input value={e.platform || ""} placeholder="Enter platform/broker" onChange={(ev) => set({ platform: ev.target.value } as any)} /></div>
+            <div><Label>Account ID</Label><Input value={e.account_id || ""} placeholder="Enter account id" onChange={(ev) => set({ account_id: ev.target.value } as any)} /></div>
+            <div><Label>Demat Number</Label><Input value={e.demat_number || ""} placeholder="Enter demat number" onChange={(ev) => set({ demat_number: ev.target.value } as any)} /></div>
+            <div><Label>Linked PAN</Label><Input value={e.linked_pan || ""} placeholder="Enter linked pan" onChange={(ev) => set({ linked_pan: ev.target.value } as any)} /></div>
+            <div><Label>Login ID</Label><Input value={e.login_id || ""} placeholder="Enter login id" onChange={(ev) => set({ login_id: ev.target.value } as any)} /></div>
+            <div><Label>Password</Label><Input value={e.password || ""} placeholder="Enter password" onChange={(ev) => set({ password: ev.target.value } as any)} /></div>
+          </>
+        );
+      })()}
+
+      {category === "social" && (() => {
+        const e = draft as SocialEntry;
+        return (
+          <>
+            <div><Label>Platform *</Label><Input value={e.platform || ""} placeholder="Enter platform" onChange={(ev) => set({ platform: ev.target.value } as any)} /></div>
+            <div><Label>Username / Email</Label><Input value={e.username_email || ""} placeholder="Enter username/email" onChange={(ev) => set({ username_email: ev.target.value } as any)} /></div>
+            <div><Label>Phone Number</Label><Input value={e.phone_number || ""} placeholder="Enter phone number" inputMode="tel" onChange={(ev) => set({ phone_number: ev.target.value } as any)} /></div>
+            <div><Label>Password</Label><Input value={e.password || ""} placeholder="Enter password" onChange={(ev) => set({ password: ev.target.value } as any)} /></div>
+            <div><Label>Recovery Email</Label><Input value={e.recovery_email || ""} placeholder="Enter recovery email" onChange={(ev) => set({ recovery_email: ev.target.value } as any)} /></div>
+          </>
+        );
+      })()}
+
       {category === "insurance" && (() => {
+
         const e = draft as InsuranceEntry;
         return (
           <>

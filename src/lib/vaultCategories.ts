@@ -6,15 +6,18 @@
  * is a short, non-sensitive nickname shown in the unlocked list.
  */
 
-export type VaultCategory = "identity" | "email" | "bank" | "insurance" | "will";
+export type VaultCategory = "identity" | "email" | "bank" | "investment" | "social" | "insurance" | "will";
 
 export const VAULT_CATEGORIES: { key: VaultCategory; label: string; emptyHint: string }[] = [
   { key: "identity", label: "Identity Docs", emptyHint: "Aadhaar, PAN, Passport, Driving License" },
   { key: "email", label: "Email Accounts", emptyHint: "Email logins, recovery details" },
   { key: "bank", label: "Bank Accounts", emptyHint: "Account numbers, IFSC, nominee" },
+  { key: "investment", label: "Investments", emptyHint: "Demat, broker logins, PAN linkage" },
+  { key: "social", label: "Social Media", emptyHint: "WhatsApp, Email, Messaging Services" },
   { key: "insurance", label: "Insurance", emptyHint: "Life, Health, General — with reminders" },
   { key: "will", label: "Legal Will", emptyHint: "Will status, partner ref, quarterly review" },
 ];
+
 
 // ---------- Per-category payload shapes ----------
 
@@ -66,7 +69,32 @@ export interface BankEntry {
 }
 
 
+
+export interface InvestmentEntry {
+  label: string;          // Title, e.g. "HDFC Securities Demat"
+  platform: string;       // Platform / Broker
+  account_id?: string;
+  demat_number?: string;
+  linked_pan?: string;
+  login_id?: string;
+  password?: string;
+  notes?: string;
+  attachment?: VaultAttachment;
+}
+
+export interface SocialEntry {
+  label: string;          // Title, e.g. "WhatsApp"
+  platform: string;
+  username_email?: string;
+  phone_number?: string;
+  password?: string;
+  recovery_email?: string;
+  notes?: string;
+  attachment?: VaultAttachment;
+}
+
 export type InsuranceCategory = "life" | "health" | "general";
+
 
 export interface InsuranceEntry {
   label: string;          // e.g. "HDFC Ergo Health"
