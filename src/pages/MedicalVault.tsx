@@ -197,7 +197,10 @@ const MedicalVaultContent = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("records");
+  const [section, setSection] = useState<null | "medical" | "data">(null);
+  const [subview, setSubview] = useState<null | "records" | "doctor-report">(null);
+  const [dataCategory, setDataCategory] = useState<VaultCategory | null>(null);
+
   const idleToastShownRef = useRef(false);
 
   // --- Profile Tab (fully read-only) ---
