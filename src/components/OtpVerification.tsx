@@ -102,6 +102,19 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     setChannel(via);
     autoSubmitted.current = false;
 
+    // Validate Indian number is exactly 10 national digits before dispatching
+    // an OTP to the wrong recipient (e.g. an extra digit silently reroutes the code).
+    const _digits = phone.replace(/\D/g, '');
+    const _nationalDigits = _digits.startsWith('91') ? _digits.slice(2) : _digits;
+    if (isIndianNumber && _nationalDigits.length !== 10) {
+      setSendState("failed");
+      setLastError(`Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code — +91 is added automatically.`);
+      toast.error("Invalid mobile number", {
+        description: `Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code — +91 is added automatically.`
+      });
+      return;
+    }
+
     if (isIndianNumber) {
       // ── MSG91 ROUTE (INDIA): guardian/user picks WhatsApp or SMS ──
       try {

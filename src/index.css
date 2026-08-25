@@ -107,6 +107,14 @@
   .text-accessible {
     @apply text-lg;
   }
+
+  /* Mobile-safe min-height: 100vh falls back to 100dvh where supported,
+     preventing the "content squashed in top ~40%" bug on Android Chrome
+     when the browser chrome resizes the viewport. */
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
 }
 
 @keyframes pulse-heart {

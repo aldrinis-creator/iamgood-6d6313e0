@@ -156,6 +156,26 @@ const Login = () => {
           {!otpPhone ? (() => {
             const hasInput = identifier.trim().length > 0;
             const isValid = isValidE164(identifier);
+
+            // Live digit-count feedback for Indian numbers so the user can see
+            // they typed 11 digits before an OTP ships to the wrong recipient.
+            const _digits = identifier.replace(/\D/g, '');
+            const _nationalDigits = _digits.startsWith('91') ? _digits.slice(2) : _digits;
+            const isIndian = identifier.trim().startsWith("+91") || _digits.startsWith('91');
+            const digitCount = _nationalDigits.length;
+            const isExactTen = isIndian && digitCount === 10;
+
+            // Guard: refuse to send an OTP to a malformed Indian number.
+            const sendOtpGuard = (): boolean => {
+              if (isIndian && digitCount !== 10) {
+                toast.error("Invalid mobile number", {
+                  description: `Indian numbers must be 10 digits. You entered ${digitCount}. Please re-enter without the country code — +91 is added automatically.`
+                });
+                return false;
+              }
+              return true;
+            };
+
             return (
 
               <>
@@ -177,6 +197,11 @@ const Login = () => {
                   {hasInput && !isValid && (
                     <p className="text-[11px] text-auth-red mt-1.5">Enter a valid number with country code</p>
                   )}
+                  {isIndian && hasInput && (
+                    <p className={`text-[12px] mt-1.5 ${isExactTen ? 'text-auth-green' : 'text-auth-text-3'}`}>
+                      {digitCount} / 10 digits{isExactTen ? ' ✓' : ''}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 mt-1">
@@ -193,6 +218,7 @@ const Login = () => {
                   <button 
                     disabled={!isValid}
                     onClick={() => {
+                      if (!sendOtpGuard()) return;
                       const phone = formatPhone(identifier.trim());
                       setOtpPhone(phone);
                     }}

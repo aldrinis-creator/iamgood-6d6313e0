@@ -2772,6 +2772,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_link_guardian_once: {
+        Args: { p_guardian_id: string; p_user_id: string }
+        Returns: string
+      }
       check_guardian_nomination: { Args: { _phone: string }; Returns: boolean }
       cleanup_admin_2fa: { Args: never; Returns: undefined }
       delete_email: {
