@@ -560,6 +560,8 @@ function AttachmentBadge({ entry }: { entry: AnyEntry }) {
 function EntryForm({
   category, draft, onChange, pin,
   pendingFile, onSelectFile, removeAttachment, onToggleRemoveAttachment,
+  pendingIdentityFiles, onIdentityFilesChange,
+  pendingCardFile, onCardFileSelect, cardOcrLoading,
 }: {
   category: VaultCategory;
   draft: AnyEntry;
@@ -569,10 +571,15 @@ function EntryForm({
   onSelectFile: (f: File | null) => void;
   removeAttachment: boolean;
   onToggleRemoveAttachment: (r: boolean) => void;
+  pendingIdentityFiles: File[];
+  onIdentityFilesChange: (files: File[]) => void;
+  pendingCardFile: File | null;
+  onCardFileSelect: (f: File) => void;
+  cardOcrLoading: boolean;
 }) {
   const set = (patch: Partial<AnyEntry>) => onChange({ ...draft, ...patch } as AnyEntry);
   const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
-
+  const identityAttachments = ((draft as IdentityEntry).attachments ?? []) as VaultAttachment[];
 
   return (
     <div className="space-y-3 py-2">
@@ -588,6 +595,52 @@ function EntryForm({
             <Label>Value *</Label>
             <Input value={(draft as IdentityEntry).value} onChange={(e) => set({ value: e.target.value } as any)}
               placeholder="Aadhaar / PAN / Passport number" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Document Photos (up to 5)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {identityAttachments.map((att, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg border bg-muted flex items-center justify-center overflow-hidden">
+                  <span className="text-[10px] text-muted-foreground text-center px-1 truncate">{att.file_name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const atts = [...identityAttachments];
+                      atts.splice(idx, 1);
+                      set({ attachments: atts } as any);
+                    }}
+                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]"
+                  >×</button>
+                </div>
+              ))}
+              {identityAttachments.length + pendingIdentityFiles.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = "image/*";
+                    input.multiple = true;
+                    input.onchange = (e) => {
+                      const files = Array.from((e.target as HTMLInputElement).files ?? []);
+                      const room = 5 - identityAttachments.length - pendingIdentityFiles.length;
+                      onIdentityFilesChange([...pendingIdentityFiles, ...files.slice(0, Math.max(room, 0))]);
+                    };
+                    input.click();
+                  }}
+                  className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span className="text-[10px]">Add photo</span>
+                </button>
+              )}
+            </div>
+            {pendingIdentityFiles.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {pendingIdentityFiles.length} photo(s) ready to encrypt &amp; save
+              </p>
+            )}
           </div>
         </>
       )}
@@ -638,6 +691,88 @@ function EntryForm({
                 </div>
               </div>
             </div>
+
+            {/* Debit / Credit card */}
+            <div className="space-y-3 pt-3 border-t border-border">
+              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5" /> Debit / Credit Card (optional)
+              </p>
+
+              <Button type="button" variant="outline" className="w-full gap-2" size="sm"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file"; input.accept = "image/*";
+                  (input as any).capture = "environment";
+                  input.onchange = (ev) => {
+                    const file = (ev.target as HTMLInputElement).files?.[0];
+                    if (file) onCardFileSelect(file);
+                  };
+                  input.click();
+                }}>
+                <Camera className="w-4 h-4" /> Scan Card with Camera
+              </Button>
+
+              {cardOcrLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Reading card details...
+                </div>
+              )}
+              {pendingCardFile && !cardOcrLoading && (
+                <p className="text-[11px] text-muted-foreground">
+                  Card photo ready to encrypt &amp; save ({pendingCardFile.name})
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <Label className="text-xs">Card Number</Label>
+                  <Input
+                    value={e.card_number ?? ""}
+                    onChange={(ev) => set({ card_number: ev.target.value.replace(/\D/g, "").slice(0, 16) } as any)}
+                    placeholder="1234 5678 9012 3456" maxLength={19}
+                    inputMode="numeric" className="font-mono text-base"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Expiry (MM/YY)</Label>
+                  <Input
+                    value={e.card_expiry ?? ""}
+                    onChange={(ev) => set({ card_expiry: ev.target.value } as any)}
+                    placeholder="MM/YY" maxLength={5} className="text-base"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">CVV</Label>
+                  <Input
+                    value={e.card_cvv ?? ""}
+                    onChange={(ev) => set({ card_cvv: ev.target.value.replace(/\D/g, "").slice(0, 4) } as any)}
+                    placeholder="•••" maxLength={4} type="password" className="text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Name on Card</Label>
+                  <Input
+                    value={e.card_name ?? ""}
+                    onChange={(ev) => set({ card_name: ev.target.value } as any)}
+                    placeholder="As printed on card" className="text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Card Network</Label>
+                  <Select value={e.card_type ?? ""}
+                    onValueChange={(v) => set({ card_type: v as BankEntry["card_type"] } as any)}>
+                    <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visa">VISA</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                      <SelectItem value="rupay">RuPay</SelectItem>
+                      <SelectItem value="amex">Amex</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </>
         );
       })()}
@@ -684,7 +819,7 @@ function EntryForm({
               <div><Label className="text-[11px]">Renewal</Label><Input type="date" value={e.renewal_date || ""} onChange={(ev) => set({ renewal_date: ev.target.value } as any)} /></div>
               <div><Label className="text-[11px]">Expiry</Label><Input type="date" value={e.expiry_date || ""} onChange={(ev) => set({ expiry_date: ev.target.value } as any)} /></div>
             </div>
-            <p className="text-[11px] text-muted-foreground -mt-1">Reminders fire 7d / 3d / 24h before renewal & expiry.</p>
+            <p className="text-[11px] text-muted-foreground -mt-1">Reminders fire 7d / 3d / 24h before renewal &amp; expiry.</p>
             <div className="border-t pt-3">
               <p className="text-xs font-semibold mb-2">Nominee details</p>
               <div className="space-y-2">
@@ -746,14 +881,16 @@ function EntryForm({
         );
       })()}
 
-      <VaultAttachmentField
-        existing={existingAttachment}
-        pendingFile={pendingFile}
-        onSelectFile={onSelectFile}
-        removed={removeAttachment}
-        onToggleRemove={onToggleRemoveAttachment}
-        pin={pin}
-      />
+      {category !== "identity" && (
+        <VaultAttachmentField
+          existing={existingAttachment}
+          pendingFile={pendingFile}
+          onSelectFile={onSelectFile}
+          removed={removeAttachment}
+          onToggleRemove={onToggleRemoveAttachment}
+          pin={pin}
+        />
+      )}
 
       <div>
         <Label>Notes</Label>
@@ -762,5 +899,6 @@ function EntryForm({
     </div>
   );
 }
+
 
 export default VaultCategorisedSection;
