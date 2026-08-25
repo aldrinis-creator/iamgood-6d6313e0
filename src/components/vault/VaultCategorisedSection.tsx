@@ -367,7 +367,8 @@ const VaultCategorisedSection = ({ userId, pin, category }: VaultCategorisedSect
   return (
     <>
       <div className="space-y-3">
-        {/* Row-wise scrollable category tabs */}
+        {/* Row-wise scrollable category tabs (hidden when a single category is pinned) */}
+        {!category && (
         <div className="overflow-x-auto -mx-1 px-1">
           <div className="flex gap-2 pb-1 min-w-max">
             {VAULT_CATEGORIES.map(({ key, label }) => {
@@ -396,6 +397,8 @@ const VaultCategorisedSection = ({ userId, pin, category }: VaultCategorisedSect
             })}
           </div>
         </div>
+        )}
+
 
         {/* Active category content */}
         {VAULT_CATEGORIES.filter((c) => c.key === activeCategory).map(({ key, label, emptyHint }) => {
