@@ -524,7 +524,12 @@ function blankDraft(category: VaultCategory): AnyEntry {
     case "email":    return { label: "", email: "", password: "", recovery_email: "", notes: "" };
     case "bank":     return { label: "", bank_name: "", account_number: "", ifsc: "", account_type: "savings",
                               nominee_name: "", nominee_relation: "", nominee_phone: "", branch: "", notes: "" };
+    case "investment": return { label: "", platform: "", account_id: "", demat_number: "", linked_pan: "",
+                               login_id: "", password: "", notes: "" };
+    case "social":   return { label: "", platform: "", username_email: "", phone_number: "",
+                              password: "", recovery_email: "", notes: "" };
     case "insurance":return { label: "", category: "health", company: "", policy_number: "", sum_assured: "",
+
                               nominee_name: "", nominee_relation: "", nominee_phone: "",
                               premium_amount: "", premium_frequency: "yearly",
                               start_date: "", renewal_date: "", expiry_date: "", notes: "" };
