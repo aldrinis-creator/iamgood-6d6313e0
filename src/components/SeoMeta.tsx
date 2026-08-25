@@ -31,7 +31,7 @@ const setLink = (rel: string, href: string) => {
   el.setAttribute("href", href);
 };
 
-export const SeoMeta = ({
+export const useSeoMeta = ({
   title,
   description,
   keywords,
@@ -58,8 +58,12 @@ export const SeoMeta = ({
       setMeta("property", "og:url", canonical);
     }
   }, [fullTitle, description, keywords, ogType, ogImage, canonical]);
+};
 
+export const SeoMeta = (props: SeoMetaProps) => {
+  useSeoMeta(props);
   return null;
 };
+
 
 export default SeoMeta;

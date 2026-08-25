@@ -35,15 +35,20 @@ const AppHeader = () => {
           <AQIWidget role={role} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-10 h-10 rounded-full bg-navy-card border border-white/5 flex items-center justify-center overflow-hidden shadow-sm relative">
+              <button
+                aria-label="Open profile menu"
+                className="w-10 h-10 rounded-full bg-navy-card border border-white/5 flex items-center justify-center overflow-hidden shadow-sm relative"
+              >
                 <AvatarImage
                   value={avatarUrl}
+                  alt=""
                   className="w-full h-full object-cover"
                   fallback={<User className="w-5 h-5 text-muted-foreground" />}
                 />
 
               </button>
             </DropdownMenuTrigger>
+
             <DropdownMenuContent align="end">
               {role !== "guardian" && (
                 <DropdownMenuItem onClick={() => navigate("/services")}>

@@ -9,6 +9,7 @@ import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 import { resendGuardianInvite } from "@/lib/guardianInvite";
+import { useSeoMeta } from "@/components/SeoMeta";
 import { clearPendingNomination, stashNominationToken, getPendingNominationToken } from "@/lib/pendingNomination";
 
 
@@ -28,6 +29,11 @@ const TOTAL_STEPS_USER = 4;
 const TOTAL_STEPS_GUARDIAN = 3;
 
 const Register = () => {
+  useSeoMeta({
+    title: "Create your Check-iN account",
+    description: "Create a free Check-iN account in minutes — set daily check-ins, add medication reminders and invite family guardians to watch over you.",
+    canonicalPath: "/register",
+  });
   const { signUp, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { canInstall, installApp, isInstalled } = usePwaInstall();

@@ -1,0 +1,26 @@
+# Check-iN
+
+> Check-iN is an Indian senior safety and medication app: daily check-ins, medication reminders, one-tap SOS, guardian alerts, and a secure medical vault.
+
+Check-iN is built for Indian families caring for elderly parents. Seniors confirm they are well with scheduled check-ins, get reminders for every dose, and can raise an SOS with one tap. Nominated guardians receive alerts by app, WhatsApp, and email.
+
+## Pages
+
+- [Home](/): What Check-iN does and how to get started.
+- [Install the app](/install): How to install Check-iN on Android and iPhone.
+- [Help](/help): Frequently asked questions for users and guardians.
+- [Contact us](/contact-us): How to reach the Check-iN support team.
+- [Privacy Policy](/privacy-policy): How health, location, and vault data is handled.
+- [Terms of Service](/terms-of-service): Terms covering subscriptions and emergency disclaimers.
+
+## Blog
+
+- [Blog](/blog): Guides on elderly care, medication adherence, and senior safety in India.
+- [Medication reminder apps in India](/blog/medication-reminder-app-india): What to look for in a reminder app.
+- [How to never miss a medication](/blog/how-to-never-miss-medication): Practical adherence routines.
+- [Elderly care app features](/blog/elderly-care-app-features): Features that matter for senior care.
+- [Caring for aging parents remotely](/blog/caring-for-aging-parents-remotely): Staying involved from another city.
+- [Senior safety app guide](/blog/senior-safety-app-guide): Choosing a safety app for a parent.
+- [Fall detection for elderly](/blog/fall-detection-for-elderly): How fall detection works and its limits.
+- [Emergency alert apps for seniors](/blog/emergency-alert-app-for-seniors): How SOS and guardian alerts work.
+- [What to do in a medical emergency in India](/blog/what-to-do-in-medical-emergency-india): Step-by-step emergency checklist.

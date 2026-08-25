@@ -26,11 +26,12 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center">
       <SeoMeta
-        title="Check-iN — Auth Flow Mockup"
-        description="India's medication reminder, elderly care & emergency alert app for seniors."
+        title="Check-iN — Senior Safety & Medication Reminders"
+        description="Check-iN helps Indian families care for elderly parents: daily check-ins, medication reminders, one-tap SOS, guardian alerts and a medical vault."
         keywords="medication reminder app, elderly care app, senior safety app"
         canonicalPath="/"
       />
+
 
       <div className="w-full max-w-[320px] flex-1 flex flex-col pt-[8vh]">
         
@@ -47,9 +48,13 @@ const Index = () => {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold tracking-tight text-auth-text-1">Check-iN</div>
-            <div className="text-xs text-auth-text-2 mt-0.5">Your personal safety network</div>
+            <h1 className="text-2xl font-bold tracking-tight text-auth-text-1">
+              Check-iN
+              <span className="sr-only"> — senior safety and medication reminders for Indian families</span>
+            </h1>
+            <p className="text-xs text-auth-text-2 mt-0.5">Your personal safety network</p>
           </div>
+
         </div>
 
         {/* CARDS */}

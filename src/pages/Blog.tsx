@@ -16,7 +16,7 @@ const Blog = () => {
   return (
     <div className="min-h-screen bg-background">
       <SeoMeta
-        title="Check-iN Blog — Elderly Care, Medication & Senior Safety in India"
+        title="Check-iN Blog — Elderly Care & Senior Safety India"
         description="Practical guides for Indian families caring for elderly parents — medication reminders, senior safety, emergency alerts, and remote caregiving."
         canonicalPath="/blog"
       />
