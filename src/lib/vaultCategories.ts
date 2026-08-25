@@ -12,11 +12,12 @@ export const VAULT_CATEGORIES: { key: VaultCategory; label: string; emptyHint: s
   { key: "identity", label: "Identity Docs", emptyHint: "Aadhaar, PAN, Passport, Driving License" },
   { key: "email", label: "Email Accounts", emptyHint: "Email logins, recovery details" },
   { key: "bank", label: "Bank Accounts", emptyHint: "Account numbers, IFSC, nominee" },
-  { key: "investment", label: "Investments", emptyHint: "Demat, broker logins, PAN linkage" },
-  { key: "social", label: "Social Media", emptyHint: "WhatsApp, Email, Messaging Services" },
   { key: "insurance", label: "Insurance", emptyHint: "Life, Health, General — with reminders" },
   { key: "will", label: "Legal Will", emptyHint: "Will status, partner ref, quarterly review" },
+  { key: "investment", label: "Investments", emptyHint: "Demat, broker logins, PAN linkage" },
+  { key: "social", label: "Social Media", emptyHint: "WhatsApp, Email, Messaging Services" },
 ];
+
 
 
 // ---------- Per-category payload shapes ----------
