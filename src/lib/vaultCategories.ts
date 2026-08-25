@@ -69,7 +69,32 @@ export interface BankEntry {
 }
 
 
+
+export interface InvestmentEntry {
+  label: string;          // Title, e.g. "HDFC Securities Demat"
+  platform: string;       // Platform / Broker
+  account_id?: string;
+  demat_number?: string;
+  linked_pan?: string;
+  login_id?: string;
+  password?: string;
+  notes?: string;
+  attachment?: VaultAttachment;
+}
+
+export interface SocialEntry {
+  label: string;          // Title, e.g. "WhatsApp"
+  platform: string;
+  username_email?: string;
+  phone_number?: string;
+  password?: string;
+  recovery_email?: string;
+  notes?: string;
+  attachment?: VaultAttachment;
+}
+
 export type InsuranceCategory = "life" | "health" | "general";
+
 
 export interface InsuranceEntry {
   label: string;          // e.g. "HDFC Ergo Health"
