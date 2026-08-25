@@ -10,6 +10,7 @@ import { lovable } from "@/integrations/lovable/index";
 import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
+import { useSeoMeta } from "@/components/SeoMeta";
 
 
 // Only allow same-origin relative paths as post-login redirect targets.
@@ -36,6 +37,11 @@ const formatPhone = (value: string) => toE164(value);
 const REMEMBER_KEY = "checkin_remember_id";
 
 const Login = () => {
+  useSeoMeta({
+    title: "Sign in to Check-iN",
+    description: "Sign in to Check-iN with your phone number or email to manage daily check-ins, medication reminders, SOS alerts and guardian updates.",
+    canonicalPath: "/login",
+  });
   const { signIn, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
