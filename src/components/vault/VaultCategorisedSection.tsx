@@ -804,10 +804,17 @@ function EntryForm({
   return (
     <div className="space-y-3 py-2">
       <div>
-        <Label>Label *</Label>
+        <Label>{category === "investment" || category === "social" ? "Title *" : "Label *"}</Label>
         <Input value={(draft as any).label || ""} onChange={(e) => set({ label: e.target.value } as any)}
-          placeholder="A short nickname e.g. Personal Gmail" />
+          placeholder={
+            category === "social"
+              ? "WhatsApp, Email, Messaging Services"
+              : category === "investment"
+                ? "e.g., HDFC Securities Demat"
+                : "A short nickname e.g. Personal Gmail"
+          } />
       </div>
+
 
       {category === "identity" && (
         <>
