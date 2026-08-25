@@ -95,7 +95,9 @@ const VaultCategorisedSection = ({ userId, pin, category }: VaultCategorisedSect
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<VaultCategory>("identity");
+  const [activeCategoryState, setActiveCategory] = useState<VaultCategory>("identity");
+  const activeCategory: VaultCategory = category ?? activeCategoryState;
+
   const [pendingIdentityFiles, setPendingIdentityFiles] = useState<File[]>([]);
   const [pendingCardFile, setPendingCardFile] = useState<File | null>(null);
   const [cardOcrLoading, setCardOcrLoading] = useState(false);
