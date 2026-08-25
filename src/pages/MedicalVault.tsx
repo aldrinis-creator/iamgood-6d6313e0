@@ -29,7 +29,7 @@ import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 import VaultCategorisedSection from "@/components/vault/VaultCategorisedSection";
 import { useVaultReminderScheduler } from "@/hooks/useVaultReminderScheduler";
 
-const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Other"];
+const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Doctor's Diagnosis", "Other"];
 
 interface MedicalRecord {
   id: string;
@@ -640,7 +640,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-6">
+        <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="records" className="text-xs gap-1">
             <FileText className="w-3 h-3" /> Records
           </TabsTrigger>
@@ -791,7 +791,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                   <CardContent className="p-6 text-center">
                     <Eye className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
-                      No visual check results yet. Run a Urine, Tongue, or Face scan from My Health → Health Tools.
+                      No visual check results yet. Run a health scan from My Health → Health Tools → Symptom Checker or Document Analyzer.
                     </p>
                   </CardContent>
                 </Card>

@@ -23,9 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Accordion, AccordionItem, AccordionTrigger, AccordionContent,
-} from "@/components/ui/accordion";
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -33,8 +30,9 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
-  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip,
+  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { encrypt, decrypt, encryptBytes } from "@/lib/encryption";
@@ -86,6 +84,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<VaultCategory>("identity");
+  const [pendingIdentityFiles, setPendingIdentityFiles] = useState<File[]>([]);
+  const [pendingCardFile, setPendingCardFile] = useState<File | null>(null);
+  const [cardOcrLoading, setCardOcrLoading] = useState(false);
+
 
   // ---------- Load + decrypt ----------
   const reload = useCallback(async () => {
@@ -143,6 +146,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDraft(blankDraft(category));
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
     setDialogOpen(true);
   };
   const openEdit = (doc: DocRow) => {
@@ -156,8 +161,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDraft({ ...entry });
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
     setDialogOpen(true);
   };
+
 
   const closeDialog = () => {
     setDialogOpen(false);
@@ -165,7 +173,45 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setEditingDoc(null);
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
+    setCardOcrLoading(false);
   };
+
+  // ---------- Card OCR (server-side vision via `scan-card` edge function) ----------
+  const runCardOcr = async (file: File) => {
+    setCardOcrLoading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res((r.result as string).split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("scan-card", {
+        body: { image_base64: base64, mime_type: file.type || "image/jpeg" },
+      });
+      if (error) throw error;
+      const parsed = data?.card;
+      if (!parsed) {
+        toast.info("Could not auto-read card — please fill in manually");
+        return;
+      }
+      setDraft((prev) => ({
+        ...(prev as BankEntry),
+        card_number: parsed.card_number ?? (prev as BankEntry)?.card_number ?? "",
+        card_expiry: parsed.card_expiry ?? (prev as BankEntry)?.card_expiry ?? "",
+        card_name: parsed.card_name ?? (prev as BankEntry)?.card_name ?? "",
+        card_type: parsed.card_type ?? (prev as BankEntry)?.card_type,
+      } as BankEntry));
+      toast.success("Card details extracted — please verify before saving");
+    } catch {
+      toast.error("Card scan failed");
+    } finally {
+      setCardOcrLoading(false);
+    }
+  };
+
 
   // ---------- Save ----------
   const saveEntry = async () => {
@@ -221,6 +267,48 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
         (finalDraft as any).attachment = undefined;
       }
 
+      // Step 2b: identity multi-photo attachments (up to 5, each encrypted)
+      if (dialogCategory === "identity") {
+        const kept = ((draft as IdentityEntry).attachments ?? []) as VaultAttachment[];
+        const removedPaths = (((decryptedById[docId] as IdentityEntry)?.attachments ?? []) as VaultAttachment[])
+          .filter((a) => !kept.some((k) => k.path === a.path))
+          .map((a) => a.path);
+        if (removedPaths.length) {
+          await supabase.storage.from("vault-attachments").remove(removedPaths);
+        }
+        const added: VaultAttachment[] = [];
+        for (let i = 0; i < pendingIdentityFiles.length && kept.length + added.length < 5; i++) {
+          const f = pendingIdentityFiles[i];
+          const enc = await encryptBytes(await f.arrayBuffer(), pin);
+          const path = `${userId}/identity_${Date.now()}_${i}.bin`;
+          const { error: upErr } = await supabase.storage
+            .from("vault-attachments")
+            .upload(path, new Blob([enc.ciphertext], { type: "text/plain" }), { upsert: true, contentType: "text/plain" });
+          if (upErr) throw upErr;
+          added.push({
+            path, file_name: f.name, mime_type: f.type || "image/jpeg",
+            iv: enc.iv, salt: enc.salt, size: f.size,
+          });
+        }
+        (finalDraft as IdentityEntry).attachments = [...kept, ...added].slice(0, 5);
+      }
+
+      // Step 2c: bank card photo (encrypted)
+      if (dialogCategory === "bank" && pendingCardFile) {
+        const enc = await encryptBytes(await pendingCardFile.arrayBuffer(), pin);
+        const path = `${userId}/card_${docId}.bin`;
+        const { error: upErr } = await supabase.storage
+          .from("vault-attachments")
+          .upload(path, new Blob([enc.ciphertext], { type: "text/plain" }), { upsert: true, contentType: "text/plain" });
+        if (upErr) throw upErr;
+        (finalDraft as BankEntry).card_attachment = {
+          path, file_name: pendingCardFile.name,
+          mime_type: pendingCardFile.type || "image/jpeg",
+          iv: enc.iv, salt: enc.salt, size: pendingCardFile.size,
+        };
+      }
+
+
       // Step 3: re-encrypt with final draft (including attachment metadata).
       const { ciphertext, iv, salt } = await encrypt(JSON.stringify(finalDraft), pin);
       const { error: updErr } = await supabase
@@ -265,92 +353,113 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
 
   return (
     <>
-      <Accordion type="multiple" defaultValue={["identity"]} className="space-y-2">
-        {VAULT_CATEGORIES.map(({ key, label, emptyHint }) => {
-          const Icon = CATEGORY_ICONS[key];
+      <div className="space-y-3">
+        {/* Row-wise scrollable category tabs */}
+        <div className="overflow-x-auto -mx-1 px-1">
+          <div className="flex gap-2 pb-1 min-w-max">
+            {VAULT_CATEGORIES.map(({ key, label }) => {
+              const Icon = CATEGORY_ICONS[key];
+              const count = grouped[key]?.length ?? 0;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveCategory(key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap border transition-colors
+                    ${activeCategory === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                  {count > 0 && (
+                    <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold
+                      ${activeCategory === key ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active category content */}
+        {VAULT_CATEGORIES.filter((c) => c.key === activeCategory).map(({ key, label, emptyHint }) => {
           const items = grouped[key];
           return (
-            <AccordionItem key={key} value={key} className="border rounded-lg px-3 bg-card">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-2 flex-1">
-                  <Icon className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">{label}</span>
-                  <Badge variant="secondary" className="ml-1 text-[10px]">{items.length}</Badge>
+            <div key={key} className="space-y-2">
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
-                {loading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-1">{emptyHint}</p>
-                ) : (
-                  items.map((doc) => {
-                    const entry = decryptedById[doc.id];
-                    const isOpen = revealed[doc.id];
-                    return (
-                      <Card key={doc.id} className="bg-muted/40">
-                        <CardContent className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {doc.label || (entry as any)?.label || doc.doc_type}
-                              </p>
-                              {entry && (
-                                <>
-                                  <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
-                                  <AttachmentBadge entry={entry} />
-                                </>
-                              )}
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              <Button size="icon" variant="ghost" className="h-7 w-7"
-                                onClick={() => setRevealed((r) => ({ ...r, [doc.id]: !r[doc.id] }))}
-                                title={isOpen ? "Hide" : "Reveal"}>
-                                {isOpen ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7"
-                                onClick={() => openEdit(doc)} title="Edit">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
-                                onClick={() => removeEntry(doc)} title="Delete">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
+              ) : items.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">{emptyHint}</p>
+              ) : (
+                items.map((doc) => {
+                  const entry = decryptedById[doc.id];
+                  const isOpen = revealed[doc.id];
+                  return (
+                    <Card key={doc.id} className="bg-muted/40">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {doc.label || (entry as any)?.label || doc.doc_type}
+                            </p>
+                            {entry && (
+                              <>
+                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                <AttachmentBadge entry={entry} />
+                              </>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
-                <Button variant="outline" size="sm" className="w-full" onClick={() => openAdd(key)}>
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Add {label.replace(/s$/, "")}
+                          <div className="flex gap-1 shrink-0">
+                            <Button size="icon" variant="ghost" className="h-7 w-7"
+                              onClick={() => setRevealed((r) => ({ ...r, [doc.id]: !r[doc.id] }))}
+                              title={isOpen ? "Hide" : "Reveal"}>
+                              {isOpen ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7"
+                              onClick={() => openEdit(doc)} title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
+                              onClick={() => removeEntry(doc)} title="Delete">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+              <Button variant="outline" size="sm" className="w-full" onClick={() => openAdd(key)}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add {label.replace(/s$/, "")}
+              </Button>
+              {key === "will" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={async () => {
+                    const { data, error } = await supabase.functions.invoke("legal-will-partner", {
+                      body: { user_id: userId, action: "create" },
+                    });
+                    if (error || !data?.url) {
+                      toast.info("Will partner integration coming soon");
+                      return;
+                    }
+                    window.open(data.url, "_blank", "noopener,noreferrer");
+                  }}>
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> Create / Update Will via Partner
                 </Button>
-                {key === "will" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-xs"
-                    onClick={async () => {
-                      const { data, error } = await supabase.functions.invoke("legal-will-partner", {
-                        body: { user_id: userId, action: "create" },
-                      });
-                      if (error || !data?.url) {
-                        toast.info("Will partner integration coming soon");
-                        return;
-                      }
-                      window.open(data.url, "_blank", "noopener,noreferrer");
-                    }}>
-                    <ExternalLink className="w-3.5 h-3.5 mr-1" /> Create / Update Will via Partner
-                  </Button>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+              )}
+            </div>
           );
         })}
-      </Accordion>
+      </div>
 
       <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1 mt-3">
         <ShieldCheck className="w-3 h-3" /> Zero-knowledge AES-256-GCM encryption
@@ -377,8 +486,14 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
               onSelectFile={setPendingFile}
               removeAttachment={removeAttachment}
               onToggleRemoveAttachment={setRemoveAttachment}
+              pendingIdentityFiles={pendingIdentityFiles}
+              onIdentityFilesChange={setPendingIdentityFiles}
+              pendingCardFile={pendingCardFile}
+              onCardFileSelect={(f) => { setPendingCardFile(f); runCardOcr(f); }}
+              cardOcrLoading={cardOcrLoading}
             />
           )}
+
           <DialogFooter>
             <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
             <Button onClick={saveEntry} disabled={saving}>
@@ -398,7 +513,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
 
 function blankDraft(category: VaultCategory): AnyEntry {
   switch (category) {
-    case "identity": return { label: "", value: "", notes: "" };
+    case "identity": return { label: "", value: "", notes: "", attachments: [] };
     case "email":    return { label: "", email: "", password: "", recovery_email: "", notes: "" };
     case "bank":     return { label: "", bank_name: "", account_number: "", ifsc: "", account_type: "savings",
                               nominee_name: "", nominee_relation: "", nominee_phone: "", branch: "", notes: "" };
@@ -509,12 +624,22 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
   }
   if (category === "bank") {
     const e = entry as BankEntry;
+    const networkLabel = e.card_network_label
+      || (e.card_type ? ({ visa: "VISA", mastercard: "Mastercard", rupay: "RuPay", amex: "Amex", other: "Card" } as Record<string, string>)[e.card_type] : "");
+    const last4 = e.card_number ? e.card_number.slice(-4) : "";
     return (
       <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
         <div>{e.bank_name} · {e.account_type}</div>
         <div>A/c: <Mask value={e.account_number} reveal={reveal} /></div>
         <div>IFSC: {e.ifsc}</div>
         {e.nominee_name && <div>Nominee: {e.nominee_name} ({e.nominee_relation})</div>}
+        {(networkLabel || last4) && (
+          <div className="inline-flex items-center gap-1 mt-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+            <CreditCard className="w-3 h-3 text-primary" />
+            {networkLabel}
+            {last4 && <span className="font-mono">•••• {last4}</span>}
+          </div>
+        )}
       </div>
     );
   }
@@ -545,13 +670,23 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
 
 function AttachmentBadge({ entry }: { entry: AnyEntry }) {
   const a = (entry as any).attachment as VaultAttachment | undefined;
-  if (!a) return null;
+  const photos = ((entry as IdentityEntry).attachments ?? []) as VaultAttachment[];
+  const cardAtt = (entry as BankEntry).card_attachment;
+  if (!a && photos.length === 0 && !cardAtt) return null;
   return (
-    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
-      <Paperclip className="w-3 h-3" /> Attachment
+    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-2">
+      {(a || cardAtt) && (
+        <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" /> Attachment</span>
+      )}
+      {photos.length > 0 && (
+        <span className="flex items-center gap-1">
+          <Camera className="w-3 h-3" /> {photos.length} photo{photos.length > 1 ? "s" : ""}
+        </span>
+      )}
     </div>
   );
 }
+
 
 // ===================================================================
 // Entry form
@@ -560,6 +695,8 @@ function AttachmentBadge({ entry }: { entry: AnyEntry }) {
 function EntryForm({
   category, draft, onChange, pin,
   pendingFile, onSelectFile, removeAttachment, onToggleRemoveAttachment,
+  pendingIdentityFiles, onIdentityFilesChange,
+  pendingCardFile, onCardFileSelect, cardOcrLoading,
 }: {
   category: VaultCategory;
   draft: AnyEntry;
@@ -569,10 +706,15 @@ function EntryForm({
   onSelectFile: (f: File | null) => void;
   removeAttachment: boolean;
   onToggleRemoveAttachment: (r: boolean) => void;
+  pendingIdentityFiles: File[];
+  onIdentityFilesChange: (files: File[]) => void;
+  pendingCardFile: File | null;
+  onCardFileSelect: (f: File) => void;
+  cardOcrLoading: boolean;
 }) {
   const set = (patch: Partial<AnyEntry>) => onChange({ ...draft, ...patch } as AnyEntry);
   const existingAttachment = (draft as any).attachment as VaultAttachment | undefined;
-
+  const identityAttachments = ((draft as IdentityEntry).attachments ?? []) as VaultAttachment[];
 
   return (
     <div className="space-y-3 py-2">
@@ -588,6 +730,52 @@ function EntryForm({
             <Label>Value *</Label>
             <Input value={(draft as IdentityEntry).value} onChange={(e) => set({ value: e.target.value } as any)}
               placeholder="Aadhaar / PAN / Passport number" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Document Photos (up to 5)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {identityAttachments.map((att, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg border bg-muted flex items-center justify-center overflow-hidden">
+                  <span className="text-[10px] text-muted-foreground text-center px-1 truncate">{att.file_name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const atts = [...identityAttachments];
+                      atts.splice(idx, 1);
+                      set({ attachments: atts } as any);
+                    }}
+                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]"
+                  >×</button>
+                </div>
+              ))}
+              {identityAttachments.length + pendingIdentityFiles.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = "image/*";
+                    input.multiple = true;
+                    input.onchange = (e) => {
+                      const files = Array.from((e.target as HTMLInputElement).files ?? []);
+                      const room = 5 - identityAttachments.length - pendingIdentityFiles.length;
+                      onIdentityFilesChange([...pendingIdentityFiles, ...files.slice(0, Math.max(room, 0))]);
+                    };
+                    input.click();
+                  }}
+                  className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span className="text-[10px]">Add photo</span>
+                </button>
+              )}
+            </div>
+            {pendingIdentityFiles.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {pendingIdentityFiles.length} photo(s) ready to encrypt &amp; save
+              </p>
+            )}
           </div>
         </>
       )}
@@ -638,6 +826,88 @@ function EntryForm({
                 </div>
               </div>
             </div>
+
+            {/* Debit / Credit card */}
+            <div className="space-y-3 pt-3 border-t border-border">
+              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5" /> Debit / Credit Card (optional)
+              </p>
+
+              <Button type="button" variant="outline" className="w-full gap-2" size="sm"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file"; input.accept = "image/*";
+                  (input as any).capture = "environment";
+                  input.onchange = (ev) => {
+                    const file = (ev.target as HTMLInputElement).files?.[0];
+                    if (file) onCardFileSelect(file);
+                  };
+                  input.click();
+                }}>
+                <Camera className="w-4 h-4" /> Scan Card with Camera
+              </Button>
+
+              {cardOcrLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Reading card details...
+                </div>
+              )}
+              {pendingCardFile && !cardOcrLoading && (
+                <p className="text-[11px] text-muted-foreground">
+                  Card photo ready to encrypt &amp; save ({pendingCardFile.name})
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <Label className="text-xs">Card Number</Label>
+                  <Input
+                    value={e.card_number ?? ""}
+                    onChange={(ev) => set({ card_number: ev.target.value.replace(/\D/g, "").slice(0, 16) } as any)}
+                    placeholder="1234 5678 9012 3456" maxLength={19}
+                    inputMode="numeric" className="font-mono text-base"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Expiry (MM/YY)</Label>
+                  <Input
+                    value={e.card_expiry ?? ""}
+                    onChange={(ev) => set({ card_expiry: ev.target.value } as any)}
+                    placeholder="MM/YY" maxLength={5} className="text-base"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">CVV</Label>
+                  <Input
+                    value={e.card_cvv ?? ""}
+                    onChange={(ev) => set({ card_cvv: ev.target.value.replace(/\D/g, "").slice(0, 4) } as any)}
+                    placeholder="•••" maxLength={4} type="password" className="text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Name on Card</Label>
+                  <Input
+                    value={e.card_name ?? ""}
+                    onChange={(ev) => set({ card_name: ev.target.value } as any)}
+                    placeholder="As printed on card" className="text-base"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Card Network</Label>
+                  <Select value={e.card_type ?? ""}
+                    onValueChange={(v) => set({ card_type: v as BankEntry["card_type"] } as any)}>
+                    <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visa">VISA</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                      <SelectItem value="rupay">RuPay</SelectItem>
+                      <SelectItem value="amex">Amex</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </>
         );
       })()}
@@ -684,7 +954,7 @@ function EntryForm({
               <div><Label className="text-[11px]">Renewal</Label><Input type="date" value={e.renewal_date || ""} onChange={(ev) => set({ renewal_date: ev.target.value } as any)} /></div>
               <div><Label className="text-[11px]">Expiry</Label><Input type="date" value={e.expiry_date || ""} onChange={(ev) => set({ expiry_date: ev.target.value } as any)} /></div>
             </div>
-            <p className="text-[11px] text-muted-foreground -mt-1">Reminders fire 7d / 3d / 24h before renewal & expiry.</p>
+            <p className="text-[11px] text-muted-foreground -mt-1">Reminders fire 7d / 3d / 24h before renewal &amp; expiry.</p>
             <div className="border-t pt-3">
               <p className="text-xs font-semibold mb-2">Nominee details</p>
               <div className="space-y-2">
@@ -746,14 +1016,16 @@ function EntryForm({
         );
       })()}
 
-      <VaultAttachmentField
-        existing={existingAttachment}
-        pendingFile={pendingFile}
-        onSelectFile={onSelectFile}
-        removed={removeAttachment}
-        onToggleRemove={onToggleRemoveAttachment}
-        pin={pin}
-      />
+      {category !== "identity" && (
+        <VaultAttachmentField
+          existing={existingAttachment}
+          pendingFile={pendingFile}
+          onSelectFile={onSelectFile}
+          removed={removeAttachment}
+          onToggleRemove={onToggleRemoveAttachment}
+          pin={pin}
+        />
+      )}
 
       <div>
         <Label>Notes</Label>
@@ -762,5 +1034,6 @@ function EntryForm({
     </div>
   );
 }
+
 
 export default VaultCategorisedSection;
