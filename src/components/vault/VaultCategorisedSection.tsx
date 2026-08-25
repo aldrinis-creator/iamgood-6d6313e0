@@ -30,8 +30,9 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
-  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard,
+  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard, Download,
 } from "lucide-react";
+
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
