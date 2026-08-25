@@ -65,7 +65,10 @@ interface DocRow {
 interface VaultCategorisedSectionProps {
   userId: string;
   pin: string;
+  /** When set, only this category is rendered (no tab strip). */
+  category?: VaultCategory;
 }
+
 
 const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: string }>> = {
   identity: IdCard,
@@ -78,8 +81,9 @@ const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: st
 };
 
 
-const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) => {
+const VaultCategorisedSection = ({ userId, pin, category }: VaultCategorisedSectionProps) => {
   const [docs, setDocs] = useState<DocRow[]>([]);
+
   const [decryptedById, setDecryptedById] = useState<Record<string, AnyEntry>>({});
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -91,7 +95,9 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<VaultCategory>("identity");
+  const [activeCategoryState, setActiveCategory] = useState<VaultCategory>("identity");
+  const activeCategory: VaultCategory = category ?? activeCategoryState;
+
   const [pendingIdentityFiles, setPendingIdentityFiles] = useState<File[]>([]);
   const [pendingCardFile, setPendingCardFile] = useState<File | null>(null);
   const [cardOcrLoading, setCardOcrLoading] = useState(false);
@@ -361,7 +367,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   return (
     <>
       <div className="space-y-3">
-        {/* Row-wise scrollable category tabs */}
+        {/* Row-wise scrollable category tabs (hidden when a single category is pinned) */}
+        {!category && (
         <div className="overflow-x-auto -mx-1 px-1">
           <div className="flex gap-2 pb-1 min-w-max">
             {VAULT_CATEGORIES.map(({ key, label }) => {
@@ -390,6 +397,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
             })}
           </div>
         </div>
+        )}
+
 
         {/* Active category content */}
         {VAULT_CATEGORIES.filter((c) => c.key === activeCategory).map(({ key, label, emptyHint }) => {
