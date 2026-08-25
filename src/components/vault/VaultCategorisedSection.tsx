@@ -143,6 +143,8 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDraft(blankDraft(category));
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
     setDialogOpen(true);
   };
   const openEdit = (doc: DocRow) => {
@@ -156,8 +158,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setDraft({ ...entry });
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
     setDialogOpen(true);
   };
+
 
   const closeDialog = () => {
     setDialogOpen(false);
