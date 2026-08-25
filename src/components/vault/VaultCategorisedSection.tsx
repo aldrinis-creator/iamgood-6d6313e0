@@ -265,92 +265,113 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
 
   return (
     <>
-      <Accordion type="multiple" defaultValue={["identity"]} className="space-y-2">
-        {VAULT_CATEGORIES.map(({ key, label, emptyHint }) => {
-          const Icon = CATEGORY_ICONS[key];
+      <div className="space-y-3">
+        {/* Row-wise scrollable category tabs */}
+        <div className="overflow-x-auto -mx-1 px-1">
+          <div className="flex gap-2 pb-1 min-w-max">
+            {VAULT_CATEGORIES.map(({ key, label }) => {
+              const Icon = CATEGORY_ICONS[key];
+              const count = grouped[key]?.length ?? 0;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveCategory(key)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap border transition-colors
+                    ${activeCategory === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                  {count > 0 && (
+                    <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold
+                      ${activeCategory === key ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active category content */}
+        {VAULT_CATEGORIES.filter((c) => c.key === activeCategory).map(({ key, label, emptyHint }) => {
           const items = grouped[key];
           return (
-            <AccordionItem key={key} value={key} className="border rounded-lg px-3 bg-card">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-2 flex-1">
-                  <Icon className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">{label}</span>
-                  <Badge variant="secondary" className="ml-1 text-[10px]">{items.length}</Badge>
+            <div key={key} className="space-y-2">
+              {loading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
-                {loading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-1">{emptyHint}</p>
-                ) : (
-                  items.map((doc) => {
-                    const entry = decryptedById[doc.id];
-                    const isOpen = revealed[doc.id];
-                    return (
-                      <Card key={doc.id} className="bg-muted/40">
-                        <CardContent className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {doc.label || (entry as any)?.label || doc.doc_type}
-                              </p>
-                              {entry && (
-                                <>
-                                  <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
-                                  <AttachmentBadge entry={entry} />
-                                </>
-                              )}
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              <Button size="icon" variant="ghost" className="h-7 w-7"
-                                onClick={() => setRevealed((r) => ({ ...r, [doc.id]: !r[doc.id] }))}
-                                title={isOpen ? "Hide" : "Reveal"}>
-                                {isOpen ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7"
-                                onClick={() => openEdit(doc)} title="Edit">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
-                                onClick={() => removeEntry(doc)} title="Delete">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
+              ) : items.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-1">{emptyHint}</p>
+              ) : (
+                items.map((doc) => {
+                  const entry = decryptedById[doc.id];
+                  const isOpen = revealed[doc.id];
+                  return (
+                    <Card key={doc.id} className="bg-muted/40">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {doc.label || (entry as any)?.label || doc.doc_type}
+                            </p>
+                            {entry && (
+                              <>
+                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                <AttachmentBadge entry={entry} />
+                              </>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
-                <Button variant="outline" size="sm" className="w-full" onClick={() => openAdd(key)}>
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Add {label.replace(/s$/, "")}
+                          <div className="flex gap-1 shrink-0">
+                            <Button size="icon" variant="ghost" className="h-7 w-7"
+                              onClick={() => setRevealed((r) => ({ ...r, [doc.id]: !r[doc.id] }))}
+                              title={isOpen ? "Hide" : "Reveal"}>
+                              {isOpen ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7"
+                              onClick={() => openEdit(doc)} title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
+                              onClick={() => removeEntry(doc)} title="Delete">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+              <Button variant="outline" size="sm" className="w-full" onClick={() => openAdd(key)}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add {label.replace(/s$/, "")}
+              </Button>
+              {key === "will" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={async () => {
+                    const { data, error } = await supabase.functions.invoke("legal-will-partner", {
+                      body: { user_id: userId, action: "create" },
+                    });
+                    if (error || !data?.url) {
+                      toast.info("Will partner integration coming soon");
+                      return;
+                    }
+                    window.open(data.url, "_blank", "noopener,noreferrer");
+                  }}>
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> Create / Update Will via Partner
                 </Button>
-                {key === "will" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-xs"
-                    onClick={async () => {
-                      const { data, error } = await supabase.functions.invoke("legal-will-partner", {
-                        body: { user_id: userId, action: "create" },
-                      });
-                      if (error || !data?.url) {
-                        toast.info("Will partner integration coming soon");
-                        return;
-                      }
-                      window.open(data.url, "_blank", "noopener,noreferrer");
-                    }}>
-                    <ExternalLink className="w-3.5 h-3.5 mr-1" /> Create / Update Will via Partner
-                  </Button>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+              )}
+            </div>
           );
         })}
-      </Accordion>
+      </div>
 
       <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1 mt-3">
         <ShieldCheck className="w-3 h-3" /> Zero-knowledge AES-256-GCM encryption
@@ -377,8 +398,14 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
               onSelectFile={setPendingFile}
               removeAttachment={removeAttachment}
               onToggleRemoveAttachment={setRemoveAttachment}
+              pendingIdentityFiles={pendingIdentityFiles}
+              onIdentityFilesChange={setPendingIdentityFiles}
+              pendingCardFile={pendingCardFile}
+              onCardFileSelect={(f) => { setPendingCardFile(f); runCardOcr(f); }}
+              cardOcrLoading={cardOcrLoading}
             />
           )}
+
           <DialogFooter>
             <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
             <Button onClick={saveEntry} disabled={saving}>
