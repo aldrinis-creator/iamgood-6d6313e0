@@ -704,6 +704,30 @@ function EntryPreview({ category, entry, reveal, pin }: { category: VaultCategor
       </div>
     );
   }
+  if (category === "investment") {
+    const e = entry as InvestmentEntry;
+    return (
+      <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+        <div>{e.platform}{e.account_id ? ` · ${e.account_id}` : ""}</div>
+        {e.demat_number && <div>Demat: <Mask value={e.demat_number} reveal={reveal} /></div>}
+        {e.linked_pan && <div>PAN: <Mask value={e.linked_pan} reveal={reveal} /></div>}
+        {e.login_id && <div>Login: {e.login_id}</div>}
+        {e.password && <div>Pwd: <Mask value={e.password} reveal={reveal} /></div>}
+      </div>
+    );
+  }
+  if (category === "social") {
+    const e = entry as SocialEntry;
+    return (
+      <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+        <div>{e.platform}{e.username_email ? ` · ${e.username_email}` : e.phone_number ? ` · ${e.phone_number}` : ""}</div>
+        {e.phone_number && <div>Phone: {e.phone_number}</div>}
+        {e.password && <div>Pwd: <Mask value={e.password} reveal={reveal} /></div>}
+        {e.recovery_email && <div>Recovery: {e.recovery_email}</div>}
+      </div>
+    );
+  }
+
   if (category === "insurance") {
     const e = entry as InsuranceEntry;
     return (
