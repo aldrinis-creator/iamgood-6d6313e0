@@ -406,19 +406,19 @@ const MedicalVaultContent = () => {
       });
   }, [userId]);
 
-  // Auto-shut Records & Profile after 30s idle for privacy
+  // Auto-shut open Medical Vault views after 30s idle for privacy
   useEffect(() => {
-    if (activeTab !== "records" && activeTab !== "profile") return;
+    if (section !== "medical" || !subview) return;
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        setActiveTab("records");
+        setSubview(null);
         setShowUploadForm(false);
         setSearchQuery("");
         setViewRecord(null);
         if (!idleToastShownRef.current) {
-          toast("Tab auto-closed for privacy");
+          toast("Closed for privacy");
           idleToastShownRef.current = true;
         }
       }, 30000);
@@ -430,7 +430,8 @@ const MedicalVaultContent = () => {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [activeTab]);
+  }, [section, subview]);
+
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const buildShareText = () => {
