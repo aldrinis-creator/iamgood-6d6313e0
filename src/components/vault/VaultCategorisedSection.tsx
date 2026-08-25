@@ -165,7 +165,45 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
     setEditingDoc(null);
     setPendingFile(null);
     setRemoveAttachment(false);
+    setPendingIdentityFiles([]);
+    setPendingCardFile(null);
+    setCardOcrLoading(false);
   };
+
+  // ---------- Card OCR (server-side vision via `scan-card` edge function) ----------
+  const runCardOcr = async (file: File) => {
+    setCardOcrLoading(true);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res((r.result as string).split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("scan-card", {
+        body: { image_base64: base64, mime_type: file.type || "image/jpeg" },
+      });
+      if (error) throw error;
+      const parsed = data?.card;
+      if (!parsed) {
+        toast.info("Could not auto-read card — please fill in manually");
+        return;
+      }
+      setDraft((prev) => ({
+        ...(prev as BankEntry),
+        card_number: parsed.card_number ?? (prev as BankEntry)?.card_number ?? "",
+        card_expiry: parsed.card_expiry ?? (prev as BankEntry)?.card_expiry ?? "",
+        card_name: parsed.card_name ?? (prev as BankEntry)?.card_name ?? "",
+        card_type: parsed.card_type ?? (prev as BankEntry)?.card_type,
+      } as BankEntry));
+      toast.success("Card details extracted — please verify before saving");
+    } catch {
+      toast.error("Card scan failed");
+    } finally {
+      setCardOcrLoading(false);
+    }
+  };
+
 
   // ---------- Save ----------
   const saveEntry = async () => {
