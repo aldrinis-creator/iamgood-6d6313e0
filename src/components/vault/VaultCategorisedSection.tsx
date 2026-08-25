@@ -558,7 +558,18 @@ function validateDraft(category: VaultCategory, draft: AnyEntry): boolean {
       if (!b.bank_name?.trim() || !b.account_number?.trim()) { toast.error("Bank & account required"); return false; }
       break;
     }
+    case "investment": {
+      const v = draft as InvestmentEntry;
+      if (!v.platform?.trim()) { toast.error("Platform / Broker is required"); return false; }
+      break;
+    }
+    case "social": {
+      const s = draft as SocialEntry;
+      if (!s.platform?.trim()) { toast.error("Platform is required"); return false; }
+      break;
+    }
     case "insurance": {
+
       const i = draft as InsuranceEntry;
       if (!i.company?.trim() || !i.policy_number?.trim()) { toast.error("Company & policy number required"); return false; }
       break;
