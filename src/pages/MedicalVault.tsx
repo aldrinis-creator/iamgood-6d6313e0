@@ -888,204 +888,83 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
               </Card>
             ));
           })()}
-        </TabsContent>
-
-        <TabsContent value="profile" className="space-y-4 mt-4">
-          {profileLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : profileView ? (
-            <>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <User className="w-4 h-4 text-primary" /> Personal Info
-                  </CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <InfoRow label="Name" value={profileView.full_name} />
-                  <InfoRow label="Date of Birth" value={profileView.date_of_birth ? new Date(profileView.date_of_birth).toLocaleDateString("en-IN") : ""} />
-                  <InfoRow label="Gender" value={profileView.gender} capitalize />
-                  <InfoRow label="Phone" value={profileView.phone} />
-                  <InfoRow label="Weight" value={profileView.weight_kg ? `${profileView.weight_kg} kg` : ""} />
-                  <InfoRow label="Height" value={profileView.height_m ? `${profileView.height_m} m` : ""} />
-                </CardContent>
-              </Card>
+          )}
+        </div>
+      )}
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-destructive" /> Health & Lifestyle
-                  </CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <InfoRow label="Blood Group" value={profileView.blood_group} />
-                  <InfoRow label="Diet Type" value={profileView.diet_type} capitalize />
-                  <InfoRow label="Activity Level" value={profileView.activity_level} capitalize />
-                  <InfoRow label="Smoking" value={profileView.smoking} capitalize />
-                  <InfoRow label="Alcohol" value={profileView.alcohol} capitalize />
-                  {profileView.allergies.length > 0 && (
-                    <div className="pt-1">
-                      <span className="text-muted-foreground text-sm">Allergies</span>
-                      <div className="flex gap-1 flex-wrap mt-1">{profileView.allergies.map((a, i) => <Badge key={i} variant="destructive" className="text-xs">{a}</Badge>)}</div>
-                    </div>
-                  )}
-                  {profileView.medical_conditions.length > 0 && (
-                    <div className="pt-1">
-                      <span className="text-muted-foreground text-sm">Medical Conditions</span>
-                      <div className="flex gap-1 flex-wrap mt-1">{profileView.medical_conditions.map((c, i) => <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>)}</div>
-                    </div>
-                  )}
-                  {profileView.dietary_preferences.length > 0 && (
-                    <div className="pt-1">
-                      <span className="text-muted-foreground text-sm">Dietary Preferences</span>
-                      <div className="flex gap-1 flex-wrap mt-1">{profileView.dietary_preferences.map((d, i) => <Badge key={i} variant="outline" className="text-xs">{d}</Badge>)}</div>
-                    </div>
-                  )}
-                  {profileView.health_goals.length > 0 && (
-                    <div className="pt-1">
-                      <span className="text-muted-foreground text-sm">Health Goals</span>
-                      <div className="flex gap-1 flex-wrap mt-1">{profileView.health_goals.map((g, i) => <Badge key={i} variant="outline" className="text-xs">{g}</Badge>)}</div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+      {/* ========== DATA VAULT ========== */}
+      {section === "data" && (
+        <div className="space-y-4">
+          <Button variant="ghost" size="sm" className="gap-1 -ml-2"
+            onClick={() => { setSection(null); setDataCategory(null); }}>
+            <ArrowLeft className="w-4 h-4" /> Secure Vault
+          </Button>
 
-              {/* Family Doctor & Emergency — read-only */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-primary" /> Emergency & Doctor
-                  </CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Edit in My Profile page</p>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <InfoRow label="Family Doctor" value={profileView.family_doctor_name} />
-                  <InfoRow label="Doctor Phone" value={profileView.family_doctor_phone} />
-                  {profileView.emergency_notes && (
-                    <div className="pt-1">
-                      <span className="text-muted-foreground text-sm">Emergency Notes</span>
-                      <p className="text-sm mt-1">{profileView.emergency_notes}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Medications — read-only */}
-              {profileMeds.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Pill className="w-4 h-4 text-primary" /> Current Medications
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {profileMeds.map((med, i) => {
-                      const isLow = med.remaining_quantity <= med.low_stock_threshold;
-                      return (
-                        <div key={i} className={`flex items-center gap-3 p-2 rounded-lg bg-muted/50 ${isLow ? "border border-destructive/30" : ""}`}>
-                          <Pill className="w-4 h-4 text-primary shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{med.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {med.dosage} · {FREQUENCIES[med.frequency] || med.frequency}
-                            </p>
-                          </div>
-                          {isLow && (
-                            <Badge variant="destructive" className="text-[10px] shrink-0">
-                              <AlertTriangle className="w-3 h-3 mr-0.5" /> Low
-                            </Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Guardians — read-only */}
-              {profileGuardians.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-primary" /> Guardians
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {profileGuardians.map((g, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                        <div>
-                          <p className="text-sm font-medium">{g.guardian_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {g.relation && <span className="capitalize">{g.relation} • </span>}{g.guardian_phone}
-                          </p>
-                        </div>
-                        {g.is_primary && <Badge className="text-xs">Primary</Badge>}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="flex gap-2">
-                <Button onClick={handleShareCard} variant="outline" className="flex-1" size="lg">
-                  <Share2 className="w-4 h-4 mr-2" /> Share
-                </Button>
-                <Button onClick={handlePrintCard} disabled={generatingPdf} variant="outline" className="flex-1" size="lg">
-                  {generatingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                    : <><Printer className="w-4 h-4 mr-2" /> Print / PDF</>}
-                </Button>
-              </div>
-            </>
-          ) : null}
-        </TabsContent>
-
-        {/* ========== SECRET VAULT TAB ========== */}
-        <TabsContent value="vault" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" /> Encrypted ID & Documents
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                AES-256-GCM encrypted. Only you can decrypt with your vault PIN.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!storedPinHash ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Set up your vault PIN first (it was created when you unlocked this page).
+          {!storedPinHash ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Set up your vault PIN first (it was created when you unlocked this page).
+            </p>
+          ) : !vaultUnlocked ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary" /> Data Vault
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  AES-256-GCM encrypted. Only you can decrypt with your vault PIN.
                 </p>
-              ) : !vaultUnlocked ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Enter your 6-digit vault PIN to view or add encrypted documents.
-                  </p>
-                  <Input
-                    type="password" maxLength={6} inputMode="numeric"
-                    value={pinForVault} placeholder="● ● ● ● ● ●"
-                    onChange={(e) => setPinForVault(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    onKeyDown={(e) => e.key === "Enter" && pinForVault.length === 6 && unlockVault()}
-                    className="text-base"
-                  />
-                  <Button onClick={unlockVault} disabled={pinForVault.length !== 6} className="w-full">
-                    <Lock className="w-4 h-4 mr-2" /> Unlock Vault
-                  </Button>
-                </div>
-              ) : (
-                <VaultCategorisedSection userId={userId!} pin={pinForVault} />
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Enter your 6-digit vault PIN to view or add encrypted entries.
+                </p>
+                <Input
+                  type="password" maxLength={6} inputMode="numeric"
+                  value={pinForVault} placeholder="● ● ● ● ● ●"
+                  onChange={(e) => setPinForVault(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onKeyDown={(e) => e.key === "Enter" && pinForVault.length === 6 && unlockVault()}
+                  className="text-base"
+                />
+                <Button onClick={unlockVault} disabled={pinForVault.length !== 6} className="w-full">
+                  <Lock className="w-4 h-4 mr-2" /> Unlock Vault
+                </Button>
+              </CardContent>
+            </Card>
+          ) : !dataCategory ? (
+            <div className="space-y-2">
+              {VAULT_CATEGORIES.map((c) => (
+                <Card key={c.key} className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setDataCategory(c.key)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Lock className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{c.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{c.emptyHint}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Button variant="ghost" size="sm" className="gap-1 -ml-2" onClick={() => setDataCategory(null)}>
+                <ArrowLeft className="w-4 h-4" />
+                {VAULT_CATEGORIES.find((c) => c.key === dataCategory)?.label}
+              </Button>
+              <VaultCategorisedSection userId={userId!} pin={pinForVault} category={dataCategory} />
+            </div>
+          )}
 
           <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1">
             <ShieldCheck className="w-3 h-3" /> Zero-knowledge AES-256-GCM encryption
           </p>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
+
 
       {/* View Record Dialog */}
       <Dialog open={!!viewRecord} onOpenChange={(open) => { if (!open) { setViewRecord(null); setViewSignedUrl(""); } }}>
