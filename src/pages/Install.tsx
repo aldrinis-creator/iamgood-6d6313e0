@@ -40,16 +40,15 @@ const Install = () => {
   }, [guardianToken, session, authLoading, navigate]);
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-  // WhatsApp / Instagram / Facebook webviews cannot install a PWA and often block
-  // the OTP autofill, so the guardian must be moved to Chrome or Safari first.
   const ua = navigator.userAgent || "";
+
+  // FIX: WhatsApp / Instagram / Facebook webviews cannot install a PWA and often block
+  // OTP autofill. Detect them and auto-redirect to the system browser on mount.
   const isInAppBrowser = /\bFB[AV]V\b|FBAN|FB_IAB|Instagram|Line\/|WhatsApp|GSA\/|; wv\)/i.test(ua);
   const currentUrl = typeof window !== "undefined" ? window.location.href : "";
 
   const openInSystemBrowser = () => {
     if (isIOS) {
-      // Safari handles this scheme; the user can also use the "Open in Safari" menu.
       window.location.href = currentUrl.replace(/^https?:/, "x-safari-https:");
       return;
     }
@@ -57,7 +56,17 @@ const Install = () => {
     window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.android.chrome;end`;
   };
 
-
+  // FIX: Auto-fire the browser redirect on mount — don't make the guardian tap a button.
+  // The button is kept as a visible fallback in case the scheme redirect fails silently.
+  useEffect(() => {
+    if (isInAppBrowser && !isInstalled) {
+      // Small delay to allow the page to render so the guardian sees what's happening
+      // before being redirected (prevents a blank-screen redirect feeling).
+      const t = setTimeout(openInSystemBrowser, 600);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInAppBrowser, isInstalled]);
 
   return (
     <AppLayout>
@@ -83,18 +92,19 @@ const Install = () => {
           </p>
         </div>
 
+        {/* FIX: Show redirect notice + manual button as fallback */}
         {isInAppBrowser && !isInstalled && (
           <Card className="border-destructive/40 bg-destructive/5">
             <CardContent className="pt-6 space-y-3">
               <p className="text-sm font-semibold text-foreground">
-                Open this page in {isIOS ? "Safari" : "Chrome"} to continue
+                Opening in {isIOS ? "Safari" : "Chrome"}…
               </p>
               <p className="text-xs text-muted-foreground">
-                You opened the link inside WhatsApp. Installing the app and receiving the verification code
-                only work in your phone's main browser.
+                You opened this link inside WhatsApp. We're redirecting you to your phone's browser
+                automatically — PWA install and OTP delivery only work there.
               </p>
               <Button onClick={openInSystemBrowser} className="w-full h-12 text-base font-semibold">
-                Open in {isIOS ? "Safari" : "Chrome"}
+                Open in {isIOS ? "Safari" : "Chrome"} now
               </Button>
             </CardContent>
           </Card>
