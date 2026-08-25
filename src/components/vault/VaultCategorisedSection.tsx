@@ -81,8 +81,9 @@ const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: st
 };
 
 
-const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) => {
+const VaultCategorisedSection = ({ userId, pin, category }: VaultCategorisedSectionProps) => {
   const [docs, setDocs] = useState<DocRow[]>([]);
+
   const [decryptedById, setDecryptedById] = useState<Record<string, AnyEntry>>({});
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
