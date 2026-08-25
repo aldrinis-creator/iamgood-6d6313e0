@@ -791,7 +791,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
                   <CardContent className="p-6 text-center">
                     <Eye className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
-                      No visual check results yet. Run a Urine, Tongue, or Face scan from My Health → Health Tools.
+                      No visual check results yet. Run a health scan from My Health → Health Tools → Symptom Checker or Document Analyzer.
                     </p>
                   </CardContent>
                 </Card>
