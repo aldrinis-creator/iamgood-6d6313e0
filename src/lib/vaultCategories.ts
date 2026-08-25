@@ -108,8 +108,10 @@ export interface IdentityEntry {
   label: string;
   value: string;
   notes?: string;
-  attachment?: VaultAttachment;
+  attachment?: VaultAttachment;      // legacy single attachment
+  attachments?: VaultAttachment[];   // up to 5 photos
 }
+
 
 // ---------- Reminder helpers ----------
 
