@@ -1085,7 +1085,7 @@ ${profileGuardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" :
 
 const MedicalVault = () => (
   <AppLayout>
-    <VaultGate title="Medical Vault">
+    <VaultGate title="Secure Vault">
       <MedicalVaultContent />
     </VaultGate>
   </AppLayout>
