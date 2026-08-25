@@ -398,7 +398,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
 
 function blankDraft(category: VaultCategory): AnyEntry {
   switch (category) {
-    case "identity": return { label: "", value: "", notes: "" };
+    case "identity": return { label: "", value: "", notes: "", attachments: [] };
     case "email":    return { label: "", email: "", password: "", recovery_email: "", notes: "" };
     case "bank":     return { label: "", bank_name: "", account_number: "", ifsc: "", account_type: "savings",
                               nominee_name: "", nominee_relation: "", nominee_phone: "", branch: "", notes: "" };
