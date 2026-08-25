@@ -137,7 +137,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   // ---------- Group by category (legacy rows with NULL category fall under "identity") ----------
   const grouped = useMemo(() => {
     const out: Record<VaultCategory, DocRow[]> = {
-      identity: [], email: [], bank: [], insurance: [], will: [],
+      identity: [], email: [], bank: [], investment: [], social: [], insurance: [], will: [],
     };
     for (const d of docs) {
       const cat = (d.category as VaultCategory) || "identity";
