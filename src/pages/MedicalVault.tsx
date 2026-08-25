@@ -4,12 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Eye, EyeOff, FileText, Shield, Heart, User, Upload, Trash2, Download,
-  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer, Share2, Save, Pill, AlertTriangle, ChevronDown
+  File, Loader2, Search, Plus, Lock, ShieldCheck, Camera, Printer, Share2, Save, Pill, AlertTriangle, ChevronDown,
+  ArrowLeft, ChevronRight, Stethoscope
 } from "lucide-react";
+import { VAULT_CATEGORIES, type VaultCategory } from "@/lib/vaultCategories";
+
 import ReactMarkdown from "react-markdown";
 import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
