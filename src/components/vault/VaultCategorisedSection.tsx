@@ -997,7 +997,35 @@ function EntryForm({
         );
       })()}
 
+      {category === "investment" && (() => {
+        const e = draft as InvestmentEntry;
+        return (
+          <>
+            <div><Label>Platform / Broker *</Label><Input value={e.platform || ""} placeholder="Enter platform/broker" onChange={(ev) => set({ platform: ev.target.value } as any)} /></div>
+            <div><Label>Account ID</Label><Input value={e.account_id || ""} placeholder="Enter account id" onChange={(ev) => set({ account_id: ev.target.value } as any)} /></div>
+            <div><Label>Demat Number</Label><Input value={e.demat_number || ""} placeholder="Enter demat number" onChange={(ev) => set({ demat_number: ev.target.value } as any)} /></div>
+            <div><Label>Linked PAN</Label><Input value={e.linked_pan || ""} placeholder="Enter linked pan" onChange={(ev) => set({ linked_pan: ev.target.value } as any)} /></div>
+            <div><Label>Login ID</Label><Input value={e.login_id || ""} placeholder="Enter login id" onChange={(ev) => set({ login_id: ev.target.value } as any)} /></div>
+            <div><Label>Password</Label><Input value={e.password || ""} placeholder="Enter password" onChange={(ev) => set({ password: ev.target.value } as any)} /></div>
+          </>
+        );
+      })()}
+
+      {category === "social" && (() => {
+        const e = draft as SocialEntry;
+        return (
+          <>
+            <div><Label>Platform *</Label><Input value={e.platform || ""} placeholder="Enter platform" onChange={(ev) => set({ platform: ev.target.value } as any)} /></div>
+            <div><Label>Username / Email</Label><Input value={e.username_email || ""} placeholder="Enter username/email" onChange={(ev) => set({ username_email: ev.target.value } as any)} /></div>
+            <div><Label>Phone Number</Label><Input value={e.phone_number || ""} placeholder="Enter phone number" inputMode="tel" onChange={(ev) => set({ phone_number: ev.target.value } as any)} /></div>
+            <div><Label>Password</Label><Input value={e.password || ""} placeholder="Enter password" onChange={(ev) => set({ password: ev.target.value } as any)} /></div>
+            <div><Label>Recovery Email</Label><Input value={e.recovery_email || ""} placeholder="Enter recovery email" onChange={(ev) => set({ recovery_email: ev.target.value } as any)} /></div>
+          </>
+        );
+      })()}
+
       {category === "insurance" && (() => {
+
         const e = draft as InsuranceEntry;
         return (
           <>
