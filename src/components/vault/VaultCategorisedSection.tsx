@@ -36,7 +36,7 @@ import {
 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { encrypt, decrypt, encryptBytes } from "@/lib/encryption";
+import { encrypt, decrypt, encryptBytes, decryptBytes } from "@/lib/encryption";
 import {
   VAULT_CATEGORIES, type VaultCategory,
   type EmailEntry, type BankEntry, type InsuranceEntry, type WillEntry, type IdentityEntry,
