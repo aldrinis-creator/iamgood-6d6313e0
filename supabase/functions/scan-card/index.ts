@@ -29,7 +29,9 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64 } = await req.json();
+    const body = await req.json();
+    const imageBase64: unknown = body?.imageBase64 ?? body?.image_base64;
+    const mimeType: string = body?.mime_type || "image/jpeg";
     if (!imageBase64 || typeof imageBase64 !== "string") {
       return json({ error: "No image provided" }, 400);
     }

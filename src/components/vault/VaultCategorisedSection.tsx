@@ -190,7 +190,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
         r.readAsDataURL(file);
       });
       const { data, error } = await supabase.functions.invoke("scan-card", {
-        body: { image_base64: base64, mime_type: file.type || "image/jpeg" },
+        body: { imageBase64: `data:${file.type || "image/jpeg"};base64,${base64}` },
       });
       if (error) throw error;
       const parsed = data?.card;
