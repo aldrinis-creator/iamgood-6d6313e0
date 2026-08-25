@@ -409,7 +409,7 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
                             </p>
                             {entry && (
                               <>
-                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} />
+                                <EntryPreview category={(doc.category as VaultCategory) || "identity"} entry={entry} reveal={isOpen} pin={pin} />
                                 <AttachmentBadge entry={entry} />
                               </>
                             )}
