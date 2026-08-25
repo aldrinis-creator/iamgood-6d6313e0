@@ -23,9 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Accordion, AccordionItem, AccordionTrigger, AccordionContent,
-} from "@/components/ui/accordion";
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -33,8 +30,9 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
-  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip,
+  Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard,
 } from "lucide-react";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { encrypt, decrypt, encryptBytes } from "@/lib/encryption";
