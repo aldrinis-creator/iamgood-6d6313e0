@@ -221,8 +221,24 @@ export const isValidE164 = (value: string): boolean => {
 /** Normalise to strict E.164: "+<digits>" with no spaces. */
 export const toE164 = (value: string, fallbackDial = DEFAULT_DIAL): string => {
   const cleaned = value.replace(/[\s\-()]/g, "");
-  if (cleaned.startsWith("+")) return `+${cleaned.slice(1).replace(/[^\d]/g, "")}`;
+
+  // Case 1: already has + prefix — just sanitise
+  if (cleaned.startsWith("+")) {
+    return `+${cleaned.slice(1).replace(/[^\d]/g, "")}`;
+  }
+
   const digits = cleaned.replace(/[^\d]/g, "");
   if (!digits) return "";
+
+  // Case 2: digits-only but already includes a known country code prefix.
+  // For India: 12-digit string starting with "91".
+  // We check length to distinguish "9876543210" (10 digits, national) from
+  // "919876543210" (12 digits, already has country code).
+  // This covers the common case where the DB stores phones without the +.
+  if (digits.startsWith("91") && digits.length === 12) {
+    return `+${digits}`;
+  }
+
+  // Case 3: bare 10-digit national number — prepend fallback dial code
   return `${fallbackDial}${digits}`;
 };
