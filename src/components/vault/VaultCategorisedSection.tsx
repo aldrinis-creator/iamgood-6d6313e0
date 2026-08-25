@@ -509,12 +509,22 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
   }
   if (category === "bank") {
     const e = entry as BankEntry;
+    const networkLabel = e.card_network_label
+      || (e.card_type ? ({ visa: "VISA", mastercard: "Mastercard", rupay: "RuPay", amex: "Amex", other: "Card" } as Record<string, string>)[e.card_type] : "");
+    const last4 = e.card_number ? e.card_number.slice(-4) : "";
     return (
       <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
         <div>{e.bank_name} · {e.account_type}</div>
         <div>A/c: <Mask value={e.account_number} reveal={reveal} /></div>
         <div>IFSC: {e.ifsc}</div>
         {e.nominee_name && <div>Nominee: {e.nominee_name} ({e.nominee_relation})</div>}
+        {(networkLabel || last4) && (
+          <div className="inline-flex items-center gap-1 mt-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+            <CreditCard className="w-3 h-3 text-primary" />
+            {networkLabel}
+            {last4 && <span className="font-mono">•••• {last4}</span>}
+          </div>
+        )}
       </div>
     );
   }
@@ -545,13 +555,23 @@ function EntryPreview({ category, entry, reveal }: { category: VaultCategory; en
 
 function AttachmentBadge({ entry }: { entry: AnyEntry }) {
   const a = (entry as any).attachment as VaultAttachment | undefined;
-  if (!a) return null;
+  const photos = ((entry as IdentityEntry).attachments ?? []) as VaultAttachment[];
+  const cardAtt = (entry as BankEntry).card_attachment;
+  if (!a && photos.length === 0 && !cardAtt) return null;
   return (
-    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
-      <Paperclip className="w-3 h-3" /> Attachment
+    <div className="text-[10px] text-primary mt-0.5 flex items-center gap-2">
+      {(a || cardAtt) && (
+        <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" /> Attachment</span>
+      )}
+      {photos.length > 0 && (
+        <span className="flex items-center gap-1">
+          <Camera className="w-3 h-3" /> {photos.length} photo{photos.length > 1 ? "s" : ""}
+        </span>
+      )}
     </div>
   );
 }
+
 
 // ===================================================================
 // Entry form
