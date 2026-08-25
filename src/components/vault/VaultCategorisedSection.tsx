@@ -608,11 +608,49 @@ const Mask = ({ value, reveal }: { value?: string; reveal: boolean }) => (
   <span className="font-mono">{reveal ? (value || "—") : (value ? "•".repeat(Math.min(value.length, 12)) : "—")}</span>
 );
 
-function EntryPreview({ category, entry, reveal }: { category: VaultCategory; entry: AnyEntry; reveal: boolean }) {
+function IdentityPhotoChips({ attachments, pin }: { attachments: VaultAttachment[]; pin: string }) {
+  const download = async (att: VaultAttachment) => {
+    try {
+      const { data, error } = await supabase.storage.from("vault-attachments").download(att.path);
+      if (error || !data) throw error || new Error("not found");
+      const b64 = await data.text();
+      const bytes = await decryptBytes(b64, att.iv, att.salt, pin);
+      const url = URL.createObjectURL(new Blob([bytes], { type: att.mime_type }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.file_name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Could not decrypt photo");
+    }
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {attachments.map((att, i) => (
+        <button key={i} type="button" onClick={() => download(att)}
+          className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground hover:bg-muted">
+          <Camera className="w-3 h-3 text-primary" />
+          <span className="max-w-[90px] truncate">{att.file_name}</span>
+          <Download className="w-3 h-3" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EntryPreview({ category, entry, reveal, pin }: { category: VaultCategory; entry: AnyEntry; reveal: boolean; pin: string }) {
   if (category === "identity") {
     const e = entry as IdentityEntry;
-    return <p className="text-xs text-muted-foreground mt-0.5"><Mask value={e.value} reveal={reveal} /></p>;
+    const photos = e.attachments ?? [];
+    return (
+      <div className="text-xs text-muted-foreground mt-0.5">
+        <Mask value={e.value} reveal={reveal} />
+        {reveal && photos.length > 0 && <IdentityPhotoChips attachments={photos} pin={pin} />}
+      </div>
+    );
   }
+
   if (category === "email") {
     const e = entry as EmailEntry;
     return (
