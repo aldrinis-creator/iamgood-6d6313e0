@@ -221,6 +221,48 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
         (finalDraft as any).attachment = undefined;
       }
 
+      // Step 2b: identity multi-photo attachments (up to 5, each encrypted)
+      if (dialogCategory === "identity") {
+        const kept = ((draft as IdentityEntry).attachments ?? []) as VaultAttachment[];
+        const removedPaths = (((decryptedById[docId] as IdentityEntry)?.attachments ?? []) as VaultAttachment[])
+          .filter((a) => !kept.some((k) => k.path === a.path))
+          .map((a) => a.path);
+        if (removedPaths.length) {
+          await supabase.storage.from("vault-attachments").remove(removedPaths);
+        }
+        const added: VaultAttachment[] = [];
+        for (let i = 0; i < pendingIdentityFiles.length && kept.length + added.length < 5; i++) {
+          const f = pendingIdentityFiles[i];
+          const enc = await encryptBytes(await f.arrayBuffer(), pin);
+          const path = `${userId}/identity_${Date.now()}_${i}.bin`;
+          const { error: upErr } = await supabase.storage
+            .from("vault-attachments")
+            .upload(path, new Blob([enc.ciphertext], { type: "text/plain" }), { upsert: true, contentType: "text/plain" });
+          if (upErr) throw upErr;
+          added.push({
+            path, file_name: f.name, mime_type: f.type || "image/jpeg",
+            iv: enc.iv, salt: enc.salt, size: f.size,
+          });
+        }
+        (finalDraft as IdentityEntry).attachments = [...kept, ...added].slice(0, 5);
+      }
+
+      // Step 2c: bank card photo (encrypted)
+      if (dialogCategory === "bank" && pendingCardFile) {
+        const enc = await encryptBytes(await pendingCardFile.arrayBuffer(), pin);
+        const path = `${userId}/card_${docId}.bin`;
+        const { error: upErr } = await supabase.storage
+          .from("vault-attachments")
+          .upload(path, new Blob([enc.ciphertext], { type: "text/plain" }), { upsert: true, contentType: "text/plain" });
+        if (upErr) throw upErr;
+        (finalDraft as BankEntry).card_attachment = {
+          path, file_name: pendingCardFile.name,
+          mime_type: pendingCardFile.type || "image/jpeg",
+          iv: enc.iv, salt: enc.salt, size: pendingCardFile.size,
+        };
+      }
+
+
       // Step 3: re-encrypt with final draft (including attachment metadata).
       const { ciphertext, iv, salt } = await encrypt(JSON.stringify(finalDraft), pin);
       const { error: updErr } = await supabase
