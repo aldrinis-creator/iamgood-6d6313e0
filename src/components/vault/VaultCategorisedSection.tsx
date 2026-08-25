@@ -31,6 +31,7 @@ import {
 import {
   Plus, Trash2, Eye, EyeOff, Loader2, ShieldCheck, Pencil, IdCard, Mail,
   Landmark, ShieldAlert, Scroll, ExternalLink, Paperclip, Camera, CreditCard, Download,
+  TrendingUp, Share2,
 } from "lucide-react";
 
 
@@ -40,12 +41,14 @@ import { encrypt, decrypt, encryptBytes, decryptBytes } from "@/lib/encryption";
 import {
   VAULT_CATEGORIES, type VaultCategory,
   type EmailEntry, type BankEntry, type InsuranceEntry, type WillEntry, type IdentityEntry,
+  type InvestmentEntry, type SocialEntry,
   type InsuranceCategory, type VaultAttachment, computeInsuranceReminderTier, computeWillReviewFireAt,
   formatReminderLabel,
 } from "@/lib/vaultCategories";
 import VaultAttachmentField from "./VaultAttachmentField";
 
-type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InsuranceEntry | WillEntry;
+type AnyEntry = IdentityEntry | EmailEntry | BankEntry | InvestmentEntry | SocialEntry | InsuranceEntry | WillEntry;
+
 
 interface DocRow {
   id: string;
