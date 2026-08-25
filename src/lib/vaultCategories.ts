@@ -55,7 +55,16 @@ export interface BankEntry {
   branch?: string;
   notes?: string;
   attachment?: VaultAttachment;
+  // ---- Optional debit / credit card details (encrypted with the entry) ----
+  card_number?: string;        // 16-digit, stored encrypted
+  card_expiry?: string;        // MM/YY
+  card_name?: string;          // name on card
+  card_cvv?: string;           // 3-4 digit CVV
+  card_type?: "visa" | "mastercard" | "rupay" | "amex" | "other";
+  card_network_label?: string; // e.g. "VISA Debit", "RuPay Credit"
+  card_attachment?: VaultAttachment; // encrypted photo of the card
 }
+
 
 export type InsuranceCategory = "life" | "health" | "general";
 
