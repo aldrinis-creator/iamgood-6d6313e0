@@ -65,7 +65,10 @@ interface DocRow {
 interface VaultCategorisedSectionProps {
   userId: string;
   pin: string;
+  /** When set, only this category is rendered (no tab strip). */
+  category?: VaultCategory;
 }
+
 
 const CATEGORY_ICONS: Record<VaultCategory, React.ComponentType<{ className?: string }>> = {
   identity: IdCard,
