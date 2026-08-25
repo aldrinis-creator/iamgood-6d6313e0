@@ -86,6 +86,11 @@ const VaultCategorisedSection = ({ userId, pin }: VaultCategorisedSectionProps) 
   const [saving, setSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<VaultCategory>("identity");
+  const [pendingIdentityFiles, setPendingIdentityFiles] = useState<File[]>([]);
+  const [pendingCardFile, setPendingCardFile] = useState<File | null>(null);
+  const [cardOcrLoading, setCardOcrLoading] = useState(false);
+
 
   // ---------- Load + decrypt ----------
   const reload = useCallback(async () => {
