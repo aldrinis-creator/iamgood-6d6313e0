@@ -48,9 +48,13 @@ const Index = () => {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold tracking-tight text-auth-text-1">Check-iN</div>
-            <div className="text-xs text-auth-text-2 mt-0.5">Your personal safety network</div>
+            <h1 className="text-2xl font-bold tracking-tight text-auth-text-1">
+              Check-iN
+              <span className="sr-only"> — senior safety and medication reminders for Indian families</span>
+            </h1>
+            <p className="text-xs text-auth-text-2 mt-0.5">Your personal safety network</p>
           </div>
+
         </div>
 
         {/* CARDS */}
