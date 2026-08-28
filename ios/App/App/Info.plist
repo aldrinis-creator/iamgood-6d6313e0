@@ -72,5 +72,8 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSContactsUsageDescription</key>
+	<string>Check-iN uses your contacts so you can easily select a phone number when adding a new guardian or emergency contact.</string>
 </dict>
 </plist>
+
