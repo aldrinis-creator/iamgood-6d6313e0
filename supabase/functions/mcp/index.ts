@@ -2,7 +2,131 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
+
+// src/lib/mcp/tools/list-medications-today.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.112.3";
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
+function supabaseForUser(ctx) {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_medications_today_default = defineTool({
+  name: "list_medications_today",
+  title: "List today's medications",
+  description: "Return the signed-in user's currently active medications and their scheduled times for today.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_input, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const { data, error } = await supabase.from("medications").select("id, name, dosage, frequency, schedule_times, schedule_days, instructions, start_date, end_date").eq("user_id", ctx.getUserId()).lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("name");
+    if (error) {
+      return { content: [{ type: "text", text: error.message }], isError: true };
+    }
+    const istWeekday = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
+    const weekdayNum = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[istWeekday] ?? (/* @__PURE__ */ new Date()).getDay();
+    const rows = (data ?? []).filter((m) => !Array.isArray(m.schedule_days) || m.schedule_days.length === 0 || m.schedule_days.map(Number).includes(weekdayNum));
+    return {
+      content: [{ type: "text", text: rows.length ? JSON.stringify(rows, null, 2) : "No active medications for today." }],
+      structuredContent: { medications: rows, count: rows.length }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-appointments.ts
+import { createClient as createClient2 } from "npm:@supabase/supabase-js@^2.112.3";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z } from "npm:zod@^4.4.3";
+function supabaseForUser2(ctx) {
+  return createClient2(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_appointments_default = defineTool2({
+  name: "list_upcoming_appointments",
+  title: "List upcoming appointments",
+  description: "Return the signed-in user's upcoming medical appointments (today onward), ordered by date and time.",
+  inputSchema: {
+    limit: z.number().int().min(1).max(50).optional().describe("Max appointments to return (default 10).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser2(ctx);
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const { data, error } = await supabase.from("appointments").select("id, title, appointment_type, doctor_name, location, start_date, start_time, end_time, description").eq("user_id", ctx.getUserId()).gte("start_date", today).order("start_date", { ascending: true }).order("start_time", { ascending: true }).limit(limit ?? 10);
+    if (error) {
+      return { content: [{ type: "text", text: error.message }], isError: true };
+    }
+    const rows = data ?? [];
+    return {
+      content: [{ type: "text", text: rows.length ? JSON.stringify(rows, null, 2) : "No upcoming appointments." }],
+      structuredContent: { appointments: rows, count: rows.length }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-health-status.ts
+import { createClient as createClient3 } from "npm:@supabase/supabase-js@^2.112.3";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
+function supabaseForUser3(ctx) {
+  return createClient3(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var get_health_status_default = defineTool3({
+  name: "get_health_status",
+  title: "Get today's health status",
+  description: "Return the signed-in user's latest Health Passport score (with category breakdown) and today's check-in responses.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_input, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = supabaseForUser3(ctx);
+    const userId = ctx.getUserId();
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const [passportRes, checkInRes] = await Promise.all([
+      supabase.from("health_passport_scores").select("overall, activity, checkin, medications, nutrition, vitals, wellness, score_date").eq("user_id", userId).order("score_date", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("check_ins").select("id, scheduled_at, responded_at, status, response").eq("user_id", userId).gte("scheduled_at", `${today}T00:00:00.000Z`).lte("scheduled_at", `${today}T23:59:59.999Z`).order("scheduled_at", { ascending: true })
+    ]);
+    const summary = {
+      healthPassport: passportRes.data ?? null,
+      todaysCheckIns: checkInRes.data ?? []
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+      structuredContent: summary
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "magnrdegcegxdtgapyez";
+var mcp_default = defineMcp({
+  name: "checkin-mcp",
+  title: "Check-iN",
+  version: "0.1.0",
+  instructions: "Tools for the signed-in Check-iN user. Read medications scheduled for today, upcoming appointments, and current Health Passport / check-in status. All data is scoped to the authenticated user.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [list_medications_today_default, list_appointments_default, get_health_status_default]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Users\\admin\\.gemini\\antigravity\\scratch\\iamgood\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.20.0/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));
