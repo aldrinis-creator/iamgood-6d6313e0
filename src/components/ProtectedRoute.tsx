@@ -48,11 +48,16 @@ export const UserRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 
-/** Only allows users with role='guardian'. Redirects users to /dashboard */
+/**
+ * Allows guardians in. A person qualifies either by `profiles.role === 'guardian'`
+ * or by being linked as a guardian for at least one ward (dual-role accounts,
+ * e.g. someone who already has their own 'user' account).
+ */
 export const GuardianRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, profile, loading } = useAuth();
+  const { isGuardianLinked, loading: linkLoading } = useGuardianLink();
 
-  if (loading) {
+  if (loading || (session && linkLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -64,11 +69,12 @@ export const GuardianRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (profile?.role !== "guardian") {
+  if (profile?.role !== "guardian" && !isGuardianLinked) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
+
 
 export default ProtectedRoute;
