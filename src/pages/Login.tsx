@@ -241,7 +241,13 @@ const Login = () => {
                       return;
                     }
                     toast.success("Signed in successfully!");
-                    navigate("/dashboard");
+                    const pendingNomination = getPendingNominationToken();
+                    navigate(
+                      pendingNomination
+                        ? `/register?nomination=accept&token=${pendingNomination}`
+                        : "/dashboard"
+                    );
+
                   } else {
                     toast.error("Could not create session. Please try again.");
                     setOtpPhone("");
