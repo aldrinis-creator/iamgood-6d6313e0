@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck } from "lucide-react";
+import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import AppLayout from "@/components/AppLayout";
