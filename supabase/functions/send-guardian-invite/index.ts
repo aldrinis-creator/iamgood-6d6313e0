@@ -290,17 +290,8 @@ Deno.serve(async (req) => {
     console.error("Error:", err);
     // Best-effort: record that the function itself errored before/while
     // attempting any channel, so the attempt is never invisible.
-    try {
-      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      await svc.from("notification_logs").insert({
-        type: "guardian_invite_error",
-        channel: "function_error",
-        status: "error",
-        metadata: { error: String(err) },
-      });
-    } catch (logErr) {
-      console.error("[send-guardian-invite] error log insert failed:", logErr);
-    }
+    await logAttemptFailure("function_error", { error: String(err) });
+
     return new Response(
       JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
