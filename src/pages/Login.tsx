@@ -11,6 +11,8 @@ import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 import { useSeoMeta } from "@/components/SeoMeta";
+import { getPendingNominationToken } from "@/lib/pendingNomination";
+
 
 
 // Only allow same-origin relative paths as post-login redirect targets.
