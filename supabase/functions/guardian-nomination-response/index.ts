@@ -78,9 +78,15 @@ Deno.serve(async (req) => {
     }
 
 
+    // Re-accepting a stuck accepted-but-unlinked row is a no-op success.
+    if (action === "accept" && acceptedButUnlinked) {
+      return jsonResponse({ success: true, status: "accepted" });
+    }
+
     if (guardian.status !== "pending") {
       return jsonResponse({ error: "Nomination already processed", status: guardian.status }, 400);
     }
+
 
     const newStatus = action === "accept" ? "accepted" : "rejected";
 
