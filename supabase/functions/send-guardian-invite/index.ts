@@ -12,20 +12,38 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Best-effort audit trail for attempts that never reach channel sending.
+  const logAttemptFailure = async (reason: string, meta: Record<string, unknown> = {}) => {
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("notification_logs").insert({
+        type: "guardian_invite_error",
+        channel: reason,
+        status: "error",
+        metadata: meta,
+      });
+    } catch (logErr) {
+      console.error("[send-guardian-invite] audit log insert failed:", logErr);
+    }
+  };
+
   try {
     const cronSecret = req.headers.get("x-cron-secret");
     const isCron = !!cronSecret && cronSecret === Deno.env.get("CRON_SECRET");
     if (!isCron) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader?.startsWith("Bearer ")) {
+        await logAttemptFailure("unauthorized", { stage: "missing_bearer" });
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const _userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _userClient.auth.getUser();
       if (_e || !_u?.user) {
+        await logAttemptFailure("unauthorized", { stage: "invalid_token" });
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
+
     const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
 
 
