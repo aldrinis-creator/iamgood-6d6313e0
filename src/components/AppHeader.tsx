@@ -4,17 +4,25 @@ import AQIWidget from "@/components/AQIWidget";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
 import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getISTHour } from "@/lib/istTime";
 import AvatarImage from "@/components/AvatarImage";
+import { useGuardianLink } from "@/hooks/useGuardianLink";
+import { cn } from "@/lib/utils";
 
 
 const AppHeader = () => {
   const { userName, role } = useApp();
   const { signOut, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isGuardianLinked } = useGuardianLink();
+  // Dual-role: their own 'user' account AND at least one guardian link.
+  const showViewSwitcher = profile?.role === "user" && isGuardianLinked;
+  const guardianViewActive = location.pathname.startsWith("/guardian");
   const avatarUrl = (profile as any)?.avatar_url;
+
 
   const getGreeting = () => {
     const hour = getISTHour();
@@ -80,7 +88,27 @@ const AppHeader = () => {
         </div>
       </div>
 
+      {showViewSwitcher && (
+        <div className="mt-3 grid grid-cols-2 gap-1 p-1 rounded-xl bg-navy-card border border-white/5">
+          {[
+            { label: "My Safety", to: "/dashboard", active: !guardianViewActive },
+            { label: "People I'm Watching", to: "/guardian", active: guardianViewActive },
+          ].map((tab) => (
+            <button
+              key={tab.to}
+              onClick={() => navigate(tab.to)}
+              className={cn(
+                "py-2 rounded-lg text-[13px] font-semibold transition-colors",
+                tab.active ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
     </header>
+
   );
 };
 

@@ -5,7 +5,9 @@
  * on the User home and signs up as a User by mistake.
  *
  * We stash the token locally the first time we see it so the app can resume
- * the Guardian accept flow after install / reopen.
+ * the Guardian accept flow after install / reopen. The token is written to BOTH
+ * localStorage and sessionStorage, because some iOS home-screen-launch
+ * scenarios do not carry localStorage over reliably.
  */
 
 const KEY = "checkin.pending_nomination";
@@ -16,23 +18,27 @@ type Stashed = { token: string; savedAt: number };
 /** Persist a nomination token seen in the URL (no-op when absent). */
 export function stashNominationToken(token?: string | null): void {
   if (!token) return;
+  const payload = JSON.stringify({ token, savedAt: Date.now() } satisfies Stashed);
   try {
-    const payload: Stashed = { token, savedAt: Date.now() };
-    localStorage.setItem(KEY, JSON.stringify(payload));
+    localStorage.setItem(KEY, payload);
+  } catch {
+    /* storage unavailable — ignore */
+  }
+  try {
+    sessionStorage.setItem(KEY, payload);
   } catch {
     /* storage unavailable — ignore */
   }
 }
 
-/** Read a non-expired pending nomination token, if any. */
-export function getPendingNominationToken(): string | null {
+function readFrom(store: Storage | undefined): string | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = store?.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Stashed;
     if (!parsed?.token) return null;
     if (Date.now() - (parsed.savedAt || 0) > TTL_MS) {
-      localStorage.removeItem(KEY);
+      store?.removeItem(KEY);
       return null;
     }
     return parsed.token;
@@ -41,10 +47,23 @@ export function getPendingNominationToken(): string | null {
   }
 }
 
+/** Read a non-expired pending nomination token from either store, if any. */
+export function getPendingNominationToken(): string | null {
+  return (
+    readFrom(typeof localStorage !== "undefined" ? localStorage : undefined) ||
+    readFrom(typeof sessionStorage !== "undefined" ? sessionStorage : undefined)
+  );
+}
+
 /** Clear the stash after accept / reject / expiry. */
 export function clearPendingNomination(): void {
   try {
     localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(KEY);
   } catch {
     /* ignore */
   }

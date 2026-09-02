@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck } from "lucide-react";
+import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import AppLayout from "@/components/AppLayout";
@@ -111,9 +113,14 @@ const Install = () => {
         )}
 
         {guardianToken && !isInAppBrowser && (
-          <Button asChild variant="outline" className="w-full h-12 text-base font-semibold">
-            <Link to={`/register?nomination=accept&token=${guardianToken}`}>Continue to verification</Link>
-          </Button>
+          <div className="space-y-2">
+            <Button asChild className="w-full h-14 text-base font-semibold">
+              <Link to={`/register?nomination=accept&token=${guardianToken}`}>Continue to verification</Link>
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Verify your phone number first — you don't need to install the app to do this.
+            </p>
+          </div>
         )}
 
         {isInstalled && (
@@ -124,76 +131,93 @@ const Install = () => {
           </Card>
         )}
 
-        {canInstall && (
+        {canInstall && !guardianToken && (
           <Button onClick={installApp} className="w-full h-12 text-base font-semibold gap-2">
             <Download className="w-5 h-5" /> Install Now
           </Button>
         )}
 
-        {isIOS && !isInstalled && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Install on iPhone / iPad</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Share className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">1. Tap the Share button</p>
-                  <p className="text-xs text-muted-foreground">At the bottom of Safari (square with arrow)</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Plus className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">2. Tap "Add to Home Screen"</p>
-                  <p className="text-xs text-muted-foreground">Scroll down in the share sheet to find it</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Download className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">3. Tap "Add"</p>
-                  <p className="text-xs text-muted-foreground">Check-iN will appear on your home screen</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {!isInstalled && (
+          <Collapsible defaultOpen={!guardianToken}>
+            <CollapsibleTrigger className="w-full flex items-center justify-between gap-2 rounded-lg border border-border px-4 py-3 text-sm font-medium text-muted-foreground">
+              <span>Install the app {guardianToken ? "(optional, do this after)" : ""}</span>
+              <ChevronDown className="w-4 h-4 shrink-0" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3 space-y-4">
+              {canInstall && guardianToken && (
+                <Button onClick={installApp} variant="outline" className="w-full h-12 text-base font-semibold gap-2">
+                  <Download className="w-5 h-5" /> Install Now
+                </Button>
+              )}
+
+              {isIOS && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Install on iPhone / iPad</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Share className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">1. Tap the Share button</p>
+                        <p className="text-xs text-muted-foreground">At the bottom of Safari (square with arrow)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Plus className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">2. Tap "Add to Home Screen"</p>
+                        <p className="text-xs text-muted-foreground">Scroll down in the share sheet to find it</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Download className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">3. Tap "Add"</p>
+                        <p className="text-xs text-muted-foreground">Check-iN will appear on your home screen</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isIOS && !canInstall && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Install on Android</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <MoreVertical className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">1. Tap the menu (⋮)</p>
+                        <p className="text-xs text-muted-foreground">Top-right corner of Chrome</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Download className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">2. Tap "Install app" or "Add to Home screen"</p>
+                        <p className="text-xs text-muted-foreground">Then confirm the installation</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
-        {!isIOS && !canInstall && !isInstalled && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Install on Android</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <MoreVertical className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">1. Tap the menu (⋮)</p>
-                  <p className="text-xs text-muted-foreground">Top-right corner of Chrome</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Download className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">2. Tap "Install app" or "Add to Home screen"</p>
-                  <p className="text-xs text-muted-foreground">Then confirm the installation</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </AppLayout>
   );
