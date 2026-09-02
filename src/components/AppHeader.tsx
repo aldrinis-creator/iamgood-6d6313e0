@@ -88,7 +88,27 @@ const AppHeader = () => {
         </div>
       </div>
 
+      {showViewSwitcher && (
+        <div className="mt-3 grid grid-cols-2 gap-1 p-1 rounded-xl bg-navy-card border border-white/5">
+          {[
+            { label: "My Safety", to: "/dashboard", active: !guardianViewActive },
+            { label: "People I'm Watching", to: "/guardian", active: guardianViewActive },
+          ].map((tab) => (
+            <button
+              key={tab.to}
+              onClick={() => navigate(tab.to)}
+              className={cn(
+                "py-2 rounded-lg text-[13px] font-semibold transition-colors",
+                tab.active ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
     </header>
+
   );
 };
 
