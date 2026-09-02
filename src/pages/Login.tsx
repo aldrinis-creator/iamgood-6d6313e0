@@ -11,6 +11,8 @@ import OtpVerification from "@/components/OtpVerification";
 import PhoneInput from "@/components/PhoneInput";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 import { useSeoMeta } from "@/components/SeoMeta";
+import { getPendingNominationToken } from "@/lib/pendingNomination";
+
 
 
 // Only allow same-origin relative paths as post-login redirect targets.
@@ -87,7 +89,13 @@ const Login = () => {
         } else {
           localStorage.removeItem(REMEMBER_KEY);
         }
-        navigate(nextPath ?? "/dashboard");
+        const pendingNomination = getPendingNominationToken();
+        navigate(
+          pendingNomination
+            ? `/register?nomination=accept&token=${pendingNomination}`
+            : nextPath ?? "/dashboard"
+        );
+
       }
     } catch (err: any) {
       toast.error("Sign in failed", { description: err?.message || "An unexpected error occurred" });
@@ -235,7 +243,13 @@ const Login = () => {
                       return;
                     }
                     toast.success("Signed in successfully!");
-                    navigate("/dashboard");
+                    const pendingNomination = getPendingNominationToken();
+                    navigate(
+                      pendingNomination
+                        ? `/register?nomination=accept&token=${pendingNomination}`
+                        : "/dashboard"
+                    );
+
                   } else {
                     toast.error("Could not create session. Please try again.");
                     setOtpPhone("");

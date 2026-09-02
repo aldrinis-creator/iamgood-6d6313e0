@@ -9,18 +9,26 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // The installed PWA starts at "/", which drops ?g=<token>. Capture it before
+    // any redirect so an existing account signing in still resumes the invite.
+    captureNominationFromSearch(window.location.search);
+    const pending = getPendingNominationToken();
+
     if (isLoggedIn) {
+      // Someone with an existing account holding a pending nomination must go
+      // through the accept flow (which runs link_guardian_user_id) first.
+      if (pending) {
+        navigate(`/register?nomination=accept&token=${pending}`, { replace: true });
+        return;
+      }
       navigate(role === "user" ? "/dashboard" : "/guardian");
       return;
     }
-    // The installed PWA starts at "/", which drops ?g=<token>. Resume any
-    // pending Guardian nomination instead of showing the User sign-up.
-    captureNominationFromSearch(window.location.search);
-    const pending = getPendingNominationToken();
     if (pending) {
       navigate(`/register?nomination=accept&token=${pending}`, { replace: true });
     }
   }, [isLoggedIn, role, navigate]);
+
 
 
   return (
