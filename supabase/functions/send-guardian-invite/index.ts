@@ -235,14 +235,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Record the dispatch so re-sends are rate-limited (best-effort).
-    if (recipientKey && (result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent")) {
+    // Record EVERY dispatch attempt (success or total failure) — best-effort.
+    // Without this, a fully-failed invite left no trace at all, making
+    // "never tried" indistinguishable from "tried and failed everywhere".
+    if (recipientKey) {
+      const anySent = result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent";
       try {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
           channel: recipientKey,
           status: `${result.email}/${result.sms}/${result.whatsapp}`,
-          metadata: { guardian_name, has_token: !!nomination_token, whatsapp: result.whatsapp_detail ?? null },
+          metadata: {
+            guardian_name,
+            has_token: !!nomination_token,
+            any_sent: anySent,
+            whatsapp: result.whatsapp_detail ?? null,
+            error: anySent
+              ? null
+              : {
+                  email: result.email_error ?? null,
+                  whatsapp: result.whatsapp_detail ?? null,
+                },
+          },
         });
       } catch (logErr) {
         console.error("[send-guardian-invite] log insert failed:", logErr);
@@ -256,9 +270,23 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error("Error:", err);
+    // Best-effort: record that the function itself errored before/while
+    // attempting any channel, so the attempt is never invisible.
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("notification_logs").insert({
+        type: "guardian_invite_error",
+        channel: "function_error",
+        status: "error",
+        metadata: { error: String(err) },
+      });
+    } catch (logErr) {
+      console.error("[send-guardian-invite] error log insert failed:", logErr);
+    }
     return new Response(
       JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+
 });
