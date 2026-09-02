@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     // Find guardian record by nomination token
     const { data: guardian, error: findError } = await supabase
       .from("guardians")
-      .select("id, user_id, guardian_name, guardian_phone, status, nomination_expires_at")
+      .select("id, user_id, guardian_name, guardian_phone, status, guardian_user_id, nomination_expires_at")
       .eq("nomination_token", token)
       .single();
 
@@ -43,18 +43,29 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Nomination not found" }, 404);
     }
 
+    // "accepted" but never linked to an account = stuck state; allow lookup so the
+    // guardian can finish phone verification and get linked.
+    const acceptedButUnlinked =
+      guardian.status === "accepted" && !guardian.guardian_user_id;
+
     // Check if nomination has expired
-    if (guardian.nomination_expires_at && new Date(guardian.nomination_expires_at) < new Date()) {
+    if (
+      guardian.nomination_expires_at &&
+      new Date(guardian.nomination_expires_at) < new Date() &&
+      !acceptedButUnlinked
+    ) {
       // Mark as expired if still pending
-      await supabase
-        .from("guardians")
-        .update({ status: "expired" })
-        .eq("id", guardian.id);
+      if (guardian.status === "pending") {
+        await supabase
+          .from("guardians")
+          .update({ status: "expired" })
+          .eq("id", guardian.id);
+      }
       return jsonResponse({ error: "Nomination has expired. Ask your ward to re-send the invite.", status: "expired" }, 400);
     }
 
     if (action === "lookup") {
-      if (guardian.status !== "pending") {
+      if (guardian.status !== "pending" && !acceptedButUnlinked) {
         return jsonResponse({ error: "Nomination already processed", status: guardian.status }, 400);
       }
       return jsonResponse({
@@ -66,9 +77,16 @@ Deno.serve(async (req) => {
       });
     }
 
+
+    // Re-accepting a stuck accepted-but-unlinked row is a no-op success.
+    if (action === "accept" && acceptedButUnlinked) {
+      return jsonResponse({ success: true, status: "accepted" });
+    }
+
     if (guardian.status !== "pending") {
       return jsonResponse({ error: "Nomination already processed", status: guardian.status }, 400);
     }
+
 
     const newStatus = action === "accept" ? "accepted" : "rejected";
 
