@@ -12,20 +12,38 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Best-effort audit trail for attempts that never reach channel sending.
+  const logAttemptFailure = async (reason: string, meta: Record<string, unknown> = {}) => {
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("notification_logs").insert({
+        type: "guardian_invite_error",
+        channel: reason,
+        status: "error",
+        metadata: meta,
+      });
+    } catch (logErr) {
+      console.error("[send-guardian-invite] audit log insert failed:", logErr);
+    }
+  };
+
   try {
     const cronSecret = req.headers.get("x-cron-secret");
     const isCron = !!cronSecret && cronSecret === Deno.env.get("CRON_SECRET");
     if (!isCron) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader?.startsWith("Bearer ")) {
+        await logAttemptFailure("unauthorized", { stage: "missing_bearer" });
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const _userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _userClient.auth.getUser();
       if (_e || !_u?.user) {
+        await logAttemptFailure("unauthorized", { stage: "invalid_token" });
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
+
     const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
 
 
@@ -47,12 +65,15 @@ Deno.serve(async (req) => {
     const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
     if (recipientKey && !force) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Only a PREVIOUS SUCCESSFUL attempt blocks a re-send. Failed attempts are
+      // logged too now, and must not lock the guardian out of a retry.
       const { data: recentSends } = await supabase
         .from("notification_logs")
-        .select("id")
+        .select("id, status")
         .eq("type", "guardian_invite")
         .eq("channel", recipientKey)
         .gte("created_at", oneHourAgo)
+        .like("status", "%sent%")
         .limit(1);
       if (recentSends && recentSends.length > 0) {
         return new Response(
@@ -61,6 +82,7 @@ Deno.serve(async (req) => {
         );
       }
     }
+
 
     const relationText = relation ? ` (${relation})` : "";
     const baseUrl = "https://iamgood.lovable.app";
@@ -231,14 +253,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Record the dispatch so re-sends are rate-limited (best-effort).
-    if (recipientKey && (result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent")) {
+    // Record EVERY dispatch attempt (success or total failure) — best-effort.
+    // Without this, a fully-failed invite left no trace at all, making
+    // "never tried" indistinguishable from "tried and failed everywhere".
+    if (recipientKey) {
+      const anySent = result.email === "sent" || result.sms === "sent" || result.whatsapp === "sent";
       try {
         await supabase.from("notification_logs").insert({
           type: "guardian_invite",
           channel: recipientKey,
           status: `${result.email}/${result.sms}/${result.whatsapp}`,
-          metadata: { guardian_name, has_token: !!nomination_token, whatsapp: result.whatsapp_detail ?? null },
+          metadata: {
+            guardian_name,
+            has_token: !!nomination_token,
+            any_sent: anySent,
+            whatsapp: result.whatsapp_detail ?? null,
+            error: anySent
+              ? null
+              : {
+                  email: result.email_error ?? null,
+                  whatsapp: result.whatsapp_detail ?? null,
+                },
+          },
         });
       } catch (logErr) {
         console.error("[send-guardian-invite] log insert failed:", logErr);
@@ -252,9 +288,14 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error("Error:", err);
+    // Best-effort: record that the function itself errored before/while
+    // attempting any channel, so the attempt is never invisible.
+    await logAttemptFailure("function_error", { error: String(err) });
+
     return new Response(
       JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+
 });
