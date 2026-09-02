@@ -87,7 +87,13 @@ const Login = () => {
         } else {
           localStorage.removeItem(REMEMBER_KEY);
         }
-        navigate(nextPath ?? "/dashboard");
+        const pendingNomination = getPendingNominationToken();
+        navigate(
+          pendingNomination
+            ? `/register?nomination=accept&token=${pendingNomination}`
+            : nextPath ?? "/dashboard"
+        );
+
       }
     } catch (err: any) {
       toast.error("Sign in failed", { description: err?.message || "An unexpected error occurred" });
