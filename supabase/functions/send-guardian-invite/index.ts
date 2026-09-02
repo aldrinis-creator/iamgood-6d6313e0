@@ -47,12 +47,15 @@ Deno.serve(async (req) => {
     const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
     if (recipientKey && !force) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Only a PREVIOUS SUCCESSFUL attempt blocks a re-send. Failed attempts are
+      // logged too now, and must not lock the guardian out of a retry.
       const { data: recentSends } = await supabase
         .from("notification_logs")
-        .select("id")
+        .select("id, status")
         .eq("type", "guardian_invite")
         .eq("channel", recipientKey)
         .gte("created_at", oneHourAgo)
+        .like("status", "%sent%")
         .limit(1);
       if (recentSends && recentSends.length > 0) {
         return new Response(
@@ -61,6 +64,7 @@ Deno.serve(async (req) => {
         );
       }
     }
+
 
     const relationText = relation ? ` (${relation})` : "";
     const baseUrl = "https://iamgood.lovable.app";
