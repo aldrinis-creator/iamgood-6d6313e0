@@ -110,9 +110,12 @@ const TodaySchedule = () => {
   const [fadingOut, setFadingOut] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // Snooze state: key → { count, until (timestamp) }
-  const [snoozeState, setSnoozeState] = useState<Map<string, { count: number; until: number }>>(new Map());
+  // Snooze state: key → { count, until (timestamp) }, persisted in localStorage per user
+  const [snoozeState, setSnoozeState] = useState<Map<string, { count: number; until: number }>>(
+    () => loadSnoozes(session?.user?.id)
+  );
   const snoozeTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const restoredForUserRef = useRef<string | null>(null);
 
   const loadSchedule = useCallback(async () => {
     if (!session?.user?.id) return;
