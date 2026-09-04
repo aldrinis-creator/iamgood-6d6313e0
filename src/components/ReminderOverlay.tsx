@@ -87,7 +87,8 @@ export const showReminderOverlay = (data: ReminderData) => {
 
 const AUTO_DISMISS_MS = 10_000; // 10 seconds
 const REPEAT_INTERVAL_MS = 5 * 60_000; // 5 minutes
-const MAX_SHOWS = 3;
+// 4 = the new on-time (T+0) bubble plus the three follow-up nudges (T+5/T+15/T+25)
+const MAX_SHOWS = 4;
 
 const getReminderKey = (data: ReminderData) =>
   data.slotKey || `${data.type}:${data.title}:${data.message}`;
