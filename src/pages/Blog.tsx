@@ -14,7 +14,7 @@ const TOPICS = [
 
 const Blog = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-top">
       <SeoMeta
         title="Check-iN Blog — Elderly Care & Senior Safety India"
         description="Practical guides for Indian families caring for elderly parents — medication reminders, senior safety, emergency alerts, and remote caregiving."

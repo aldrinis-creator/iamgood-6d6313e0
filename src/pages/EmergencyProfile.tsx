@@ -80,7 +80,7 @@ const EmergencyProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background safe-top">
         <div className="animate-pulse text-muted-foreground text-lg">Loading emergency profile…</div>
       </div>
     );
@@ -88,7 +88,7 @@ const EmergencyProfile = () => {
 
   if (notFound || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-top">
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-8 text-center space-y-3">
             <Shield className="w-12 h-12 text-muted-foreground mx-auto" />
@@ -101,7 +101,7 @@ const EmergencyProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-top">
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {/* Back Button */}
         <Button

@@ -85,7 +85,7 @@ const PublicJourneyView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background safe-top">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -93,7 +93,7 @@ const PublicJourneyView = () => {
 
   if (ended || !journey) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center safe-top">
         <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
           <MapPin className="w-10 h-10 text-muted-foreground" />
         </div>

@@ -97,7 +97,7 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-top">
       <div className="w-full max-w-md">
         <Card>
           <CardHeader className="text-center space-y-2">

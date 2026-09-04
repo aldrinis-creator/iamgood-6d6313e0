@@ -52,7 +52,7 @@ const BlogPost = () => {
     .filter(Boolean) as typeof BLOG_POSTS;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-top">
       <SeoMeta
         title={post.metaTitle}
         description={post.excerpt}
