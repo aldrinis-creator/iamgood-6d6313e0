@@ -79,6 +79,7 @@ const useMedicationAlarms = () => {
     // Phase 1: Collect into batched maps per time slot
     const preAlertSlots = new Map<string, string[]>();
     const popupSlots = new Map<string, string[]>();
+    const dueNowSlots = new Map<string, string[]>();
     const finalSlots = new Map<string, { names: string[]; medsToLog: Array<{ id: string; scheduledAt: Date }> }>();
     const silentMissedSlots = new Map<string, Array<{ id: string; scheduledAt: Date }>>();
     const firedMedNames: string[] = [];
