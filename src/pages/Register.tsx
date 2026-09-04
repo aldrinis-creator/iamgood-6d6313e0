@@ -527,7 +527,10 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
                     <PhoneInput value={g.phone} onChange={val => updateGuardian(i, "phone", val)} placeholder="📱 Phone Number" className="h-10 border-0 shadow-none bg-transparent" />
                   </div>
 
-                  <input type="email" placeholder="✉️ Email for alerts *" value={g.email} onChange={e => updateGuardian(i, "email", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
+                  <div>
+                    <input type="email" placeholder="✉️ Email for alerts *" value={g.email} onChange={e => updateGuardian(i, "email", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
+                    <p className="text-[11px] text-auth-text-3 mt-1">Required — used to reach your guardian if WhatsApp doesn't go through.</p>
+                  </div>
                   
                   <select value={g.relation} onChange={e => updateGuardian(i, "relation", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green appearance-none">
                     <option value="" disabled>🔗 Relation (e.g. Son, Daughter)</option>
