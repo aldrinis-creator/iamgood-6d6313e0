@@ -183,6 +183,17 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
       toast.error("Primary guardian name and phone are required");
       return;
     }
+    if (selectedRole === "user") {
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      for (const g of guardians.filter(g => g.name || g.phone)) {
+        if (!emailRe.test((g.email || "").trim())) {
+          toast.error("Guardian email is required", {
+            description: `Add a valid email for ${g.name || "your guardian"} — it's the backup if WhatsApp doesn't go through.`,
+          });
+          return;
+        }
+      }
+    }
     
     if (selectedRole === "user") {
       for (const g of guardians.filter(g => g.phone)) {
@@ -516,7 +527,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
                     <PhoneInput value={g.phone} onChange={val => updateGuardian(i, "phone", val)} placeholder="📱 Phone Number" className="h-10 border-0 shadow-none bg-transparent" />
                   </div>
 
-                  <input type="email" placeholder="✉️ Email for alerts (optional)" value={g.email} onChange={e => updateGuardian(i, "email", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
+                  <input type="email" placeholder="✉️ Email for alerts *" value={g.email} onChange={e => updateGuardian(i, "email", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green" />
                   
                   <select value={g.relation} onChange={e => updateGuardian(i, "relation", e.target.value)} className="w-full bg-navy-mid border border-auth-border rounded-[10px] px-3 py-[13px] text-[14px] text-auth-text-1 placeholder:text-auth-text-3 outline-none focus:border-auth-green appearance-none">
                     <option value="" disabled>🔗 Relation (e.g. Son, Daughter)</option>
