@@ -142,8 +142,20 @@ const useCheckInAudio = () => {
           firedRef.current.add(dueKey);
           const msg = `Hey ${userName || "there"}, it's time to Check in and let your people know you are well. Have a nice day!`;
           tryFireAudio(audioKey, msg);
+          // Show the bubble right away too (previously audio-only until T+5)
+          const dueSlotKey = `checkin-${dateKey}-${h}`;
+          if (!isReminderAcknowledged(dueSlotKey) && !isOverlayVisible()) {
+            showReminderOverlay({
+              type: "checkin",
+              title: "Time to Check-iN",
+              message: `It's ${formatHour(h)}. Tap to let your people know you're okay.`,
+              reminderCount: `Due now — ${formatHour(h)}`,
+              slotKey: dueSlotKey,
+            });
+          }
         }
       }
+
 
       // --- T+5 / T+15 / T+25: Popup overlays 1/3, 2/3, 3/3 ---
       if (diffMin >= POPUP_DELAY_MIN && !missedSentRef.current.has(missedKey)) {
