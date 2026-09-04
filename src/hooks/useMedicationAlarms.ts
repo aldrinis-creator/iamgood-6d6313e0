@@ -119,6 +119,18 @@ const useMedicationAlarms = () => {
           }
         }
 
+        // --- T+0: immediate chime + bubble the moment the dose becomes due ---
+        const dueNowKey = `med-now-${dateKey}-${timeStr}`;
+        if (diffMin >= 0 && diffMin < POPUP_DELAY_MIN && !firedRef.current.has(dueNowKey)) {
+          if (takenLog) {
+            firedRef.current.add(dueNowKey);
+          } else if (!isReminderAcknowledged(`med-${dateKey}-${timeStr}`)) {
+            if (!dueNowSlots.has(timeStr)) dueNowSlots.set(timeStr, []);
+            dueNowSlots.get(timeStr)!.push(med.name);
+          }
+        }
+
+
         // --- T+5 to T+35: Popup reminders 1/3, 2/3, 3/3 ---
         if (diffMin >= POPUP_DELAY_MIN && diffMin < HARD_CUTOFF_MIN && !missedSentRef.current.has(missedKey)) {
           if (takenLog) {
