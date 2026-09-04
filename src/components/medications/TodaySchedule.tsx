@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { format, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { isMedScheduledToday } from "@/lib/medSchedule";
+import { loadSnoozes, saveSnoozes, snoozeKey } from "@/lib/medSnooze";
 
 interface Medication {
   id: string;
