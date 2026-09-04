@@ -387,6 +387,12 @@ const Settings = () => {
       toast.error("Name and phone are required");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
+      toast.error("A valid email is required", {
+        description: "It's the backup way to reach your guardian if WhatsApp doesn't go through.",
+      });
+      return;
+    }
     // Dynamic guardian limit based on plan — check subscription table directly
     const { data: subData } = await supabase
       .from("subscriptions")
