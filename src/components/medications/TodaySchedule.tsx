@@ -47,7 +47,7 @@ const periodIcon: Record<TimePeriod, React.ReactNode> = {
 };
 
 const slotKey = (slot: DoseSlot) =>
-  `${slot.medication.id}_${slot.scheduledAt.getHours()}:${slot.scheduledAt.getMinutes()}`;
+  snoozeKey(slot.medication.id, slot.scheduledAt.getHours(), slot.scheduledAt.getMinutes());
 
 const notifyTimeoutRefs = new Map<string, NodeJS.Timeout>();
 const pendingNotifications = new Map<string, string[]>();
