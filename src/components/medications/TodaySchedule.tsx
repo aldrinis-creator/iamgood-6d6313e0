@@ -209,7 +209,9 @@ const TodaySchedule = () => {
 
     try {
       const diffMin = differenceInMinutes(now, slot.scheduledAt);
-      const effectiveStatus = diffMin > 60 ? "taken_late" : "taken";
+      // On time when within 60 minutes either side of the scheduled time.
+      const effectiveStatus = Math.abs(diffMin) <= 60 ? "taken" : "taken_late";
+
 
       if (!navigator.onLine) {
         const req = indexedDB.open("checkin-offline", 2);
@@ -370,13 +372,23 @@ const TodaySchedule = () => {
     return { activeDoses: active, completedDoses: completed };
   }, [doses, hiddenTaken, snoozeState]);
 
-  // One-dose-at-a-time: most urgent active dose first
+  // One-dose-at-a-time: most urgent active dose first.
+  // A dose only becomes the actionable "due now" hero once it is within the
+  // 60-minute window (i.e. scheduled no more than 60 minutes in the future).
+  // Past-due unresolved doses stay as hero so they aren't lost.
   const sortedActive = useMemo(
     () => [...activeDoses].sort((x, y) => x.scheduledAt.getTime() - y.scheduledAt.getTime()),
     [activeDoses],
   );
-  const heroDose = sortedActive[0] || null;
-  const laterDoses = sortedActive.slice(1);
+  const heroDose = useMemo(() => {
+    const now = new Date();
+    return sortedActive.find((d) => differenceInMinutes(d.scheduledAt, now) <= 60) || null;
+  }, [sortedActive]);
+  const laterDoses = useMemo(
+    () => sortedActive.filter((d) => d !== heroDose),
+    [sortedActive, heroDose],
+  );
+
 
   if (loading) {
     return <p className="text-sm text-muted-foreground text-center py-8">Loading schedule...</p>;

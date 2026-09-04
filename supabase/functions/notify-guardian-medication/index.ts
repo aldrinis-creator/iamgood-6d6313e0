@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
     if (isMissed && scheduled_time) {
       const scheduledDate = new Date(scheduled_time);
-      const isVeryLate = scheduledDate.getTime() < now.getTime() - (65 * 60 * 1000); // > 65 minutes
+      const isVeryLate = scheduledDate.getTime() < now.getTime() - (60 * 60 * 1000); // > 60 minutes
       
       if (isVeryLate) {
         console.log(`Medication alert is >65 mins late, skipping missed alert for ${user_id}`);
