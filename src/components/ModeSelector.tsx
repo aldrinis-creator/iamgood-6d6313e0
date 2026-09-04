@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Moon, Sun, DoorOpen } from "lucide-react";
+import { Moon, Sun, DoorOpen, Coffee } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/contexts/AppContext";
@@ -9,13 +9,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatISTTime } from "@/lib/istTime";
 import SleepModeDialog from "@/components/SleepModeDialog";
+import NapModeDialog from "@/components/NapModeDialog";
 import CheckOutSettingsDialog from "@/components/CheckOutSettingsDialog";
 import type { PauseMode } from "@/contexts/AppContext";
 
 const MODE_OPTIONS: { mode: PauseMode; icon: typeof Sun; label: string; description: string }[] = [
   { mode: "active", icon: Sun, label: "Active", description: "Normal check-in reminders" },
   { mode: "sleep", icon: Moon, label: "Sleep", description: "Pause reminders during rest hours" },
-  { mode: "checked-out", icon: DoorOpen, label: "Checked Out", description: "Pause reminders while away" },
+  { mode: "nap", icon: Coffee, label: "Nap", description: "Pause reminders during your nap" },
+  { mode: "checked-out", icon: DoorOpen, label: "Away", description: "Pause reminders while away" },
 ];
 
 export default function ModeSelector() {
@@ -24,6 +26,7 @@ export default function ModeSelector() {
   const { settings, updateSetting } = useUserSettings();
 
   const [showSleepDialog, setShowSleepDialog] = useState(false);
+  const [showNapDialog, setShowNapDialog] = useState(false);
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false);
 
   const returnToActive = useCallback(() => {
@@ -61,6 +64,8 @@ export default function ModeSelector() {
       returnToActive();
     } else if (newMode === "sleep") {
       setShowSleepDialog(true);
+    } else if (newMode === "nap") {
+      setShowNapDialog(true);
     } else if (newMode === "checked-out") {
       setShowCheckOutDialog(true);
     }
@@ -77,6 +82,16 @@ export default function ModeSelector() {
       "🌙 Sleep Mode Activated",
       `${userName} entered Sleep Mode at ${now}. Check-iNs paused until ${schedule.to}.`
     );
+  };
+
+  const handleNapSave = (schedule: SleepSchedule) => {
+    updateSetting("napSchedule", schedule);
+    updateSetting("autoNapMode", true);
+    setPauseMode("nap");
+    updateSetting("pauseMode", "nap");
+    setShowNapDialog(false);
+    toast.success("Your Nap time is now active. No alerts will be sent to your Guardian/s", { duration: 5000 });
+    notifyGuardians("💤 Nap Mode", `${userName} is taking a nap from ${schedule.from} to ${schedule.to}.`);
   };
 
   const handleCheckOutSave = (config: CheckOutConfig) => {
@@ -98,13 +113,13 @@ export default function ModeSelector() {
       <Card className="bg-primary/5">
         <CardContent className="p-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Check-iN Mode</h3>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {MODE_OPTIONS.map(({ mode, icon: Icon, label }) => (
               <Button
                 key={mode}
                 variant={pauseMode === mode ? "default" : "outline"}
                 size="sm"
-                className={`flex-1 gap-1.5 ${
+                className={`gap-1.5 ${
                   pauseMode === mode && mode === "active" ? "bg-primary text-primary-foreground" : ""
                 } ${
                   pauseMode === mode && mode !== "active" ? "bg-success text-success-foreground" : ""
@@ -126,6 +141,12 @@ export default function ModeSelector() {
             </p>
           )}
 
+          {pauseMode === "nap" && settings.napSchedule && (
+            <p className="text-xs text-success text-center">
+              💤 Nap: {settings.napSchedule.from} – {settings.napSchedule.to} • Auto-resumes at {settings.napSchedule.to}
+            </p>
+          )}
+
           {pauseMode === "checked-out" && settings.checkOutConfig?.endsAt && (
             <p className="text-xs text-success text-center">
               🚪 Returns at {formatISTTime(settings.checkOutConfig.endsAt)}
@@ -141,6 +162,13 @@ export default function ModeSelector() {
         currentSchedule={settings.sleepSchedule}
         isActive={pauseMode === "sleep"}
         onSave={handleSleepSave}
+      />
+      <NapModeDialog
+        open={showNapDialog}
+        onClose={() => setShowNapDialog(false)}
+        currentSchedule={settings.napSchedule}
+        isActive={pauseMode === "nap"}
+        onSave={handleNapSave}
       />
       <CheckOutSettingsDialog
         open={showCheckOutDialog}
