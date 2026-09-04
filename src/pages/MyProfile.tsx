@@ -893,7 +893,7 @@ const ProfileContent = () => {
             <div className="space-y-3 p-3 rounded-lg border border-border">
               <div><Label className="text-xs">Name *</Label><Input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Guardian name" className="text-base" /></div>
               <div><Label className="text-xs">Phone *</Label><PhoneInput value={gPhone} onChange={setGPhone} /></div>
-              <div><Label className="text-xs">Email * (for emergency notifications)</Label><Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="guardian@email.com" type="email" className="text-base" /></div>
+              <div><Label className="text-xs">Email *</Label><Input value={gEmail} onChange={(e) => setGEmail(e.target.value)} placeholder="guardian@email.com" type="email" className="text-base" /><p className="text-xs text-muted-foreground mt-1">Required — used to reach your guardian if WhatsApp doesn't go through.</p></div>
               <div>
                 <Label className="text-xs">Relation</Label>
                 <Select value={gRelation} onValueChange={setGRelation}>
@@ -912,6 +912,10 @@ const ProfileContent = () => {
                   onClick={async () => {
                     if (!gName.trim() || !gPhone.trim() || !gEmail.trim()) {
                       toast.error("Name, phone and email are required");
+                      return;
+                    }
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) {
+                      toast.error("Enter a valid email address");
                       return;
                     }
                     setAddingGuardian(true);
@@ -948,7 +952,7 @@ const ProfileContent = () => {
           ) : null}
 
           <p className="text-[11px] text-muted-foreground">
-            Guardian email is essential — emergency alerts are sent via email and SMS/WhatsApp.
+            Your guardian will get an invite by WhatsApp and email. They'll need to install Check-iN and verify their phone to accept — this usually takes a few minutes. The invite is valid for 4 days.
           </p>
         </CardContent>
       </Card>

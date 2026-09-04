@@ -387,6 +387,12 @@ const Settings = () => {
       toast.error("Name and phone are required");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
+      toast.error("A valid email is required", {
+        description: "It's the backup way to reach your guardian if WhatsApp doesn't go through.",
+      });
+      return;
+    }
     // Dynamic guardian limit based on plan — check subscription table directly
     const { data: subData } = await supabase
       .from("subscriptions")
@@ -962,14 +968,17 @@ const Settings = () => {
                       <Label className="text-xs">Phone *</Label>
                       <PhoneInput value={newPhone} onChange={setNewPhone} />
                     </div>
-                    <Input placeholder="Email (optional)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="text-base" />
+                    <div>
+                      <Input type="email" placeholder="Email *" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="text-base" />
+                      <p className="text-xs text-muted-foreground mt-1">Required — used to reach your guardian if WhatsApp doesn't go through.</p>
+                    </div>
                     <Input placeholder="Relation (optional)" value={newRelation} onChange={(e) => setNewRelation(e.target.value)} className="text-base" />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={addGuardian} className="flex-1">Add Guardian</Button>
                       <Button size="sm" variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Guardian will be auto-accepted upon nomination. They have 24 hours to reject via SMS/WhatsApp.
+                      Your guardian will get an invite by WhatsApp and email. They'll need to install Check-iN and verify their phone to accept — this usually takes a few minutes. The invite is valid for 4 days.
                     </p>
                   </div>
                 )}
