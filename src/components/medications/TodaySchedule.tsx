@@ -209,7 +209,9 @@ const TodaySchedule = () => {
 
     try {
       const diffMin = differenceInMinutes(now, slot.scheduledAt);
-      const effectiveStatus = diffMin > 60 ? "taken_late" : "taken";
+      // On time when within 60 minutes either side of the scheduled time.
+      const effectiveStatus = Math.abs(diffMin) <= 60 ? "taken" : "taken_late";
+
 
       if (!navigator.onLine) {
         const req = indexedDB.open("checkin-offline", 2);
