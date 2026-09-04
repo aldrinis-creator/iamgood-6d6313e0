@@ -91,8 +91,13 @@ const useMedicationAlarms = () => {
         scheduledAt.setHours(h, m || 0, 0, 0);
         const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
 
+        // Respect an active snooze: skip pre-alert, popups and hard cutoff for this dose.
+        const snoozeEntry = snoozes.get(snoozeKey(med.id, h, m || 0));
+        if (snoozeEntry && snoozeEntry.until > now.getTime()) continue;
+
         const preKey = `med-pre-${dateKey}-${timeStr}`;
         const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
+
 
         const takenLog = logs.some((l) => {
           const logDate = new Date(l.scheduled_at ?? "");
