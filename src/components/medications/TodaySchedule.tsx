@@ -342,7 +342,6 @@ const TodaySchedule = () => {
   // Summary stats (include all, even hidden)
   const takenCount = doses.filter(d => d.status === "taken" || d.status === "taken_late").length;
   const totalCount = doses.length;
-  const progressPct = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
   // Separate pending/active from completed
   const { activeDoses, completedDoses } = useMemo(() => {
@@ -371,16 +370,6 @@ const TodaySchedule = () => {
     return { activeDoses: active, completedDoses: completed };
   }, [doses, hiddenTaken, snoozeState]);
 
-  // Group active doses by period
-  const grouped = useMemo(() => {
-    const groups: Record<TimePeriod, DoseSlot[]> = { Morning: [], Afternoon: [], Evening: [] };
-    activeDoses.forEach(d => {
-      const period = getTimePeriod(d.scheduledAt.getHours());
-      groups[period].push(d);
-    });
-    return groups;
-  }, [activeDoses]);
-
   // One-dose-at-a-time: most urgent active dose first
   const sortedActive = useMemo(
     () => [...activeDoses].sort((x, y) => x.scheduledAt.getTime() - y.scheduledAt.getTime()),
@@ -402,9 +391,6 @@ const TodaySchedule = () => {
       </div>
     );
   }
-
-  const now = new Date();
-  const periods: TimePeriod[] = ["Morning", "Afternoon", "Evening"];
 
   return (
     <div className="space-y-3">
