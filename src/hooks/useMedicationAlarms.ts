@@ -7,6 +7,7 @@ import { useApp } from "@/contexts/AppContext";
 import { showReminderOverlay, isOverlayVisible, isReminderAcknowledged, clearReminderAcknowledgement } from "@/components/ReminderOverlay";
 import { formatISTDateTime } from "@/lib/istTime";
 import { isMedScheduledToday } from "@/lib/medSchedule";
+import { loadSnoozes, snoozeKey } from "@/lib/medSnooze";
 
 const PRE_ALERT_MIN = 5;        // browser notification 5 min before
 const POPUP_DELAY_MIN = 5;      // first popup 5 min after scheduled time
@@ -71,6 +72,8 @@ const useMedicationAlarms = () => {
       .lte("scheduled_at", todayEnd.toISOString());
 
     const logs = allLogs || [];
+    // Read snoozes fresh each cycle so a snooze taken in the UI applies immediately.
+    const snoozes = loadSnoozes(session.user.id);
     const ts = formatISTDateTime(now);
 
     // Phase 1: Collect into batched maps per time slot
@@ -88,8 +91,13 @@ const useMedicationAlarms = () => {
         scheduledAt.setHours(h, m || 0, 0, 0);
         const diffMin = (now.getTime() - scheduledAt.getTime()) / 60_000;
 
+        // Respect an active snooze: skip pre-alert, popups and hard cutoff for this dose.
+        const snoozeEntry = snoozes.get(snoozeKey(med.id, h, m || 0));
+        if (snoozeEntry && snoozeEntry.until > now.getTime()) continue;
+
         const preKey = `med-pre-${dateKey}-${timeStr}`;
         const missedKey = `missed-${dateKey}-${med.id}-${timeStr}`;
+
 
         const takenLog = logs.some((l) => {
           const logDate = new Date(l.scheduled_at ?? "");
