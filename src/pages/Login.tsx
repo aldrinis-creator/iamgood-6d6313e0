@@ -136,7 +136,7 @@ const Login = () => {
   // OTP FLOW
   if (otpMode) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex flex-col items-center">
         <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
           <div className="flex items-center gap-2 text-[13px] text-auth-text-2 cursor-pointer mb-2" onClick={() => setOtpMode(false)}>
             ‹ Back
@@ -267,7 +267,7 @@ const Login = () => {
   // EMAIL FORM
   if (emailMode) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex flex-col items-center">
         <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
           <div className="flex items-center gap-2 text-[13px] text-auth-text-2 cursor-pointer mb-2" onClick={() => setEmailMode(false)}>
             ‹ Back
@@ -339,7 +339,7 @@ const Login = () => {
   // OTHER STATES (Forgot Password, Resend Verify)
   if (showForgot) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex items-center justify-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex items-center justify-center">
         <div className="w-full max-w-[320px] flex flex-col">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold mb-2">Reset Password</h1>
@@ -366,7 +366,7 @@ const Login = () => {
 
   if (showResendVerify) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex items-center justify-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex items-center justify-center">
         <div className="w-full max-w-[320px] flex flex-col">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold mb-2">Email Not Verified</h1>
@@ -393,7 +393,7 @@ const Login = () => {
 
   // MAIN SELECTION
   return (
-    <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center">
+    <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 safe-top-8 pb-16 flex flex-col items-center">
       <div className="w-full max-w-[320px] flex-1 flex flex-col pt-[6vh]">
         
         <div className="flex flex-col items-center gap-3 mb-5">
