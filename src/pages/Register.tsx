@@ -268,7 +268,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
   // --- BLOCKED ---
   if (nominationBlocked) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-8 safe-top-8 flex flex-col items-center justify-center">
         <div className="w-full max-w-[320px] flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-auth-amber-soft border-[1.5px] border-[#F5A6234D] flex items-center justify-center text-[28px] mb-4">🔒</div>
           <h1 className="text-[22px] font-bold text-center tracking-tight mb-1.5">No invitation found</h1>
@@ -304,7 +304,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
   // --- SUCCESS ---
   if (registrationComplete) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-8 flex flex-col items-center justify-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-8 safe-top-8 flex flex-col items-center justify-center">
         <div className="w-full max-w-[320px] flex flex-col items-center">
           <div className="w-[72px] h-[72px] rounded-full bg-auth-green-glow border-[1.5px] border-[#2ECC8A66] flex items-center justify-center text-[32px] mb-5">
             {selectedRole === "user" ? "✅" : "🛡️"}
@@ -384,7 +384,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
   // --- STEP 2: DETAILS ---
   if (step === 2) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex flex-col items-center">
         <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">{selectedRole === "guardian" ? "Guardian details" : "Your details"}</h1>
@@ -484,7 +484,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
   // --- STEP 3: OTP ---
   if (step === 3) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex flex-col items-center">
         <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">Verify your<br/>phone</h1>
@@ -504,7 +504,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
   // --- STEP 4: GUARDIAN NOMINATION (User only) ---
   if (step === 4) {
     return (
-      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 py-6 flex flex-col items-center overflow-y-auto">
+      <div className="dark min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pb-6 safe-top-6 flex flex-col items-center overflow-y-auto">
         <div className="w-full max-w-[320px] flex-1 flex flex-col pt-4">
           <ProgressHeader />
           <h1 className="text-[22px] font-bold tracking-tight mb-1">Nominate your<br/>guardian</h1>

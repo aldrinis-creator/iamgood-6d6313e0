@@ -32,7 +32,7 @@ const Index = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center">
+    <div className="min-h-screen bg-[#08111F] text-auth-text-1 font-sans px-4 pt-8 pb-16 flex flex-col items-center safe-top">
       <SeoMeta
         title="Check-iN — Senior Safety & Medication Reminders"
         description="Check-iN helps Indian families care for elderly parents: daily check-ins, medication reminders, one-tap SOS, guardian alerts and a medical vault."

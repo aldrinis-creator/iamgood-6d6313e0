@@ -76,7 +76,7 @@ const VaultClaim = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30 safe-top">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center space-y-3">
             <AlertTriangle className="w-12 h-12 mx-auto text-destructive" />
@@ -90,7 +90,7 @@ const VaultClaim = () => {
 
   if (!payload) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30 safe-top">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5 text-primary" /> Vault Claim Portal</CardTitle>
@@ -127,7 +127,7 @@ const VaultClaim = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 bg-muted/30 print:bg-white">
+    <div className="min-h-screen p-4 bg-muted/30 print:bg-white safe-top">
       <div className="max-w-3xl mx-auto space-y-4">
         <div className="flex items-center justify-between print:hidden">
           <h1 className="text-2xl font-bold">Vault Release for {payload.user_name}</h1>

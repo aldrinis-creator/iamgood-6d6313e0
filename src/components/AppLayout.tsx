@@ -84,7 +84,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [settings?.largeTextMode]);
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="dark min-h-screen bg-background text-foreground safe-top">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg relative">
         {isUser && !loginInProgress && <UserOnlyHooks />}
         {isGuardian && !loginInProgress && <GuardianOnlyHooks />}

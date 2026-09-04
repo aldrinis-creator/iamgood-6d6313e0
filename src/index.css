@@ -104,6 +104,18 @@
 }
 
 @layer utilities {
+  /* Safe-area insets: index.html uses viewport-fit=cover + black-translucent
+     status bar, so content draws under the notch/status bar unless padded. */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-top-6 {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  }
+  .safe-top-8 {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+  }
+
   .text-accessible {
     @apply text-lg;
   }
