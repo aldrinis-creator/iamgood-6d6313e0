@@ -78,12 +78,16 @@ const WardMedicationStatus = ({ wardUserId, wardName }: WardMedicationStatusProp
         );
 
         let status: DoseSlot["status"] = "pending";
+        const scheduledAt = new Date(now);
+        scheduledAt.setHours(h, m, 0, 0);
+        const minutesLate = Math.floor((now.getTime() - scheduledAt.getTime()) / 60000);
         if (log?.status === "taken") status = "taken";
         else if (log?.status === "taken_late") status = "taken_late";
         else if (log?.status === "missed" || log?.status === "skipped") status = "missed";
-        else if (h < now.getHours() || (h === now.getHours() && m < now.getMinutes() - 60)) {
+        else if (minutesLate > 60) {
           status = "missed";
         }
+
 
         slots.push({
           medName: med.name,
