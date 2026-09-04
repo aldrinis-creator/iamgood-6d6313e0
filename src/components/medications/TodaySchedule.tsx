@@ -342,7 +342,6 @@ const TodaySchedule = () => {
   // Summary stats (include all, even hidden)
   const takenCount = doses.filter(d => d.status === "taken" || d.status === "taken_late").length;
   const totalCount = doses.length;
-  const progressPct = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
   // Separate pending/active from completed
   const { activeDoses, completedDoses } = useMemo(() => {
@@ -371,15 +370,13 @@ const TodaySchedule = () => {
     return { activeDoses: active, completedDoses: completed };
   }, [doses, hiddenTaken, snoozeState]);
 
-  // Group active doses by period
-  const grouped = useMemo(() => {
-    const groups: Record<TimePeriod, DoseSlot[]> = { Morning: [], Afternoon: [], Evening: [] };
-    activeDoses.forEach(d => {
-      const period = getTimePeriod(d.scheduledAt.getHours());
-      groups[period].push(d);
-    });
-    return groups;
-  }, [activeDoses]);
+  // One-dose-at-a-time: most urgent active dose first
+  const sortedActive = useMemo(
+    () => [...activeDoses].sort((x, y) => x.scheduledAt.getTime() - y.scheduledAt.getTime()),
+    [activeDoses],
+  );
+  const heroDose = sortedActive[0] || null;
+  const laterDoses = sortedActive.slice(1);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground text-center py-8">Loading schedule...</p>;
@@ -395,148 +392,85 @@ const TodaySchedule = () => {
     );
   }
 
-  const now = new Date();
-  const periods: TimePeriod[] = ["Morning", "Afternoon", "Evening"];
-
   return (
     <div className="space-y-3">
-      {/* Summary header */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">{takenCount} of {totalCount} doses taken</span>
-          <span className="text-muted-foreground">{progressPct}%</span>
-        </div>
-        <Progress value={progressPct} className="h-2" />
-      </div>
+      {/* Plain summary sentence */}
+      <p className="text-base text-foreground">
+        {takenCount} of {totalCount} taken today
+        {heroDose ? " · next one below" : ""}
+      </p>
 
-      {/* Active (pending/missed) doses grouped by period */}
-      {activeDoses.length === 0 && completedDoses.length > 0 ? (
-        <div className="text-center py-6 space-y-2">
-          <Check className="w-8 h-8 text-success mx-auto" />
-          <p className="text-sm font-medium text-success">All doses taken! 🎉</p>
-        </div>
+      {activeDoses.length === 0 ? (
+        completedDoses.length > 0 ? (
+          <div className="text-center py-8 space-y-2">
+            <Check className="w-10 h-10 text-success mx-auto" />
+            <p className="text-lg font-semibold text-success">All done for now 🎉</p>
+          </div>
+        ) : null
       ) : (
-        periods.map(period => {
-          const slots = grouped[period];
-          if (slots.length === 0) return null;
-
-          return (
-            <div key={period} className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
-                {periodIcon[period]}
-                {period}
-              </div>
-              {slots.map((slot, i) => {
-                const key = slotKey(slot);
-                const isCurrent = Math.abs(differenceInMinutes(now, slot.scheduledAt)) <= 60;
-                const isPast = slot.scheduledAt < now && !isCurrent;
-                const isFading = fadingOut.has(key);
-                const snooze = snoozeState.get(key);
-                const snoozeCount = snooze?.count || 0;
-                const canSnooze = snoozeCount < MAX_SNOOZES && slot.status === "pending";
-
-                return (
-                  <Card
-                    key={`${slot.medication.id}-${slot.timeLabel}-${i}`}
-                    className={`transition-all duration-500 ${
-                      isFading ? "opacity-0 scale-95 h-0 overflow-hidden" : "opacity-100"
-                    } ${
-                      isCurrent && slot.status === "pending"
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : slot.status === "missed"
-                        ? "border-destructive/30 bg-destructive/5"
-                        : ""
-                    }`}
+        <>
+          {/* Hero dose — one at a time */}
+          {heroDose && (() => {
+            const key = slotKey(heroDose);
+            const isFading = fadingOut.has(key);
+            const snoozeCount = snoozeState.get(key)?.count || 0;
+            const canSnooze = snoozeCount < MAX_SNOOZES && heroDose.status === "pending";
+            const isMissed = heroDose.status === "missed";
+            return (
+              <Card
+                className={`transition-all duration-500 ${isFading ? "opacity-0 scale-95" : "opacity-100"} ${
+                  isMissed ? "border-destructive/40 bg-destructive/5" : "border-primary bg-primary/5"
+                }`}
+              >
+                <CardContent className="p-5 space-y-4 text-center">
+                  <p className="text-lg font-semibold text-muted-foreground">
+                    {isMissed ? "Not taken yet" : "Take now"} · {heroDose.timeLabel}
+                  </p>
+                  <p className="text-3xl font-extrabold leading-tight">{heroDose.medication.name}</p>
+                  <p className="text-xl">{heroDose.medication.dosage}</p>
+                  {heroDose.medication.instructions && (
+                    <p className="text-lg text-muted-foreground italic">{heroDose.medication.instructions}</p>
+                  )}
+                  <Button
+                    size="lg"
+                    className="w-full h-16 text-xl font-bold gap-2"
+                    onClick={() => markTaken(heroDose)}
                   >
-                    <CardContent className="p-3 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="text-center min-w-[60px]">
-                          <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
-                          {isCurrent && slot.status === "pending" && (
-                            <Badge variant="default" className="text-[10px] mt-1">DUE NOW</Badge>
-                          )}
-                          {slot.status === "missed" && (
-                            <Badge variant="destructive" className="text-[10px] mt-1">NOT TAKEN</Badge>
-                          )}
-                          {snoozeCount > 0 && slot.status === "pending" && (
-                            <Badge variant="secondary" className="text-[10px] mt-1">
-                              <Timer className="w-2.5 h-2.5 mr-0.5" />
-                              {snoozeCount}/{MAX_SNOOZES}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{slot.medication.name}</p>
-                          <p className="text-xs text-muted-foreground">{slot.medication.dosage}</p>
-                          {slot.medication.instructions && (
-                            <p className="text-xs text-muted-foreground italic">{slot.medication.instructions}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {(slot.status === "missed" || (slot.status === "pending" && !isCurrent && isPast)) && (
-                            <AlertTriangle className="w-4 h-4 text-destructive" />
-                          )}
-                        </div>
-                      </div>
+                    <Check className="w-6 h-6" />
+                    I took it
+                  </Button>
+                  {canSnooze && (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full h-14 text-lg gap-2"
+                      onClick={() => handleSnooze(heroDose, 10)}
+                    >
+                      <Timer className="w-5 h-5" />
+                      Remind me later
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
-                      {/* Action buttons for pending doses */}
-                      {slot.status === "pending" && isCurrent && (
-                        <div className="flex items-center gap-2 pl-[72px]">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-8 text-xs gap-1"
-                            onClick={() => markTaken(slot)}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            Taken
-                          </Button>
-                          {canSnooze && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs gap-1"
-                                onClick={() => handleSnooze(slot, 5)}
-                              >
-                                <Timer className="w-3 h-3" />
-                                5m
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs gap-1"
-                                onClick={() => handleSnooze(slot, 15)}
-                              >
-                                <Timer className="w-3 h-3" />
-                                15m
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Taken Late button for missed doses */}
-                      {slot.status === "missed" && (
-                        <div className="flex items-center gap-2 pl-[72px]">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs gap-1 border-amber-500 text-amber-600 hover:bg-amber-50"
-                            onClick={() => markTaken(slot)}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            Taken (Late)
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+          {/* Later today — plain list, no buttons */}
+          {laterDoses.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <p className="text-base font-semibold text-muted-foreground">Later today</p>
+              {laterDoses.map((slot, i) => (
+                <div
+                  key={`later-${slot.medication.id}-${slot.timeLabel}-${i}`}
+                  className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+                >
+                  <span className="text-lg">{slot.medication.name}</span>
+                  <span className="text-lg text-muted-foreground">{slot.timeLabel}</span>
+                </div>
+              ))}
             </div>
-          );
-        })
+          )}
+        </>
       )}
 
       {/* Show completed toggle */}
