@@ -206,6 +206,60 @@ const TodaySchedule = () => {
     };
   }, []);
 
+  // Persist snooze state whenever it changes so a reload keeps the same "until".
+  useEffect(() => {
+    saveSnoozes(session?.user?.id, snoozeState);
+  }, [snoozeState, session?.user?.id]);
+
+  // Restore persisted snoozes once doses are known: re-arm timers with the
+  // REMAINING time (until - now), and handle entries that already expired.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || doses.length === 0) return;
+    if (restoredForUserRef.current === userId) return;
+    restoredForUserRef.current = userId;
+
+    const persisted = loadSnoozes(userId);
+    if (persisted.size === 0) return;
+    setSnoozeState(persisted);
+
+    persisted.forEach((entry, key) => {
+      const slot = doses.find((d) => slotKey(d) === key);
+      if (!slot) return;
+      const remaining = entry.until - Date.now();
+
+      if (remaining <= 0) {
+        // Snooze already elapsed while the app was closed.
+        setSnoozeState((prev) => {
+          const next = new Map(prev);
+          next.set(key, { ...entry, until: 0 });
+          return next;
+        });
+        if (entry.count >= MAX_SNOOZES && slot.status === "pending") {
+          autoMarkMissed(slot);
+        }
+        return;
+      }
+
+      const existing = snoozeTimers.current.get(key);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        setSnoozeState((prev) => {
+          const next = new Map(prev);
+          const e = next.get(key);
+          if (e) next.set(key, { ...e, until: 0 });
+          return next;
+        });
+        if (entry.count >= MAX_SNOOZES) {
+          setTimeout(() => autoMarkMissed(slot), 2000);
+        }
+      }, remaining);
+      snoozeTimers.current.set(key, timer);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doses, session?.user?.id]);
+
+
   const markTaken = async (slot: DoseSlot) => {
     if (!session?.user?.id) return;
     const now = new Date();
