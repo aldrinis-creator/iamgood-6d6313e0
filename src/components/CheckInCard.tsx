@@ -416,59 +416,57 @@ const CheckInCard = () => {
             >
               <Heart className="w-16 h-16 text-success fill-current" />
             </div>
-            <p className="text-2xl font-bold text-success">
+            <p className="text-3xl font-bold text-success">
               {pauseLabel} — Check-iNs Paused
             </p>
-            <p className="text-lg text-white">
-              To update mode, select from the above.
+            <p className="text-xl text-white">
+              To update mode, go to Settings.
             </p>
           </div>
         ) : isApproaching && !checkedIn && getCurrentWindow() === null ? (
           <div className="text-center space-y-3">
-            <p className="text-2xl font-bold text-foreground">
+            <p className="text-3xl font-bold text-foreground">
               {userName}, Check-iN coming up!
             </p>
             <button
               onClick={() => setShowDialog(true)}
               disabled={loading}
-              className="relative w-36 h-36 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              className="relative w-44 h-44 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in early"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-20 h-20 text-sos fill-current drop-shadow-lg" />
+              <Heart className="w-24 h-24 text-sos fill-current drop-shadow-lg" />
             </button>
-            <p className="text-lg text-muted-foreground font-medium">
+            <p className="text-xl text-muted-foreground font-medium">
               Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
             </p>
-            <p className="text-base text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               Get ready for your next check-in at {formatHour(getNextCheckInTime().getHours())}
             </p>
           </div>
         ) : !checkedIn ? (
           <div className="text-center space-y-3">
-            <p className="text-2xl font-bold text-foreground">
+            <p className="text-3xl font-bold text-foreground">
               {userName}, did you Check-In today?
             </p>
             <button
               onClick={() => setShowDialog(true)}
               disabled={loading}
-              className="relative w-36 h-36 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
+              className="relative w-44 h-44 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
             >
-              <Heart className="w-20 h-20 text-sos fill-current drop-shadow-lg" />
+              <Heart className="w-24 h-24 text-sos fill-current drop-shadow-lg" />
             </button>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-xl text-muted-foreground">
               Tap the heart to Check-iN
             </p>
-            <p className="text-lg text-muted-foreground">
-              Next check-in: {nextLabel} • <span className="font-semibold text-sos">{timeLeft}</span> remaining
-            </p>
           </div>
+
         ) : (
           <div className="text-center py-4">
             <div className="w-24 h-24 rounded-full border-[3px] border-warning mx-auto flex flex-col items-center justify-center mb-4">

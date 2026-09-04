@@ -406,43 +406,38 @@ const Login = () => {
           <div className="text-[20px] font-bold text-auth-text-1 tracking-tight">Check-iN</div>
         </div>
 
-        <h1 className="text-[22px] font-bold text-auth-text-1 tracking-tight mb-1.5">Welcome back</h1>
-        <div className="text-[14px] text-auth-text-2 mb-[18px]">Sign in to your safety network</div>
+        <h1 className="text-[25px] font-bold text-auth-text-1 tracking-tight mb-1.5">Welcome back</h1>
+        <div className="text-[16px] text-auth-text-2 mb-6">Let's get you signed in</div>
 
-        {/* Primary Method */}
-        <div className="text-[11px] font-semibold text-auth-text-3 tracking-widest uppercase mb-2 mt-2">Recommended</div>
-        
-        <div 
+        {/* Primary action — Phone OTP */}
+        <button
           onClick={() => setOtpMode(true)}
-          className="bg-auth-green-glow/20 border-[1.5px] border-auth-green rounded-2xl p-3.5 mb-2.5 flex items-center gap-3.5 cursor-pointer hover:bg-auth-green-glow/30 transition-colors"
+          className="w-full bg-auth-green text-[#0A1525] rounded-2xl p-5 flex items-center gap-4 text-left transition-transform active:scale-[0.98]"
         >
-          <div className="w-10 h-10 rounded-lg bg-auth-green-glow flex items-center justify-center text-[18px] shrink-0">📱</div>
+          <div className="w-12 h-12 rounded-xl bg-black/10 flex items-center justify-center text-[26px] shrink-0">📱</div>
           <div className="flex-1">
-            <div className="text-[15px] font-semibold text-auth-text-1 mb-0.5">Phone OTP</div>
-            <div className="text-[12px] text-auth-text-2">Get a code on your mobile</div>
+            <div className="text-[19px] font-bold mb-0.5">Text me a code</div>
+            <div className="text-[14px] opacity-80">Fastest way in — no password</div>
           </div>
-          <div className="text-[16px] text-auth-green">›</div>
+        </button>
+
+        <div className="text-center text-[14px] text-auth-text-3 my-4">— or —</div>
+
+        <button
+          onClick={() => setEmailMode(true)}
+          className="w-full bg-transparent border-[1.5px] border-auth-border-hi rounded-2xl p-4 flex items-center gap-4 text-left hover:border-auth-text-2 transition-colors"
+        >
+          <div className="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-[22px] shrink-0">🔑</div>
+          <div className="flex-1 text-[17px] font-semibold text-auth-text-1">Use email &amp; password</div>
+          <div className="text-[18px] text-auth-text-3">›</div>
+        </button>
+
+        <div className="mt-auto pt-8 text-center">
+          <div className="text-[16px] text-auth-text-2 cursor-pointer" onClick={() => navigate("/register")}>
+            New here? <span className="text-auth-green font-semibold underline">Create an account</span>
+          </div>
         </div>
 
-        <div className="text-[11px] font-semibold text-auth-text-3 tracking-widest uppercase mt-3.5 mb-2">Other options</div>
-        
-        <div 
-          onClick={() => setEmailMode(true)} 
-          className="bg-navy-card border-[1.5px] border-auth-border rounded-2xl p-3.5 mb-2.5 flex items-center gap-3.5 cursor-pointer hover:border-auth-border-hi transition-colors"
-        >
-          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-[18px] shrink-0">🔑</div>
-          <div className="flex-1">
-            <div className="text-[15px] font-semibold text-auth-text-1 mb-0.5">Email & password</div>
-            <div className="text-[12px] text-auth-text-2">Sign in with email address</div>
-          </div>
-          <div className="text-[16px] text-auth-text-3">›</div>
-        </div>
-
-        <div className="mt-auto pt-6 text-center">
-          <div className="text-[13px] text-auth-text-3 cursor-pointer" onClick={() => navigate("/register")}>
-            New to Check-iN? <span className="text-auth-green font-semibold">Create account</span>
-          </div>
-        </div>
 
       </div>
     </div>

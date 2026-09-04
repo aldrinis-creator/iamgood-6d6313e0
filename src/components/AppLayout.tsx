@@ -3,7 +3,7 @@ import { Settings, WifiOff } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
 import NavTabs from "@/components/NavTabs";
-import SOSButton from "@/components/SOSButton";
+
 import EmergencyModeOverlay from "@/components/EmergencyModeOverlay";
 import FallDetectionOverlay from "@/components/FallDetectionOverlay";
 import GuardianPingOverlay from "@/components/GuardianPingOverlay";
@@ -139,7 +139,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </footer>
         </main>
         <NavTabs />
-        {isUser && <SOSButton />}
+        
         {!loginInProgress && <EmergencyModeOverlay />}
         {isUser && !loginInProgress && <FallDetectionOverlay />}
         {isUser && !loginInProgress && <BatteryWarning />}
