@@ -205,7 +205,35 @@ const useMedicationAlarms = () => {
       }
     }
 
+    // --- On-time alert (T+0): chime + bubble immediately at the scheduled minute ---
+    for (const [timeStr, names] of dueNowSlots) {
+      const dueNowKey = `med-now-${dateKey}-${timeStr}`;
+      if (firedRef.current.has(dueNowKey)) continue;
+      firedRef.current.add(dueNowKey);
+
+      const combined = names.join(", ");
+      if (settings.voiceReminders) {
+        playVoiceReminder(`[${ts}] It's time to take your medication: ${combined}.`);
+      } else if (settings.audioAlerts) {
+        playChime();
+      } else {
+        playChime();
+      }
+      if (settings.vibration && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+      if (!isOverlayVisible()) {
+        showReminderOverlay({
+          type: "medication",
+          title: "Medicine Due Now",
+          message: `Time to take: ${combined}`,
+          reminderCount: `Due now — ${timeStr}`,
+          slotKey: `med-${dateKey}-${timeStr}`,
+        });
+      }
+    }
+
     // --- Popup reminders (T+5, T+15, T+25) ---
+
     for (const [timeStr, names] of popupSlots) {
       const graceKey = `med-popup-${dateKey}-${timeStr}`;
       const state = postGraceRef.current.get(graceKey) || { count: 0, lastFiredAt: 0 };
