@@ -72,6 +72,8 @@ const useMedicationAlarms = () => {
       .lte("scheduled_at", todayEnd.toISOString());
 
     const logs = allLogs || [];
+    // Read snoozes fresh each cycle so a snooze taken in the UI applies immediately.
+    const snoozes = loadSnoozes(session.user.id);
     const ts = formatISTDateTime(now);
 
     // Phase 1: Collect into batched maps per time slot
