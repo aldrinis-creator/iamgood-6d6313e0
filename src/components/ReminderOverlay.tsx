@@ -87,7 +87,8 @@ export const showReminderOverlay = (data: ReminderData) => {
 
 const AUTO_DISMISS_MS = 10_000; // 10 seconds
 const REPEAT_INTERVAL_MS = 5 * 60_000; // 5 minutes
-const MAX_SHOWS = 3;
+// 4 = the new on-time (T+0) bubble plus the three follow-up nudges (T+5/T+15/T+25)
+const MAX_SHOWS = 4;
 
 const getReminderKey = (data: ReminderData) =>
   data.slotKey || `${data.type}:${data.title}:${data.message}`;
@@ -241,51 +242,49 @@ const ReminderOverlay = () => {
 
   return (
     <div
+      onClick={handleDismiss}
       className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
     >
+      {/* Round bubble — tap anywhere on it to dismiss */}
       <div
-        className={`bg-background rounded-3xl shadow-2xl w-[90%] max-w-sm mx-auto p-8 text-center space-y-6 transition-all duration-300 ${
-          visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        role="button"
+        tabIndex={0}
+        onClick={handleDismiss}
+        className={`relative aspect-square w-[80vw] max-w-[20rem] rounded-full bg-background shadow-2xl border-4 border-destructive/60 flex flex-col items-center justify-center text-center px-8 gap-2 cursor-pointer select-none transition-all duration-300 animate-[pulse_1.6s_cubic-bezier(0.4,0,0.6,1)_infinite] ${
+          visible ? "scale-100 opacity-100" : "scale-90 opacity-0"
         }`}
       >
-        {/* Icon + Title */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-center gap-2">
-            <Icon className="w-10 h-10 text-destructive fill-destructive" />
-            <h2 className="text-3xl font-bold text-destructive">{reminder.title}</h2>
-          </div>
-          <p className="text-xl text-foreground leading-relaxed">
-            {reminder.message}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
-            {" · Auto-closes in 10s"}
-          </p>
-        </div>
+        {/* Soft flashing halo */}
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-destructive/10 animate-ping" />
 
+        <Icon className="w-14 h-14 text-destructive fill-destructive" />
+        <h2 className="text-2xl font-bold text-destructive leading-tight">{reminder.title}</h2>
+        <p className="text-lg text-foreground leading-snug line-clamp-3">
+          {reminder.message}
+        </p>
 
         {/* Action Button */}
         <button
-          onClick={handleAction}
-          className="w-full py-6 rounded-2xl bg-destructive text-destructive-foreground text-2xl font-bold flex items-center justify-center gap-3 hover:bg-destructive/90 transition-colors active:scale-[0.98] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleAction();
+          }}
+          className="mt-1 px-6 py-3 rounded-full bg-destructive text-destructive-foreground text-lg font-bold flex items-center justify-center gap-2 hover:bg-destructive/90 transition-colors active:scale-[0.98]"
         >
-          <Icon className="w-8 h-8 fill-current" />
+          <Icon className="w-6 h-6 fill-current" />
           {actionLabel}
         </button>
 
-        {/* Dismiss — closes overlay but cycle continues */}
-        <button
-          onClick={handleDismiss}
-          className="w-full py-3 rounded-xl border border-border text-muted-foreground text-lg font-medium hover:bg-muted transition-colors active:scale-[0.98]"
-        >
-          Dismiss
-        </button>
-
+        <p className="text-xs text-muted-foreground">
+          {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
+          {" · Tap to close"}
+        </p>
       </div>
     </div>
   );
+
 };
 
 export default ReminderOverlay;
