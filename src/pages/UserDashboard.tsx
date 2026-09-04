@@ -7,16 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
 import NeedHelpButton from "@/components/NeedHelpButton";
-import HealthPassport from "@/components/HealthPassport";
 import AppLayout from "@/components/AppLayout";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { useApp } from "@/contexts/AppContext";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import VoiceAgentButton from "@/components/VoiceAgentButton";
 import { useLiveDashboardStats } from "@/hooks/useLiveDashboardStats";
@@ -24,7 +19,6 @@ import AudioUnlocker from "@/components/AudioUnlocker";
 import SOSDialog from "@/components/SOSDialog";
 
 const UserDashboard = () => {
-  const { userName } = useApp();
   const todayAppointments = useTodayAppointments();
   const refillDue = useRefillDue();
   const navigate = useNavigate();
