@@ -6,8 +6,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CheckInDialog from "@/components/CheckInDialog";
+import { useUserSettings } from "@/hooks/useUserSettings";
 
-const CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
+const DEFAULT_CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
+
+// Convert saved "HH:MM" strings into a sorted, de-duplicated list of hours
+export const parseCheckInHours = (times?: string[] | null): number[] => {
+  if (!times || times.length === 0) return DEFAULT_CHECK_IN_HOURS;
+  const hours = Array.from(
+    new Set(
+      times
+        .map((t) => parseInt(String(t).split(":")[0], 10))
+        .filter((h) => Number.isFinite(h) && h >= 0 && h <= 23)
+    )
+  ).sort((a, b) => a - b);
+  return hours.length > 0 ? hours : DEFAULT_CHECK_IN_HOURS;
+};
 
 const getCheckInWindowStart = (hour: number, date: Date = new Date()) => {
   const d = new Date(date);
@@ -15,7 +29,7 @@ const getCheckInWindowStart = (hour: number, date: Date = new Date()) => {
   return d;
 };
 
-const getCurrentWindow = () => {
+const getCurrentWindow = (CHECK_IN_HOURS: number[]) => {
   const now = new Date();
   const nowMs = now.getTime();
   
@@ -40,7 +54,7 @@ const getCurrentWindow = () => {
   return null;
 };
 
-const getNextCheckInTime = () => {
+const getNextCheckInTime = (CHECK_IN_HOURS: number[]) => {
   const now = new Date();
   const nowMs = now.getTime();
   for (const h of CHECK_IN_HOURS) {
@@ -52,12 +66,12 @@ const getNextCheckInTime = () => {
   }
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(7, 0, 0, 0);
+  tomorrow.setHours(CHECK_IN_HOURS[0] ?? 7, 0, 0, 0);
   return tomorrow;
 };
 
-const getMinutesUntilNext = () => {
-  const next = getNextCheckInTime();
+const getMinutesUntilNext = (CHECK_IN_HOURS: number[]) => {
+  const next = getNextCheckInTime(CHECK_IN_HOURS);
   return (next.getTime() - Date.now()) / 60000;
 };
 
@@ -93,13 +107,16 @@ const CheckInCard = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [slotStatuses, setSlotStatuses] = useState<Record<number, string>>({});
 
+  const { settings } = useUserSettings();
+  const CHECK_IN_HOURS = useMemo(() => parseCheckInHours(settings?.checkInTimes), [settings?.checkInTimes]);
+
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 
   // Fetch or create today's check-in for the current window
   const loadCurrentCheckIn = useCallback(async () => {
     if (!session?.user?.id) return;
 
-    const windowHour = getCurrentWindow();
+    const windowHour = getCurrentWindow(CHECK_IN_HOURS);
     if (windowHour === null) {
       // Before first check-in of the day
       setCheckedIn(false);
@@ -178,7 +195,7 @@ const CheckInCard = () => {
       setCheckedIn(false);
       setCheckedInStatus(null);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, CHECK_IN_HOURS]);
 
   // Fetch statuses for all today's check-in slots
   const loadSlotStatuses = useCallback(async () => {
@@ -212,7 +229,7 @@ const CheckInCard = () => {
     loadCurrentCheckIn();
     loadSlotStatuses();
     const interval = setInterval(() => {
-      const newWindow = getCurrentWindow();
+      const newWindow = getCurrentWindow(CHECK_IN_HOURS);
       if (prevWindowRef.current !== undefined && newWindow !== prevWindowRef.current) {
         // Audio alerts are now handled by useCheckInAudio hook
       }
@@ -220,18 +237,18 @@ const CheckInCard = () => {
       loadCurrentCheckIn();
       loadSlotStatuses();
     }, 30000);
-    prevWindowRef.current = getCurrentWindow();
+    prevWindowRef.current = getCurrentWindow(CHECK_IN_HOURS);
     return () => clearInterval(interval);
   }, [loadCurrentCheckIn, loadSlotStatuses]);
 
   // Countdown timer + approaching detection
   useEffect(() => {
     const tick = () => {
-      const next = getNextCheckInTime();
+      const next = getNextCheckInTime(CHECK_IN_HOURS);
       const ms = next.getTime() - Date.now();
       setTimeLeft(formatTimeLeft(ms));
-      const minsLeft = getMinutesUntilNext();
-      const currentWindow = getCurrentWindow();
+      const minsLeft = getMinutesUntilNext(CHECK_IN_HOURS);
+      const currentWindow = getCurrentWindow(CHECK_IN_HOURS);
       // Approaching = within 60 min of next window AND not currently in an active window (or already checked in)
       if (minsLeft <= 60 && minsLeft > 0 && (currentWindow === null || checkedIn)) {
         setIsApproaching(true);
@@ -243,22 +260,22 @@ const CheckInCard = () => {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [checkedIn]);
+  }, [checkedIn, CHECK_IN_HOURS]);
 
   const handleCheckIn = async () => {
     if (!session?.user?.id || loading) return;
     setLoading(true);
 
     const now = new Date();
-    const windowHour = getCurrentWindow();
+    const windowHour = getCurrentWindow(CHECK_IN_HOURS);
     let scheduledAt = windowHour !== null
       ? getCheckInWindowStart(windowHour)
       : now;
     
     // If we're approaching the next window and checking in early, log it for the upcoming window
-    const minsLeft = getMinutesUntilNext();
+    const minsLeft = getMinutesUntilNext(CHECK_IN_HOURS);
     if (windowHour === null && minsLeft <= 60 && minsLeft > 0) {
-      scheduledAt = getNextCheckInTime();
+      scheduledAt = getNextCheckInTime(CHECK_IN_HOURS);
     }
 
     if (!navigator.onLine) {
@@ -385,7 +402,7 @@ const CheckInCard = () => {
     setLoading(false);
   };
 
-  const nextCheckIn = getNextCheckInTime();
+  const nextCheckIn = getNextCheckInTime(CHECK_IN_HOURS);
   const nextLabel = nextCheckIn.getDate() !== new Date().getDate()
     ? `${formatHour(nextCheckIn.getHours())} (Tomorrow)`
     : formatHour(nextCheckIn.getHours());
@@ -423,7 +440,7 @@ const CheckInCard = () => {
               To update mode, go to Settings.
             </p>
           </div>
-        ) : isApproaching && !checkedIn && getCurrentWindow() === null ? (
+        ) : isApproaching && !checkedIn && getCurrentWindow(CHECK_IN_HOURS) === null ? (
           <div className="text-center space-y-3">
             <p className="text-3xl font-bold text-foreground">
               {userName}, Check-iN coming up!
@@ -443,7 +460,7 @@ const CheckInCard = () => {
               Check-iN in <span className="font-semibold text-sos">{approachingMinutes} min</span>
             </p>
             <p className="text-lg text-muted-foreground">
-              Get ready for your next check-in at {formatHour(getNextCheckInTime().getHours())}
+              Get ready for your next check-in at {formatHour(getNextCheckInTime(CHECK_IN_HOURS).getHours())}
             </p>
           </div>
         ) : !checkedIn ? (
@@ -489,7 +506,7 @@ const CheckInCard = () => {
             const status = slotStatuses[h];
             const now = new Date();
             const isPast = now.getHours() >= h;
-            const isCurrent = getCurrentWindow() === h;
+            const isCurrent = getCurrentWindow(CHECK_IN_HOURS) === h;
 
             let badgeClass = "bg-primary/10 text-primary"; // upcoming
             let icon = "";
