@@ -623,13 +623,14 @@ const GuardianDashboard = () => {
           ? "bg-warning/15 text-warning"
           : "bg-muted";
 
-  // Auto-reset the dismiss flag when the ward becomes active again
+  // Re-arm the popup only when the ward becomes active again (inactivity resets).
   useEffect(() => {
-    if (inactivityMin < 60 && inactivityPopupDismissed && wardUserId) {
+    if (inactivityMin < 15 && inactivityPopupDismissed && wardUserId) {
       setInactivityPopupDismissed(false);
-      sessionStorage.removeItem(`inactivity_dismissed_at_${wardUserId}`);
+      sessionStorage.removeItem(`inactivity_shown_${wardUserId}`);
     }
   }, [inactivityMin, inactivityPopupDismissed, wardUserId]);
+
 
 
   // Battery low visual indicator only – no audio alert
