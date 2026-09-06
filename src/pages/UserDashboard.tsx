@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
 import NeedHelpButton from "@/components/NeedHelpButton";
+import MedicationsBand from "@/components/MedicationsBand";
 import AppLayout from "@/components/AppLayout";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,9 @@ const UserDashboard = () => {
 
         {/* I NEED HELP */}
         <NeedHelpButton />
+
+        {/* Medications shortcut */}
+        <MedicationsBand />
 
         {/* Practice SOS */}
         {isNewUser && (

@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
-import useRefillDue from "@/hooks/useRefillDue";
-import useMedicationDue from "@/hooks/useMedicationDue";
 
 const NavTabs = () => {
   const navigate = useNavigate();
@@ -15,8 +13,6 @@ const NavTabs = () => {
   const { session } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const todayApptCount = useTodayAppointments();
-  const refillDue = useRefillDue();
-  const medDue = useMedicationDue();
 
   useEffect(() => {
     if (role !== "guardian" || !session?.user?.id) return;
@@ -68,12 +64,11 @@ const NavTabs = () => {
     return () => { supabase.removeChannel(pingChannel); };
   }, [role, session?.user?.id]);
 
-  const medsAlert = refillDue || medDue;
   const userTabs: any[] = [
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Activity, label: "My Activity", path: "/my-activity" },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health", alert: medsAlert },
+    { icon: Heart, label: "My Health", path: "/my-health" },
   ];
 
 
