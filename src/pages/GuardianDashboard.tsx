@@ -1150,189 +1150,38 @@ const GuardianDashboard = () => {
           />
         )}
 
-        {/* ===== TODAY'S CHECK-INS (moved above Alerts) ===== */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Today's Check-iNs</CardTitle>
-              <span className="text-[10px] text-muted-foreground">Auto-refreshes</span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {todayCheckIns.length > 0 ? (
-              todayCheckIns.map(ci => (
-                <div key={ci.id} className={`flex items-center justify-between py-2 border-b border-border last:border-0 ${ci.status === "missed" ? "bg-destructive/5 -mx-2 px-2 rounded" : ""}`}>
-                  <span className="text-sm">{formatCheckInTime(ci.scheduled_at)}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    ci.status === "ok" || ci.status === "responded" ? "bg-success/10 text-success" :
-                    ci.status === "late" ? "bg-amber-500/10 text-amber-600 font-medium" :
-                    ci.status === "missed" ? "bg-destructive/10 text-destructive font-semibold" :
-                    "bg-muted text-muted-foreground"
-                  }`}>
-                    {getStatusLabel(ci.status)}
-                    {(ci.status === "ok" || ci.status === "responded" || ci.status === "late") && ci.responded_at && (
-                      <span className="ml-1 opacity-75">· {formatISTTime(ci.responded_at)}</span>
-                    )}
-                  </span>
+        {/* ===== WARD'S ACTIVITY BAND (Check-iNs, Medications, Alerts, Location, Data Analysis, Hospital Kit) ===== */}
+        {wardUserId && (
+          <Card
+            className="cursor-pointer hover:border-primary/30 transition-colors border-primary/20 bg-primary/5"
+            onClick={() => navigate("/guardian/ward-activity")}
+          >
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-primary" />
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No check-ins recorded today</p>
-            )}
-          </CardContent>
-        </Card>
+                <div>
+                  <p className="text-base font-semibold flex items-center gap-2">
+                    {wardName}'s Activity
+                    {unreadCount > 0 && <Badge variant="destructive" className="text-[10px]">{unreadCount}</Badge>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Check-iNs, medications, alerts, location & more</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-primary" />
+            </CardContent>
+          </Card>
+        )}
 
         {/* ===== TODAY'S APPOINTMENTS (compact strip) ===== */}
         {wardUserId && (
           <WardTodayAppointmentsStrip wardUserId={wardUserId} wardName={wardName} />
         )}
 
-        {/* ===== MEDICATIONS SUMMARY (moved above Alerts) ===== */}
-        {wardUserId && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Pill className="w-5 h-5 text-primary" />
-                  <span className="text-sm font-semibold">{wardName}'s Medications</span>
-                </div>
-              </div>
-              {medDoseSummary && medDoseSummary.total > 0 ? (
-                <>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {medDoseSummary.taken} of {medDoseSummary.total} doses taken
-                      </span>
-                      <span className="font-medium">
-                        {Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)}%
-                      </span>
-                    </div>
-                    <Progress value={Math.round((medDoseSummary.taken / medDoseSummary.total) * 100)} className="h-2" />
-                  </div>
-                  {!medDetailsOpen ? (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setMedDetailsOpen(true)}>
-                      View Details <ChevronRight className="w-3 h-3 ml-1" />
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      <WardMedicationStatus wardUserId={wardUserId} wardName={wardName} />
-                      <WardMedicationAdherence wardUserId={wardUserId} wardName={wardName} />
-                      <WardRefillOrder wardUserId={wardUserId} wardName={wardName} />
-                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setMedDetailsOpen(false)}>
-                        Collapse
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : medDoseSummary && medDoseSummary.total === 0 ? (
-                <p className="text-sm text-muted-foreground text-center">No medications scheduled</p>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center">Loading…</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ===== ALERTS (auto-collapsing) ===== */}
-        <Collapsible open={alertsOpen} onOpenChange={setAlertsOpen}>
-          <CollapsibleTrigger asChild>
-            <Card className="cursor-pointer hover:border-primary/20 transition-colors">
-              <CardContent className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-destructive" />
-                  <span className="text-sm font-semibold">Alerts</span>
-                  {unreadCount > 0 && <Badge variant="destructive" className="text-[10px]">{unreadCount}</Badge>}
-                </div>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${alertsOpen ? "rotate-180" : ""}`} />
-              </CardContent>
-            </Card>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-1">
-            {unreadCount > 0 ? (
-              <Card className="border-destructive/30 bg-destructive/5">
-                <CardContent className="p-4 space-y-2">
-                  {notifications.filter(n => !n.read).slice(0, 5).map(n => (
-                    <div key={n.id} className="p-3 rounded-lg bg-card border border-destructive/20 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">{n.title}</p>
-                        <span className="text-[10px] text-muted-foreground">{formatISTTime(n.created_at)}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{n.message}</p>
-                      <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>Dismiss</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-4 text-center text-sm text-muted-foreground">No active alerts</CardContent>
-              </Card>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Active Journey Tracker */}
+        {/* Active Journey Tracker (hidden, code retained) */}
         {false && wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
 
-        {/* Location (collapsible) */}
-        <CollapsibleSection
-          title={activeSOS ? "🔴 Live Location (SOS Active)" : "Location"}
-          icon={<MapPin className="w-5 h-5 text-primary" />}
-          forceOpen={!!activeSOS}
-        >
-          <Card>
-            <CardContent className="pt-3">
-              {!locationConsent && !activeSOS ? (
-                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground text-center px-4">
-                    {wardName} has not permitted their location to be displayed
-                  </p>
-                </div>
-              ) : wardLocation ? (
-                <div className="space-y-2">
-                  <MapExpandable wardLocation={wardLocation} activeSOS={!!activeSOS} locationUpdatedAt={locationUpdatedAt} safeZones={wardSafeZones} />
-                  {!activeSOS && (
-                    <Button variant="outline" size="sm" className="w-full" onClick={handleRefreshLocation}>
-                      <RefreshCw className="w-3 h-3 mr-1" /> Refresh Location
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-                  <MapPin className="w-8 h-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No location data available</p>
-                  <Button variant="outline" size="sm" onClick={handleRefreshLocation}>
-                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </CollapsibleSection>
-
-        {/* ===== DATA ANALYSIS LINK ===== */}
-        {wardUserId && (
-          <Card className="cursor-pointer hover:border-primary/20 transition-colors" onClick={() => navigate("/guardian/reports")}>
-            <CardContent className="p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                <span className="text-sm font-semibold">{wardName}'s Data Analysis</span>
-              </div>
-              <span className="text-xs text-primary font-medium">View Reports →</span>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Hospital Admission Kit */}
-        {wardUserId && <HospitalKitCard wardUserId={wardUserId} wardName={wardName} />}
-
-        {/* Care Journal */}
-        {wardUserId && (
-          <CollapsibleSection title="Care Journal" icon={<Badge variant="outline" className="text-[10px] px-1.5 py-0">📔</Badge>}>
-            <CareJournal wardUserId={wardUserId} />
-          </CollapsibleSection>
-        )}
       </div>
       <WardInactivityPopup
         open={showInactivity && inactivityMin >= 60 && !inactivityPopupDismissed}
