@@ -1,4 +1,4 @@
-import { User, LogOut, Settings, UserCircle, Wrench, Send, CalendarDays } from "lucide-react";
+import { User, LogOut, Settings, UserCircle, Wrench, Send, CalendarDays, HelpCircle } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import AQIWidget from "@/components/AQIWidget";
 import AccessibilityMenu from "@/components/AccessibilityMenu";
@@ -68,6 +68,12 @@ const AppHeader = () => {
                   <CalendarDays className="w-4 h-4 mr-2" /> Appointments
                 </DropdownMenuItem>
               )}
+              {role !== "guardian" && (
+                <DropdownMenuItem onClick={() => navigate("/help")}>
+                  <HelpCircle className="w-4 h-4 mr-2" /> Help
+                </DropdownMenuItem>
+              )}
+
 
               {role === "guardian" && (
                 <DropdownMenuItem onClick={() => navigate("/guardian/appointments")}>

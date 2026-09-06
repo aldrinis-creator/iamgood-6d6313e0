@@ -73,10 +73,9 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Activity, label: "My Activity", path: "/my-activity" },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health" },
-    { icon: HelpCircle, label: "Help", path: "/help" },
-    { icon: Pill, label: "Medications", path: "/my-health?tool=Tablets", alert: medsAlert },
+    { icon: Heart, label: "My Health", path: "/my-health", alert: medsAlert },
   ];
+
 
 
   const [unreadReplies, setUnreadReplies] = useState(0);
@@ -131,8 +130,8 @@ const NavTabs = () => {
           if (typeof tab.render === "function") {
             return <div key={`${tab.path}-${tabIdx}`} className="flex-1 flex">{tab.render()}</div>;
           }
-          const isActive = location.pathname === tab.path.split("?")[0] &&
-            (!tab.path.includes("?") ? !location.search.includes("tool=Tablets") : location.search.includes("tool=Tablets"));
+          const isActive = location.pathname === tab.path.split("?")[0];
+
           const badge = "badge" in tab ? (tab as any).badge : 0;
           const alert = !!tab.alert;
           return (
