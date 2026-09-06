@@ -883,12 +883,6 @@ const GuardianDashboard = () => {
     }
   };
 
-  const handleRoute = () => {
-    if (wardLocation) {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${wardLocation.lat},${wardLocation.lng}`, "_blank");
-    }
-  };
-
   const handleRefreshLocation = async () => {
     if (!wardUserId) return;
     // Hard guard: never load location if consent is off (unless active SOS).
@@ -1117,7 +1111,7 @@ const GuardianDashboard = () => {
         })()}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={`flex-col h-auto py-4 ${wardPhone ? "bg-primary" : "bg-muted text-muted-foreground"}`} size="lg">
@@ -1131,10 +1125,6 @@ const GuardianDashboard = () => {
               <DropdownMenuItem onClick={() => handleCallUser("flash")}>⚡ Flash Call</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="flex-col h-auto py-4 bg-blue-600 hover:bg-blue-700 text-white" size="lg" onClick={handleRoute} disabled={!wardLocation}>
-            <Navigation className="w-5 h-5 mb-1" />
-            <span className="text-xs">Route</span>
-          </Button>
           <Button className="flex-col h-auto py-4 bg-destructive hover:bg-destructive/90" size="lg" onClick={() => setShowAmbulance(!showAmbulance)}>
             <Navigation className="w-5 h-5 mb-1" />
             <span className="text-xs">Ambulance</span>

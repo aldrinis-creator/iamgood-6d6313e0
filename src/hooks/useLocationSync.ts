@@ -4,10 +4,13 @@ import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { haversineDistance } from "@/lib/haversine";
+import { ZONE_APPROACH_EVENT } from "@/components/SafeZoneExitPrompt";
 import { useQueryClient } from "@tanstack/react-query";
 
 const NORMAL_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 const SOS_INTERVAL_MS = 30 * 1000; // 30 sec
+const APPROACH_MARGIN_M = 100; // warn when within 100m of the zone edge
+const APPROACH_RESET_MARGIN_M = 150; // hysteresis: re-arm only when well back inside
 const SOS_FAST_CAP_MS = 15 * 60 * 1000; // 15 min hard cap on accelerated cadence
 
 /**
@@ -29,6 +32,9 @@ export default function useLocationSync() {
   const sosStartedAtRef = useRef<number | null>(null);
   const wasInsideRef = useRef<boolean>(localStorage.getItem('isInsideSafeZone') !== 'false');
   const farAlertSentRef = useRef<boolean>(localStorage.getItem('farFromSafeZoneAlerted') === 'true');
+  // "About to exit" pre-alert: fires once per approach, re-arms after moving
+  // back deeper inside the zone (hysteresis).
+  const approachPromptedRef = useRef<boolean>(false);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -82,6 +88,37 @@ export default function useLocationSync() {
         );
 
         if (isInsideAny) {
+          // --- NEW: "about to exit" pre-alert (ward-facing) ---
+          try {
+            const insideZones = (zones as any[]).filter(
+              (z) => haversineDistance(latitude, longitude, z.lat, z.lng) <= z.radius_m
+            );
+            const edgeGap = insideZones.reduce((min, z) => {
+              const gap = z.radius_m - haversineDistance(latitude, longitude, z.lat, z.lng);
+              return gap < min.gap ? { gap, zone: z } : min;
+            }, { gap: Infinity, zone: null as any });
+
+            if (edgeGap.zone) {
+              if (!approachPromptedRef.current && edgeGap.gap <= APPROACH_MARGIN_M) {
+                approachPromptedRef.current = true;
+                window.dispatchEvent(
+                  new CustomEvent(ZONE_APPROACH_EVENT, {
+                    detail: {
+                      zoneId: edgeGap.zone.id,
+                      zoneName: edgeGap.zone.name,
+                      lat: latitude,
+                      lng: longitude,
+                    },
+                  })
+                );
+              } else if (approachPromptedRef.current && edgeGap.gap > APPROACH_RESET_MARGIN_M) {
+                approachPromptedRef.current = false;
+              }
+            }
+          } catch {
+            // never break the main safe-zone flow
+          }
+
           const wasOutside = wasInsideRef.current === false;
           wasInsideRef.current = true;
           localStorage.removeItem('isInsideSafeZone');
