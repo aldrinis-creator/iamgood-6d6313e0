@@ -9,7 +9,8 @@ const SOSButton = () => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 z-50 w-16 h-16 rounded-full bg-sos text-sos-foreground shadow-lg flex items-center justify-center animate-sos-pulse active:scale-95 transition-transform"
+        style={{ bottom: "calc(var(--nav-h, 64px) + 1rem)" }}
+        className="fixed right-4 z-50 w-16 h-16 rounded-full bg-sos text-sos-foreground shadow-lg flex items-center justify-center animate-sos-pulse active:scale-95 transition-transform"
         aria-label="Emergency SOS"
       >
         <div className="text-center">

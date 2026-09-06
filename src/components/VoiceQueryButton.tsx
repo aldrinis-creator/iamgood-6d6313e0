@@ -308,7 +308,8 @@ const VoiceQueryButton = () => {
       <button
         onClick={handleTap}
         aria-label="Voice assistant — Hey Check-iN"
-        className={`fixed bottom-40 right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform ${
+        style={{ bottom: "calc(var(--nav-h, 64px) + 6rem)" }}
+        className={`fixed right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform ${
           phase === "listening"
             ? "bg-destructive text-destructive-foreground animate-pulse"
             : phase === "thinking"

@@ -76,7 +76,8 @@ export default function ProductHelpChat() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Ask Check-iN help assistant"
-          className="fixed bottom-4 right-4 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+          style={{ bottom: "calc(var(--nav-h, 64px) + 1rem)" }}
+          className="fixed right-4 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
         >
           <MessageCircleQuestion className="h-6 w-6" />
         </button>
