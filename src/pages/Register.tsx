@@ -442,27 +442,32 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
               </div>
             )}
 
-            <div 
-              className="flex items-center gap-2 py-2.5 mt-1 border-t border-auth-border cursor-pointer text-auth-green text-[13px] font-medium"
-              onClick={() => setShowEmailSection(!showEmailSection)}
-            >
-              <span>{showEmailSection ? "-" : "+"}</span> Add email for alerts <span className="ml-auto text-[11px] text-auth-text-3 font-normal">Optional</span>
-            </div>
-
-            {showEmailSection && (
-              <div className="flex flex-col gap-3.5 animate-in slide-in-from-top-2">
-                <div>
-                  <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+            {selectedRole !== "guardian" && (
+              <>
+                <div
+                  className="flex items-center gap-2 py-2.5 mt-1 border-t border-auth-border cursor-pointer text-auth-green text-[13px] font-medium"
+                  onClick={() => setShowEmailSection(!showEmailSection)}
+                >
+                  <span>{showEmailSection ? "-" : "+"}</span> Add email for alerts <span className="ml-auto text-[11px] text-auth-text-3 font-normal">Optional</span>
                 </div>
-                {email && (
-                  <div>
-                    <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+
+                {showEmailSection && (
+                  <div className="flex flex-col gap-3.5 animate-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email</label>
+                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+                    </div>
+                    {email && (
+                      <div>
+                        <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
+
           </div>
 
           <div className="mt-auto pt-6 flex flex-col gap-2.5">

@@ -70,6 +70,14 @@ const Install = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInAppBrowser, isInstalled]);
 
+  // Guardian invite links must not be gated behind install instructions — go
+  // straight to phone verification (installing is offered afterwards).
+  useEffect(() => {
+    if (authLoading || session || !guardianToken || isInAppBrowser) return;
+    navigate(`/register?nomination=accept&token=${guardianToken}`, { replace: true });
+  }, [authLoading, session, guardianToken, isInAppBrowser, navigate]);
+
+
   return (
     <AppLayout>
       <SeoMeta
