@@ -226,7 +226,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
       <button
         onClick={handleOpen}
         aria-label="Voice assistant"
-        style={{ bottom: "calc(var(--nav-h, 64px) + 1rem)" }}
+        style={{ bottom: "calc(var(--nav-h, 64px) + 5rem)" }}
         className="fixed right-4 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform bg-white text-[#08111F]"
       >
         <Mic className="w-6 h-6" />
