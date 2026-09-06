@@ -11,6 +11,7 @@ import { GuardianWardProvider } from "@/contexts/GuardianWardContext";
 import { UserRoute, GuardianRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import NavTest from "./pages/NavTest";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminRoute from "./components/AdminRoute";
@@ -96,6 +97,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/__navtest" element={<NavTest />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 {/* User-only routes */}
