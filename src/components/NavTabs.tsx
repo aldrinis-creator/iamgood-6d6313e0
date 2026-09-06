@@ -131,29 +131,39 @@ const NavTabs = () => {
           if (typeof tab.render === "function") {
             return <div key={`${tab.path}-${tabIdx}`} className="flex-1 flex">{tab.render()}</div>;
           }
-          const isActive = location.pathname === tab.path;
+          const isActive = location.pathname === tab.path.split("?")[0] &&
+            (!tab.path.includes("?") ? !location.search.includes("tool=Tablets") : location.search.includes("tool=Tablets"));
           const badge = "badge" in tab ? (tab as any).badge : 0;
+          const alert = !!tab.alert;
           return (
             <button
               key={`${tab.path}-${tabIdx}`}
               onClick={() => navigate(tab.path)}
-              className={`flex-1 flex flex-col items-center py-2 px-1 text-xs transition-colors relative ${
-                isActive
+              className={`flex-1 flex flex-col items-center py-2 px-0.5 text-[10px] leading-tight text-center transition-colors relative ${
+                alert
+                  ? "text-destructive font-semibold"
+                  : isActive
                   ? "text-primary font-semibold"
                   : "text-muted-foreground"
               }`}
             >
               <div className="relative">
-                <tab.icon className={`w-5 h-5 mb-1 ${isActive ? "text-primary" : ""} ${badge > 0 && (tab.label === "Appointments" || tab.label === "My Health") ? "text-destructive" : ""}`} />
-                {badge > 0 && (
-                  <span className={`absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center ${(tab.label === "Appointments" || tab.label === "My Health") ? "animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]" : "animate-pulse"}`}>
-                    {tab.label === "My Health" ? "!" : badge > 9 ? "9+" : badge}
+                <tab.icon className={`w-5 h-5 mb-1 ${alert ? "text-destructive animate-pulse" : isActive ? "text-primary" : ""}`} />
+                {alert && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse shadow-[0_0_8px_hsl(var(--destructive))]">
+                    !
+                  </span>
+                )}
+                {!alert && badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse">
+                    {badge > 9 ? "9+" : badge}
                   </span>
                 )}
               </div>
               {tab.label}
             </button>
           );
+
         })}
       </div>
     </nav>
