@@ -73,10 +73,9 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Activity, label: "My Activity", path: "/my-activity" },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health" },
-    { icon: HelpCircle, label: "Help", path: "/help" },
-    { icon: Pill, label: "Medications", path: "/my-health?tool=Tablets", alert: medsAlert },
+    { icon: Heart, label: "My Health", path: "/my-health", alert: medsAlert },
   ];
+
 
 
   const [unreadReplies, setUnreadReplies] = useState(0);
