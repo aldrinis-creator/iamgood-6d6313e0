@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill, MapPin } from "lucide-react";
+import { Heart, UserPlus, Clock, Shield, ChevronRight, Check, Pill, MapPin, Plus, Trash2, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { addGuardianWithInvite } from "@/lib/guardianInvite";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +44,10 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
 
   // Check-in & Nap
   const [selectedPreset, setSelectedPreset] = useState(1);
+  const [customTimes, setCustomTimes] = useState<string[]>(["09:00"]);
+  const [intervalStart, setIntervalStart] = useState("08:00");
+  const [intervalEnd, setIntervalEnd] = useState("20:00");
+  const [intervalHours, setIntervalHours] = useState(4);
   const [defaultNapMins, setDefaultNapMins] = useState(60);
 
   // Medication
@@ -55,6 +59,33 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const [allergies, setAllergies] = useState("");
 
   const userName = profile?.full_name || "there";
+
+  const isCustom = selectedPreset === 2;
+  const validCustomTimes = Array.from(new Set(customTimes.filter((t) => /^\d{2}:\d{2}$/.test(t)))).sort();
+  const canContinueTimes = !isCustom || validCustomTimes.length > 0;
+
+  const updateCustomTime = (index: number, value: string) =>
+    setCustomTimes((prev) => prev.map((t, i) => (i === index ? value : t)));
+  const addCustomTime = () => setCustomTimes((prev) => [...prev, ""]);
+  const removeCustomTime = (index: number) =>
+    setCustomTimes((prev) => prev.filter((_, i) => i !== index));
+
+  const generateInterval = () => {
+    const [sh, sm] = intervalStart.split(":").map(Number);
+    const [eh, em] = intervalEnd.split(":").map(Number);
+    const startMins = sh * 60 + sm;
+    const endMins = eh * 60 + em;
+    if (!Number.isFinite(startMins) || !Number.isFinite(endMins) || endMins < startMins) {
+      toast.error("End time must be after the start time");
+      return;
+    }
+    const times: string[] = [];
+    for (let m = startMins; m <= endMins; m += intervalHours * 60) {
+      times.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+    }
+    setCustomTimes(times);
+    toast.success(`${times.length} check-in times added`);
+  };
 
   const handleNext = async () => {
     if (step === 3) {
@@ -73,7 +104,8 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
   const saveCheckInTimes = async () => {
     if (!session?.user?.id) return;
     const preset = CHECK_IN_PRESETS[selectedPreset];
-    if (!preset || preset.times.length === 0) return;
+    const times = isCustom ? validCustomTimes : preset?.times ?? [];
+    if (times.length === 0) return;
     try {
       const { data: existing } = await supabase
         .from("user_settings")
@@ -84,7 +116,7 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
       const currentSettings = (existing?.settings as Record<string, unknown>) || {};
       const newSettings = { 
         ...currentSettings, 
-        checkInTimes: preset.times,
+        checkInTimes: times,
         defaultNapDurationMins: defaultNapMins 
       };
 
@@ -297,6 +329,73 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
                 </button>
               ))}
             </div>
+
+            {isCustom && (
+              <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div>
+                  <p className="text-xs font-semibold mb-2">Your check-in times</p>
+                  <div className="space-y-2">
+                    {customTimes.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={t}
+                          onChange={(e) => updateCustomTime(i, e.target.value)}
+                          className="text-base"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeCustomTime(i)}
+                          disabled={customTimes.length === 1}
+                          aria-label="Remove time"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full mt-2" onClick={addCustomTime}>
+                    <Plus className="w-4 h-4 mr-1" /> Add another time
+                  </Button>
+                </div>
+
+                <div className="pt-2 border-t border-border/60">
+                  <p className="text-xs font-semibold mb-2">Or repeat every few hours</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[11px]">Start</Label>
+                      <Input type="time" value={intervalStart} onChange={(e) => setIntervalStart(e.target.value)} className="text-base" />
+                    </div>
+                    <div>
+                      <Label className="text-[11px]">End</Label>
+                      <Input type="time" value={intervalEnd} onChange={(e) => setIntervalEnd(e.target.value)} className="text-base" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    {[2, 3, 4, 6].map((h) => (
+                      <button
+                        key={h}
+                        onClick={() => setIntervalHours(h)}
+                        className={`py-2 rounded-md text-xs font-medium transition-colors ${
+                          intervalHours === h ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {h}h
+                      </button>
+                    ))}
+                  </div>
+                  <Button variant="secondary" size="sm" className="w-full mt-2" onClick={generateInterval}>
+                    <Wand2 className="w-4 h-4 mr-1" /> Fill times every {intervalHours}h
+                  </Button>
+                </div>
+
+                {validCustomTimes.length === 0 && (
+                  <p className="text-[11px] text-destructive text-center">Set at least one time to continue.</p>
+                )}
+              </div>
+            )}
+
             <div className="pt-2 border-t border-border mt-2">
               <p className="text-xs font-semibold mb-2 text-center">Default Nap Duration</p>
               <div className="grid grid-cols-4 gap-2">
@@ -313,7 +412,7 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
                 ))}
               </div>
             </div>
-            <Button className="w-full mt-2" onClick={handleNext}>
+            <Button className="w-full mt-2" onClick={handleNext} disabled={!canContinueTimes}>
               Continue <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
