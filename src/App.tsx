@@ -22,6 +22,8 @@ const GuardianAlerts = lazy(() => import("./pages/GuardianAlerts"));
 const GuardianReports = lazy(() => import("./pages/GuardianReports"));
 const GuardianServices = lazy(() => import("./pages/GuardianServices"));
 const MyHealth = lazy(() => import("./pages/MyHealth"));
+const MyActivity = lazy(() => import("./pages/MyActivity"));
+const GuardianActivity = lazy(() => import("./pages/GuardianActivity"));
 const HealthPassportPage = lazy(() => import("./pages/HealthPassportPage"));
 const Services = lazy(() => import("./pages/Services"));
 const MedicalVault = lazy(() => import("./pages/MedicalVault"));
@@ -99,6 +101,7 @@ const App = () => (
                 {/* User-only routes */}
                 <Route path="/dashboard" element={<UserRoute><UserDashboard /></UserRoute>} />
                 <Route path="/my-health" element={<UserRoute><MyHealth /></UserRoute>} />
+                <Route path="/my-activity" element={<UserRoute><MyActivity /></UserRoute>} />
                 <Route path="/health-passport" element={<UserRoute><HealthPassportPage /></UserRoute>} />
                 <Route path="/financial-health" element={<UserRoute><FinancialHealth /></UserRoute>} />
                 <Route path="/personal-healthcare" element={<UserRoute><PersonalHealthcare /></UserRoute>} />
@@ -111,6 +114,7 @@ const App = () => (
                 <Route path="/services" element={<UserRoute><Services /></UserRoute>}/>
                 {/* Guardian-only routes */}
                 <Route path="/guardian" element={<GuardianRoute><GuardianWardProvider><GuardianDashboard /></GuardianWardProvider></GuardianRoute>} />
+                <Route path="/guardian/activity" element={<GuardianRoute><GuardianWardProvider><GuardianActivity /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/alerts" element={<GuardianRoute><GuardianWardProvider><GuardianAlerts /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/services" element={<GuardianRoute><GuardianWardProvider><GuardianServices /></GuardianWardProvider></GuardianRoute>} />
