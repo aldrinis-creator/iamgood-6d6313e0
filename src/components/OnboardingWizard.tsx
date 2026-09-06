@@ -202,21 +202,24 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-sm mx-auto [&>button]:hidden">
+      <DialogContent className="max-w-sm mx-auto [&>button]:hidden max-h-[90dvh] flex flex-col overflow-hidden">
         {/* Progress */}
-        <div className="flex gap-1 mb-4">
+        <div className="flex gap-1 mb-4 shrink-0">
           {STEPS.map((_, i) => (
             <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? "bg-primary" : "bg-muted"}`} />
           ))}
         </div>
 
-        <div className="text-center mb-4">
+        <div className="text-center mb-4 shrink-0">
           <div className={`w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3`}>
             <StepIcon className={`w-7 h-7 ${STEPS[step].color}`} />
           </div>
           <h2 className="text-lg font-bold">{STEPS[step].title}</h2>
           <Badge variant="outline" className="mt-1 text-xs">Step {step + 1} of {STEPS.length}</Badge>
         </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto pb-2 -mx-1 px-1">
+
 
         {/* Step 0: Welcome */}
         {step === 0 && (
