@@ -233,7 +233,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4" onClick={handleClose}>
+        <div className="fixed inset-0 z-[60] bg-background flex items-end sm:items-center justify-center p-2 sm:p-4" onClick={handleClose}>
           <Card className="w-full max-w-md shadow-2xl pointer-events-auto max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <CardContent className="p-4 flex flex-col gap-3 min-h-0 flex-1">
               {/* Header */}
@@ -312,7 +312,7 @@ const VoiceAgentButton = ({ persona = "user", wardUserId = null, wardName = null
                   aria-label={phase === "listening" ? "Stop listening" : "Start listening"}
                   className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all ${
                     phase === "listening"
-                      ? "bg-destructive text-destructive-foreground animate-pulse"
+                      ? "bg-destructive text-destructive-foreground"
                       : phase === "thinking"
                       ? "bg-accent text-accent-foreground"
                       : phase === "speaking"
