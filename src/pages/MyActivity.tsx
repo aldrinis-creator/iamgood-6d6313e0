@@ -4,10 +4,13 @@ import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import VitalsMonitor from "@/components/VitalsMonitor";
 import { useLiveDashboardStats } from "@/hooks/useLiveDashboardStats";
+import useRefillDue from "@/hooks/useRefillDue";
+import useMedicationDue from "@/hooks/useMedicationDue";
 
 const MyActivity = () => {
   const navigate = useNavigate();
   const stats = useLiveDashboardStats();
+  const medsAlert = useRefillDue() || useMedicationDue();
 
   const sections = [
     {
@@ -35,6 +38,7 @@ const MyActivity = () => {
       color: "text-warning",
       value: `${stats.medsCompleted}`,
       suffix: `/${stats.medsTotal || 0}`,
+      alert: true,
       onClick: () => navigate("/my-health?tool=Tablets&returnTo=my-activity"),
     },
   ];
@@ -53,7 +57,12 @@ const MyActivity = () => {
                 <s.icon className={`w-6 h-6 ${s.color}`} />
               </div>
               <div className="flex-1">
-                <p className="text-base font-semibold">{s.label}</p>
+                <p className="text-base font-semibold flex items-center gap-2">
+                  {s.label}
+                  {(s as any).alert && medsAlert && (
+                    <span className="min-w-[18px] h-[18px] px-1 text-[11px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse">!</span>
+                  )}
+                </p>
                 <p className="text-sm text-muted-foreground">Today</p>
               </div>
               <div className={`text-2xl font-bold ${s.color}`}>
