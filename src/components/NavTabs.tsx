@@ -118,8 +118,28 @@ const NavTabs = () => {
 
   const tabs = role === "guardian" ? guardianTabs : userTabs;
 
+  // Publish the nav bar's real rendered height (incl. safe-area inset) so
+  // floating elements (e.g. the voice bubble) can anchor above it.
+  const navRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const apply = () => {
+      document.documentElement.style.setProperty("--nav-h", `${Math.round(el.getBoundingClientRect().height)}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+      document.documentElement.style.removeProperty("--nav-h");
+    };
+  }, [tabs.length]);
+
   return (
-    <nav className="sticky bottom-0 w-full bg-card border-t border-border z-40 mt-auto pb-[env(safe-area-inset-bottom)]">
+    <nav ref={navRef} className="sticky bottom-0 w-full bg-card border-t border-border z-40 mt-auto pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-md mx-auto flex">
         {tabs.map((tab: any, tabIdx) => {
           if (typeof tab.render === "function") {
