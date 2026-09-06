@@ -1141,7 +1141,7 @@ const GuardianDashboard = () => {
           />
         )}
 
-        {/* ===== WARD'S ACTIVITY BAND (Check-iNs, Medications, Alerts, Location, Data Analysis, Hospital Kit) ===== */}
+        {/* ===== WARD'S ACTIVITY BAND (Check-iNs, Medications, Alerts, Data Analysis, Hospital Kit) ===== */}
         {wardUserId && (
           <Card
             className="cursor-pointer hover:border-primary/30 transition-colors border-primary/20 bg-primary/5"
@@ -1157,7 +1157,7 @@ const GuardianDashboard = () => {
                     {wardName}'s Activity
                     {unreadCount > 0 && <Badge variant="destructive" className="text-[10px]">{unreadCount}</Badge>}
                   </p>
-                  <p className="text-xs text-muted-foreground">Check-iNs, medications, alerts, location & more</p>
+                  <p className="text-xs text-muted-foreground">Check-iNs, medications, alerts & more</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-primary" />
