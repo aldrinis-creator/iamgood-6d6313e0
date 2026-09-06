@@ -466,7 +466,9 @@ const OnboardingWizard = ({ open, onComplete }: OnboardingWizardProps) => {
             </div>
           </div>
         )}
+        </div>
       </DialogContent>
+
     </Dialog>
   );
 };
