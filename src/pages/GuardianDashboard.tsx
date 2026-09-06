@@ -1273,7 +1273,7 @@ const GuardianDashboard = () => {
         </Collapsible>
 
         {/* Active Journey Tracker */}
-        {wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
+        {false && wardUserId && <GuardianJourneyTracker wardUserId={wardUserId} wardName={wardName} />}
 
         {/* Location (collapsible) */}
         <CollapsibleSection
