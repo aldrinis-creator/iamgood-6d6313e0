@@ -2696,6 +2696,36 @@ export type Database = {
         }
         Relationships: []
       }
+      zone_exit_declines: {
+        Row: {
+          created_at: string
+          id: string
+          lat: number | null
+          lng: number | null
+          user_id: string
+          zone_id: string | null
+          zone_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          user_id: string
+          zone_id?: string | null
+          zone_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          user_id?: string
+          zone_id?: string | null
+          zone_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       guardians_emergency_safe: {
