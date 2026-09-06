@@ -130,8 +130,8 @@ const NavTabs = () => {
           if (typeof tab.render === "function") {
             return <div key={`${tab.path}-${tabIdx}`} className="flex-1 flex">{tab.render()}</div>;
           }
-          const isActive = location.pathname === tab.path.split("?")[0] &&
-            (!tab.path.includes("?") ? !location.search.includes("tool=Tablets") : location.search.includes("tool=Tablets"));
+          const isActive = location.pathname === tab.path.split("?")[0];
+
           const badge = "badge" in tab ? (tab as any).badge : 0;
           const alert = !!tab.alert;
           return (
