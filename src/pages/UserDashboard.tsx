@@ -96,27 +96,6 @@ const UserDashboard = () => {
         {/* I NEED HELP */}
         <NeedHelpButton />
 
-        {/* Today's Stats */}
-        <div className="flex gap-2">
-          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/dashboard")}>
-            <div className="text-[20px] font-bold text-success mb-1">
-              {stats.checkInsCompleted}<span className="text-[12px] text-white font-normal">/{stats.checkInsTotal}</span>
-            </div>
-            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Check-ins</div>
-          </div>
-          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/health-passport")}>
-            <div className="text-[20px] font-bold text-primary mb-1">{stats.healthScore}<span className="text-[12px] text-white font-normal">/100</span></div>
-            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Health</div>
-          </div>
-          <div className="flex-1 bg-navy-card rounded-2xl p-4 cursor-pointer hover:bg-navy-card/80 transition-colors" onClick={() => navigate("/my-health?tool=Tablets&returnTo=dashboard")}>
-            <div className="text-[20px] font-bold text-warning mb-1">
-              {stats.medsCompleted}<span className="text-[12px] text-white font-normal">/{stats.medsTotal || 0}</span>
-            </div>
-            <div className="text-[11px] text-white font-medium uppercase tracking-wide">Meds</div>
-          </div>
-        </div>
-
-
         {/* Practice SOS */}
         {isNewUser && (
           <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
@@ -132,22 +111,6 @@ const UserDashboard = () => {
             </CardContent>
           </Card>
         )}
-
-        {/* Health Passport — collapsible */}
-        {/* Health Passport dropdown removed per user request */}
-
-        {/* Map My Journey */}
-        <Card className="cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20" onClick={() => navigate("/journey")}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Navigation className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm">Map My Journey</h3>
-              <p className="text-xs text-muted-foreground">Track your travel & keep guardians informed</p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Today's Appointments */}
         {todayAppointments > 0 && (
@@ -165,21 +128,6 @@ const UserDashboard = () => {
           </Card>
         )}
 
-        {/* Medication Refill Due */}
-        {refillDue && (
-          <Card className="cursor-pointer hover:shadow-md transition-shadow border-warning/30 bg-warning/5" onClick={() => navigate("/my-health?tool=Tablets&tab=refill")}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
-                <Pill className="w-5 h-5 text-warning" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm">Medication Refill Due</h3>
-                <p className="text-xs text-muted-foreground">One or more medications are running low</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       <SOSDialog open={showPracticeDialog} onClose={() => setShowPracticeDialog(false)} isPracticeMode={true} />
