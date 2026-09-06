@@ -24,6 +24,7 @@ const GuardianServices = lazy(() => import("./pages/GuardianServices"));
 const MyHealth = lazy(() => import("./pages/MyHealth"));
 const MyActivity = lazy(() => import("./pages/MyActivity"));
 const GuardianActivity = lazy(() => import("./pages/GuardianActivity"));
+const GuardianWardActivity = lazy(() => import("./pages/GuardianWardActivity"));
 const HealthPassportPage = lazy(() => import("./pages/HealthPassportPage"));
 const Services = lazy(() => import("./pages/Services"));
 const MedicalVault = lazy(() => import("./pages/MedicalVault"));
@@ -115,6 +116,7 @@ const App = () => (
                 {/* Guardian-only routes */}
                 <Route path="/guardian" element={<GuardianRoute><GuardianWardProvider><GuardianDashboard /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/activity" element={<GuardianRoute><GuardianWardProvider><GuardianActivity /></GuardianWardProvider></GuardianRoute>} />
+                <Route path="/guardian/ward-activity" element={<GuardianRoute><GuardianWardProvider><GuardianWardActivity /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/alerts" element={<GuardianRoute><GuardianWardProvider><GuardianAlerts /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/reports" element={<GuardianRoute><GuardianWardProvider><GuardianReports /></GuardianWardProvider></GuardianRoute>} />
                 <Route path="/guardian/services" element={<GuardianRoute><GuardianWardProvider><GuardianServices /></GuardianWardProvider></GuardianRoute>} />
