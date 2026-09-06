@@ -1191,7 +1191,7 @@ const GuardianDashboard = () => {
         onDismiss={() => {
           setInactivityPopupDismissed(true);
           if (wardUserId) {
-            sessionStorage.setItem(`inactivity_dismissed_at_${wardUserId}`, Date.now().toString());
+            sessionStorage.setItem(`inactivity_shown_${wardUserId}`, "1");
           }
         }}
       />
