@@ -16,7 +16,7 @@ import HospitalKitCard from "@/components/guardian/HospitalKitCard";
 import WardLocationMap, { SafeZone } from "@/components/guardian/WardLocationMap";
 import { formatISTTime } from "@/lib/istTime";
 
-type TileKey = "checkins" | "medications" | "alerts" | "location" | "kit";
+type TileKey = "checkins" | "medications" | "alerts" | "kit";
 
 const STATUS_LABELS: Record<string, string> = {
   ok: "Done",
@@ -106,7 +106,6 @@ const GuardianWardActivity = () => {
     { key: "checkins", label: "Today's Check-iNs", icon: CheckCircle2, sub: `${checkIns.filter(c => c.status === "ok" || c.status === "responded" || c.status === "late").length}/${checkIns.length || 0} done`, alert: missedCheckIns > 0 },
     { key: "medications", label: "Medications", icon: Pill, sub: medSummary ? `${medSummary.taken}/${medSummary.total} doses` : "…" },
     { key: "alerts", label: "Alerts", icon: Bell, sub: unread.length ? `${unread.length} unread` : "No active alerts", alert: unread.length > 0 },
-    { key: "location", label: "Location", icon: MapPin, sub: activeSOS ? "SOS active" : locationConsent ? "Live map" : "Not shared", alert: activeSOS },
     { key: "reports", label: "Data Analysis", icon: Activity, sub: "View reports" },
     ...(isPrimary ? [{ key: "kit" as TileKey, label: "Hospital Admittance Kit", icon: BriefcaseMedical, sub: "Documents" }] : []),
   ];
@@ -205,35 +204,6 @@ const GuardianWardActivity = () => {
                   <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => markAsRead(n.id)}>Dismiss</Button>
                 </div>
               )) : <p className="text-sm text-muted-foreground text-center">No active alerts</p>}
-            </CardContent>
-          </Card>
-        )}
-
-        {active === "location" && (
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              {!locationConsent && !activeSOS ? (
-                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground text-center px-4">
-                    {wardName} has not permitted their location to be displayed
-                  </p>
-                </div>
-              ) : wardLocation ? (
-                <WardLocationMap
-                  wardLocation={wardLocation}
-                  activeSOS={activeSOS}
-                  locationUpdatedAt={locationUpdatedAt}
-                  safeZones={safeZones}
-                />
-              ) : (
-                <div className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-                  <MapPin className="w-8 h-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No location data available</p>
-                  <Button variant="outline" size="sm" onClick={load}>
-                    <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         )}

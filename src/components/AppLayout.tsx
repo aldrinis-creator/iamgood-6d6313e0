@@ -32,6 +32,7 @@ import useGuardianAudio from "@/hooks/useGuardianAudio";
 import useGuardianAppointmentAlarms from "@/hooks/useGuardianAppointmentAlarms";
 import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
 import GuardianSafeZoneOverlay from "@/components/GuardianSafeZoneOverlay";
+import SafeZoneExitPrompt from "@/components/SafeZoneExitPrompt";
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -151,6 +152,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {isGuardian && !loginInProgress && <UserPingOverlay />}
         {isGuardian && !loginInProgress && <GuardianMissedAlarmOverlay />}
         {isGuardian && !loginInProgress && <GuardianSafeZoneOverlay />}
+        {!isGuardian && !loginInProgress && <SafeZoneExitPrompt />}
       </div>
     </div>
   );

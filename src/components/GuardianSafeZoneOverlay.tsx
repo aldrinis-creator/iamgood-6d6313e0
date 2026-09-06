@@ -8,7 +8,7 @@ import { playChime } from "@/lib/audioAlerts";
 
 type ZoneAlert = {
   id: string;
-  type: "zone_far" | "zone_far_return";
+  type: "zone_far" | "zone_far_return" | "zone_approaching_exit";
   title: string;
   message: string;
 };
@@ -45,12 +45,18 @@ const GuardianSafeZoneOverlay = () => {
         },
         (payload: any) => {
           const n = payload.new as any;
-          if (n?.type !== "zone_far" && n?.type !== "zone_far_return") return;
+          if (n?.type !== "zone_far" && n?.type !== "zone_far_return" && n?.type !== "zone_approaching_exit") return;
 
           setAlert({
             id: n.id,
             type: n.type,
-            title: n.title || (n.type === "zone_far" ? "Ward far from safe zone" : "Ward back in safe zone"),
+            title:
+              n.title ||
+              (n.type === "zone_far"
+                ? "Ward far from safe zone"
+                : n.type === "zone_approaching_exit"
+                ? "Ward leaving safe zone"
+                : "Ward back in safe zone"),
             message: n.message || "",
           });
           playChime();
@@ -76,6 +82,7 @@ const GuardianSafeZoneOverlay = () => {
   if (!alert) return null;
 
   const isReturn = alert.type === "zone_far_return";
+  const isApproaching = alert.type === "zone_approaching_exit";
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -104,7 +111,11 @@ const GuardianSafeZoneOverlay = () => {
         </div>
 
         <h2 className="text-lg font-semibold text-foreground">
-          {isReturn ? "✅ Ward back in safe zone" : "🚨 Ward far from safe zone"}
+          {isReturn
+            ? "✅ Ward back in safe zone"
+            : isApproaching
+            ? "🚶 " + alert.title
+            : "🚨 Ward far from safe zone"}
         </h2>
         <p className="text-base text-muted-foreground">{alert.message}</p>
 
