@@ -248,17 +248,26 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
-      const nominationToken = searchParams.get("token");
+      const nominationToken = searchParams.get("token") || getPendingNominationToken();
       if (nominationToken) {
         try {
           await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } });
           clearPendingNomination();
         } catch (e) { console.error(e); }
       }
+      setLoading(false);
+      // Guardian: no account/success ceremony — straight into the dashboard.
+      toast.success("You're verified — welcome to Check-iN");
+      if (!isInstalled) {
+        setTimeout(() => toast("Tip: add Check-iN to your home screen for instant alerts."), 1500);
+      }
+      navigate("/guardian");
+      return;
     }
     setLoading(false);
     setRegistrationComplete(true);
   };
+
 
   const handleInstallClick = async () => {
     if (canInstall) await installApp();
