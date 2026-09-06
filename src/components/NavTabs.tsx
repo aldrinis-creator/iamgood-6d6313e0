@@ -73,7 +73,7 @@ const NavTabs = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Activity, label: "My Activity", path: "/my-activity" },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health", alert: medsAlert },
+    { icon: Heart, label: "My Health", path: "/my-health" },
   ];
 
 
