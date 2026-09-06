@@ -312,13 +312,14 @@ const GuardianDashboard = () => {
   const [nowTick, setNowTick] = useState<number>(Date.now());
   const [inactivityPopupDismissed, setInactivityPopupDismissed] = useState(false);
 
+  // Once the 1-hour popup has been shown for this inactivity episode, never
+  // re-show it until the ward becomes active again.
   useEffect(() => {
     if (!wardUserId) return;
-    const key = `inactivity_dismissed_at_${wardUserId}`;
-    const dismissedAt = sessionStorage.getItem(key);
-    const recentlyDismissed = dismissedAt && (Date.now() - Number(dismissedAt) < 10 * 60 * 1000); // 10 min
-    setInactivityPopupDismissed(!!recentlyDismissed);
-  }, [wardUserId, nowTick]);
+    const shown = sessionStorage.getItem(`inactivity_shown_${wardUserId}`);
+    if (shown) setInactivityPopupDismissed(true);
+  }, [wardUserId]);
+
 
   // Track missed medication/check-in counts for escalation
   const missedMedCount = useRef(0);
