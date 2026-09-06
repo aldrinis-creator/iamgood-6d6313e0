@@ -1,7 +1,7 @@
 import { Home, Calendar, Heart, HelpCircle, Settings, Bell, FileText, User, MessageCircle, Pill, Activity } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
