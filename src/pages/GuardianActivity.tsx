@@ -84,11 +84,16 @@ const GuardianActivity = () => {
         </Card>
 
         {/* 3. Meds */}
-        <Card className={refillDue ? "border-destructive" : undefined}>
+        <Card className={refillDue ? "border-destructive/50 bg-destructive/10" : "border-primary/30 bg-primary/10"}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Pill className={`w-4 h-4 ${refillDue ? "text-destructive" : "text-primary"}`} /> Meds
-              {refillDue && <span className="text-xs font-semibold text-destructive">Refill running low</span>}
+              {refillDue && (
+                <>
+                  <span className="min-w-[18px] h-[18px] px-1 text-[11px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center animate-pulse">!</span>
+                  <span className="text-xs font-semibold text-destructive">Refill running low</span>
+                </>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
