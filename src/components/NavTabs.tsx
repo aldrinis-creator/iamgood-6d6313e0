@@ -1,4 +1,4 @@
-import { Home, Calendar, Heart, HelpCircle, Settings, Bell, FileText, User, MessageCircle } from "lucide-react";
+import { Home, Calendar, Heart, HelpCircle, Settings, Bell, FileText, User, MessageCircle, Pill, Activity } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useEffect, useState } from "react";
@@ -68,13 +68,16 @@ const NavTabs = () => {
     return () => { supabase.removeChannel(pingChannel); };
   }, [role, session?.user?.id]);
 
+  const medsAlert = refillDue || medDue;
   const userTabs: any[] = [
     { icon: Home, label: "Home", path: "/dashboard" },
-    { icon: Calendar, label: "Appointments", path: "/appointments", badge: todayApptCount },
+    { icon: Activity, label: "My Activity", path: "/my-activity" },
     { icon: MessageCircle, label: "Messages", path: "/messages", badge: unreadPings },
-    { icon: Heart, label: "My Health", path: "/my-health", badge: (refillDue || medDue) ? 1 : 0 },
+    { icon: Heart, label: "My Health", path: "/my-health" },
     { icon: HelpCircle, label: "Help", path: "/help" },
+    { icon: Pill, label: "Medications", path: "/my-health?tool=Tablets", alert: medsAlert },
   ];
+
 
   const [unreadReplies, setUnreadReplies] = useState(0);
 
@@ -109,13 +112,15 @@ const NavTabs = () => {
     return () => { supabase.removeChannel(replyChannel); };
   }, [role, session?.user?.id]);
 
-  const guardianTabs = [
+  const guardianTabs: any[] = [
     { icon: User, label: "My User", path: "/guardian", badge: unreadCount },
+    { icon: Activity, label: "Activity", path: "/guardian/activity" },
     { icon: Bell, label: "Alerts", path: "/guardian/alerts" },
     { icon: FileText, label: "Reports", path: "/guardian/reports" },
     { icon: MessageCircle, label: "Messages", path: "/guardian/messages", badge: unreadReplies },
     { icon: Settings, label: "Settings", path: "/guardian-settings" },
   ];
+
 
   const tabs = role === "guardian" ? guardianTabs : userTabs;
 
