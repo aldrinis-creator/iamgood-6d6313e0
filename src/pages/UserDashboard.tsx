@@ -93,6 +93,9 @@ const UserDashboard = () => {
         {/* I NEED HELP */}
         <NeedHelpButton />
 
+        {/* Medications shortcut */}
+        <MedicationsBand />
+
         {/* Practice SOS */}
         {isNewUser && (
           <Card className="cursor-pointer hover:shadow-md transition-shadow border-sos/30 bg-sos/5" onClick={() => setShowPracticeDialog(true)}>
