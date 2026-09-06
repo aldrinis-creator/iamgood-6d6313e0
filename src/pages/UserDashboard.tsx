@@ -1,8 +1,7 @@
-import { Navigation, CalendarDays, Pill, ChevronRight, Droplets, AlertTriangle } from "lucide-react";
+import { CalendarDays, ChevronRight, Droplets, AlertTriangle } from "lucide-react";
 import EmailPromptBanner from "@/components/EmailPromptBanner";
 import VaultClaimCancelBanner from "@/components/vault/VaultClaimCancelBanner";
 import { useTodayAppointments } from "@/hooks/useTodayAppointments";
-import useRefillDue from "@/hooks/useRefillDue";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import CheckInCard from "@/components/CheckInCard";
@@ -14,14 +13,12 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import VoiceAgentButton from "@/components/VoiceAgentButton";
-import { useLiveDashboardStats } from "@/hooks/useLiveDashboardStats";
-import AudioUnlocker from "@/components/AudioUnlocker";
 import SOSDialog from "@/components/SOSDialog";
 
 const UserDashboard = () => {
   const todayAppointments = useTodayAppointments();
-  const refillDue = useRefillDue();
   const navigate = useNavigate();
+
   const { settings } = useUserSettings();
 
   const { session } = useAuth();
@@ -62,7 +59,7 @@ const UserDashboard = () => {
       <div className="p-4 space-y-4">
         <VaultClaimCancelBanner />
         <EmailPromptBanner userEmail={session?.user?.email} />
-        <AudioUnlocker />
+        
 
         {/* Hydration High-Risk Banner */}
         {showHydrationBanner && (
