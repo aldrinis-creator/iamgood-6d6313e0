@@ -31,12 +31,10 @@ const healthTools = [
   { icon: Stethoscope, label: "Health Tools", color: "bg-success/10 text-success" },
   { icon: Ambulance, label: "Ambulance", color: "bg-sos/10 text-sos" },
   { icon: HeartPulse, label: "Wellness Hub", color: "bg-primary/10 text-primary" },
-  { icon: Heart, label: "Vitals", color: "bg-sos/10 text-sos" },
   { icon: ShieldCheck, label: "Vault", color: "bg-sos/10 text-sos" },
   { icon: ShieldAlert, label: "Emergency First Aid", color: "bg-destructive/10 text-destructive" },
-  { icon: Wallet, label: "Financial Healthcare", color: "bg-success/10 text-success" },
-  { icon: HeartHandshake, label: "Personal Healthcare", color: "bg-primary/10 text-primary" },
 ];
+
 
 const healthToolsSubItems = [
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },

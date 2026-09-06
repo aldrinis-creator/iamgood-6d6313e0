@@ -25,7 +25,7 @@ const UserDashboard = () => {
   const signupDateStr = session?.user?.created_at;
   const isNewUser = signupDateStr ? (Date.now() - new Date(signupDateStr).getTime()) < 30 * 24 * 60 * 60 * 1000 : true;
 
-  const stats = useLiveDashboardStats();
+  
 
   const [showPracticeDialog, setShowPracticeDialog] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
