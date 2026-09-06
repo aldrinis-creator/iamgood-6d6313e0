@@ -248,17 +248,26 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
 
     if (selectedRole === "guardian" && data?.user?.id) {
       await supabase.rpc("link_guardian_user_id");
-      const nominationToken = searchParams.get("token");
+      const nominationToken = searchParams.get("token") || getPendingNominationToken();
       if (nominationToken) {
         try {
           await supabase.functions.invoke("guardian-nomination-response", { body: { token: nominationToken, action: "accept" } });
           clearPendingNomination();
         } catch (e) { console.error(e); }
       }
+      setLoading(false);
+      // Guardian: no account/success ceremony — straight into the dashboard.
+      toast.success("You're verified — welcome to Check-iN");
+      if (!isInstalled) {
+        setTimeout(() => toast("Tip: add Check-iN to your home screen for instant alerts."), 1500);
+      }
+      navigate("/guardian");
+      return;
     }
     setLoading(false);
     setRegistrationComplete(true);
   };
+
 
   const handleInstallClick = async () => {
     if (canInstall) await installApp();
@@ -442,27 +451,32 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
               </div>
             )}
 
-            <div 
-              className="flex items-center gap-2 py-2.5 mt-1 border-t border-auth-border cursor-pointer text-auth-green text-[13px] font-medium"
-              onClick={() => setShowEmailSection(!showEmailSection)}
-            >
-              <span>{showEmailSection ? "-" : "+"}</span> Add email for alerts <span className="ml-auto text-[11px] text-auth-text-3 font-normal">Optional</span>
-            </div>
-
-            {showEmailSection && (
-              <div className="flex flex-col gap-3.5 animate-in slide-in-from-top-2">
-                <div>
-                  <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+            {selectedRole !== "guardian" && (
+              <>
+                <div
+                  className="flex items-center gap-2 py-2.5 mt-1 border-t border-auth-border cursor-pointer text-auth-green text-[13px] font-medium"
+                  onClick={() => setShowEmailSection(!showEmailSection)}
+                >
+                  <span>{showEmailSection ? "-" : "+"}</span> Add email for alerts <span className="ml-auto text-[11px] text-auth-text-3 font-normal">Optional</span>
                 </div>
-                {email && (
-                  <div>
-                    <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+
+                {showEmailSection && (
+                  <div className="flex flex-col gap-3.5 animate-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Email</label>
+                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+                    </div>
+                    {email && (
+                      <div>
+                        <label className="block text-[12px] font-semibold text-auth-text-2 tracking-wide uppercase mb-1.5">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-navy-mid border border-auth-border-hi rounded-[10px] p-[13px] text-auth-text-1 text-[16px] outline-none focus:border-auth-green" />
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
+
           </div>
 
           <div className="mt-auto pt-6 flex flex-col gap-2.5">

@@ -63,6 +63,12 @@ const AppHeader = () => {
                   <Wrench className="w-4 h-4 mr-2" /> Services
                 </DropdownMenuItem>
               )}
+              {role !== "guardian" && (
+                <DropdownMenuItem onClick={() => navigate("/appointments")}>
+                  <CalendarDays className="w-4 h-4 mr-2" /> Appointments
+                </DropdownMenuItem>
+              )}
+
               {role === "guardian" && (
                 <DropdownMenuItem onClick={() => navigate("/guardian/appointments")}>
                   <CalendarDays className="w-4 h-4 mr-2" /> Appointments

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { version as APP_VERSION } from "../../package.json";
 import { Settings, WifiOff } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
@@ -126,7 +127,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 Terms of Service
               </Link>
               <span className="text-white">·</span>
-              <span className="text-xs text-white font-mono">v1.1.0</span>
+              <span className="text-xs text-white font-mono">v{APP_VERSION}</span>
               <span className="text-white">·</span>
               <button
                 onClick={() => setShowCookieSettings(true)}
