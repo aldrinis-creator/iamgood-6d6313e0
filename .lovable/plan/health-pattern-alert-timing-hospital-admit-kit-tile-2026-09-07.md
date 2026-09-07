@@ -5,6 +5,7 @@
 The pop-up that appears at the bottom of the screen when an unusual health pattern is detected currently fades away on its own after a few seconds.
 
 Change it so it:
+
 - stays visible for 30 seconds
 - shows a clear "Dismiss" button that closes it immediately
 
@@ -13,13 +14,14 @@ Everything else about the alert (when it fires, what it says, the guardian notif
 ## 2. "Hospital Admit Kit" tile on the Guardian home page
 
 Add a fourth tile to the quick action row on the Guardian's home page, next to Ambulance:
+
 - Label: "Hospital Admit Kit", with a medical-briefcase icon
 - Visible to all guardians (no primary-guardian restriction on the tile)
 - Tapping it opens the Guardian's Reports page
 
 The row becomes Call · Ambulance · Ping · Hospital Admit Kit, laid out so four tiles fit comfortably on a phone (2x2 grid on narrow screens).
 
-Nothing is removed: the Hospital Admittance Kit tile inside Ward's Activity stays exactly as it is today, including its primary-guardian gating.
+Nothing is removed: the Hospital Admittance Kit tile inside Ward's Activity stays exactly as it is today, including its primary-guardian gating. 
 
 ## Technical notes
 
