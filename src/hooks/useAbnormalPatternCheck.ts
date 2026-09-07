@@ -78,8 +78,13 @@ export default function useAbnormalPatternCheck() {
             }
           }
 
-          toast.warning("Health pattern alert detected", {
+          const toastId = toast.warning("Health pattern alert detected", {
             description: data.summary.substring(0, 100) + (data.summary.length > 100 ? "…" : ""),
+            duration: 30000,
+            action: {
+              label: "Dismiss",
+              onClick: () => toast.dismiss(toastId),
+            },
           });
         }
       } catch (e) {
