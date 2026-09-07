@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, Smartphone, Share, Plus, MoreVertical, ShieldCheck, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -58,10 +58,10 @@ const Install = () => {
     window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.android.chrome;end`;
   };
 
-  // FIX: Auto-fire the browser redirect on mount — don't make the guardian tap a button.
+  // FIX: Auto-fire the browser redirect on mount â€” don't make the guardian tap a button.
   // The button is kept as a visible fallback in case the scheme redirect fails silently.
   useEffect(() => {
-    if (isInAppBrowser && !isInstalled) {
+    if (isInAppBrowser && !isInstalled && !sessionStorage.getItem("redirected_to_chrome")) { sessionStorage.setItem("redirected_to_chrome", "true"); 
       // Small delay to allow the page to render so the guardian sees what's happening
       // before being redirected (prevents a blank-screen redirect feeling).
       const t = setTimeout(openInSystemBrowser, 600);
@@ -70,10 +70,11 @@ const Install = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInAppBrowser, isInstalled]);
 
-  // Guardian invite links must not be gated behind install instructions — go
+  // Guardian invite links must not be gated behind install instructions â€” go
   // straight to phone verification (installing is offered afterwards).
   useEffect(() => {
-    if (authLoading || session || !guardianToken || isInAppBrowser) return;
+    if (authLoading || session || !guardianToken) return;
+    if (isInAppBrowser && !sessionStorage.getItem("redirected_to_chrome")) return;
     navigate(`/register?nomination=accept&token=${guardianToken}`, { replace: true });
   }, [authLoading, session, guardianToken, isInAppBrowser, navigate]);
 
@@ -107,11 +108,11 @@ const Install = () => {
           <Card className="border-destructive/40 bg-destructive/5">
             <CardContent className="pt-6 space-y-3">
               <p className="text-sm font-semibold text-foreground">
-                Opening in {isIOS ? "Safari" : "Chrome"}…
+                Opening in {isIOS ? "Safari" : "Chrome"}â€¦
               </p>
               <p className="text-xs text-muted-foreground">
                 You opened this link inside WhatsApp. We're redirecting you to your phone's browser
-                automatically — PWA install and OTP delivery only work there.
+                automatically â€” PWA install and OTP delivery only work there.
               </p>
               <Button onClick={openInSystemBrowser} className="w-full h-12 text-base font-semibold">
                 Open in {isIOS ? "Safari" : "Chrome"} now
@@ -120,13 +121,13 @@ const Install = () => {
           </Card>
         )}
 
-        {guardianToken && !isInAppBrowser && (
+        {guardianToken && (
           <div className="space-y-2">
             <Button asChild className="w-full h-14 text-base font-semibold">
               <Link to={`/register?nomination=accept&token=${guardianToken}`}>Continue to verification</Link>
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Verify your phone number first — you don't need to install the app to do this.
+              Verify your phone number first â€” you don't need to install the app to do this.
             </p>
           </div>
         )}
@@ -134,7 +135,7 @@ const Install = () => {
         {isInstalled && (
           <Card className="border-success/30 bg-success/5">
             <CardContent className="pt-6 text-center">
-              <p className="text-success font-semibold">✓ Check-iN is already installed!</p>
+              <p className="text-success font-semibold">âœ“ Check-iN is already installed!</p>
             </CardContent>
           </Card>
         )}
@@ -206,7 +207,7 @@ const Install = () => {
                         <MoreVertical className="w-4 h-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">1. Tap the menu (⋮)</p>
+                        <p className="text-sm font-medium text-foreground">1. Tap the menu (â‹®)</p>
                         <p className="text-xs text-muted-foreground">Top-right corner of Chrome</p>
                       </div>
                     </div>
@@ -232,3 +233,5 @@ const Install = () => {
 };
 
 export default Install;
+
+

@@ -15,7 +15,7 @@ declare global {
 interface OtpVerificationProps {
   phone: string;
   purpose?: "login" | "register";
-  /** Guardian invite token — server rejects sends to a number the ward did not invite. */
+  /** Guardian invite token â€” server rejects sends to a number the ward did not invite. */
   nominationToken?: string | null;
   onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
   onCancel: () => void;
@@ -45,6 +45,14 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     // StrictMode / re-entry guard: never fire two OTP requests for one screen.
     if (sentOnce.current) return;
     sentOnce.current = true;
+    
+    const lastSent = sessionStorage.getItem("otp_sent_" + phone);
+    if (lastSent && Date.now() - parseInt(lastSent) < 120000) {
+      setSendState("sent");
+      setHasSent(true);
+      return;
+    }
+    sessionStorage.setItem("otp_sent_" + phone, Date.now().toString());
     sendOtp("send", "whatsapp");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,15 +116,15 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     const _nationalDigits = _digits.startsWith('91') ? _digits.slice(2) : _digits;
     if (isIndianNumber && _nationalDigits.length !== 10) {
       setSendState("failed");
-      setLastError(`Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code — +91 is added automatically.`);
+      setLastError(`Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code â€” +91 is added automatically.`);
       toast.error("Invalid mobile number", {
-        description: `Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code — +91 is added automatically.`
+        description: `Indian numbers must be 10 digits. You entered ${_nationalDigits.length}. Please re-enter without the country code â€” +91 is added automatically.`
       });
       return;
     }
 
     if (isIndianNumber) {
-      // ── MSG91 ROUTE (INDIA): guardian/user picks WhatsApp or SMS ──
+      // â”€â”€ MSG91 ROUTE (INDIA): guardian/user picks WhatsApp or SMS â”€â”€
       try {
         const { data, error } = await supabase.functions.invoke("send-otp", {
           body: { phone, action, purpose, channel: via, nomination_token: nominationToken || undefined },
@@ -152,7 +160,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         setRequestId(typeof payload.request_id === "string" ? payload.request_id : null);
         setExpiresIn(typeof payload.expires_in === "number" ? payload.expires_in : 600);
         if (payload.reused) {
-          setDeliveryNote("The code we already sent is still valid — please use the latest message.");
+          setDeliveryNote("The code we already sent is still valid â€” please use the latest message.");
         } else {
           toast.success(`Code sent on ${via === "sms" ? "SMS" : "WhatsApp"} to ${phone}`);
         }
@@ -165,7 +173,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         toast.error("Couldn't send the code", { description: msg });
       }
     } else {
-      // ── FIREBASE PHONE AUTH ROUTE (INTERNATIONAL) ──
+      // â”€â”€ FIREBASE PHONE AUTH ROUTE (INTERNATIONAL) â”€â”€
       try {
         if (!window.recaptchaVerifier) {
           window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
@@ -193,7 +201,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     setLoading(true);
 
     if (isIndianNumber) {
-      // ── MSG91 WHATSAPP VERIFY (INDIA) ──
+      // â”€â”€ MSG91 WHATSAPP VERIFY (INDIA) â”€â”€
       try {
         const { data, error } = await supabase.functions.invoke("send-otp", {
           body: { action: "verify", phone, otp, purpose },
@@ -236,7 +244,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
 
       setLoading(false);
     } else {
-      // ── FIREBASE VERIFY (INTERNATIONAL) ──
+      // â”€â”€ FIREBASE VERIFY (INTERNATIONAL) â”€â”€
       if (!confirmationResult) {
         setLoading(false);
         return;
@@ -306,7 +314,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
   return (
     <div className="flex flex-col">
       <div className="bg-auth-green-glow/20 border border-auth-green/30 rounded-xl p-3 mb-5 flex items-start gap-2.5">
-        <div className="text-[18px] shrink-0 mt-[1px]">💬</div>
+        <div className="text-[18px] shrink-0 mt-[1px]">ðŸ’¬</div>
         <div className="text-[13px] text-auth-text-2 leading-relaxed">
           {sendState === "sending" ? (
             "Sending code..."
@@ -411,7 +419,7 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
           disabled={otp.length !== 6 || loading || sendState === "sending"}
           className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl flex items-center justify-center disabled:opacity-50 transition-transform active:scale-[0.98]"
         >
-          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & continue ›"}
+          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Verify & continue â€º"}
         </button>
       </div>
     </div>
@@ -419,3 +427,4 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
 };
 
 export default OtpVerification;
+
