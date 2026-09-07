@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Navigation, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Smartphone, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
+import { Phone, Navigation, BriefcaseMedical, BatteryFull, BatteryMedium, BatteryLow, BatteryWarning, Smartphone, MapPin, AlertTriangle, Bell, Moon, LogOut, RefreshCw, ChevronDown, MessageCircle, Maximize2, Minimize2, ExternalLink, ShieldAlert, Pill, Activity, Heart, IdCard, Apple, ScanFace, Smile, ChevronRight } from "lucide-react";
 import { haversineDistance } from "@/lib/haversine";
 import { Progress } from "@/components/ui/progress";
 
@@ -1111,7 +1111,7 @@ const GuardianDashboard = () => {
         })()}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={`flex-col h-auto py-4 ${wardPhone ? "bg-primary" : "bg-muted text-muted-foreground"}`} size="lg">
@@ -1130,6 +1130,15 @@ const GuardianDashboard = () => {
             <span className="text-xs">Ambulance</span>
           </Button>
           {wardUserId && <GuardianPingDialog wardUserId={wardUserId} wardName={wardName} />}
+          <Button
+            variant="outline"
+            className="flex-col h-auto py-4"
+            size="lg"
+            onClick={() => navigate("/guardian/reports")}
+          >
+            <BriefcaseMedical className="w-5 h-5 mb-1" />
+            <span className="text-xs">Hospital Admit Kit</span>
+          </Button>
         </div>
 
         {showAmbulance && (
