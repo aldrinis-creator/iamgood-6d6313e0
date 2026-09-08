@@ -22,6 +22,8 @@ const AppHeader = () => {
   const showViewSwitcher = profile?.role === "user" && isGuardianLinked;
   const guardianViewActive = location.pathname.startsWith("/guardian");
   const avatarUrl = (profile as any)?.avatar_url;
+  // Guardians get a back arrow everywhere except their own Home page.
+  const showGuardianBack = role === "guardian" && location.pathname !== "/guardian";
 
 
   const getGreeting = () => {
