@@ -34,6 +34,19 @@ const AppHeader = () => {
   return (
     <header className="bg-background text-foreground px-4 pt-6 pb-2">
       <div className="flex items-start justify-between">
+        <div className="flex items-start gap-2">
+          {showGuardianBack && (
+            <button
+              aria-label="Go back"
+              onClick={() => {
+                if (window.history.length > 1) navigate(-1);
+                else navigate("/guardian");
+              }}
+              className="mt-1 w-9 h-9 rounded-full bg-navy-card border border-white/5 flex items-center justify-center shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-foreground" />
+            </button>
+          )}
         <div>
           <div className="text-[13px] text-muted-foreground font-medium">{getGreeting()},</div>
           <div className="text-[22px] font-bold text-foreground tracking-tight">{userName}</div>
