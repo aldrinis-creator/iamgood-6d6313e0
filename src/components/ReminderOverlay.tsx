@@ -274,7 +274,7 @@ const ReminderOverlay = () => {
           {actionLabel}
         </button>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-slate-500">
           {reminder.reminderCount ?? `Reminder ${currentShow} of ${MAX_SHOWS}`}
           {" · Tap to close"}
         </p>
