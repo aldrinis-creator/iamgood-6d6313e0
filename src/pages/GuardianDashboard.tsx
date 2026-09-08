@@ -1134,7 +1134,7 @@ const GuardianDashboard = () => {
             variant="outline"
             className="flex-col h-auto py-4"
             size="lg"
-            onClick={() => navigate("/guardian/reports")}
+            onClick={() => navigate("/guardian/reports?section=hospital_visit")}
           >
             <BriefcaseMedical className="w-5 h-5 mb-1" />
             <span className="text-xs">Hospital Admit Kit</span>
