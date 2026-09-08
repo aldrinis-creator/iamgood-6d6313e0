@@ -51,6 +51,7 @@ const AppHeader = () => {
           <div className="text-[13px] text-muted-foreground font-medium">{getGreeting()},</div>
           <div className="text-[22px] font-bold text-foreground tracking-tight">{userName}</div>
         </div>
+        </div>
         <div className="flex items-center gap-2">
           <NotificationCenter />
           <AQIWidget role={role} />
