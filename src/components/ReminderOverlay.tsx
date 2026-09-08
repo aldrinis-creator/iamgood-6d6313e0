@@ -252,16 +252,13 @@ const ReminderOverlay = () => {
         role="button"
         tabIndex={0}
         onClick={handleDismiss}
-        className={`relative aspect-square w-[80vw] max-w-[20rem] rounded-full bg-background shadow-2xl border-4 border-destructive/60 flex flex-col items-center justify-center text-center px-8 gap-2 cursor-pointer select-none transition-all duration-300 animate-[pulse_1.6s_cubic-bezier(0.4,0,0.6,1)_infinite] ${
+        className={`relative aspect-square w-[80vw] max-w-[20rem] rounded-full bg-white shadow-2xl border-4 border-destructive/60 flex flex-col items-center justify-center text-center px-8 gap-2 cursor-pointer select-none transition-all duration-300 ${
           visible ? "scale-100 opacity-100" : "scale-90 opacity-0"
         }`}
       >
-        {/* Soft flashing halo */}
-        <span className="pointer-events-none absolute inset-0 rounded-full bg-destructive/10 animate-ping" />
-
         <Icon className="w-14 h-14 text-destructive fill-destructive" />
         <h2 className="text-2xl font-bold text-destructive leading-tight">{reminder.title}</h2>
-        <p className="text-lg text-foreground leading-snug line-clamp-3">
+        <p className="text-lg text-slate-800 leading-snug line-clamp-3">
           {reminder.message}
         </p>
 
