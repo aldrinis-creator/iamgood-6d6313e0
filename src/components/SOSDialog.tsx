@@ -62,7 +62,7 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
   });
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [medicationDetails, setMedicationDetails] = useState<MedicationDetail[]>([]);
-  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [isOfflineFallback, setIsOfflineFallback] = useState(false);
@@ -197,7 +197,7 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
       fetchData();
       countingRef.current = true;
       hasSentRef.current = false;
-      setTimeLeft(10);
+      setTimeLeft(30);
       setSent(false);
       setSending(false);
       setIsOfflineFallback(false);
@@ -392,7 +392,7 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
 
   const handleCancel = () => {
     countingRef.current = false;
-    setTimeLeft(10);
+    setTimeLeft(30);
     cancelSOS();
     onClose();
   };
@@ -943,7 +943,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
               </Badge>
             )}
           </div>
-          <Progress value={((10 - timeLeft) / 10) * 100} className="h-2 [&>div]:bg-sos" />
+          <Progress value={((30 - timeLeft) / 30) * 100} className="h-2 [&>div]:bg-sos" />
           <Button
             onClick={() => { countingRef.current = false; sendAlerts(); }}
             disabled={sending}

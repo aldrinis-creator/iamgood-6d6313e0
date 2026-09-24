@@ -17,7 +17,7 @@ All three features run only during an active journey, hooked into `useJourneyTra
 - When `routeDeviation` becomes true: forces check-in popup open + starts 5-minute timer.
 - If user responds OR returns to route → timer cancelled.
 - If timer fires while still off-route AND check-in unanswered → sets `pendingAutoSos = true`, mounting `JourneyAutoSosOverlay`.
-- Overlay shows 60-second cancel countdown (audible chime every 5s, vibration). On expiry: notifies guardians (`type: "auto_sos"`) + calls `triggerSOS()` from AppContext.
+- Overlay shows 30-second cancel countdown (audible chime every 5s, vibration). On expiry: notifies guardians (`type: "auto_sos"`) + calls `triggerSOS()` from AppContext.
 - One escalation per journey (`escalationFiredRef`).
 
 ### 3. Public Shareable Live-Tracking Link

@@ -10,7 +10,7 @@ const SENSITIVITY_MAP: Record<string, { freeFall: number; impact: number; confid
 
 const FREE_FALL_TO_IMPACT_WINDOW = 800; // ms
 const COOLDOWN = 30_000;
-const COUNTDOWN_SECONDS = 15;
+const COUNTDOWN_SECONDS = 30;
 const BUFFER_DURATION_MS = 3000; // 3 seconds of pre-impact data
 const POST_IMPACT_WINDOW_MS = 2000; // 2 seconds of post-impact data
 const SAMPLE_INTERVAL_MS = 20; // ~50Hz
