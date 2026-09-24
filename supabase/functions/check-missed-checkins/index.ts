@@ -670,25 +670,61 @@ Deno.serve(async (req) => {
           console.error("WhatsApp/SMS missed check-in send error:", waErr);
         }
 
-        // Trigger full auto-SOS for the missed check-in
-        try {
-          console.log(`[check-missed-checkins] Escalating missed check-in to full SOS for user ${checkIn.user_id}`);
-          const { error: sosError } = await supabase.from("sos_events").insert({
-            user_id: checkIn.user_id,
-            trigger_type: "auto",
-            status: "active",
-          });
-          if (sosError) {
-            console.error("[check-missed-checkins] Failed to trigger auto-SOS:", sosError);
-          }
-        } catch (sosErr) {
-          console.error("[check-missed-checkins] Exception triggering auto-SOS:", sosErr);
-        }
-
+        // Full auto-SOS is handled by the 2-hour escalation pass below.
       }
     }
 
-    console.log(`Created ${notificationsCreated} notifications, sent ${emailsSent} emails, ${pushesSent} pushes`);
+    // ── 2-hour escalation: missed check-in still unanswered → full SOS ──
+    let autoSosFired = 0;
+    try {
+      const nowMs = Date.now();
+      const twoHoursAgo = new Date(nowMs - 2 * 60 * 60 * 1000).toISOString();
+      const lookback = new Date(nowMs - 6 * 60 * 60 * 1000).toISOString();
+      const { data: stale } = await supabase
+        .from("check_ins")
+        .select("id, user_id, scheduled_at")
+        .eq("status", "missed")
+        .is("responded_at", null)
+        .lte("scheduled_at", twoHoursAgo)
+        .gte("scheduled_at", lookback);
+
+      for (const ci of stale ?? []) {
+        const marker = `missed_checkin:${ci.id}`;
+        const { data: existing } = await supabase
+          .from("sos_events").select("id").eq("notes", marker).limit(1);
+        if (existing && existing.length) continue;
+
+        const { data: recentActive } = await supabase
+          .from("sos_events").select("id")
+          .eq("user_id", ci.user_id).eq("status", "active")
+          .gte("created_at", new Date(nowMs - 60 * 60 * 1000).toISOString())
+          .limit(1);
+        if (recentActive && recentActive.length) continue;
+
+        // Skip if the user responded to any check-in since this one was scheduled
+        const { data: laterResp } = await supabase
+          .from("check_ins").select("id")
+          .eq("user_id", ci.user_id)
+          .not("responded_at", "is", null)
+          .gte("responded_at", ci.scheduled_at)
+          .limit(1);
+        if (laterResp && laterResp.length) continue;
+
+        console.log(`[check-missed-checkins] 2h unanswered → auto-SOS for user ${ci.user_id} (check-in ${ci.id})`);
+        const { error: sosError } = await supabase.from("sos_events").insert({
+          user_id: ci.user_id,
+          trigger_type: "missed_checkin",
+          status: "active",
+          notes: marker,
+        });
+        if (sosError) console.error("[check-missed-checkins] Failed to trigger auto-SOS:", sosError);
+        else autoSosFired++;
+      }
+    } catch (sosErr) {
+      console.error("[check-missed-checkins] Exception in auto-SOS escalation:", sosErr);
+    }
+
+    console.log(`Created ${notificationsCreated} notifications, sent ${emailsSent} emails, ${pushesSent} pushes, auto-SOS ${autoSosFired}`);
 
 
     return new Response(

@@ -231,7 +231,7 @@ const FallDetectionOverlay = () => {
 
   if (!fallDetected) return null;
 
-  const progress = (countdown / 15) * 100;
+  const progress = (countdown / 30) * 100;
   const confidencePercent = Math.round(fallConfidence * 100);
   const confidenceLabel = fallConfidence >= 0.8 ? "High" : fallConfidence >= 0.6 ? "Moderate" : "Low";
 

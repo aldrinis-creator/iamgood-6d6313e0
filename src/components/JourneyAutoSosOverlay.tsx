@@ -10,7 +10,7 @@ interface JourneyAutoSosOverlayProps {
   destinationName?: string;
 }
 
-const COUNTDOWN_SEC = 60;
+const COUNTDOWN_SEC = 30;
 
 const JourneyAutoSosOverlay = ({ open, onCancel, onTrigger, destinationName }: JourneyAutoSosOverlayProps) => {
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
