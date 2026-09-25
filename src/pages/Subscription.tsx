@@ -474,17 +474,23 @@ const Subscription = () => {
             <p className="text-base text-muted-foreground">
               Vitals older than a month are deleted on the 7th of each month. Keep all your vitals history for ₹99/month.
             </p>
-            <Button
-              className="w-full"
-              onClick={() => {
-                if (!user) return;
-                const cb = encodeURIComponent(`${window.location.origin}/subscription?status=success&plan=vitals-storage&billing=monthly`);
-                const cancel = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
-                window.location.href = `https://futurewave.in/pay?plan=vitals-storage&billing=monthly&amount=9900&user_id=${user.id}&app_callback=${cb}&cancel_url=${cancel}`;
-              }}
-            >
-              Add Extra Storage — ₹99/month
-            </Button>
+            {VITALS_STORAGE_CHECKOUT_LIVE ? (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (!user) return;
+                  const cb = encodeURIComponent(`${window.location.origin}/subscription?status=success&plan=vitals-storage&billing=monthly`);
+                  const cancel = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
+                  window.location.href = `https://futurewave.in/pay?plan=vitals-storage&billing=monthly&amount=9900&user_id=${user.id}&app_callback=${cb}&cancel_url=${cancel}`;
+                }}
+              >
+                Add Extra Storage — ₹99/month
+              </Button>
+            ) : (
+              <div className="rounded-lg bg-muted p-3 text-base text-foreground">
+                Extra Storage checkout is coming soon — contact support to add it.
+              </div>
+            )}
           </CardContent>
         </Card>
 

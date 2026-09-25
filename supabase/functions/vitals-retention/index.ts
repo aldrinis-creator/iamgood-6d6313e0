@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { pushToUser } from "../_shared/webPush.ts";
 
 // Vitals retention: data from the previous month (and older) is deleted on the
 // 7th of each month at 12:00 IST. Warnings: last day of previous month, 5th,
@@ -87,15 +88,38 @@ Deno.serve(async (req) => {
   const title = stage === "1_hour" ? "Vitals data deleting in 1 hour" : "Vitals data will be deleted soon";
   const message = `Vitals data older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Save a "Your Health Vitals" report to your Vault, or keep all data with Extra Storage for ₹99/month from the Subscription page.`;
 
-  let sent = 0;
+  let sent = 0, pushes = 0, guardianNotices = 0;
   for (const uid of users) {
     if (dryRun) { sent++; continue; }
     const { error } = await sb.from("vitals_retention_notices").insert({ user_id: uid, purge_date: purgeDate, stage });
-    if (error) continue; // already sent this stage
+    if (error) continue; // already sent this stage (also gates guardian alerts)
     await sb.rpc("insert_notification_deduped", {
       p_user_id: uid, p_title: title, p_message: message, p_type: "vitals_retention", p_guardian_id: null,
     });
+    pushes += await pushToUser(sb, uid, {
+      title, body: message, tag: `vitals-retention-${purgeDate}-${stage}`,
+      url: "/subscription#vitals-storage", type: "vitals_retention", user_id: uid,
+    });
+
+    // Guardians
+    const [{ data: prof }, { data: gs }] = await Promise.all([
+      sb.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
+      sb.from("guardians").select("id, guardian_user_id").eq("user_id", uid).eq("status", "accepted"),
+    ]);
+    const name = prof?.full_name || "Your ward";
+    const gTitle = stage === "1_hour" ? `${name}'s vitals deleting in 1 hour` : `${name}'s vitals will be deleted soon`;
+    const gMsg = `${name}'s vitals older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Save a "Your Health Vitals" report or ask them to add Extra Storage (₹99/month).`;
+    for (const g of gs || []) {
+      await sb.from("notifications").insert({ user_id: uid, guardian_id: g.id, title: gTitle, message: gMsg, type: "vitals_retention" });
+      guardianNotices++;
+      if (g.guardian_user_id) {
+        pushes += await pushToUser(sb, g.guardian_user_id, {
+          title: gTitle, body: gMsg, tag: `vitals-retention-${uid}-${purgeDate}-${stage}`,
+          url: "/guardian", type: "vitals_retention",
+        });
+      }
+    }
     sent++;
   }
-  return json({ mode, stage, purgeDate, users: users.size, sent, dryRun });
+  return json({ mode, stage, purgeDate, users: users.size, sent, pushes, guardianNotices, dryRun });
 });
