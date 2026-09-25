@@ -14,6 +14,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import ReportShareButtons from "@/components/ReportShareButtons";
+import VitalsTrendReport from "@/components/VitalsTrendReport";
 
 /* ───────── types ───────── */
 interface VitalMetric { label: string; value: string | number; unit: string; icon: React.ReactNode; color: string }
@@ -32,8 +33,7 @@ const DashboardTab = () => {
   const { session } = useAuth();
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [wellness, setWellness] = useState<WellnessLog[]>([]);
-  const [aiInsights, setAiInsights] = useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Manual vitals entry
@@ -137,29 +137,6 @@ const DashboardTab = () => {
     }
   };
 
-  const getAiInsights = async () => {
-    setLoadingAi(true);
-    setAiInsights(null);
-    try {
-      const payload = JSON.stringify({
-        activities: activities.slice(-7).map(a => ({
-          log_date: a.log_date, heart_rate: a.heart_rate, spo2: a.spo2, steps: a.steps,
-          calories: a.calories, active_minutes: a.active_minutes, distance_km: a.distance_km,
-          respiration_rate: a.respiration_rate, bp_systolic: a.bp_systolic, bp_diastolic: a.bp_diastolic,
-          temperature_c: a.temperature_c, glucose_mg_dl: a.glucose_mg_dl,
-        })),
-        wellness: wellness.slice(-7),
-      });
-      const { data, error } = await supabase.functions.invoke("health-tools", { body: { type: "vitals_insights", payload } });
-      if (error) throw error;
-      setAiInsights(data.response);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to get AI insights");
-    } finally {
-      setLoadingAi(false);
-    }
-  };
-
   if (loading) return <div className="flex items-center justify-center py-12 text-muted-foreground">Loading vitals…</div>;
 
   return (
@@ -247,31 +224,11 @@ const DashboardTab = () => {
         </Card>
       )}
 
-      {/* AI Insights */}
-      <Button onClick={getAiInsights} disabled={loadingAi} className="w-full gap-2">
-        <Brain className="w-4 h-4" /> {loadingAi ? "Analyzing…" : "Get AI Insights"}
+      {/* Your Health Vitals — 30-day trend report (no AI) */}
+      <Button onClick={() => setShowReport(v => !v)} className="w-full gap-2">
+        <FileText className="w-4 h-4" /> {showReport ? "Hide Your Health Vitals" : "Your Health Vitals"}
       </Button>
-      {aiInsights && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <ReportShareButtons
-              title="Vitals AI Insights"
-              subtitle="AI Health Analysis"
-              content={aiInsights}
-              category="Vitals"
-            />
-            {(() => {
-              const visual = tryParseVisualReport(aiInsights);
-              if (visual) return <VisualHealthReport report={visual} />;
-              return (
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <ReactMarkdown>{aiInsights}</ReactMarkdown>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-      )}
+      {showReport && session?.user?.id && <VitalsTrendReport userId={session.user.id} />}
     </div>
   );
 };
