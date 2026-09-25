@@ -14,6 +14,7 @@ export function useSubscription() {
         .select("*")
         .eq("user_id", user!.id)
         .eq("status", "active")
+        .neq("plan_type", "vitals-storage")
         .gte("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(1)
