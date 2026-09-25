@@ -87,6 +87,8 @@ export async function sendPushNotification(
     },
     body,
   });
+}
+
 
 export const VAPID_PUBLIC_KEY = "BJq2e6gs1zTIdmNLo6v4DWL4trzwEedK_ghxuB9wb63nlh_y1ShYf2RS_IKdDdPu59tQJ3pLk5XHed6pGZ141lw";
 export const VAPID_SUBJECT = "mailto:checkin_support@futurewave.in";
