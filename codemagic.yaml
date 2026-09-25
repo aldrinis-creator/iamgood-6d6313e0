@@ -80,4 +80,4 @@ workflows:
       google_play:
         credentials: $GPLAY_SERVICE_ACCOUNT_JSON
         track: internal
-        submit_as_draft: true
+        submit_as_draft: false
