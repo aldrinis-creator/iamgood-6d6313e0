@@ -70,3 +70,6 @@ project_id = "magnrdegcegxdtgapyez"
 
 
 
+
+[functions.vitals-retention]
+verify_jwt = false

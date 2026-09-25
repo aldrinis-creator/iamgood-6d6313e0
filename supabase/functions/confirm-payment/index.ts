@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       return jsonRes({ error: "Missing required fields" }, 400);
     }
 
-    if (!["basic", "pro"].includes(plan_type)) {
+    if (!["basic", "pro", "vitals-storage"].includes(plan_type)) {
       return jsonRes({ error: "Invalid plan_type" }, 400);
     }
 
@@ -106,7 +106,8 @@ Deno.serve(async (req) => {
       .from("subscriptions")
       .update({ status: "expired", updated_at: now.toISOString() })
       .eq("user_id", user_id)
-      .eq("status", "active");
+      .eq("status", "active")
+      [plan_type === "vitals-storage" ? "eq" : "neq"]("plan_type", "vitals-storage");
 
     // Insert new subscription with optional coupon_code
     const { error } = await supabase.from("subscriptions").insert({

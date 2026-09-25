@@ -2651,6 +2651,30 @@ export type Database = {
           },
         ]
       }
+      vitals_retention_notices: {
+        Row: {
+          id: string
+          purge_date: string
+          sent_at: string
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          purge_date: string
+          sent_at?: string
+          stage: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          purge_date?: string
+          sent_at?: string
+          stage?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wellness_logs: {
         Row: {
           created_at: string

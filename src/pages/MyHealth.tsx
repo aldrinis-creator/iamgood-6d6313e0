@@ -38,11 +38,7 @@ const healthTools = [
 
 const healthToolsSubItems = [
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
-  { icon: Search, label: "Document Analyzer", desc: "AI-powered document analysis" },
   { icon: Receipt, label: "Hospital Bill Analyzer", desc: "Check bill for duplicates & overcharging" },
-  { icon: Stethoscope, label: "Symptom Checker", desc: "AI symptom assessment" },
-  { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
-  { icon: Phone, label: "Tele-Consult", desc: "Record & video consult" },
 ];
 
 
@@ -96,6 +92,11 @@ const legacyToolRedirect: Record<string, string> = {
   "Face Scan": "Quick Visual Checks",
   "Urine Check": "Quick Visual Checks",
   "Tongue Check": "Quick Visual Checks",
+  // Unpublished tools (code kept) fall back to the Health Tools list
+  "Document Analyzer": "Health Tools",
+  "Symptom Checker": "Health Tools",
+  "Medication Info": "Health Tools",
+  "Tele-Consult": "Health Tools",
 };
 
 const MyHealth = () => {

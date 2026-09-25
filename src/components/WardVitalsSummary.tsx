@@ -3,9 +3,7 @@ import { Heart, Activity, Brain, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
+import VitalsTrendReport from "@/components/VitalsTrendReport";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -21,8 +19,7 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
   const [activities, setActivities] = useState<any[]>([]);
   const [scans, setScans] = useState<any[]>([]);
   const [wellness, setWellness] = useState<any[]>([]);
-  const [aiInsights, setAiInsights] = useState<string | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -48,25 +45,6 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
     hr: a.heart_rate || 0,
     spo2: a.spo2 || 0,
   }));
-
-  const getAiInsights = async () => {
-    setLoadingAi(true);
-    setAiInsights(null);
-    try {
-      const payload = JSON.stringify({
-        activities: activities.slice(-7),
-        wellness: wellness.slice(-7),
-        faceScans: scans.slice(0, 5).map(s => ({ heart_rate: s.heart_rate, stress_score: s.stress_score, stress_level: s.stress_level, confidence: s.confidence })),
-      });
-      const { data, error } = await supabase.functions.invoke("health-tools", { body: { type: "vitals_insights", payload } });
-      if (error) throw error;
-      setAiInsights(data.response);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to get AI insights");
-    } finally {
-      setLoadingAi(false);
-    }
-  };
 
   if (loading) return null;
 
@@ -116,19 +94,10 @@ const WardVitalsSummary = ({ wardUserId, wardName }: Props) => {
           </ResponsiveContainer>
         )}
 
-        <Button onClick={getAiInsights} disabled={loadingAi} size="sm" className="w-full gap-2">
-          <Brain className="w-4 h-4" /> {loadingAi ? "Analyzing…" : "Get AI Insights"}
+        <Button onClick={() => setShowReport(v => !v)} size="sm" className="w-full gap-2">
+          <Activity className="w-4 h-4" /> {showReport ? "Hide Health Vitals" : "Your Health Vitals"}
         </Button>
-
-        {aiInsights && (() => {
-            const visual = tryParseVisualReport(aiInsights);
-            if (visual) return <VisualHealthReport report={visual} />;
-            return (
-              <div className="prose prose-sm max-w-none dark:prose-invert border rounded-lg p-3">
-                <ReactMarkdown>{aiInsights}</ReactMarkdown>
-              </div>
-            );
-          })()}
+        {showReport && <VitalsTrendReport userId={wardUserId} ownerName={wardName} allowSave={false} />}
       </CardContent>
     </Card>
   );
