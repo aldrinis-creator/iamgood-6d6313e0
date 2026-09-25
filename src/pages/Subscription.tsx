@@ -16,6 +16,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { printReceipt } from "@/lib/receiptPdf";
 import { cn } from "@/lib/utils";
 
+// Flip to true once futurewave.in/pay supports the ₹99 monthly "vitals-storage" plan.
+const VITALS_STORAGE_CHECKOUT_LIVE = false;
+
 const plans = [
   {
     key: "basic",
