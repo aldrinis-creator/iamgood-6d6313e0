@@ -183,6 +183,16 @@ self.addEventListener("push", (event: PushEvent) => {
       { action: "dismiss", title: "Dismiss" },
     ];
   }
+  if (data.type === "vitals_retention") {
+    options.requireInteraction = true;
+    // @ts-ignore
+    options.vibrate = [300, 150, 300];
+    // @ts-ignore
+    options.actions = [
+      { action: "open", title: "Open" },
+      { action: "dismiss", title: "Dismiss" },
+    ];
+  }
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
