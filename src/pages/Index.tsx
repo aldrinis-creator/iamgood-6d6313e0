@@ -42,9 +42,17 @@ const Index = () => {
 
 
       <div className="w-full max-w-[320px] flex-1 flex flex-col pt-[8vh]">
-        
+
+        {/* PUBLISHER LINE */}
+        <div className="text-center mb-5">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-auth-text-2">
+            Future Wave Technologies
+          </span>
+        </div>
+
         {/* LOGO SECTION */}
         <div className="flex flex-col items-center gap-3 mb-7">
+
           <div className="relative w-[72px] h-[72px] flex items-center justify-center">
             <div className="absolute -inset-2 rounded-full border-[1.5px] border-auth-green opacity-35 animate-[pulse_2.4s_ease-in-out_infinite]"></div>
             <div className="absolute -inset-4 rounded-full border border-auth-green opacity-15 animate-[pulse_2.4s_ease-in-out_infinite_0.6s]"></div>
