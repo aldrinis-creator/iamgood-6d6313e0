@@ -45,10 +45,11 @@ const Index = () => {
 
         {/* PUBLISHER LINE */}
         <div className="text-center mb-5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-auth-text-2">
+          <span className="text-[13px] font-semibold uppercase tracking-[0.16em] text-auth-text-1">
             Future Wave Technologies
           </span>
         </div>
+
 
         {/* LOGO SECTION */}
         <div className="flex flex-col items-center gap-3 mb-7">
