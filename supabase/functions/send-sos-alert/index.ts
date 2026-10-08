@@ -881,6 +881,7 @@ Deno.serve(async (req) => {
       // -----------------------------------------------------------------------
 
       const recipientVariables = {
+        // WhatsApp variables
         body_var_1: {
           type: "text",
           parameter_name: "var_1",
@@ -905,6 +906,24 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
+        // SMS variables
+        // These contain the same values as the corresponding
+        // WhatsApp variables, as required by the OneAPI flow.
+        var1: {
+          value: userNameSafe,
+        },
+
+        var2: {
+          value: istTimestamp,
+        },
+
+        var3: {
+          value: locationStr.slice(0, 200),
+        },
+
+        var4: {
+          value: healthSummary,
+        },
         // SMS variables (same values) for the OneAPI SMS channel.
         var1: { type: "text", value: userNameSafe },
         var2: { type: "text", value: istTimestamp },
