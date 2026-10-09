@@ -367,6 +367,13 @@ const CheckInCard = () => {
       console.error("Failed to check in:", error);
       toast.error("Check-in failed. Please try again.");
     } else {
+      // If this was a late check-in, trigger the late check-in alert via edge function
+      if (isLate) {
+        supabase.functions.invoke("send-late-checkin-alert", {
+          body: { checkInTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
+        }).catch(err => console.error("Failed to send late check-in alert:", err));
+      }
+
       setCheckedIn(true);
       setCheckedInStatus(finalStatus);
       toast.success(isLate ? "Late Check-in recorded! Guardians notified." : "Check-in recorded! Your guardians have been notified.");
