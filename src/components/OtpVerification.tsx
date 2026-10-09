@@ -307,6 +307,30 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
     sendOtp("resend");
   };
 
+  // WebOTP API integration for Android Chrome/PWA
+  useEffect(() => {
+    if (typeof window !== "undefined" && "OTPCredential" in window) {
+      const ac = new AbortController();
+      navigator.credentials
+        .get({
+          otp: { transport: ["sms"] },
+          signal: ac.signal,
+        } as any)
+        .then((otp: any) => {
+          if (otp && otp.code) {
+            setOtp(otp.code);
+            toast.success("Code auto-filled from SMS");
+          }
+        })
+        .catch((err) => {
+          console.log("WebOTP API error/abort:", err);
+        });
+      return () => {
+        ac.abort();
+      };
+    }
+  }, []);
+
   // Auto-verify as soon as all 6 digits are present (typed, pasted, or filled by
   // the phone's SMS autofill) so the guardian never has to hunt for a button.
   useEffect(() => {
