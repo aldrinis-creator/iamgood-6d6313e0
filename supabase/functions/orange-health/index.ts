@@ -274,6 +274,11 @@ serve(async (req) => {
         patient_details: normalizedPatients,
       };
 
+      console.log(
+  "Orange Health create-order payload:",
+  JSON.stringify(orangePayload)
+);
+
       const response = await fetch(`${BASE_URL}/v1/partner/order`, {
         method: "POST",
         headers: { "Content-Type": "application/json", api_key: apiKey! },
