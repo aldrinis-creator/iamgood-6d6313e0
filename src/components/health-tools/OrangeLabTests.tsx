@@ -65,6 +65,7 @@ export const OrangeLabTests: React.FC = () => {
   const [patientAge, setPatientAge] = useState("");
   const [patientGender, setPatientGender] = useState("male");
   const [address, setAddress] = useState("");
+  const [partnerNotes, setPartnerNotes] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [requestDate, setRequestDate] = useState(() => {
@@ -278,7 +279,7 @@ export const OrangeLabTests: React.FC = () => {
           slot_datetime: selectedSlot,
           payment_type: "paid_by_patient",
           selected_tests: selectedTests.map((test) => ({ test_id: test.id, name: test.name })),
-          partner_notes: "Sample collection for elder care - Check-iN Health",
+          ...(partnerNotes.trim() ? { partner_notes: partnerNotes.trim() } : {}),
           patient_details: [
             {
               partner_reference_id: `patient_${session?.user?.id?.slice(0, 8)}`,
@@ -642,6 +643,23 @@ export const OrangeLabTests: React.FC = () => {
                   required
                   className="text-xs h-9"
                 />
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <Label className="text-xs font-semibold">
+                  Partner Notes <span className="font-normal text-muted-foreground">(Optional)</span>
+                </Label>
+                <textarea
+                  value={partnerNotes}
+                  onChange={(e) => setPartnerNotes(e.target.value)}
+                  placeholder="e.g. A senior eMedic is required to handle a senior citizen."
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  For specific operational instructions only. Leave blank if none. These notes may be used by Orange Health's operations team to assign an appropriate eMedic or contact the customer.
+                </p>
               </div>
             </CardContent>
           </Card>
