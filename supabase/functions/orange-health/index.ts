@@ -100,7 +100,7 @@ serve(async (req) => {
     const { action } = body;
     console.log("orange-health action:", action);
 
-    if (["serviceability", "discover", "create-order", "test-results", "cancel-order"].includes(action) && !apiKey) {
+    if (["serviceability", "discover", "create-order", "test-results", "cancel-order", "reschedule-order"].includes(action) && !apiKey) {
       console.error("ORANGE_HEALTH_API_KEY Supabase secret is not configured.");
       return jsonResponse({ error: "Orange Health API key is not configured on the server" }, 500);
     }
@@ -411,43 +411,138 @@ serve(async (req) => {
       });
     }
 
-    // Cancel an order. Ownership is checked against the local record before calling Orange Health.
+    // Cancel an Orange Health request. Cancellation applies to the entire request_id,
+    // so every local row belonging to that request is considered together.
     if (action === "cancel-order") {
       const requestId = typeof body.city_request_id === "string" ? body.city_request_id.trim() : "";
       const cancellationReason =
-        typeof body.cancellation_reason === "string" ? body.cancellation_reason : "Customer requested";
+        typeof body.cancellation_reason === "string" ? body.cancellation_reason.trim() : "";
+      const cancellationExplanation =
+        typeof body.cancellation_explanation === "string" ? body.cancellation_explanation.trim() : "";
+
       if (!requestId) return jsonResponse({ error: "city_request_id is required" }, 400);
+      if (!cancellationReason) return jsonResponse({ error: "cancellation_reason is required" }, 400);
 
-      const { data: ownedOrder, error: ownedOrderError } = await serviceClient
+      const { data: ownedOrders, error: ownedOrdersError } = await serviceClient
         .from("lab_orders")
-        .select("id")
+        .select("id, city_request_id, raw_response, status")
         .eq("city_request_id", requestId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (ownedOrderError || !ownedOrder) return jsonResponse({ error: "Order not found" }, 404);
+        .eq("user_id", user.id);
 
-      const response = await fetch(`${BASE_URL}/v1/partner/${encodeURIComponent(requestId)}/cancel`, {
-        method: "POST",
+      if (ownedOrdersError) {
+        console.error("Failed to look up Orange Health booking for cancellation:", ownedOrdersError);
+        return jsonResponse({ error: "Could not verify booking ownership" }, 500);
+      }
+      if (!ownedOrders?.length) return jsonResponse({ error: "Order not found" }, 404);
+
+      const rawResponse = ownedOrders.find((order: JsonObject) => order.raw_response?.token)?.raw_response;
+      const token = typeof rawResponse?.token === "string" ? rawResponse.token.trim() : "";
+      if (!token) {
+        return jsonResponse({ error: "Orange Health cancellation token is missing for this booking" }, 409);
+      }
+
+      const cancelUrl = `${BASE_URL}/v1/partner/${encodeURIComponent(requestId)}/cancel?token=${encodeURIComponent(token)}`;
+      const response = await fetch(cancelUrl, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", api_key: apiKey! },
-        body: JSON.stringify({ cancellation_reason: cancellationReason }),
+        body: JSON.stringify({
+          cancellationReason,
+          ...(cancellationExplanation ? { cancellationExplanation } : {}),
+        }),
       });
       const data = await readJson(response);
-      if (!response.ok)
+
+      if (!response.ok) {
         return jsonResponse(
           { error: "Failed to cancel Orange Health booking", details: data, provider_status: response.status },
           response.status,
         );
+      }
 
-      const { error: updateError } = await serviceClient
+      // Orange Health may respond that cancellation is still in process. Do not
+      // mark the local booking as definitively cancelled without final confirmation.
+      return jsonResponse({
+        success: true,
+        cancellation_pending: true,
+        message: "Cancellation request accepted by Orange Health. Final cancellation status is not yet confirmed.",
+        status: response.status,
+        data,
+      });
+    }
+
+    // Reschedule an Orange Health request. The provider validates that the new
+    // slot is available and that the request is still eligible for rescheduling.
+    if (action === "reschedule-order") {
+      const requestId = typeof body.city_request_id === "string" ? body.city_request_id.trim() : "";
+      const requestedSlotTime = body.requested_slot_time;
+      const rescheduleReason = typeof body.reschedule_reason === "string" ? body.reschedule_reason.trim() : "";
+      const rescheduleExplanation =
+        typeof body.reschedule_explanation === "string" ? body.reschedule_explanation.trim() : "";
+
+      if (!requestId) return jsonResponse({ error: "city_request_id is required" }, 400);
+      if (!validSlotDateTime(requestedSlotTime)) {
+        return jsonResponse({ error: "requested_slot_time must be a valid ISO-style datetime (YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ss)" }, 400);
+      }
+      if (!rescheduleReason) return jsonResponse({ error: "reschedule_reason is required" }, 400);
+      if (!rescheduleExplanation) return jsonResponse({ error: "reschedule_explanation is required" }, 400);
+
+      const { data: ownedOrders, error: ownedOrdersError } = await serviceClient
         .from("lab_orders")
-        .update({
-          status: "cancelled",
-          updated_at: new Date().toISOString(),
-        })
+        .select("id, city_request_id, raw_response, status")
         .eq("city_request_id", requestId)
         .eq("user_id", user.id);
-      if (updateError) console.error("Orange booking cancelled but local status update failed:", updateError);
-      return jsonResponse({ success: true, status: response.status, data });
+
+      if (ownedOrdersError) {
+        console.error("Failed to look up Orange Health booking for rescheduling:", ownedOrdersError);
+        return jsonResponse({ error: "Could not verify booking ownership" }, 500);
+      }
+      if (!ownedOrders?.length) return jsonResponse({ error: "Order not found" }, 404);
+
+      const rawResponse = ownedOrders.find((order: JsonObject) => order.raw_response?.token)?.raw_response;
+      const token = typeof rawResponse?.token === "string" ? rawResponse.token.trim() : "";
+      if (!token) {
+        return jsonResponse({ error: "Orange Health rescheduling token is missing for this booking" }, 409);
+      }
+
+      const rescheduleUrl = `${BASE_URL}/v1/partner/${encodeURIComponent(requestId)}/reschedule?token=${encodeURIComponent(token)}`;
+      const response = await fetch(rescheduleUrl, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", api_key: apiKey! },
+        body: JSON.stringify({
+          requested_slot_time: requestedSlotTime,
+          reschedule_reason: rescheduleReason,
+          reschedule_explanation: rescheduleExplanation,
+        }),
+      });
+      const data = await readJson(response);
+
+      if (!response.ok) {
+        return jsonResponse(
+          { error: "Failed to reschedule Orange Health booking", details: data, provider_status: response.status },
+          response.status,
+        );
+      }
+
+      // The documented success response is { result: "ok" }. Update every local
+      // row tied to this request because rescheduling operates on the whole request.
+      const { error: updateError } = await serviceClient
+        .from("lab_orders")
+        .update({ slot_datetime: requestedSlotTime, updated_at: new Date().toISOString() })
+        .eq("city_request_id", requestId)
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        console.error("Orange Health accepted reschedule, but local slot update failed:", updateError);
+        return jsonResponse({
+          success: true,
+          provider_accepted: true,
+          saved: false,
+          data,
+          warning: "Orange Health accepted the reschedule, but the local booking could not be updated. Refresh or contact support.",
+        }, 200);
+      }
+
+      return jsonResponse({ success: true, provider_accepted: true, saved: true, data });
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
