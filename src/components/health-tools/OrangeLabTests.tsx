@@ -14,6 +14,8 @@ import {
   Download,
   Loader2,
   ShieldCheck,
+  Ban,
+  CalendarClock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -95,6 +97,12 @@ export const OrangeLabTests: React.FC = () => {
   const [orders, setOrders] = useState<LabOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [checkingResults, setCheckingResults] = useState<string | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [reschedulingOrderId, setReschedulingOrderId] = useState<string | null>(null);
+  const [activeRescheduleFormId, setActiveRescheduleFormId] = useState<string | null>(null);
+  const [rescheduleSlot, setRescheduleSlot] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("Patient not available at originally scheduled time");
+  const [rescheduleExplanation, setRescheduleExplanation] = useState("Patient is not available at the scheduled time");
 
   // Load user profile & address defaults
   useEffect(() => {
@@ -356,6 +364,123 @@ export const OrangeLabTests: React.FC = () => {
       toast.error("Failed to check report status");
     } finally {
       setCheckingResults(null);
+    }
+  };
+
+  const canManageOrder = (order: LabOrder) => {
+    const status = (order.status || "").toLowerCase();
+    return Boolean(order.city_request_id) &&
+      !["cancelled", "completed", "cancellation_pending", "cancelled_pending"].includes(status);
+  };
+
+  const handleCancelOrder = async (order: LabOrder) => {
+    if (!order.city_request_id) {
+      toast.error("This booking is missing its Orange Health request ID.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Cancel this Orange Health request? This may cancel every patient/order associated with the same request ID. Continue only if you want to cancel the entire request."
+    );
+    if (!confirmed) return;
+
+    const reason = window.prompt("Reason for cancellation:", "Customer requested");
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error("Please provide a cancellation reason.");
+      return;
+    }
+    const explanation = window.prompt("Additional explanation (optional):", "");
+    if (explanation === null) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("orange-health", {
+        body: {
+          action: "cancel-order",
+          city_request_id: order.city_request_id,
+          cancellation_reason: reason.trim(),
+          ...(explanation.trim() ? { cancellation_explanation: explanation.trim() } : {}),
+        },
+      });
+
+      if (error) {
+        let message = error.message || "Cancellation request failed.";
+        try {
+          const details = (error as any).context ? await (error as any).context.json() : null;
+          message = details?.details?.message || details?.details?.detail || details?.error || message;
+        } catch {
+          // Keep the original error message.
+        }
+        throw new Error(message);
+      }
+      if (data?.error || data?.success !== true) {
+        throw new Error(data?.details?.message || data?.details?.detail || data?.error || "Cancellation request failed.");
+      }
+
+      toast.success("Cancellation request submitted to Orange Health. Final cancellation may still be processing.");
+      await loadOrders();
+    } catch (err: any) {
+      console.error("Cancellation request failed:", err);
+      toast.error(err.message || "Failed to cancel booking.");
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  const handleRescheduleOrder = async (order: LabOrder) => {
+    if (!order.city_request_id) {
+      toast.error("This booking is missing its Orange Health request ID.");
+      return;
+    }
+    if (!rescheduleSlot) {
+      toast.error("Please select a new collection date and time.");
+      return;
+    }
+    if (!rescheduleReason.trim() || !rescheduleExplanation.trim()) {
+      toast.error("Please enter both a rescheduling reason and explanation.");
+      return;
+    }
+
+    // datetime-local gives a local wall-clock value in YYYY-MM-DDTHH:mm format.
+    setReschedulingOrderId(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("orange-health", {
+        body: {
+          action: "reschedule-order",
+          city_request_id: order.city_request_id,
+          requested_slot_time: rescheduleSlot,
+          reschedule_reason: rescheduleReason.trim(),
+          reschedule_explanation: rescheduleExplanation.trim(),
+        },
+      });
+
+      if (error) {
+        let message = error.message || "Rescheduling request failed.";
+        try {
+          const details = (error as any).context ? await (error as any).context.json() : null;
+          message = details?.details?.message || details?.details?.detail || details?.error || message;
+        } catch {
+          // Keep the original error message.
+        }
+        throw new Error(message);
+      }
+      if (data?.error || data?.success !== true) {
+        throw new Error(data?.details?.message || data?.details?.detail || data?.error || "Rescheduling request failed.");
+      }
+
+      toast.success("Rescheduling request accepted by Orange Health.");
+      setReschedulingOrderId(null);
+      setActiveRescheduleFormId(null);
+      setRescheduleSlot("");
+      setRescheduleReason("Patient not available at originally scheduled time");
+      setRescheduleExplanation("Patient is not available at the scheduled time");
+      await loadOrders();
+    } catch (err: any) {
+      console.error("Rescheduling request failed:", err);
+      toast.error(err.message || "Failed to reschedule booking.");
+    } finally {
+      setReschedulingOrderId(null);
     }
   };
 
@@ -888,7 +1013,90 @@ export const OrangeLabTests: React.FC = () => {
                           Check Report Status
                         </Button>
                       )}
+                      {canManageOrder(ord) && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={cancellingOrderId === ord.id || reschedulingOrderId === ord.id}
+                            onClick={() => void handleCancelOrder(ord)}
+                            className="gap-1.5 text-xs h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
+                          >
+                            {cancellingOrderId === ord.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Ban className="w-3.5 h-3.5" />
+                            )}
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={cancellingOrderId === ord.id || reschedulingOrderId === ord.id}
+                            onClick={() => {
+                              setActiveRescheduleFormId(ord.id);
+                              setRescheduleSlot("");
+                              setRescheduleSlot("");
+                            }}
+                            className="gap-1.5 text-xs h-8"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            Reschedule
+                          </Button>
+                        </>
+                      )}
                     </div>
+                    {activeRescheduleFormId === ord.id && (
+                      <div className="w-full border-t pt-4 mt-2 space-y-3">
+                        <h4 className="text-xs font-semibold">Reschedule collection</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">New date and time</Label>
+                            <Input
+                              type="datetime-local"
+                              value={rescheduleSlot}
+                              min={new Date().toISOString().slice(0, 16)}
+                              onChange={(e) => setRescheduleSlot(e.target.value)}
+                              className="text-xs h-9"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Reason</Label>
+                            <Input
+                              value={rescheduleReason}
+                              onChange={(e) => setRescheduleReason(e.target.value)}
+                              placeholder="Reason for rescheduling"
+                              className="text-xs h-9"
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-xs">Explanation</Label>
+                            <Input
+                              value={rescheduleExplanation}
+                              onChange={(e) => setRescheduleExplanation(e.target.value)}
+                              placeholder="Explain why the booking needs to be rescheduled"
+                              className="text-xs h-9"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setActiveRescheduleFormId(null)}>
+                            Close
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                            disabled={reschedulingOrderId === ord.id}
+                            onClick={() => void handleRescheduleOrder(ord)}
+                          >
+                            {reschedulingOrderId === ord.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Submit reschedule"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
