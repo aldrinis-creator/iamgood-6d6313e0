@@ -274,10 +274,12 @@ serve(async (req) => {
         patient_details: normalizedPatients,
       };
 
-      console.log(
-  "Orange Health create-order payload:",
-  JSON.stringify(orangePayload)
-);
+      // Do not log patient names, phone numbers, addresses, or other booking details.
+      console.log("Orange Health create-order request prepared", {
+        patientCount: normalizedPatients.length,
+        hasLocation: Boolean(location),
+        hasPartnerNotes: Boolean(orangePayload.partner_notes),
+      });
 
       const response = await fetch(`${BASE_URL}/v1/partner/order`, {
         method: "POST",
@@ -459,14 +461,67 @@ serve(async (req) => {
         );
       }
 
-      // Orange Health may respond that cancellation is still in process. Do not
-      // mark the local booking as definitively cancelled without final confirmation.
+      // Verify cancellation with the Order Status API. The provider may need a
+      // short time to reflect the cancellation, so keep the local status unchanged
+      // unless the status endpoint explicitly confirms "cancelled".
+      let providerOrderStatus: string | null = null;
+      let statusCheckSucceeded = false;
+      try {
+        const statusUrl = `${BASE_URL}/v1/partner/order-details/${encodeURIComponent(requestId)}?token=${encodeURIComponent(token)}`;
+        const statusResponse = await fetch(statusUrl, {
+          method: "GET",
+          headers: { api_key: apiKey! },
+        });
+        const statusData = await readJson(statusResponse);
+        if (statusResponse.ok) {
+          statusCheckSucceeded = true;
+          const rawStatus = statusData?.data?.status ?? statusData?.status_text ?? statusData?.order_status;
+          providerOrderStatus = typeof rawStatus === "string" ? rawStatus.toLowerCase() : null;
+        } else {
+          console.warn("Orange Health cancellation accepted; status check not yet successful", {
+            providerStatus: statusResponse.status,
+          });
+        }
+      } catch (statusCheckError) {
+        console.warn("Orange Health cancellation accepted; status check failed", {
+          message: statusCheckError instanceof Error ? statusCheckError.message : "Unknown status-check error",
+        });
+      }
+
+      if (providerOrderStatus === "cancelled" || providerOrderStatus === "canceled") {
+        const { error: updateError } = await serviceClient
+          .from("lab_orders")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("city_request_id", requestId)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          console.error("Orange Health confirmed cancellation, but local status update failed:", updateError);
+          return jsonResponse({
+            success: true,
+            cancellation_pending: false,
+            provider_status: providerOrderStatus,
+            saved: false,
+            warning: "Orange Health confirmed cancellation, but the local booking status could not be updated. Refresh or contact support.",
+          });
+        }
+
+        return jsonResponse({
+          success: true,
+          cancellation_pending: false,
+          provider_status: providerOrderStatus,
+          saved: true,
+          message: "Orange Health confirmed that the booking is cancelled.",
+        });
+      }
+
       return jsonResponse({
         success: true,
         cancellation_pending: true,
-        message: "Cancellation request accepted by Orange Health. Final cancellation status is not yet confirmed.",
+        provider_status: providerOrderStatus,
+        status_check_succeeded: statusCheckSucceeded,
+        message: "Cancellation request accepted by Orange Health. The booking will remain unchanged until cancellation is confirmed. Refresh or check again shortly.",
         status: response.status,
-        data,
       });
     }
 
@@ -523,26 +578,18 @@ serve(async (req) => {
         );
       }
 
-      // The documented success response is { result: "ok" }. Update every local
-      // row tied to this request because rescheduling operates on the whole request.
-      const { error: updateError } = await serviceClient
-        .from("lab_orders")
-        .update({ slot_datetime: requestedSlotTime, updated_at: new Date().toISOString() })
-        .eq("city_request_id", requestId)
-        .eq("user_id", user.id);
-
-      if (updateError) {
-        console.error("Orange Health accepted reschedule, but local slot update failed:", updateError);
-        return jsonResponse({
-          success: true,
-          provider_accepted: true,
-          saved: false,
-          data,
-          warning: "Orange Health accepted the reschedule, but the local booking could not be updated. Refresh or contact support.",
-        }, 200);
-      }
-
-      return jsonResponse({ success: true, provider_accepted: true, saved: true, data });
+      // A successful API response means the request was accepted, not that the
+      // requested time is the final confirmed slot. Orange Health confirms the
+      // actual slot through the task.confirmed webhook. Keep slot_datetime intact
+      // here; the webhook handler should update it when that event arrives.
+      return jsonResponse({
+        success: true,
+        provider_accepted: true,
+        awaiting_confirmation: true,
+        saved: false,
+        message: "Orange Health accepted the reschedule request. The displayed slot will update when the task.confirmed webhook confirms the new time.",
+        data,
+      }, 200);
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
