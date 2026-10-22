@@ -103,6 +103,20 @@ export const OrangeLabTests: React.FC = () => {
   const [rescheduleSlot, setRescheduleSlot] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("Patient not available at originally scheduled time");
   const [rescheduleExplanation, setRescheduleExplanation] = useState("Patient is not available at the scheduled time");
+  // These flags prevent duplicate requests while waiting for Orange Health webhooks/status updates.
+  const [pendingCancellationIds, setPendingCancellationIds] = useState<string[]>([]);
+  const [pendingRescheduleSlots, setPendingRescheduleSlots] = useState<Record<string, string>>({});
+
+  const getLocalDateTimeInputValue = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const getLocalDateInputValue = (date = new Date()) => getLocalDateTimeInputValue(date).slice(0, 10);
 
   // Load user profile & address defaults
   useEffect(() => {
@@ -237,7 +251,23 @@ export const OrangeLabTests: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOrders((data as any) || []);
+      const loadedOrders = ((data as any) || []) as LabOrder[];
+      setOrders(loadedOrders);
+      const cancelledRequestIds = new Set(loadedOrders
+        .filter((order) => ["cancelled", "canceled"].includes((order.status || "").toLowerCase()))
+        .map((order) => order.city_request_id || ""));
+      setPendingCancellationIds((current) => current.filter((id) => !cancelledRequestIds.has(id)));
+      // Clear pending reschedule markers once the webhook changes the stored slot.
+      setPendingRescheduleSlots((current) => {
+        const next = { ...current };
+        for (const order of loadedOrders) {
+          const requestId = order.city_request_id || "";
+          if (requestId && Object.prototype.hasOwnProperty.call(next, requestId) && order.slot_datetime !== next[requestId]) {
+            delete next[requestId];
+          }
+        }
+        return next;
+      });
     } catch (err) {
       console.error("Failed to load lab orders:", err);
     } finally {
@@ -271,6 +301,9 @@ export const OrangeLabTests: React.FC = () => {
     if (!patientPhone.trim() || patientPhone.replace(/\D/g, "").length < 10) {
       return toast.error("Please enter a valid 10-digit mobile number");
     }
+    if (!patientAge.trim() || !Number.isInteger(Number(patientAge)) || Number(patientAge) < 1 || Number(patientAge) > 120) {
+      return toast.error("Please enter a valid patient age between 1 and 120");
+    }
     if (!address.trim()) return toast.error("Please enter collection address");
     if (!selectedSlot) return toast.error("Please select an available collection time slot");
     if (selectedTests.length === 0) return toast.error("Please select at least one test");
@@ -293,7 +326,7 @@ export const OrangeLabTests: React.FC = () => {
               partner_reference_id: `patient_${session?.user?.id?.slice(0, 8)}`,
               patient_name: patientName.trim(),
               patient_phone: patientPhone.replace(/\D/g, "").slice(-10),
-              age: patientAge ? String(patientAge) : "65",
+              age: String(Number(patientAge)),
               gender: patientGender || "male",
               tests: selectedTests.map((t) => ({ test_id: String(t.id) })),
             },
@@ -327,7 +360,7 @@ export const OrangeLabTests: React.FC = () => {
       if (data?.saved === false) {
         toast.error(data?.warning || "Orange Health accepted the booking, but the local record could not be saved. Contact support before retrying.");
       } else {
-        toast.success("Home Lab Test collection booked successfully!");
+        toast.success("Booking request accepted by Orange Health. Check My Bookings for confirmation.");
       }
       await loadOrders();
     } catch (err: any) {
@@ -368,9 +401,19 @@ export const OrangeLabTests: React.FC = () => {
   };
 
   const canManageOrder = (order: LabOrder) => {
-    const status = (order.status || "").toLowerCase();
-    return Boolean(order.city_request_id) &&
-      !["cancelled", "completed", "cancellation_pending", "cancelled_pending"].includes(status);
+    const status = (order.status || "").toLowerCase().replace(/[ -]/g, "_");
+    const requestId = order.city_request_id || "";
+    return Boolean(requestId) &&
+      !pendingCancellationIds.includes(requestId) &&
+      !Object.prototype.hasOwnProperty.call(pendingRescheduleSlots, requestId) &&
+      !["cancelled", "canceled", "completed", "cancellation_pending", "cancelled_pending", "reschedule_pending"].includes(status);
+  };
+
+  const getOrderStatusLabel = (order: LabOrder) => {
+    const requestId = order.city_request_id || "";
+    if (pendingCancellationIds.includes(requestId)) return "Cancellation pending";
+    if (Object.prototype.hasOwnProperty.call(pendingRescheduleSlots, requestId)) return "Reschedule pending";
+    return (order.status || "requested").replace(/_/g, " ");
   };
 
   const handleCancelOrder = async (order: LabOrder) => {
@@ -418,7 +461,17 @@ export const OrangeLabTests: React.FC = () => {
         throw new Error(data?.details?.message || data?.details?.detail || data?.error || "Cancellation request failed.");
       }
 
-      toast.success("Cancellation request submitted to Orange Health. Final cancellation may still be processing.");
+      if (data?.cancellation_pending === true) {
+        setPendingCancellationIds((current) => current.includes(order.city_request_id!) ? current : [...current, order.city_request_id!]);
+        toast.info(data?.message || "Cancellation is pending confirmation from Orange Health.");
+      } else {
+        setPendingCancellationIds((current) => current.filter((id) => id !== order.city_request_id));
+        if (data?.saved === false) {
+          toast.error(data?.warning || "Orange Health confirmed cancellation, but the local booking status could not be updated. Refresh or contact support.");
+        } else {
+          toast.success(data?.message || "Orange Health confirmed the cancellation.");
+        }
+      }
       await loadOrders();
     } catch (err: any) {
       console.error("Cancellation request failed:", err);
@@ -435,6 +488,15 @@ export const OrangeLabTests: React.FC = () => {
     }
     if (!rescheduleSlot) {
       toast.error("Please select a new collection date and time.");
+      return;
+    }
+    const requestedDate = new Date(rescheduleSlot);
+    if (Number.isNaN(requestedDate.getTime()) || requestedDate.getTime() <= Date.now()) {
+      toast.error("Please select a future collection date and time.");
+      return;
+    }
+    if (order.slot_datetime && rescheduleSlot === order.slot_datetime.slice(0, 16)) {
+      toast.error("Please choose a different collection time.");
       return;
     }
     if (!rescheduleReason.trim() || !rescheduleExplanation.trim()) {
@@ -469,7 +531,15 @@ export const OrangeLabTests: React.FC = () => {
         throw new Error(data?.details?.message || data?.details?.detail || data?.error || "Rescheduling request failed.");
       }
 
-      toast.success("Rescheduling request accepted by Orange Health.");
+      if (data?.awaiting_confirmation === true) {
+        setPendingRescheduleSlots((current) => ({
+          ...current,
+          [order.city_request_id!]: order.slot_datetime,
+        }));
+        toast.info(data?.message || "Reschedule accepted. Waiting for Orange Health to confirm the new slot.");
+      } else {
+        toast.success(data?.message || "Rescheduling request accepted by Orange Health.");
+      }
       setReschedulingOrderId(null);
       setActiveRescheduleFormId(null);
       setRescheduleSlot("");
@@ -571,9 +641,9 @@ export const OrangeLabTests: React.FC = () => {
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Booking Confirmed!</h3>
+              <h3 className="text-lg font-bold text-foreground">Booking Request Accepted</h3>
               <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
-                Your home diagnostic sample collection has been scheduled with Orange Health Labs. An e-medic will visit your address at the selected slot.
+                Orange Health has accepted your booking request. The final collection schedule and status will be reflected in My Bookings when confirmed by Orange Health.
               </p>
             </div>
 
@@ -584,7 +654,7 @@ export const OrangeLabTests: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scheduled Slot:</span>
-                <span className="font-semibold">{selectedSlot ? formatSlotDateTime(selectedSlot) : ""}</span>
+                <span className="font-semibold">{selectedSlot ? formatSlotDateTime(selectedSlot) : "Pending confirmation"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Payment Mode:</span>
@@ -732,12 +802,15 @@ export const OrangeLabTests: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Age</Label>
+                  <Label className="text-xs font-semibold">Age *</Label>
                   <Input
                     type="number"
                     value={patientAge}
                     onChange={(e) => setPatientAge(e.target.value)}
                     placeholder="Age (e.g. 68)"
+                    min={1}
+                    max={120}
+                    required
                     className="text-xs h-9"
                   />
                 </div>
@@ -815,7 +888,7 @@ export const OrangeLabTests: React.FC = () => {
                   <Input
                     type="date"
                     value={requestDate}
-                    min={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`}
+                    min={getLocalDateInputValue()}
                     onChange={(e) => setRequestDate(e.target.value)}
                     className="text-xs h-9"
                   />
@@ -955,14 +1028,14 @@ export const OrangeLabTests: React.FC = () => {
                         <Badge
                           variant="outline"
                           className={`text-[10px] capitalize ${
-                            ord.status === "completed"
+                            getOrderStatusLabel(ord).toLowerCase().includes("completed")
                               ? "bg-green-500/10 text-green-600 border-green-500/30"
-                              : ord.status === "cancelled"
+                              : getOrderStatusLabel(ord).toLowerCase().includes("cancelled")
                               ? "bg-destructive/10 text-destructive border-destructive/30"
                               : "bg-orange-500/10 text-orange-600 border-orange-500/30"
                           }`}
                         >
-                          {ord.status}
+                          {getOrderStatusLabel(ord)}
                         </Badge>
                         {ord.city_request_id && (
                           <span className="text-[10px] text-muted-foreground">
@@ -975,6 +1048,12 @@ export const OrangeLabTests: React.FC = () => {
                         <span>📅 Slot: {formatSlotDateTime(ord.slot_datetime)}</span>
                         <span>📍 {ord.address}</span>
                       </div>
+                      {Object.prototype.hasOwnProperty.call(pendingRescheduleSlots, ord.city_request_id || "") && (
+                        <p className="text-[11px] text-orange-600">New time requested. The displayed slot will change after Orange Health confirms it.</p>
+                      )}
+                      {pendingCancellationIds.includes(ord.city_request_id || "") && (
+                        <p className="text-[11px] text-orange-600">Cancellation requested. Waiting for Orange Health confirmation.</p>
+                      )}
 
                       {/* Tests list */}
                       <div className="flex flex-wrap gap-1 pt-1">
@@ -1038,7 +1117,6 @@ export const OrangeLabTests: React.FC = () => {
                             onClick={() => {
                               setActiveRescheduleFormId(ord.id);
                               setRescheduleSlot("");
-                              setRescheduleSlot("");
                             }}
                             className="gap-1.5 text-xs h-8"
                           >
@@ -1057,7 +1135,7 @@ export const OrangeLabTests: React.FC = () => {
                             <Input
                               type="datetime-local"
                               value={rescheduleSlot}
-                              min={new Date().toISOString().slice(0, 16)}
+                              min={getLocalDateTimeInputValue()}
                               onChange={(e) => setRescheduleSlot(e.target.value)}
                               className="text-xs h-9"
                             />
