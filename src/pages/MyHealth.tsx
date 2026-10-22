@@ -41,6 +41,9 @@ const healthToolsSubItems = [
   { icon: TestTube, label: "Home Lab Tests", desc: "Doorstep diagnostic sample collection by Orange Health Labs" },
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
   { icon: Receipt, label: "Hospital Bill Analyzer", desc: "Check bill for duplicates & overcharging" },
+  { icon: Search, label: "Document Analyzer", desc: "AI-powered document analysis" },
+  { icon: Info, label: "Medication Info", desc: "Drug information & banned list" },
+  { icon: ShieldAlert, label: "Emergency First Aid", desc: "Step-by-step first aid guides" },
 ];
 
 
