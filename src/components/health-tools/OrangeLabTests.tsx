@@ -37,7 +37,7 @@ import {
   toSlotKey,
   type PendingMap,
   type StatusTone,
-} from "./orangeLabHelpers";
+} from "./OrangeLabHelpers.ts";
 
 interface SlotInfo {
   slot_datetime?: string;
