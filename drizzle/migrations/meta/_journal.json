@@ -15,6 +15,13 @@
       "when": 1791954840886,
       "tag": "0001_create_lab_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793103343372,
+      "tag": "0002_lab_orders_read_only_for_clients",
+      "breakpoints": true
     }
   ]
 }
