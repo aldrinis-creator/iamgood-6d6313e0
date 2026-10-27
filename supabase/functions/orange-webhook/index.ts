@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Handled events:
  *   order.created        -> status requested, stores per-test info (fasting, TAT)
  *   task.confirmed       -> status scheduled, slot from payload.request.scheduled_on
- *   task.assigned / accepted / started / in_progress -> lifecycle stage only
+ *   task.assigned / accepted / started / in_progress -> lifecycle stage (+ repairs status/slot if task.confirmed was lost)
  *   task.completed       -> status sample_collected (NOT final; no report yet)
  *   test.completed_sent  -> partial report info (report_data only; status/report_url untouched)
  *   order.completed      -> status completed (= report ready), report_url + report_data
@@ -161,10 +161,12 @@ interface EventRule {
 const EVENT_RULES: Record<string, EventRule> = {
   "order.created": { status: "requested", stage: "initiated", scope: "request", captureTests: true },
   "task.confirmed": { status: "scheduled", stage: "scheduled", scope: "request", updateSlot: true },
-  "task.assigned": { stage: "phlebo_assigned", scope: "request" },
-  "task.accepted": { stage: "phlebo_accepted", scope: "request" },
-  "task.started": { stage: "emedic_on_the_way", scope: "request" },
-  "task.in_progress": { stage: "collection_in_progress", scope: "request" },
+  // Every task.* payload carries request.status_string "scheduled" and request.scheduled_on, and these events can only
+  // happen AFTER Orange confirmed the order. So they also (forward-only) repair status/slot if task.confirmed was lost.
+  "task.assigned": { status: "scheduled", stage: "phlebo_assigned", scope: "request", updateSlot: true },
+  "task.accepted": { status: "scheduled", stage: "phlebo_accepted", scope: "request", updateSlot: true },
+  "task.started": { status: "scheduled", stage: "emedic_on_the_way", scope: "request", updateSlot: true },
+  "task.in_progress": { status: "scheduled", stage: "collection_in_progress", scope: "request", updateSlot: true },
   "task.completed": { status: "sample_collected", stage: "sample_collected", scope: "request" },
   "test.completed_sent": { stage: "partial_report_available", scope: "order", reports: "partial" },
   "order.completed": { status: "completed", stage: "report_ready", scope: "order", reports: "final" },

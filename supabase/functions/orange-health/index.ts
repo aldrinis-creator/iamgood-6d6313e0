@@ -8,7 +8,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  *   create-order     POST /v1/partner/order
  *   cancel-order     PATCH /v1/partner/{request_id}/cancel?token=
  *   reschedule-order PATCH /v1/partner/{request_id}/reschedule?token=
- *   discover / test-results   unchanged logic (see notes at the bottom of each block)
+ *
+ * Reports are NOT fetched from here: Orange pushes them per order through the documented order.completed webhook
+ * (see orange-webhook). A lookup by phone number could attach the wrong person's report, so it was removed.
  *
  * Error contract (every failure):
  *   { success:false, code, error, message, provider_status?, provider_message?, details? }
@@ -156,6 +158,15 @@ async function orangeFetch(
       signal: controller.signal,
     });
     const data = await readJson(response);
+    if (!response.ok) {
+      // Diagnostics for support: method, path WITHOUT the query string (which holds the token / address), status, body.
+      console.warn("Orange Health non-OK response", {
+        method: init.method ?? "GET",
+        path: path.split("?")[0],
+        status: response.status,
+        body: JSON.stringify(data).slice(0, 300),
+      });
+    }
     return { response, data };
   } catch (error) {
     throw new ProviderUnreachableError(error instanceof Error ? error.message : "Provider unreachable");
@@ -182,12 +193,21 @@ function providerFieldMessages(data: JsonObject): string[] {
     .map((v) => v.trim());
 }
 
-const KNOWN_PROVIDER_ISSUES: Array<{ match: RegExp; code: string; message: string }> = [
+const KNOWN_PROVIDER_ISSUES: Array<{ match: RegExp; code: string; message: string; status?: number }> = [
   {
     match: /cannot (cancel|reschedule) after medic/i,
     code: "medic_assigned",
     message:
       "A phlebotomist has already been assigned, so this booking can no longer be changed online. Please contact support if you need help.",
+  },
+  {
+    // Seen from Orange's sandbox: {"error":"Task with request with id 345965 not found"} when rescheduling. The request
+    // exists (cancel works) but has no task yet, i.e. Orange hasn't finished confirming it. This is temporary, not final.
+    match: /task\b.*\bnot found/i,
+    code: "task_not_ready",
+    status: 409,
+    message:
+      "This booking can't be changed yet because Orange Health hasn't finished setting it up. Please try again a little later, or contact support.",
   },
   {
     match: /slot is not available/i,
@@ -205,6 +225,12 @@ const KNOWN_PROVIDER_ISSUES: Array<{ match: RegExp; code: string; message: strin
     code: "address_not_found",
     message:
       "We couldn't locate that address. Please enter a more complete address (house/flat, area, city and pincode).",
+  },
+  {
+    match: /latitude|longitude|pincode/i,
+    code: "address_check_unavailable",
+    message:
+      "We couldn't check slots for that address right now. Please try again in a moment, or contact support if it keeps happening.",
   },
   { match: /past or invalid date/i, code: "invalid_date", message: "Please choose today or a future date." },
   {
@@ -239,15 +265,6 @@ function providerFailure(response: Response, data: JsonObject, fallback: string)
       { provider_status: status },
     );
   }
-  if (status >= 500) {
-    console.error("Orange Health server error", { providerStatus: status });
-    return fail(
-      502,
-      "provider_error",
-      "The lab booking service is having trouble right now. Please try again in a few minutes.",
-      { provider_status: status },
-    );
-  }
   if (status === 429) {
     return fail(429, "rate_limited", "Too many requests. Please wait a moment and try again.", {
       provider_status: status,
@@ -257,10 +274,35 @@ function providerFailure(response: Response, data: JsonObject, fallback: string)
   const raw = providerMessage(data);
   const fields = providerFieldMessages(data);
   const known = KNOWN_PROVIDER_ISSUES.find((k) => k.match.test(raw ?? ""));
-  const message = known
-    ? (known.code === "missing_fields" && fields.length ? fields.join(". ") : known.message)
-    : (fields.length ? fields.join(". ") : (raw ?? fallback));
-  return fail(status, known?.code ?? "provider_rejected", message, {
+
+  // Messages we recognise are translated whatever the HTTP status Orange used (some arrive as 400, some as 5xx).
+  if (known) {
+    const message = known.code === "missing_fields" && fields.length ? fields.join(". ") : known.message;
+    return fail(known.status ?? (status >= 500 ? 502 : status), known.code, message, {
+      provider_status: status,
+      provider_message: raw,
+      details: data,
+    });
+  }
+  if (status >= 500) {
+    console.error("Orange Health server error", { providerStatus: status });
+    return fail(
+      502,
+      "provider_error",
+      "The lab booking service is having trouble right now. Please try again in a few minutes.",
+      { provider_status: status, provider_message: raw },
+    );
+  }
+  if (status === 404) {
+    // Unrecognised 404 (e.g. plain "404 page not found"): the booking/route isn't known to Orange. Don't show raw text.
+    return fail(
+      404,
+      "provider_not_found",
+      "Orange Health couldn't find this request. Please contact support with your booking reference.",
+      { provider_status: 404, provider_message: raw },
+    );
+  }
+  return fail(status, "provider_rejected", fields.length ? fields.join(". ") : (raw ?? fallback), {
     provider_status: status,
     provider_message: raw,
     details: data,
@@ -294,8 +336,9 @@ function extractSlots(data: JsonObject): string[] {
 }
 
 async function lookupSlots(apiKey: string, address: string, requestDate: string) {
-  const params = new URLSearchParams({ request_date: requestDate, address });
-  const { response, data } = await orangeFetch(`/v1/partner/serviceability?${params.toString()}`, apiKey);
+  // Same encoding as Orange's documented cURL (spaces as %20, commas as %2C), not URLSearchParams' '+'.
+  const query = `request_date=${encodeURIComponent(requestDate)}&address=${encodeURIComponent(address)}`;
+  const { response, data } = await orangeFetch(`/v1/partner/serviceability?${query}`, apiKey);
   return { response, data, slots: response.ok ? extractSlots(data) : [] };
 }
 
@@ -422,7 +465,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     if (!body || typeof body !== "object") return fail(400, "invalid_request", "A valid JSON body is required");
     const { action } = body;
 
-    const providerActions = ["serviceability", "discover", "create-order", "test-results", "cancel-order", "reschedule-order"];
+    const providerActions = ["serviceability", "create-order", "cancel-order", "reschedule-order"];
     if (!providerActions.includes(action)) return fail(400, "invalid_action", "Invalid action");
 
     const apiKey = Deno.env.get("ORANGE_HEALTH_API_KEY");
@@ -457,32 +500,6 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     // -----------------------------------------------------------------------
-    // discover: logic unchanged (not used by the booking flow); errors now use the shared contract.
-    // -----------------------------------------------------------------------
-    if (action === "discover") {
-      const { latitude, longitude, pincode } = body;
-      const address = cleanAddress(body.address);
-      const params = new URLSearchParams();
-      try {
-        if (address) params.set("address", address);
-        else if (pincode) params.set("pincode", String(pincode).trim());
-        else {
-          const location = getLocation(latitude, longitude);
-          if (location) {
-            params.set("latitude", location.latitude);
-            params.set("longitude", location.longitude);
-          }
-        }
-      } catch (error) {
-        return fail(400, "invalid_request", error instanceof Error ? error.message : "Invalid coordinates");
-      }
-      const query = params.toString();
-      const { response, data } = await orangeFetch(`/v1/partner/discover${query ? `?${query}` : ""}`, apiKey);
-      if (!response.ok) return providerFailure(response, data, "Orange Health test discovery failed");
-      return jsonResponse({ status: response.status, data });
-    }
-
-    // -----------------------------------------------------------------------
     // create-order
     // -----------------------------------------------------------------------
     if (action === "create-order") {
@@ -491,7 +508,12 @@ export async function handleRequest(req: Request): Promise<Response> {
       const primaryPhone = cleanPhone(body.primary_patient_number);
       const slotDateTime = normalizeSlot(body.slot_datetime);
       const patientDetails = body.patient_details;
-      const paymentType = body.payment_type === "paid_by_group" ? "paid_by_group" : "paid_by_patient";
+      // Who pays is a BUSINESS decision, so the server decides, never the client (otherwise any caller could send
+      // "paid_by_group" and have Check-iN billed). Default: the patient pays. To test Orange's "paid_by_group" flow,
+      // set the ORANGE_HEALTH_PAYMENT_TYPE function secret to paid_by_group.
+      const paymentType = Deno.env.get("ORANGE_HEALTH_PAYMENT_TYPE")?.trim() === "paid_by_group"
+        ? "paid_by_group"
+        : "paid_by_patient";
 
       if (!address || !primaryName || primaryPhone.length !== 10 || !Array.isArray(patientDetails) || patientDetails.length === 0) {
         return fail(
@@ -644,54 +666,6 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     // -----------------------------------------------------------------------
-    // test-results: logic unchanged in this pass (see hand-off notes); errors use the shared contract.
-    // -----------------------------------------------------------------------
-    if (action === "test-results") {
-      const numberToQuery = cleanPhone(body.primary_patient_number || user.phone);
-      const orderId = typeof body.order_id === "string" ? body.order_id : "";
-      if (numberToQuery.length !== 10) {
-        return fail(400, "invalid_request", "A valid 10-digit primary_patient_number is required");
-      }
-
-      if (orderId) {
-        const { data: ownedOrder, error: ownedOrderError } = await serviceClient
-          .from("lab_orders")
-          .select("id")
-          .eq("id", orderId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (ownedOrderError || !ownedOrder) return fail(404, "order_not_found", "Order not found");
-      }
-
-      const { response, data } = await orangeFetch(
-        `/v1/partner/test-results?primary_patient_number=${encodeURIComponent(numberToQuery)}`,
-        apiKey,
-      );
-      if (response.status === 204) return jsonResponse({ ready: false, message: "Reports not ready yet" });
-      if (!response.ok) return providerFailure(response, data, "Failed to fetch test results");
-
-      const reportUrl = data.report_url || data.reportUrl || data.data?.report_url || null;
-      if (orderId && reportUrl) {
-        const { error: updateError } = await serviceClient
-          .from("lab_orders")
-          .update({
-            report_url: String(reportUrl),
-            report_data: data,
-            status: "completed",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", orderId)
-          .eq("user_id", user.id);
-        if (updateError) console.error("Failed to update lab report:", updateError);
-      }
-      return jsonResponse({
-        ready: Boolean(reportUrl),
-        data,
-        message: reportUrl ? "Test report is ready" : "Reports not ready yet",
-      });
-    }
-
-    // -----------------------------------------------------------------------
     // cancel-order: cancels the WHOLE Orange request (partial cancel is not supported).
     // -----------------------------------------------------------------------
     if (action === "cancel-order") {
@@ -750,63 +724,16 @@ export async function handleRequest(req: Request): Promise<Response> {
         return providerFailure(cancelResult.response, cancelResult.data, "Failed to cancel Orange Health booking");
       }
 
-      // Orange processes cancellation asynchronously. The order.cancelled webhook is the reliable
-      // confirmation; this best-effort status check just lets us answer immediately when it is ready.
-      let providerOrderStatus: string | null = null;
-      let statusCheckSucceeded = false;
-      try {
-        const { response: statusResponse, data: statusData } = await orangeFetch(
-          `/v1/partner/order-details/${encodeURIComponent(requestId)}?token=${encodeURIComponent(token)}`,
-          apiKey,
-          { method: "GET" },
-        );
-        if (statusResponse.ok) {
-          statusCheckSucceeded = true;
-          const rawStatus = statusData?.data?.status ?? statusData?.status_text ?? statusData?.order_status;
-          providerOrderStatus = typeof rawStatus === "string" ? rawStatus.toLowerCase() : null;
-        } else {
-          console.warn("Orange Health cancellation accepted; status check not yet successful", {
-            providerStatus: statusResponse.status,
-          });
-        }
-      } catch {
-        console.warn("Orange Health cancellation accepted; status check failed");
-      }
-
-      if (providerOrderStatus === "cancelled" || providerOrderStatus === "canceled") {
-        const { error: updateError } = await serviceClient
-          .from("lab_orders")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
-          .eq("city_request_id", requestId)
-          .eq("user_id", user.id);
-
-        if (updateError) {
-          console.error("Orange Health confirmed cancellation, but local status update failed:", updateError);
-          return jsonResponse({
-            success: true,
-            cancellation_pending: false,
-            provider_status: providerOrderStatus,
-            saved: false,
-            warning:
-              "Orange Health confirmed cancellation, but the local booking status could not be updated. Refresh or contact support.",
-          });
-        }
-        return jsonResponse({
-          success: true,
-          cancellation_pending: false,
-          provider_status: providerOrderStatus,
-          saved: true,
-          message: "Orange Health confirmed that the booking is cancelled.",
-        });
-      }
-
+      // Per Orange's docs the cancel call only ACCEPTS the request ("... is in process, please check order status to
+      // confirm cancellation"). The documented order.cancelled webhook is the confirmation: orange-webhook then sets
+      // lab_orders.status = cancelled. Until then the booking stays as it was and the UI shows "Cancellation pending".
       return jsonResponse({
         success: true,
+        provider_accepted: true,
         cancellation_pending: true,
-        provider_status: providerOrderStatus,
-        status_check_succeeded: statusCheckSucceeded,
         message:
-          "Cancellation request accepted by Orange Health. The booking will remain unchanged until cancellation is confirmed. Refresh or check again shortly.",
+          "Cancellation request accepted by Orange Health. The booking will show as cancelled once Orange Health confirms it.",
+        provider_message: providerMessage(cancelResult.data),
         status: cancelResult.response.status,
       });
     }
