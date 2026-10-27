@@ -23,6 +23,7 @@ import ReactMarkdown from "react-markdown";
 import VisualHealthReport, { tryParseVisualReport } from "@/components/health-tools/VisualHealthReport";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
+import { getOrderDisplay, getPartialReportUrl, formatSlotDisplay, needsPaymentHint } from "@/components/health-tools/orangeLabHelpers";
 
 type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit" | "lab_tests";
 
@@ -167,33 +168,28 @@ const GuardianReports = () => {
     });
   };
 
-  const refreshLabOrders = async () => {
-    if (!wardUserId) return;
+  const refreshLabOrders = async (): Promise<any[]> => {
+    if (!wardUserId) return [];
     const { data } = await supabase.from("lab_orders" as any).select("*").eq("user_id", wardUserId).order("created_at", { ascending: false });
-    setLabOrders((data as any) || []);
+    const fresh = ((data as any) || []) as any[];
+    setLabOrders(fresh);
+    return fresh;
   };
 
+  // Reports are pushed to us per order by Orange's webhook, so "refresh" just reloads our records.
   const handleCheckLabResults = async (order: any) => {
     setCheckingLabResults(order.id);
     try {
-      const { data, error } = await supabase.functions.invoke("orange-health", {
-        body: {
-          action: "test-results",
-          primary_patient_number: order.patient_phone,
-          order_id: order.id,
-        },
-      });
-      if (error) throw error;
-      if (data?.ready && data?.data?.report_url) {
-        toast.success("Test report is ready!");
-        await refreshLabOrders();
-        window.open(data.data.report_url, "_blank");
+      const fresh = await refreshLabOrders();
+      const updated = fresh.find((o) => o.id === order.id);
+      if (updated?.report_url) {
+        toast.success("The report is ready!");
       } else {
-        toast.info(data?.message || "Sample is being processed by the lab. Report not ready yet.");
+        toast.info("The report appears here automatically once the lab releases it (after payment is complete).");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to check report status");
+      toast.error("Couldn't refresh. Please try again.");
     } finally {
       setCheckingLabResults(null);
     }
@@ -410,8 +406,9 @@ const GuardianReports = () => {
             ) : (
               labOrders.map((order: any) => {
                 const tests = Array.isArray(order.tests) ? order.tests : [];
-                const status = String(order.status || "booked");
-                const statusVariant = status === "completed" ? "default" : status === "cancelled" ? "destructive" : "secondary";
+                const display = getOrderDisplay(order, {});
+                const statusVariant = display.tone === "green" ? "default" : display.tone === "red" ? "destructive" : "secondary";
+                const partialReportUrl = order.report_url ? null : getPartialReportUrl(order);
                 return (
                   <Card key={order.id}>
                     <CardContent className="p-4 space-y-3">
@@ -420,11 +417,11 @@ const GuardianReports = () => {
                           <p className="text-sm font-semibold">{order.patient_name}</p>
                           <p className="text-xs text-muted-foreground">
                             Booked {format(new Date(order.created_at), "dd MMM yyyy")}
-                            {order.slot_datetime ? ` • Slot ${format(new Date(order.slot_datetime), "dd MMM, hh:mm a")}` : ""}
+                            {order.slot_datetime ? ` • Slot ${formatSlotDisplay(order.slot_datetime) ?? ""}` : ""}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          <Badge variant={statusVariant as any} className="capitalize text-[10px]">{status.replace(/_/g, " ")}</Badge>
+                          <Badge variant={statusVariant as any} className="text-[10px]">{display.label}</Badge>
                           {order.payment_status && (
                             <Badge variant="outline" className="capitalize text-[10px]">{order.payment_status}</Badge>
                           )}
@@ -440,6 +437,12 @@ const GuardianReports = () => {
                       {order.address && (
                         <p className="text-xs text-muted-foreground line-clamp-2">{order.address}</p>
                       )}
+                      {needsPaymentHint(order) && (
+                        <p className="text-xs text-muted-foreground">
+                          The report is released after payment. Orange Health sends the payment link to the patient's phone
+                          {order.patient_phone ? ` (${order.patient_phone})` : ""} on WhatsApp or SMS.
+                        </p>
+                      )}
                       <div className="flex items-center justify-between gap-2">
                         {order.total_price != null && (
                           <p className="text-xs font-semibold">₹{Number(order.total_price).toLocaleString("en-IN")}</p>
@@ -449,7 +452,11 @@ const GuardianReports = () => {
                             <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => window.open(order.report_url, "_blank")}>
                               <ExternalLink className="w-3 h-3" /> View Report
                             </Button>
-                          ) : status !== "cancelled" && (
+                          ) : partialReportUrl ? (
+                            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => window.open(partialReportUrl, "_blank")}>
+                              <ExternalLink className="w-3 h-3" /> View partial report
+                            </Button>
+                          ) : display.tone !== "red" && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -458,7 +465,7 @@ const GuardianReports = () => {
                               onClick={() => handleCheckLabResults(order)}
                             >
                               {checkingLabResults === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
-                              Check Results
+                              Refresh status
                             </Button>
                           )}
                         </div>

@@ -29,15 +29,17 @@ import {
   getOrderDisplay,
   getPartialReportUrl,
   istToday,
+  needsPaymentHint,
   parseInvokeFailure,
   parsePendingStorage,
   reconcilePending,
   removePending,
   slotPeriod,
+  slotPeriodFromFlags,
   toSlotKey,
   type PendingMap,
   type StatusTone,
-} from "./OrangeLabHelpers.ts";
+} from "./orangeLabHelpers";
 
 interface SlotInfo {
   slot_datetime?: string;
@@ -73,19 +75,22 @@ interface CatalogItem {
   kind: CatalogKind;
 }
 
-// IMPORTANT (before production): ids, kinds and prices below are placeholders from the sandbox integration.
-// They must be replaced with Orange Health's real catalogue (ids, and whether each item is a test or a package).
-// Orange keeps tests (test_id) and packages (package_id) in separate id spaces, so `kind` decides which list an
-// item is sent in.
-const POPULAR_TESTS: Array<CatalogItem & { desc: string; price: string }> = [
-  { id: "3", kind: "test", name: "Complete Blood Count (CBC)", desc: "Overall health & infection screen", price: "₹299" },
-  { id: "4", kind: "test", name: "Lipid Profile (Cholesterol)", desc: "Heart health & cardiovascular risk", price: "₹450" },
-  { id: "5", kind: "test", name: "HbA1c (Blood Sugar 3-Month)", desc: "Diabetes diagnosis & monitoring", price: "₹399" },
-  { id: "6", kind: "test", name: "Thyroid Profile (T3, T4, TSH)", desc: "Thyroid gland evaluation", price: "₹499" },
-  { id: "7", kind: "test", name: "Liver Function Test (LFT)", desc: "Liver enzymes & proteins", price: "₹599" },
-  { id: "8", kind: "test", name: "Kidney Function Test (KFT)", desc: "Creatinine, urea & electrolytes", price: "₹549" },
-  { id: "9", kind: "test", name: "Vitamin D & B12 Combo", desc: "Bone strength & nerve vitality", price: "₹899" },
-  { id: "10", kind: "package", name: "Senior Citizen Comprehensive Package", desc: "60+ vital parameters for elders", price: "₹1,499" },
+const isSameCatalogItem = (a: CatalogItem, b: CatalogItem) => a.kind === b.kind && a.id === b.id;
+
+// SANDBOX catalogue. These are the only ids Orange Health allows for testing:
+//   tests:    1, 2, 3
+//   packages: 1, 2
+// Orange keeps tests (test_id) and packages (package_id) in SEPARATE id spaces, so `kind` decides which list an
+// item is sent in (tests[] vs packages[]). The names/descriptions below are neutral labels because Orange has not
+// told us what these sandbox ids contain: rename them freely. `price` is optional and is simply hidden when absent
+// (Orange sends the payment link itself).
+// BEFORE PRODUCTION: replace this whole list with Orange's real production catalogue.
+const POPULAR_TESTS: Array<CatalogItem & { desc: string; price?: string }> = [
+  { id: "1", kind: "test", name: "Lab Test 1", desc: "Sandbox test (id 1)" },
+  { id: "2", kind: "test", name: "Lab Test 2", desc: "Sandbox test (id 2)" },
+  { id: "3", kind: "test", name: "Lab Test 3", desc: "Sandbox test (id 3)" },
+  { id: "1", kind: "package", name: "Health Package 1", desc: "Sandbox package (id 1)" },
+  { id: "2", kind: "package", name: "Health Package 2", desc: "Sandbox package (id 2)" },
 ];
 
 const DEFAULT_RESCHEDULE_REASON = "Patient not available at originally scheduled time";
@@ -145,7 +150,7 @@ export const OrangeLabTests: React.FC = () => {
   });
 
   const [selectedTests, setSelectedTests] = useState<CatalogItem[]>([
-    { id: "3", name: "Complete Blood Count (CBC)", kind: "test" },
+    { id: "1", name: "Lab Test 1", kind: "test" },
   ]);
 
   // Slots state
@@ -170,6 +175,7 @@ export const OrangeLabTests: React.FC = () => {
   const [rescheduleSlotOptions, setRescheduleSlotOptions] = useState<string[]>([]);
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
   const [rescheduleSlotsMessage, setRescheduleSlotsMessage] = useState<string | null>(null);
+  const [rescheduleSlotPeriods, setRescheduleSlotPeriods] = useState<Record<string, string>>({});
   const [rescheduleReason, setRescheduleReason] = useState(DEFAULT_RESCHEDULE_REASON);
   const [rescheduleExplanation, setRescheduleExplanation] = useState(DEFAULT_RESCHEDULE_EXPLANATION);
   const slotsRequestRef = useRef(0);
@@ -318,8 +324,8 @@ export const OrangeLabTests: React.FC = () => {
   }, [checkSlots, address]);
 
   // Load user's lab orders
-  const loadOrders = async () => {
-    if (!session?.user?.id) return;
+  const loadOrders = async (): Promise<LabOrder[]> => {
+    if (!session?.user?.id) return [];
     setOrdersLoading(true);
     try {
       const { data, error } = await supabase
@@ -333,8 +339,10 @@ export const OrangeLabTests: React.FC = () => {
       setOrders(loadedOrders);
       // Drop pending markers that the database (via Orange's webhooks) has now resolved, or that expired.
       updatePending((current) => reconcilePending(current, loadedOrders));
+      return loadedOrders;
     } catch (err) {
       console.error("Failed to load lab orders:", err);
+      return [];
     } finally {
       setOrdersLoading(false);
     }
@@ -346,14 +354,15 @@ export const OrangeLabTests: React.FC = () => {
     }
   }, [activeTab]);
 
-  // Toggle test selection
+  // Toggle test selection. A test and a package can share the same id (e.g. test 1 and package 1), so an item
+  // is identified by kind + id, never by id alone.
   const toggleTest = (test: CatalogItem) => {
-    if (selectedTests.some((t) => t.id === test.id)) {
+    if (selectedTests.some((t) => isSameCatalogItem(t, test))) {
       if (selectedTests.length === 1) {
         toast.error("Please select at least one test");
         return;
       }
-      setSelectedTests(selectedTests.filter((t) => t.id !== test.id));
+      setSelectedTests(selectedTests.filter((t) => !isSameCatalogItem(t, test)));
     } else {
       setSelectedTests([...selectedTests, test]);
     }
@@ -386,7 +395,6 @@ export const OrangeLabTests: React.FC = () => {
           primary_patient_name: patientName.trim(),
           primary_patient_number: patientPhone.replace(/\D/g, "").slice(-10),
           slot_datetime: selectedSlot,
-          payment_type: "paid_by_patient",
           selected_tests: selectedTests.map((t) =>
             t.kind === "package" ? { package_id: t.id, name: t.name } : { test_id: t.id, name: t.name }
           ),
@@ -431,29 +439,17 @@ export const OrangeLabTests: React.FC = () => {
   };
 
   // Poll / fetch test results
-  const handleCheckResults = async (order: LabOrder) => {
+  // Reports are pushed to us per order by Orange's webhook (order.completed), so "refresh" just reloads our records.
+  const handleRefreshStatus = async (order: LabOrder) => {
     setCheckingResults(order.id);
     try {
-      const { data, error } = await supabase.functions.invoke("orange-health", {
-        body: {
-          action: "test-results",
-          primary_patient_number: order.patient_phone,
-          order_id: order.id,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.ready && data?.data?.report_url) {
-        toast.success("Test report is ready!");
-        loadOrders();
-        window.open(data.data.report_url, "_blank");
+      const fresh = await loadOrders();
+      const updated = fresh.find((o) => o.id === order.id);
+      if (updated?.report_url) {
+        toast.success("Your report is ready.");
       } else {
-        toast.info(data?.message || "Sample is being processed by the lab. Report not ready yet.");
+        toast.info("Your report appears here automatically once the lab releases it (after payment is complete).");
       }
-    } catch (err: any) {
-      console.error(err);
-      toast.error("Failed to check report status");
     } finally {
       setCheckingResults(null);
     }
@@ -520,6 +516,7 @@ export const OrangeLabTests: React.FC = () => {
     const requestToken = ++rescheduleSlotsRequestRef.current;
     setRescheduleSlot("");
     setRescheduleSlotOptions([]);
+    setRescheduleSlotPeriods({});
     setRescheduleSlotsMessage(null);
 
     if (!order.address?.trim()) {
@@ -546,6 +543,15 @@ export const OrangeLabTests: React.FC = () => {
         : [];
       const current = toSlotKey(order.slot_datetime);
       const options = offered.filter((slot) => slot !== current);
+      // Use Orange's own morning/afternoon/evening flags for the labels.
+      const periods: Record<string, string> = {};
+      const offeredInfo = data?.data?.slots && typeof data.data.slots === "object" ? data.data.slots : {};
+      for (const [key, info] of Object.entries(offeredInfo) as Array<[string, any]>) {
+        const slot = toSlotKey(info?.slot_datetime ?? key);
+        const period = slotPeriodFromFlags(info);
+        if (slot && period) periods[slot] = period;
+      }
+      setRescheduleSlotPeriods(periods);
       setRescheduleSlotOptions(options);
       if (options.length === 0) {
         setRescheduleSlotsMessage(
@@ -800,10 +806,10 @@ export const OrangeLabTests: React.FC = () => {
               {/* Grid of Tests */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 {POPULAR_TESTS.map((test) => {
-                  const isSelected = selectedTests.some((t) => t.id === test.id);
+                  const isSelected = selectedTests.some((t) => isSameCatalogItem(t, test));
                   return (
                     <div
-                      key={test.id}
+                      key={`${test.kind}-${test.id}`}
                       onClick={() => toggleTest({ id: test.id, name: test.name, kind: test.kind })}
                       className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-start justify-between gap-3 ${
                         isSelected
@@ -816,7 +822,7 @@ export const OrangeLabTests: React.FC = () => {
                           {test.name}
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-snug">{test.desc}</p>
-                        <span className="text-xs font-semibold text-orange-600">{test.price}</span>
+                        {test.price && <span className="text-xs font-semibold text-orange-600">{test.price}</span>}
                       </div>
                       <div
                         className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${
@@ -834,7 +840,7 @@ export const OrangeLabTests: React.FC = () => {
               {/* Selected summary */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {selectedTests.map((t) => (
-                  <Badge key={t.id} variant="secondary" className="text-xs gap-1 py-1">
+                  <Badge key={`${t.kind}-${t.id}`} variant="secondary" className="text-xs gap-1 py-1">
                     {t.name}
                     <button
                       type="button"
@@ -995,7 +1001,7 @@ export const OrangeLabTests: React.FC = () => {
               <div className="space-y-2 pt-2">
                 <Label className="text-xs font-semibold flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-orange-600" />
-                  Available 60-Minute Home Collection Windows
+                  Available Home Collection Slots
                 </Label>
 
                 {slotsLoading ? (
@@ -1021,11 +1027,7 @@ export const OrangeLabTests: React.FC = () => {
                         >
                           <div className="text-xs font-bold">{formatSlotTime(slotDateTime)}</div>
                           <div className={`text-[10px] mt-0.5 ${isSelected ? "text-orange-100" : "text-muted-foreground"}`}>
-                            {info.is_morning_slot
-                              ? "Morning"
-                              : info.is_afternoon_slot
-                              ? "Afternoon"
-                              : "Evening"}
+                            {slotPeriodFromFlags(info) ?? slotPeriod(slotDateTime)}
                           </div>
                         </button>
                       );
@@ -1112,8 +1114,8 @@ export const OrangeLabTests: React.FC = () => {
                 const busy = cancellingOrderId === ord.id || reschedulingOrderId === ord.id;
                 return (
                 <Card key={ord.id} className="overflow-hidden">
-                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1.5 flex-1">
+                  <CardContent className="p-4 sm:p-5 flex flex-col items-stretch gap-3">
+                    <div className="space-y-1.5 w-full">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-foreground">{ord.patient_name}</span>
                         <Badge variant="outline" className={`text-[10px] ${STATUS_TONE_CLASSES[display.tone]}`}>
@@ -1130,6 +1132,14 @@ export const OrangeLabTests: React.FC = () => {
                         <span>📅 Slot: {formatSlotDateTime(ord.slot_datetime)}</span>
                         <span>📍 {ord.address}</span>
                       </div>
+                      {needsPaymentHint(ord) && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Your report is released after payment. If you haven't paid yet, use the payment link Orange Health sent to your phone on WhatsApp or SMS.
+                        </p>
+                      )}
+                      {isOrderManageable(ord, pending) && !isOrderReschedulable(ord, pending) && (
+                        <p className="text-[11px] text-muted-foreground">This slot time has already passed, so it can't be rescheduled.</p>
+                      )}
                       {pendingKind === "reschedule" && (
                         <p className="text-[11px] text-orange-600">New time requested. The displayed slot will change after Orange Health confirms it.</p>
                       )}
@@ -1148,7 +1158,7 @@ export const OrangeLabTests: React.FC = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2 w-full justify-end">
                       {ord.report_url ? (
                         <Button
                           size="sm"
@@ -1173,7 +1183,7 @@ export const OrangeLabTests: React.FC = () => {
                           variant="outline"
                           size="sm"
                           disabled={checkingResults === ord.id}
-                          onClick={() => handleCheckResults(ord)}
+                          onClick={() => handleRefreshStatus(ord)}
                           className="gap-1.5 text-xs h-8"
                         >
                           {checkingResults === ord.id ? (
@@ -1181,7 +1191,7 @@ export const OrangeLabTests: React.FC = () => {
                           ) : (
                             <FileCheck className="w-3.5 h-3.5" />
                           )}
-                          Check Report Status
+                          Refresh status
                         </Button>
                       ) : null}
                       {isOrderManageable(ord, pending) && (
@@ -1268,7 +1278,7 @@ export const OrangeLabTests: React.FC = () => {
                                   >
                                     <div className="text-xs font-bold">{formatSlotTime(slot)}</div>
                                     <div className={`text-[10px] mt-0.5 ${isSelected ? "text-orange-100" : "text-muted-foreground"}`}>
-                                      {slotPeriod(slot)}
+                                      {rescheduleSlotPeriods[slot] ?? slotPeriod(slot)}
                                     </div>
                                   </button>
                                 );
