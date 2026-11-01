@@ -22,6 +22,13 @@
       "when": 1793103343372,
       "tag": "0002_lab_orders_read_only_for_clients",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793560356563,
+      "tag": "0003_create_digital_legacy_messages",
+      "breakpoints": true
     }
   ]
 }
