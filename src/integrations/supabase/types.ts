@@ -608,6 +608,48 @@ export type Database = {
         }
         Relationships: []
       }
+      digital_legacy_messages: {
+        Row: {
+          content_text: string | null
+          created_at: string | null
+          id: string
+          is_released: boolean | null
+          media_type: string
+          media_url: string | null
+          recipient_name: string
+          recipient_relation: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content_text?: string | null
+          created_at?: string | null
+          id?: string
+          is_released?: boolean | null
+          media_type: string
+          media_url?: string | null
+          recipient_name: string
+          recipient_relation?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content_text?: string | null
+          created_at?: string | null
+          id?: string
+          is_released?: boolean | null
+          media_type?: string
+          media_url?: string | null
+          recipient_name?: string
+          recipient_relation?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_alert_config: {
         Row: {
           bounce_rate_threshold: number
