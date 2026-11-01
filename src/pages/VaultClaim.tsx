@@ -27,6 +27,7 @@ interface ReleasePayload {
   bank?: { label: string; bank_name: string; account_number: string; ifsc: string; nominee_name: string; nominee_phone: string; nominee_relation: string; notes?: string }[];
   insurance?: { label: string; company: string; category: string; policy_number: string; nominee_name: string; nominee_phone: string; renewal_date?: string; expiry_date?: string }[];
   will?: { label: string; status: string; partner: string; document_ref?: string; nominee_name?: string; nominee_phone?: string; notes?: string }[];
+  digital_legacy?: { id: string; title: string; recipient_name: string; recipient_relation: string; media_type: string; content_text?: string; media_url?: string }[];
   metadata_only?: boolean;
 }
 
@@ -216,6 +217,47 @@ const VaultClaim = () => {
                   <p className="text-xs">Partner: <span className="capitalize">{e.partner}</span> {e.document_ref && `· Ref: ${e.document_ref}`}</p>
                   {e.nominee_name && <p className="text-xs"><strong>Nominee:</strong> {e.nominee_name} · {e.nominee_phone}</p>}
                   {e.notes && <p className="text-xs text-muted-foreground">{e.notes}</p>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {payload.digital_legacy?.length ? (
+          <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+                <span>Personal Messages & Digital Legacy</span>
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
+                  Released
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {payload.digital_legacy.map((msg, i) => (
+                <div key={i} className="p-4 rounded-xl bg-card border border-emerald-500/20 text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-foreground">{msg.title}</p>
+                    <Badge variant="secondary" className="text-xs capitalize">{msg.media_type}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Intended For: <strong className="text-foreground">{msg.recipient_name}</strong> ({msg.recipient_relation})
+                  </p>
+                  {msg.media_type === "text" && msg.content_text && (
+                    <div className="p-3 rounded-lg bg-muted/50 italic text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+                      "{msg.content_text}"
+                    </div>
+                  )}
+                  {msg.media_type === "audio" && msg.media_url && (
+                    <div className="pt-1">
+                      <audio controls src={msg.media_url} className="w-full h-8" />
+                    </div>
+                  )}
+                  {msg.media_type === "video" && msg.media_url && (
+                    <div className="pt-1">
+                      <video controls src={msg.media_url} className="w-full rounded-lg max-h-56 bg-black" />
+                    </div>
+                  )}
                 </div>
               ))}
             </CardContent>

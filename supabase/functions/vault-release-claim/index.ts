@@ -72,12 +72,27 @@ Deno.serve(async (req) => {
       renewal_date: m.target_date,
     }));
 
+    // Fetch digital legacy messages
+    const { data: legacyMessages } = await supa
+      .from("digital_legacy_messages")
+      .select("id, title, recipient_name, recipient_relation, media_type, content_text, media_url")
+      .eq("user_id", claim.user_id);
+
+    // Mark them as released in the database
+    if (legacyMessages && legacyMessages.length > 0) {
+      await supa
+        .from("digital_legacy_messages")
+        .update({ is_released: true, updated_at: new Date().toISOString() })
+        .eq("user_id", claim.user_id);
+    }
+
     const payload = {
       user_name: prof?.full_name || "User",
       released_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
       metadata_only: !escrow,
       insurance,
+      digital_legacy: legacyMessages || [],
     };
 
     // Generate OTP

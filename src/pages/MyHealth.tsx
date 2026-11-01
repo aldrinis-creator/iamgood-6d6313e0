@@ -23,6 +23,7 @@ import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UrineCheck from "@/components/health-tools/UrineCheck";
 import TongueAnalysis from "@/components/health-tools/TongueAnalysis";
 import OrangeLabTests from "@/components/health-tools/OrangeLabTests";
+import DigitalLegacy from "@/components/health-tools/DigitalLegacy";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -48,6 +49,7 @@ const healthToolsSubItems = [
 
 
 const wellnessHubSubItems = [
+  { icon: HeartHandshake, label: "My Digital Legacy", desc: "Sealed voice, video & written messages for loved ones" },
   { icon: Activity, label: "Activity", desc: "Steps, exercise & daily movement" },
   { icon: HeartPulse, label: "Mindfulness", desc: "Mood, sleep & mindfulness tracking" },
   { icon: Apple, label: "Nutrition", desc: "Meal logging & AI nutrition advice" },
@@ -66,6 +68,7 @@ const subToolComponents: Record<string, React.FC> = {
   "Urine Analysis": UrineCheck,
   "Tongue Analysis": TongueAnalysis,
   "Face Scan Analysis": FaceScan,
+  "My Digital Legacy": DigitalLegacy,
   "Activity": ActivityTracker,
   "Mindfulness": WellnessTracker,
   "Nutrition": NutritionAdvisor,
