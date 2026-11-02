@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     };
 
     // Generate OTP
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const otp = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
     const otpHash = await sha256(otp);
 
     const { data: tokenRow, error: tokErr } = await supa.from("vault_release_tokens").insert({

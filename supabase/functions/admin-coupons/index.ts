@@ -105,14 +105,17 @@ Deno.serve(async (req) => {
       }
 
       case "update": {
-        const { id, ...fields } = payload;
+        const { id, ...raw } = payload;
+        const ALLOWED = ["code", "discount_type", "discount_value", "applicable_plans", "expires_at", "max_uses", "is_active"];
+        const fields: Record<string, any> = {};
+        for (const k of ALLOWED) if (raw && k in raw) fields[k] = raw[k];
         if (!id) {
           return new Response(JSON.stringify({ error: "id is required" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (fields.code) fields.code = fields.code.toUpperCase().trim();
+        if (typeof fields.code === "string") fields.code = fields.code.toUpperCase().trim();
         const { data, error } = await adminClient
           .from("coupons")
           .update(fields)
