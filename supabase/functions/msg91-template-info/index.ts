@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -6,6 +7,10 @@ const corsHeaders = {
 // Diagnostic: returns the registered MSG91 WhatsApp template definition so we
 // can confirm the exact variable names the Flow expects.
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

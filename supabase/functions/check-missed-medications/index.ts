@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
@@ -14,6 +15,10 @@ const corsHeaders = {
 // covering every medication in that slot. Stamp `whatsapp_alerted_at` so we
 // never resend.
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return new Response(JSON.stringify({ skipped: true, reason: "scheduled job only" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

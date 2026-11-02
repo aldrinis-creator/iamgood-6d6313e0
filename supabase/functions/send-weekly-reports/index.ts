@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,6 +8,10 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
