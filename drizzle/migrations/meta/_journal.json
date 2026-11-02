@@ -29,6 +29,13 @@
       "when": 1793560356563,
       "tag": "0003_create_digital_legacy_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793639514030,
+      "tag": "0004_restrict_signup_role",
+      "breakpoints": true
     }
   ]
 }

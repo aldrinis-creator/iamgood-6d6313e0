@@ -1,8 +1,13 @@
+import { requireUser } from "../_shared/guard.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const SARVAM_API_KEY = Deno.env.get("SARVAM_API_KEY");
 
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __u = await requireUser(req, corsHeaders);
+    if (__u.error) return __u.error;
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

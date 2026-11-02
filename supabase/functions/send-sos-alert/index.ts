@@ -1159,13 +1159,25 @@ Deno.serve(async (req) => {
     // Email notifications
     // -------------------------------------------------------------------------
 
-    const allEmails = [
-      ...(guardian_emails || []),
-    ];
-
-    if (doctor_email) {
-      allEmails.push(doctor_email);
-    }
+    // Only email addresses saved as this ward's guardians are allowed; caller-
+    // supplied addresses that are not on file are dropped.
+    const { data: storedGuardianEmails } = await supabase
+      .from("guardians")
+      .select("guardian_email")
+      .eq("user_id", user_id)
+      .in("status", ["accepted", "pending"]);
+    const allowedEmails = new Set(
+      (storedGuardianEmails || [])
+        .map((g: any) => String(g.guardian_email || "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const allEmails = Array.from(new Set(
+      (Array.isArray(guardian_emails) ? guardian_emails : [])
+        .map((e: unknown) => String(e || "").trim().toLowerCase())
+        .filter((e: string) => allowedEmails.has(e)),
+    ));
+    // Doctor email is no longer accepted from the request body.
+    void doctor_email;
 
     let emailsQueued = 0;
 

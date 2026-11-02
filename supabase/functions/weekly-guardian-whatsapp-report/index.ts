@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 /**
  * weekly-guardian-whatsapp-report
  * ─────────────────────────────────────────────────────────────────────────
@@ -410,6 +411,10 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
 
 // ═══════════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabase = createClient(

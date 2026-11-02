@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 import * as React from "npm:react@18.3.1";
 import { renderAsync } from "npm:@react-email/components@0.0.22";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -131,6 +132,10 @@ async function buildStats(supabase: ReturnType<typeof createClient>, userId: str
 
 // ══════════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

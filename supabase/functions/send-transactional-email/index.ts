@@ -134,6 +134,32 @@ Deno.serve(async (req) => {
   // Create Supabase client with service role (bypasses RLS)
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+  // Caller authorization: internal (service-role / cron) callers may send any
+  // template. App users may only send a few templates, to themselves.
+  if (!isCronRequest(req)) {
+    const caller = await getCaller(req)
+    if (!caller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const target = String(effectiveRecipient).trim().toLowerCase()
+    const own = (caller.email || '').trim().toLowerCase()
+    let allowed = false
+    if (['welcome', 'appointment-confirmation'].includes(templateName) && !template.to) {
+      allowed = !!own && target === own
+    } else if (templateName === 'premium-plus-waitlist-confirmation' && !template.to) {
+      const { data: w } = await supabase.from('premium_plus_waitlist').select('id')
+        .ilike('email', target).limit(1)
+      allowed = !!w?.length
+    }
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   // 2. Check suppression list (fail-closed: if we can't verify, don't send)
   const { data: suppressed, error: suppressionError } = await supabase
     .from('suppressed_emails')

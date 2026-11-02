@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 // Diagnostic: pulls MSG91 WhatsApp delivery reports for a given request_id.
 // MSG91's WA report endpoint has moved a few times, so we probe the known
 // candidates and return every raw response for inspection.
@@ -7,6 +8,10 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

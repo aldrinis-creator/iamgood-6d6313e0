@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 // Diagnostic: sends the guardian app-download WhatsApp invite using the
 // 3-body-variable + URL-button template shape and returns the raw MSG91 response.
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
@@ -8,6 +9,10 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Diagnostic only: hard-restricted to the single agreed test recipient.

@@ -1,3 +1,4 @@
+import { requireUser, acceptedGuardianPhones, phoneIn } from "../_shared/guard.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -44,7 +45,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const wardName = String(body?.wardName ?? "").trim();
     const zoneName = String(body?.zoneName ?? "").trim();
-    const phonesIn: unknown = body?.phones;
+    const __u = await requireUser(req, corsHeaders);
+    if (__u.error) return __u.error;
+    const __allowed = __u.caller ? await acceptedGuardianPhones(__u.caller.id) : null;
+    const phonesIn: unknown = Array.isArray(body?.phones) && __allowed
+      ? (body.phones as unknown[]).filter((p) => phoneIn(__allowed, String(p ?? "")))
+      : body?.phones;
 
     if (!wardName || !zoneName || !Array.isArray(phonesIn) || phonesIn.length === 0) {
       return new Response(

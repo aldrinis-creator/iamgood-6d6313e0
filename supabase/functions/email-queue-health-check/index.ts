@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 // Email queue health check — runs every 15 minutes via pg_cron.
 // Evaluates pipeline thresholds and emits in-app + email alerts to all admins.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -19,6 +20,10 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __deny = await requireCronOrAdmin(req, corsHeaders);
+    if (__deny) return __deny;
+  }
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!

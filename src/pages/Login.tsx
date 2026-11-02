@@ -74,14 +74,10 @@ const Login = () => {
       let emailToUse = identifier.trim();
 
       if (isPhoneInput(emailToUse)) {
-        const phone = formatPhone(emailToUse);
-        const { data, error: fnError } = await supabase.rpc("get_email_by_phone" as any, { _phone: phone });
-        if (fnError || !data) {
-          toast.error("No account found with this phone number.");
-          setLoading(false);
-          return;
-        }
-        emailToUse = data as string;
+        // Phone-to-email lookup is no longer public; phone users sign in with OTP.
+        toast.error("Please sign in with the OTP option for phone numbers, or use your email.");
+        setLoading(false);
+        return;
       }
 
       const { error } = await signIn(emailToUse, password);

@@ -22,7 +22,7 @@ function randomToken(bytes = 32): string {
 }
 
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
 }
 
 async function logAudit(adminClient: any, user_id: string | null, action: string, req: Request, metadata: any = {}) {
