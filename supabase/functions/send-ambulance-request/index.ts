@@ -227,6 +227,13 @@ Deno.serve(async (req) => {
 
     // The "owner" of the health record is the patient: ward in guardian mode, else self
     const ownerUserId = body.source === "guardian" && body.ward_user_id ? body.ward_user_id : user.id;
+    if (ownerUserId !== user.id) {
+      const { data: link } = await admin.from("guardians").select("id")
+        .eq("user_id", ownerUserId).eq("guardian_user_id", user.id).eq("status", "accepted").limit(1);
+      if (!link?.length) {
+        return new Response(JSON.stringify({ error: "Not an accepted guardian of this ward" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
     const { summary: healthSummary, profileLink } = await buildHealthSummary(admin, ownerUserId);
 
     // Insert audit row
