@@ -1,3 +1,4 @@
+import { requireUser } from "../_shared/guard.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
@@ -17,6 +18,10 @@ const SYSTEM_PROMPT =
   "You are a medical assistant that extracts medication names from prescriptions. Only return the extracted medication name and standard dosage (e.g., 'Metformin 500mg'). DO NOT return anything else. DO NOT return quantities, schedules, or instructions. If you cannot read it or it is not a prescription, return 'Unknown'.";
 
 serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __u = await requireUser(req, corsHeaders);
+    if (__u.error) return __u.error;
+  }
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

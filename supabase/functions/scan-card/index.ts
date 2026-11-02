@@ -1,3 +1,4 @@
+import { requireUser } from "../_shared/guard.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
@@ -24,6 +25,10 @@ const PROMPT = `Extract the following from this debit/credit card image and resp
 If a field is not visible, use null.`;
 
 serve(async (req) => {
+  if (req.method !== "OPTIONS") {
+    const __u = await requireUser(req, corsHeaders);
+    if (__u.error) return __u.error;
+  }
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
