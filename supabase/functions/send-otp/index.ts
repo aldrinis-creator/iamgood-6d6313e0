@@ -201,7 +201,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: true, channels: { sms: "skipped", whatsapp: "skipped" } });
       }
 
-      if (!reviewCode || otp !== reviewCode) {
+      // Lock the review bypass after 5 wrong codes in an hour (anti-guessing).
+      const sinceIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count: failCount } = await admin
+        .from("otp_events")
+        .select("id", { count: "exact", head: true })
+        .eq("phone", phone)
+        .eq("action", "review_bypass_fail")
+        .gte("created_at", sinceIso);
+      if ((failCount ?? 0) >= 5) {
+        return jsonResponse({ success: false, error: "Too many attempts. Try again later." }, 429);
+      }
+
+      if (!reviewCode || reviewCode.length < 6 || otp !== reviewCode) {
         await logOtpEvent(admin, phone, "review_bypass_fail", undefined, "failed", "Invalid review code");
         return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
       }
