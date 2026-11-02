@@ -69,9 +69,12 @@ Deno.serve(async (req) => {
           }
           return null;
         })
-        .filter((m: any): m is ChatMessage => m && typeof m.content === "string" && m.content.length > 0);
+        .filter((m: any): m is ChatMessage => m && typeof m.content === "string" && m.content.length > 0)
+        // Never let callers inject system instructions; cap size and history.
+        .map((m: ChatMessage) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content.slice(0, 2000) } as ChatMessage))
+        .slice(-12);
     } else if (typeof body?.query === "string" && body.query.trim()) {
-      messages = [{ role: "user", content: body.query.trim() }];
+      messages = [{ role: "user", content: body.query.trim().slice(0, 2000) }];
     }
     if (messages.length === 0) return json({ error: "Please ask a question." }, 400);
 
