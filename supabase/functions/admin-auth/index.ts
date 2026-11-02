@@ -65,6 +65,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "setup") {
+      // Public first-admin setup is disabled. Additional admins must be
+      // provisioned by an existing admin through the backend.
+      return json({ error: "Admin setup is disabled" }, 403);
+      // deno-lint-ignore no-unreachable
       const { count } = await admin
         .from("admin_credentials")
         .select("id", { count: "exact", head: true });
