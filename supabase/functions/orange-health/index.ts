@@ -27,14 +27,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sandbox by default. Set ORANGE_HEALTH_BASE_URL (https only) to switch to production.
+// Sandbox by default. Set ORANGE_HEALTH_BASE_URL (https only) to switch environment, e.g. https://partner-api.orangehealth.in
+// Give the HOST only. If a full endpoint URL is pasted by mistake (".../v1/partner/order"), it is cut back to the host,
+// because every call below adds its own "/v1/partner/..." path.
 const BASE_URL = (() => {
   const configured = Deno.env.get("ORANGE_HEALTH_BASE_URL")?.trim();
   const url = configured && /^https:\/\//i.test(configured)
-    ? configured
+    ? configured.replace(/\/v1\/partner.*$/i, "")
     : "https://sandbox-partner-api.orangehealth.dev";
   return url.replace(/\/+$/, "");
 })();
+// Shows which Orange environment this function instance talks to (host only, never the key).
+console.log("Orange Health API host:", new URL(BASE_URL).host);
 
 const PROVIDER_TIMEOUT_MS = 20_000;
 const IST_OFFSET_MS = 330 * 60_000;
