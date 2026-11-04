@@ -68,35 +68,6 @@ Deno.serve(async (req) => {
       // Public first-admin setup is disabled. Additional admins must be
       // provisioned by an existing admin through the backend.
       return json({ error: "Admin setup is disabled" }, 403);
-      // deno-lint-ignore no-unreachable
-      const { count } = await admin
-        .from("admin_credentials")
-        .select("id", { count: "exact", head: true });
-      if ((count ?? 0) > 0) return json({ error: "Admin already configured" }, 403);
-
-      const idParse = adminIdSchema.safeParse(body.admin_id);
-      if (!idParse.success) return json({ error: idParse.error.errors[0].message }, 400);
-      const pwParse = passwordSchema.safeParse(body.password);
-      if (!pwParse.success) return json({ error: pwParse.error.errors[0].message }, 400);
-
-      const adminId = idParse.data.toLowerCase();
-      const email = `${adminId}@${SYNTHETIC_DOMAIN}`;
-
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password: pwParse.data,
-        email_confirm: true,
-        user_metadata: { full_name: adminId, app_role: "admin" },
-      });
-      if (createErr || !created.user) return json({ error: createErr?.message || "Could not create admin" }, 500);
-
-      const userId = created.user.id;
-
-      await admin.from("admin_credentials").insert({ admin_id: adminId, user_id: userId });
-      await admin.from("user_roles").insert({ user_id: userId, role: "admin" }).then(() => {});
-      await audit(userId, "admin_setup", { admin_id: adminId });
-
-      return json({ success: true });
     }
 
     if (action === "login") {
