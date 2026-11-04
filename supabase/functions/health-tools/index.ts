@@ -340,14 +340,29 @@ serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    let _userId = "";
     {
       const _uc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _uc.auth.getUser();
       if (_e || !_u?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      _userId = _u.user.id;
     }
     const { type, payload } = await req.json();
+    // Premium AI tools require an active paid plan; medication_info stays free.
+    const FREE_TYPES = new Set(["medication_info"]);
+    if (!FREE_TYPES.has(type)) {
+      const _svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: _sub } = await _svc.from("subscriptions")
+        .select("plan_type,status,expires_at")
+        .eq("user_id", _userId).eq("status", "active")
+        .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
+      const { data: _adm } = await _svc.rpc("has_role", { _user_id: _userId, _role: "admin" });
+      if (!_sub && !_adm) {
+        return new Response(JSON.stringify({ error: "This AI health tool needs an active paid plan." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "LOVABLE_API_KEY is missing in Supabase Edge Function Secrets. The AI features cannot run without it." }), {

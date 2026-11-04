@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       });
     }
     const payload = parsed.data;
-    console.log("[otp-delivery-webhook] Received:", JSON.stringify(payload));
+    console.log("[otp-delivery-webhook] Received delivery event");
 
     const nested = typeof payload.data === "object" && payload.data !== null ? payload.data as Record<string, unknown> : {};
     const requestId = firstString(payload.requestId, payload.request_id, nested.requestId, nested.request_id);
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       if (error) {
         console.error("[otp-delivery-webhook] Update error:", error.message);
       } else {
-        console.log(`[otp-delivery-webhook] Updated request_id=${requestId} status=${status}`);
+        console.log(`[otp-delivery-webhook] Updated status=${status}`);
       }
     }
 

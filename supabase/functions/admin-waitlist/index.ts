@@ -14,12 +14,11 @@ function json(body: unknown, status = 200) {
 }
 
 function csvEscape(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  let s = String(v);
+  let s = String(v ?? "");
   // Neutralize spreadsheet formula injection.
-  if (/^[=+\-@	]/.test(s)) s = "'" + s;
-  return /[",
-]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (/^[=+\-@	
+]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
 }
 
 Deno.serve(async (req) => {
@@ -131,7 +130,7 @@ Deno.serve(async (req) => {
               .eq("id", row.id);
             queued++;
           } catch (e) {
-            console.error("notify_all failed for", row.email, e);
+            console.error("notify_all failed for waitlist row", row.id, e);
             failed++;
           }
         }

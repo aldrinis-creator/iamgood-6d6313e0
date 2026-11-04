@@ -14,12 +14,11 @@ function json(body: unknown, status = 200) {
 }
 
 function csvEscape(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  let s = String(v);
+  let s = String(v ?? "");
   // Neutralize spreadsheet formula injection.
-  if (/^[=+\-@	]/.test(s)) s = "'" + s;
-  return /[",
-]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (/^[=+\-@	
+]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
 }
 
 const VALID_STATUSES = new Set(["new", "in_progress", "resolved"]);

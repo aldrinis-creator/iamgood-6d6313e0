@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
     const phone = normalizePhone(rawPhone);
     const admin = getAdminClient();
 
-    console.log(`[send-otp] action=${action} phone=${phone} purpose=${purpose || "login"}`);
+    console.log(`[send-otp] action=${action} phone=***${phone.slice(-4)} purpose=${purpose || "login"}`);
 
     // A short-lived, phone-bound status check lets the client distinguish
     // provider acceptance from actual delivery without exposing OTP data.
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
       const reviewCode = Deno.env.get("REVIEW_OTP_CODE") ?? "";
 
       if (action !== "verify") {
-        console.log(`[send-otp] review bypass: skipping dispatch for ${phone}`);
+        console.log(`[send-otp] review bypass: skipping dispatch for ***${phone.slice(-4)}`);
         await logOtpEvent(admin, phone, "review_bypass", undefined, "sent");
         return jsonResponse({ success: true, channels: { sms: "skipped", whatsapp: "skipped" } });
       }

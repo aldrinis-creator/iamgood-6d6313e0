@@ -272,7 +272,7 @@ ${PRODUCT_KB}`;
     const aiData = await aiResp.json();
     const answer = aiData.choices?.[0]?.message?.content?.trim() ||
       "I couldn't phrase a response. Please try rephrasing your question.";
-    console.log(`[voice-query] answer="${answer.slice(0, 120)}"`);
+    console.log(`[voice-query] answer generated (${answer.length} chars)`);
 
     const audio = await synthesizeSpeech(answer);
     console.log(`[voice-query] tts=${audio ? "ok" : "skipped"}`);

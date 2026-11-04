@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
         await sendRes.text();
 
         sentCount++;
-        console.log(`Weekly report sent → ${g.guardian_email} for ward ${wardName}`);
+        console.log(`Weekly report sent for ward ${wardName}`);
       } catch (err: any) {
         const msg = `Guardian ${g.guardian_email} (ward: ${g.user_id}): ${err.message}`;
         console.error(msg);
