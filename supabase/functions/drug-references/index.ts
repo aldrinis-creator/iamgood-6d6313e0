@@ -1,7 +1,7 @@
 // Fetches openFDA drug label + RxNorm normalized name for a given drug.
 // Public, keyless APIs. Soft-fail per source.
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { z } from 'npm:zod@3';
+import { z } from 'https://esm.sh/zod@3.23.8';
 
 const BodySchema = z.object({ drug: z.string().min(1).max(100) });
 

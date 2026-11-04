@@ -67,14 +67,14 @@ Deno.serve(async (req) => {
     }
 
     const decodedToken = await verifyFirebaseToken(idToken.trim());
-    if (decodedToken && decodedToken.error) {
+    if (decodedToken && "error" in decodedToken) {
       return new Response(JSON.stringify({ success: false, error: `JWT Verification Failed: ${decodedToken.error}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    if (!decodedToken || !decodedToken.phone_number) {
+    if (!decodedToken || !("phone_number" in decodedToken) || typeof decodedToken.phone_number !== "string" || !decodedToken.phone_number) {
       return new Response(JSON.stringify({ success: false, error: "Invalid token or missing phone number" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,

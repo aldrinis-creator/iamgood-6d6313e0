@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       const avgEnergy = energies.length > 0 ? Number((energies.reduce((a, b) => a + b, 0) / energies.length).toFixed(1)) : 3;
 
       const moods = (wellnessLogs || []).map((l) => l.mood).filter((m) => !!m);
-      const moodCounts = moods.reduce((acc, m) => {
+      const moodCounts: Record<string, number> = moods.reduce((acc, m) => {
         acc[m] = (acc[m] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);

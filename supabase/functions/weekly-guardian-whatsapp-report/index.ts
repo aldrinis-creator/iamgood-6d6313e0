@@ -13,8 +13,7 @@ import { requireCronOrAdmin } from "../_shared/guard.ts";
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-// @ts-ignore - jsPDF has no Deno types
-import { jsPDF } from "npm:jspdf@2.5.1";
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -77,7 +77,7 @@ export const WeeklyGuardianReportEmail = ({
     <Html lang="en" dir="ltr">
       <Head />
       <Preview>
-        📊 {wardName}'s weekly report — {scoreLabel(healthScore)} ({healthScore}/100) · {weekLabel}
+        {`📊 ${wardName}'s weekly report — ${scoreLabel(healthScore)} (${healthScore}/100) · ${weekLabel}`}
       </Preview>
       <Body style={s.main}>
         <Container style={s.container}>
