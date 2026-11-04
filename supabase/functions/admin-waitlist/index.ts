@@ -16,9 +16,9 @@ function json(body: unknown, status = 200) {
 function csvEscape(v: unknown): string {
   let s = String(v ?? "");
   // Neutralize spreadsheet formula injection.
-  if (/^[=+\-@	]/.test(s)) s = "'" + s;
+  if (/^[=+\-@	
+]/.test(s)) s = "'" + s;
   return `"${s.replace(/"/g, '""')}"`;
-}"` : s;
 }
 
 Deno.serve(async (req) => {
