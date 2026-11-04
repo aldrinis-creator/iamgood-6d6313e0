@@ -531,7 +531,7 @@ Deno.serve(async (req) => {
         let query =
           admin
             .from("sos_message_attempts")
-            .update(update)
+            .update(update, { count: "exact" })
             .eq("channel", "oneapi");
 
         if (requestId) {
@@ -578,10 +578,7 @@ Deno.serve(async (req) => {
         const {
           error,
           count,
-        } = await query.select("id", {
-          count: "exact",
-          head: true,
-        });
+        } = await query;
 
         if (error) {
           console.error(
