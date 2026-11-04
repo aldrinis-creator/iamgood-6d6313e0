@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
     }
   };
 
+  let _callerId = "";
   try {
     const cronSecret = req.headers.get("x-cron-secret");
     const isCron = !!cronSecret && cronSecret === Deno.env.get("CRON_SECRET");
@@ -42,10 +43,10 @@ Deno.serve(async (req) => {
         await logAttemptFailure("unauthorized", { stage: "invalid_token" });
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      _callerId = _u.user.id;
     }
 
     const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
-
 
     if (!guardian_name || !user_name) {
       return new Response(
@@ -57,6 +58,21 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Non-cron callers may only send invites to guardians they themselves nominated.
+    if (!isCron) {
+      const { data: _own } = await supabase
+        .from("guardians")
+        .select("id")
+        .eq("user_id", _callerId)
+        .or(`guardian_email.eq.${String(guardian_email || "").toLowerCase()},guardian_phone.eq.${String(guardian_phone || "")}`)
+        .limit(1);
+      if (!_own?.length) {
+        await logAttemptFailure("forbidden", { stage: "not_own_nomination" });
+        return new Response(JSON.stringify({ error: "You can only send invites to guardians you nominated." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
 
     // Rate-limit re-sends: at most one invite dispatch per recipient per hour.
     // NOTE: this is tracked in notification_logs, NOT on guardians.nominated_at —
