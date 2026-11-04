@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
           },
         })
       } catch (e) {
-        console.error('Failed to send health alert email', { email, error: e })
+        console.error('Failed to send health alert email', { error: e })
       }
     }
 

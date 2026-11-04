@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
               .eq("id", row.id);
             queued++;
           } catch (e) {
-            console.error("notify_all failed for", row.email, e);
+            console.error("notify_all failed for waitlist row", row.id, e);
             failed++;
           }
         }

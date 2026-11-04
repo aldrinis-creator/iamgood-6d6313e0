@@ -218,9 +218,9 @@ Deno.serve(async (req) => {
             },
           });
           reportsSent++;
-          console.log(`Successfully enqueued weekly report for user ${userEmail}`);
+          console.log(`Successfully enqueued weekly report for user ${userId}`);
         } catch (err) {
-          console.error(`Failed to send weekly report to user ${userEmail}:`, err);
+          console.error(`Failed to send weekly report to user ${userId}:`, err);
         }
       }
 
@@ -242,9 +242,9 @@ Deno.serve(async (req) => {
               },
             });
             reportsSent++;
-            console.log(`Successfully enqueued weekly report for guardian ${guardian.guardian_email}`);
+            console.log(`Successfully enqueued weekly report for guardian ${guardian.id}`);
           } catch (err) {
-            console.error(`Failed to send weekly report to guardian ${guardian.guardian_email}:`, err);
+            console.error(`Failed to send weekly report to guardian ${guardian.id}:`, err);
           }
         }
       }

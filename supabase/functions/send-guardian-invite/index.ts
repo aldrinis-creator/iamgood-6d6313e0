@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
           console.error("[send-guardian-invite] email send failed", mailRes.status, mailBody.slice(0, 600));
         } else {
           result.email = "sent";
-          console.log("[send-guardian-invite] email queued for", guardian_email, mailBody.slice(0, 300));
+          console.log("[send-guardian-invite] email queued");
         }
       } catch (emailErr) {
         result.email = "failed";
