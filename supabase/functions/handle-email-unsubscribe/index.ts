@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (updateError) {
-    console.error('Failed to mark token as used', { error: updateError, token })
+    console.error('Failed to mark token as used', { error: updateError })
     return jsonResponse({ error: 'Failed to process unsubscribe' }, 500)
   }
 
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Failed to process unsubscribe' }, 500)
   }
 
-  console.log('Email unsubscribed', { email: tokenRecord.email })
+  console.log('Email unsubscribed')
 
   return jsonResponse({ success: true })
 })
