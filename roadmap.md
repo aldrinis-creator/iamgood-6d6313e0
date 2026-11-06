@@ -1,5 +1,8 @@
 # Roadmap
 
+## Current request
+- Fix remaining 12 critical and 23 warning findings from the November 6 deep scan; validate deployed protections and rescan after saving.
+
 ## In progress
 - Deep-scan security fixes (approved plan: 36 critical, 36 warnings, 5 batches)
   - Batch 1 done: signup role clamp, admin setup disabled, review-bypass lockout, secure random codes, coupon field allowlist, email-by-phone lookup closed
