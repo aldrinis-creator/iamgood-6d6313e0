@@ -10,6 +10,7 @@ import { Heart, Phone, Pill, Shield, User, AlertTriangle, Stethoscope, Printer, 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { escapeHtml as esc } from "@/lib/printSafety";
 
 interface Props {
   wardUserId: string;
@@ -143,20 +144,20 @@ const WardEmergencyCard = ({ wardUserId, wardName }: Props) => {
     const h = health;
     return `
 <div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">
-<div class="row"><span class="label">Name</span><span class="value">${wardName}</span></div>
+<div class="row"><span class="label">Name</span><span class="value">${esc(wardName)}</span></div>
 ${profile?.date_of_birth ? `<div class="row"><span class="label">Age</span><span class="value">${Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / 31557600000)} years</span></div>` : ""}
-${profile?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${profile.gender}</span></div>` : ""}
-${profile?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${profile.phone}</span></div>` : ""}
-${h?.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${h.blood_group}</span></span></div>` : ""}
+${profile?.gender ? `<div class="row"><span class="label">Gender</span><span class="value" style="text-transform:capitalize">${esc(profile.gender)}</span></div>` : ""}
+${profile?.phone ? `<div class="row"><span class="label">Phone</span><span class="value">${esc(profile.phone)}</span></div>` : ""}
+${h?.blood_group ? `<div class="row"><span class="label">Blood Group</span><span class="value"><span class="badge">${esc(h.blood_group)}</span></span></div>` : ""}
 </div></div>
-${h?.allergies.length ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${h.allergies.map(a => `<span class="badge">${a}</span>`).join(" ")}</p></div>` : ""}
-${h?.chronic_conditions.length ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${h.chronic_conditions.map(c => `<span class="badge" style="background:#eff6ff;color:#2563eb">${c}</span>`).join(" ")}</div></div>` : ""}
-${meds.length ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body"><table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${m.name}</td><td>${m.dosage}</td><td>${m.frequency.replace(/_/g," ")}</td><td>${(m.schedule_times||[]).join(", ")}</td></tr>`).join("")}</table></div></div>` : ""}
-${h?.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${h.emergency_notes}</p></div></div>` : ""}
-${h?.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${h.family_doctor_name}</span></div>${h.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${h.family_doctor_phone}</span></div>` : ""}</div></div>` : ""}
-${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${g.guardian_name}${g.is_primary ? " ⭐" : ""}</td><td>${g.relation || "—"}</td><td>${g.guardian_phone}</td></tr>`).join("")}</table></div></div>` : ""}
-${hospitalizations.length ? `<div class="section"><div class="section-title">🏥 Past Hospitalizations</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>${hospitalizations.map(h => `<tr><td>${h.reason}</td><td>${h.hospital_name || "—"}</td><td>${h.start_date ? `${h.start_date}${h.end_date ? ` — ${h.end_date}` : ""}` : "—"}</td><td>${h.treatment || "—"}</td></tr>`).join("")}</table></div></div>` : ""}
-${surgeries.length ? `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Doctor</th><th>Date</th></tr>${surgeries.map(s => `<tr><td>${s.reason}</td><td>${s.hospital_name || "—"}</td><td>${s.doctor_name || "—"}</td><td>${s.start_date || "—"}</td></tr>`).join("")}</table></div></div>` : ""}`;
+${h?.allergies.length ? `<div class="alert-box"><p>⚠️ ALLERGIES: ${h.allergies.map(a => `<span class="badge">${esc(a)}</span>`).join(" ")}</p></div>` : ""}
+${h?.chronic_conditions.length ? `<div class="section"><div class="section-title">🩺 Medical Conditions</div><div class="section-body">${h.chronic_conditions.map(c => `<span class="badge" style="background:#eff6ff;color:#2563eb">${esc(c)}</span>`).join(" ")}</div></div>` : ""}
+${meds.length ? `<div class="section"><div class="section-title">💊 Medications</div><div class="section-body"><table><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Times</th></tr>${meds.map(m => `<tr><td>${esc(m.name)}</td><td>${esc(m.dosage)}</td><td>${esc(m.frequency.replace(/_/g," "))}</td><td>${esc((m.schedule_times||[]).join(", "))}</td></tr>`).join("")}</table></div></div>` : ""}
+${h?.emergency_notes ? `<div class="section"><div class="section-title">📝 Emergency Notes</div><div class="section-body"><p>${esc(h.emergency_notes)}</p></div></div>` : ""}
+${h?.family_doctor_name ? `<div class="section"><div class="section-title">👨‍⚕️ Family Doctor</div><div class="section-body"><div class="row"><span class="label">Name</span><span class="value">${esc(h.family_doctor_name)}</span></div>${h.family_doctor_phone ? `<div class="row"><span class="label">Phone</span><span class="value">${esc(h.family_doctor_phone)}</span></div>` : ""}</div></div>` : ""}
+${guardians.length ? `<div class="section"><div class="section-title">🛡️ Emergency Contacts</div><div class="section-body"><table><tr><th>Name</th><th>Relation</th><th>Phone</th></tr>${guardians.map(g => `<tr><td>${esc(g.guardian_name)}${g.is_primary ? " ⭐" : ""}</td><td>${esc(g.relation || "—")}</td><td>${esc(g.guardian_phone)}</td></tr>`).join("")}</table></div></div>` : ""}
+${hospitalizations.length ? `<div class="section"><div class="section-title">🏥 Past Hospitalizations</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>${hospitalizations.map(h => `<tr><td>${esc(h.reason)}</td><td>${esc(h.hospital_name || "—")}</td><td>${h.start_date ? `${esc(h.start_date)}${h.end_date ? ` — ${esc(h.end_date)}` : ""}` : "—"}</td><td>${esc(h.treatment || "—")}</td></tr>`).join("")}</table></div></div>` : ""}
+${surgeries.length ? `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body"><table><tr><th>Reason</th><th>Hospital</th><th>Doctor</th><th>Date</th></tr>${surgeries.map(s => `<tr><td>${esc(s.reason)}</td><td>${esc(s.hospital_name || "—")}</td><td>${esc(s.doctor_name || "—")}</td><td>${esc(s.start_date || "—")}</td></tr>`).join("")}</table></div></div>` : ""}`;
   };
 
   const handlePrint = () => {

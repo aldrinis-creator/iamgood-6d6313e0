@@ -26,6 +26,7 @@ import PastMedicalHistory from "@/components/PastMedicalHistory";
 import IdInsuranceSection from "@/components/profile/IdInsuranceSection";
 import GuardianBlockedSection from "@/components/profile/GuardianBlockedSection";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { escapeHtml as esc } from "@/lib/printSafety";
 import { addGuardianWithInvite, resendGuardianInvite, setPrimaryGuardian } from "@/lib/guardianInvite";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -420,8 +421,9 @@ const ProfileContent = () => {
     };
 
     const buildProfileHtml = () => {
-      const row = (label: string, value: string) =>
-        `<div class="row"><span class="label">${label}</span><span class="value">${value || "—"}</span></div>`;
+      const rowHtml = (label: string, valueHtml: string) =>
+        `<div class="row"><span class="label">${esc(label)}</span><span class="value">${valueHtml || "—"}</span></div>`;
+      const row = (label: string, value: string) => rowHtml(label, esc(value || "—"));
 
       let html = `<div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">`;
       html += row("Full Name", fullName);
@@ -439,13 +441,13 @@ const ProfileContent = () => {
       html += `<div class="section"><div class="section-title">❤️ Body & Health</div><div class="section-body">`;
       html += row("Blood Group", bloodGroup);
       html += row("Diet Type", dietType ? dietType.replace("-", " ") : "—");
-      html += row("Allergies", allergies.length > 0 ? allergies.map(a => `<span class="badge">${a}</span>`).join(" ") : "—");
-      html += row("Medical Conditions", medicalConditions.length > 0 ? medicalConditions.map(c => `<span class="badge">${c}</span>`).join(" ") : "—");
+      html += rowHtml("Allergies", allergies.length > 0 ? allergies.map(a => `<span class="badge">${esc(a)}</span>`).join(" ") : "—");
+      html += rowHtml("Medical Conditions", medicalConditions.length > 0 ? medicalConditions.map(c => `<span class="badge">${esc(c)}</span>`).join(" ") : "—");
       html += row("Activity Level", activityLevel ? activityLevel.charAt(0).toUpperCase() + activityLevel.slice(1) : "—");
       html += row("Smoking", smoking ? smoking.charAt(0).toUpperCase() + smoking.slice(1) : "—");
       html += row("Alcohol", alcohol ? alcohol.charAt(0).toUpperCase() + alcohol.slice(1) : "—");
-      if (dietaryPreferences.length > 0) html += row("Dietary Preferences", dietaryPreferences.map(d => `<span class="badge-blue badge">${d}</span>`).join(" "));
-      if (healthGoals.length > 0) html += row("Health Goals", healthGoals.map(g => `<span class="badge-green badge">${g}</span>`).join(" "));
+      if (dietaryPreferences.length > 0) html += rowHtml("Dietary Preferences", dietaryPreferences.map(d => `<span class="badge-blue badge">${esc(d)}</span>`).join(" "));
+      if (healthGoals.length > 0) html += rowHtml("Health Goals", healthGoals.map(g => `<span class="badge-green badge">${esc(g)}</span>`).join(" "));
       html += `</div></div>`;
 
       html += `<div class="section"><div class="section-title">🩺 Family Doctor</div><div class="section-body">`;
@@ -456,7 +458,7 @@ const ProfileContent = () => {
       if (guardians.length > 0) {
         html += `<div class="section"><div class="section-title">🛡️ Guardians</div><div class="section-body">`;
         guardians.forEach((g) => {
-          html += `<div class="row"><span class="label">${g.guardian_name}${g.relation ? ` (${g.relation})` : ""}</span><span class="value">${g.guardian_phone}</span></div>`;
+          html += `<div class="row"><span class="label">${esc(g.guardian_name)}${g.relation ? ` (${esc(g.relation)})` : ""}</span><span class="value">${esc(g.guardian_phone)}</span></div>`;
         });
         html += `</div></div>`;
       }
@@ -466,7 +468,7 @@ const ProfileContent = () => {
         html += `<table><tr><th>Name</th><th>Dosage</th><th>Frequency</th><th>Stock</th></tr>`;
         medications.forEach((med) => {
           const isLow = med.remaining_quantity <= med.low_stock_threshold;
-          html += `<tr><td>${med.name}</td><td>${med.dosage}</td><td>${FREQUENCIES[med.frequency] || med.frequency}</td><td style="${isLow ? "color:#dc2626;font-weight:600" : ""}">${med.remaining_quantity}/${med.total_quantity}${isLow ? " ⚠️" : ""}</td></tr>`;
+          html += `<tr><td>${esc(med.name)}</td><td>${esc(med.dosage)}</td><td>${esc(FREQUENCIES[med.frequency] || med.frequency)}</td><td style="${isLow ? "color:#dc2626;font-weight:600" : ""}">${med.remaining_quantity}/${med.total_quantity}${isLow ? " ⚠️" : ""}</td></tr>`;
         });
         html += `</table></div></div>`;
       }
@@ -479,7 +481,7 @@ const ProfileContent = () => {
         html += `<table><tr><th>Reason</th><th>Hospital</th><th>Period</th><th>Treatment</th></tr>`;
         hospitalizations.forEach((h) => {
           const period = h.start_date ? `${h.start_date}${h.end_date ? ` — ${h.end_date}` : ""}` : "—";
-          html += `<tr><td>${h.reason}</td><td>${h.hospital_name || "—"}</td><td>${period}</td><td>${h.treatment || "—"}</td></tr>`;
+          html += `<tr><td>${esc(h.reason)}</td><td>${esc(h.hospital_name || "—")}</td><td>${esc(period)}</td><td>${esc(h.treatment || "—")}</td></tr>`;
         });
         html += `</table></div></div>`;
       }
@@ -488,7 +490,7 @@ const ProfileContent = () => {
         html += `<div class="section"><div class="section-title">✂️ Past Surgeries</div><div class="section-body">`;
         html += `<table><tr><th>Reason</th><th>Nature</th><th>Doctor</th><th>Date</th></tr>`;
         surgeries.forEach((s) => {
-          html += `<tr><td>${s.reason}</td><td>${s.nature || "—"}</td><td>${s.doctor_name || "—"}</td><td>${s.start_date || "—"}</td></tr>`;
+          html += `<tr><td>${esc(s.reason)}</td><td>${esc(s.nature || "—")}</td><td>${esc(s.doctor_name || "—")}</td><td>${esc(s.start_date || "—")}</td></tr>`;
         });
         html += `</table></div></div>`;
       }
