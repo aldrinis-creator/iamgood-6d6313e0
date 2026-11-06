@@ -1,4 +1,5 @@
 import { PRODUCT_KB } from "../_shared/product-kb.ts";
+import { requireUser } from "../_shared/guard.ts";
 import { selectRelevantFaqs, type Audience } from "../_shared/faq-kb.ts";
 import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
 
@@ -46,6 +47,8 @@ type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const access = await requireUser(req, corsHeaders);
+  if (access.error) return access.error;
 
   try {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";

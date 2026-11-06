@@ -3,6 +3,7 @@
 // Designed to be called daily via pg_cron, but also safe to invoke
 // manually from the client as a backup to useVaultReminderScheduler.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { requireUser } from "../_shared/guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,17 +14,21 @@ const ONE_DAY = 86400_000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const access = await requireUser(req, corsHeaders);
+  if (access.error) return access.error;
   try {
     const supa = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: due } = await supa
+    let dueQuery = supa
       .from("vault_reminder_meta")
       .select("*")
       .lte("next_reminder_at", new Date().toISOString())
       .neq("tier", "done");
+    if (!access.internal && access.caller) dueQuery = dueQuery.eq("user_id", access.caller.id);
+    const { data: due } = await dueQuery;
 
     let fired = 0;
     for (const row of due || []) {

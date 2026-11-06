@@ -357,10 +357,11 @@ serve(async (req) => {
       const { data: _sub } = await _svc.from("subscriptions")
         .select("plan_type,status,expires_at")
         .eq("user_id", _userId).eq("status", "active")
+        .in("plan_type", ["premium", "premium-plus", "pro"])
         .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
       const { data: _adm } = await _svc.rpc("has_role", { _user_id: _userId, _role: "admin" });
       if (!_sub && !_adm) {
-        return new Response(JSON.stringify({ error: "This AI health tool needs an active paid plan." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: "This AI health tool needs an active Premium or Premium Plus plan." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

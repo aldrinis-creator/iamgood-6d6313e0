@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       _callerId = _u.user.id;
     }
 
-    const { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
+    let { guardian_email, guardian_name, guardian_phone, user_name, relation, nomination_token, accept_link, reminder_number, force } = await req.json();
 
     if (!guardian_name || !user_name) {
       return new Response(
@@ -59,19 +59,27 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Non-cron callers may only send invites to guardians they themselves nominated.
-    if (!isCron) {
-      const { data: _own } = await supabase
-        .from("guardians")
-        .select("id")
-        .eq("user_id", _callerId)
-        .or(`guardian_email.eq.${String(guardian_email || "").toLowerCase()},guardian_phone.eq.${String(guardian_phone || "")}`)
-        .limit(1);
-      if (!_own?.length) {
+    // Resolve the exact nomination, never interpolate contact data into filters.
+    if (typeof nomination_token !== "string" || !nomination_token) {
+      return new Response(JSON.stringify({ error: "A valid nomination is required." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    let nominationQuery = supabase.from("guardians")
+      .select("id,user_id,guardian_email,guardian_phone,guardian_name,relation,status,nomination_token")
+      .eq("nomination_token", nomination_token).in("status", ["pending", "expired"]);
+    if (!isCron) nominationQuery = nominationQuery.eq("user_id", _callerId);
+    const { data: nomination, error: nominationError } = await nominationQuery.maybeSingle();
+    if (nominationError || !nomination) {
         await logAttemptFailure("forbidden", { stage: "not_own_nomination" });
         return new Response(JSON.stringify({ error: "You can only send invites to guardians you nominated." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
     }
+    guardian_email = nomination.guardian_email;
+    guardian_phone = nomination.guardian_phone;
+    guardian_name = nomination.guardian_name;
+    relation = nomination.relation;
+    const { data: wardProfile } = await supabase.from("profiles").select("full_name").eq("id", nomination.user_id).maybeSingle();
+    user_name = wardProfile?.full_name || "Your ward";
+    accept_link = undefined;
+    if (!isCron) force = false;
 
 
     // Rate-limit re-sends: at most one invite dispatch per recipient per hour.
@@ -143,12 +151,10 @@ Deno.serve(async (req) => {
           result.whatsapp = wa.ok ? "sent" : "failed";
           result.whatsapp_detail = { status: wa.status, body: wa.body };
           console.log("[send-guardian-invite] WhatsApp MSG91 response", JSON.stringify({
-            to: waTo,
             template: "guardian_app_downlaod",
             namespace: WA_NAMESPACE_V2,
             status: wa.status,
             ok: wa.ok,
-            body: wa.body,
           }));
         } catch (waErr) {
           result.whatsapp = "failed";
@@ -157,7 +163,7 @@ Deno.serve(async (req) => {
         }
       } else {
         result.whatsapp = "failed";
-        console.error("[send-guardian-invite] could not normalise phone for WhatsApp:", guardian_phone);
+        console.error("[send-guardian-invite] could not normalise phone for WhatsApp");
       }
     }
 

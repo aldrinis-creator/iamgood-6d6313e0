@@ -58,10 +58,8 @@ Deno.serve(async (req) => {
 
   try {
     if (action === "exists") {
-      const { count } = await admin
-        .from("admin_credentials")
-        .select("id", { count: "exact", head: true });
-      return json({ exists: (count ?? 0) > 0 });
+      // Setup is permanently disabled; do not disclose credential-table state.
+      return json({ exists: true });
     }
 
     if (action === "setup") {
