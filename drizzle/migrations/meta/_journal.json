@@ -50,6 +50,13 @@
       "when": 1793936678312,
       "tag": "0006_atomic_single_use_otp_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793936879915,
+      "tag": "0007_align_atomic_otp_with_hash_only_schema",
+      "breakpoints": true
     }
   ]
 }
