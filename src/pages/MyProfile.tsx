@@ -421,8 +421,9 @@ const ProfileContent = () => {
     };
 
     const buildProfileHtml = () => {
-      const row = (label: string, value: string) =>
-        `<div class="row"><span class="label">${label}</span><span class="value">${value || "—"}</span></div>`;
+      const rowHtml = (label: string, valueHtml: string) =>
+        `<div class="row"><span class="label">${esc(label)}</span><span class="value">${valueHtml || "—"}</span></div>`;
+      const row = (label: string, value: string) => rowHtml(label, esc(value || "—"));
 
       let html = `<div class="section"><div class="section-title">👤 Personal Information</div><div class="section-body">`;
       html += row("Full Name", fullName);
@@ -440,13 +441,13 @@ const ProfileContent = () => {
       html += `<div class="section"><div class="section-title">❤️ Body & Health</div><div class="section-body">`;
       html += row("Blood Group", bloodGroup);
       html += row("Diet Type", dietType ? dietType.replace("-", " ") : "—");
-      html += row("Allergies", allergies.length > 0 ? allergies.map(a => `<span class="badge">${esc(a)}</span>`).join(" ") : "—");
-      html += row("Medical Conditions", medicalConditions.length > 0 ? medicalConditions.map(c => `<span class="badge">${esc(c)}</span>`).join(" ") : "—");
+      html += rowHtml("Allergies", allergies.length > 0 ? allergies.map(a => `<span class="badge">${esc(a)}</span>`).join(" ") : "—");
+      html += rowHtml("Medical Conditions", medicalConditions.length > 0 ? medicalConditions.map(c => `<span class="badge">${esc(c)}</span>`).join(" ") : "—");
       html += row("Activity Level", activityLevel ? activityLevel.charAt(0).toUpperCase() + activityLevel.slice(1) : "—");
       html += row("Smoking", smoking ? smoking.charAt(0).toUpperCase() + smoking.slice(1) : "—");
       html += row("Alcohol", alcohol ? alcohol.charAt(0).toUpperCase() + alcohol.slice(1) : "—");
-      if (dietaryPreferences.length > 0) html += row("Dietary Preferences", dietaryPreferences.map(d => `<span class="badge-blue badge">${esc(d)}</span>`).join(" "));
-      if (healthGoals.length > 0) html += row("Health Goals", healthGoals.map(g => `<span class="badge-green badge">${esc(g)}</span>`).join(" "));
+      if (dietaryPreferences.length > 0) html += rowHtml("Dietary Preferences", dietaryPreferences.map(d => `<span class="badge-blue badge">${esc(d)}</span>`).join(" "));
+      if (healthGoals.length > 0) html += rowHtml("Health Goals", healthGoals.map(g => `<span class="badge-green badge">${esc(g)}</span>`).join(" "));
       html += `</div></div>`;
 
       html += `<div class="section"><div class="section-title">🩺 Family Doctor</div><div class="section-body">`;
