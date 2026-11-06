@@ -9,8 +9,9 @@ import {
   AlertTriangle, ShoppingCart, Package, Loader2,
   CheckCircle, MessageCircle, FileText, Share2, Pencil, X
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { escapeHtml } from "@/lib/printSafety";
 import { normalizeWhatsAppNumber, buildWhatsAppUrl, PREPARING_WHATSAPP_HTML } from "@/lib/whatsapp";
 
 interface Medication {
@@ -221,6 +222,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
       .join("\n");
     const waUrl = buildWhatsAppUrl(num, buildOrderText());
     const itemsSnapshot = [...orderItems];
+    let savedOrderId: string | undefined;
 
     const persistOrder = async (via: "msg91" | "browser") => {
       if (!session?.user?.id) return;
@@ -232,14 +234,15 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
           qty: it.qty,
           total_quantity: it.med.total_quantity,
         }));
-        await supabase.from("medication_orders" as any).insert({
-          user_id: wardUserId,
-          ordered_by: session.user.id,
-          items,
-          status: "pending_receipt",
-          pharmacy_phone: pharmacyNumber,
-          send_method: via,
-        });
+        if (savedOrderId) {
+          await supabase.from("medication_orders" as any).update({ send_method: via }).eq("id", savedOrderId);
+        } else {
+          await supabase.from("medication_orders" as any).insert({
+            user_id: wardUserId, ordered_by: session.user.id, items,
+            status: "pending_receipt", pharmacy_phone: pharmacyNumber, send_method: via,
+            doctor_name: null, hospital_name: null,
+          });
+        }
         loadPendingOrders();
       } catch (err) {
         console.error("Failed to persist medication order", err);
@@ -256,15 +259,17 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
 
     setSending(true);
     try {
+      if (!session?.user.id) throw new Error("Please sign in");
+      const { data: saved, error: saveError } = await supabase.from("medication_orders" as any).insert({
+        user_id: wardUserId, ordered_by: session.user.id,
+        items: itemsSnapshot.map(it => ({ med_id: it.med.id, name: it.med.name, dosage: it.med.dosage, qty: it.qty, total_quantity: it.med.total_quantity })),
+        status: "pending_receipt", pharmacy_phone: pharmacyNumber, send_method: "browser",
+        doctor_name: null, hospital_name: null,
+      }).select("id").single();
+      if (saveError || !saved?.id) throw new Error("Could not save the order");
+      savedOrderId = saved.id;
       const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
-        body: {
-          pharmacy_phone: num,
-          patient_name: wardName,
-          doctor_name: "—",
-          hospital_name: "—",
-          order_date: orderDate,
-          items_text: itemsText,
-        },
+        body: { order_id: savedOrderId },
       });
       console.log("[send-pharmacy-order] ward client verdict:", JSON.stringify({ data, error }));
 
@@ -330,7 +335,7 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
   const saveAsPdf = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) { toast.error("Please allow popups"); return; }
-    const tableHtml = `<table><tr><th>#</th><th>Medication</th><th>Dosage</th><th>Qty</th></tr>${orderItems.map((item, i) => `<tr><td>${i + 1}</td><td>${item.med.name}</td><td>${item.med.dosage}</td><td>${item.qty}</td></tr>`).join("")}</table>`;
+    const tableHtml = `<table><tr><th>#</th><th>Medication</th><th>Dosage</th><th>Qty</th></tr>${orderItems.map((item, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(item.med.name)}</td><td>${escapeHtml(item.med.dosage)}</td><td>${item.qty}</td></tr>`).join("")}</table>`;
     const html = buildLetterheadHtml({
       title: "Medication Order",
       subtitle: `Ward: ${wardName}`,
