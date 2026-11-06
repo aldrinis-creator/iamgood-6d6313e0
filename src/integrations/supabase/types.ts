@@ -1925,6 +1925,51 @@ export type Database = {
         }
         Relationships: []
       }
+      orange_lab_catalog: {
+        Row: {
+          category_code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          kind: string
+          mrp: number | null
+          name: string
+          partner_net_rate: number | null
+          provider_item_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          kind: string
+          mrp?: number | null
+          name: string
+          partner_net_rate?: number | null
+          provider_item_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          kind?: string
+          mrp?: number | null
+          name?: string
+          partner_net_rate?: number | null
+          provider_item_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       otp_events: {
         Row: {
           action: string

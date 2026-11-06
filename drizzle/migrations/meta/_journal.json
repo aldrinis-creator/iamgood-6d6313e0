@@ -64,6 +64,13 @@
       "when": 1793937931385,
       "tag": "0008_reassert_signup_role_clamp",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793979928608,
+      "tag": "0009_create_orange_lab_catalog",
+      "breakpoints": true
     }
   ]
 }
