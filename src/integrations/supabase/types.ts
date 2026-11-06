@@ -2955,6 +2955,10 @@ export type Database = {
       }
       check_guardian_nomination: { Args: { _phone: string }; Returns: boolean }
       cleanup_admin_2fa: { Args: never; Returns: undefined }
+      consume_login_otp: {
+        Args: { _hash: string; _phone: string }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
