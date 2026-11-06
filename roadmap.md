@@ -1,16 +1,15 @@
 # Roadmap
 
-## Current request
-- Fix remaining 12 critical and 23 warning findings from the November 6 deep scan; validate deployed protections and rescan after saving.
+## Completed
+- Deployed account, admin, invite, paid-tool and scheduled-job access protections; user-triggered missed-item checks are owner-scoped.
+- Applied signup admin-escalation closure and atomic single-use OTP verification.
+- Protected shared report HTML, CSV exports, search filters and saved pharmacy-order authorization.
+- Nine frontend regression tests and one request-guard test passed; 43 function checks passed; preview build passed.
+- Verified deployed anonymous requests are rejected by protected functions; no live SOS or message sent.
+- ORANGE_HEALTH_API_KEY updated through the secure secret flow earlier.
 
-## In progress
-- Deep-scan security fixes (approved plan: 36 critical, 36 warnings, 5 batches)
-  - Batch 1 done: signup role clamp, admin setup disabled, review-bypass lockout, secure random codes, coupon field allowlist, email-by-phone lookup closed
-  - Batch 3 done: scheduler-only guards on 12 jobs, test-db deleted
-  - Batch 4 partial: scan-card, sarvam-stt, extract-prescription require sign-in; product-assistant sanitized
-  - Batch 2 partial: safe-zone alerts bound to accepted guardians, msg91-send internal-only, ambulance ward check, SOS emails validated, transactional email restricted
-  - Batch 5 in progress: printout escaping (reportPdf done; MedicalVault, SOSDialog, MyProfile pending), CSV formula neutralization, log scrubbing
-  - Remaining: typecheck, deploy all touched functions, verification calls, mark findings fixed
-
-## New
-- Update ORANGE_HEALTH_API_KEY secret with the new value the user provided (via update_secret secure form)
+## Outstanding
+- MSG91 SOS delivery-webhook authentication: blocked by previously declined webhook secret configuration; leave existing delivery integration unchanged until an approved verification method is configured.
+- Authenticated end-to-end verification: requesting user has no matching sign-in session; requires sign-in in the preview.
+- Fresh deep rescan of saved changes: scanner only sees saved state, so start in the next turn; do not mark old findings fixed without fresh evidence.
+- Frontend publication: requires explicit publication request; the saved-order pharmacy payload must be published with its updated function.
