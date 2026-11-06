@@ -1,4 +1,4 @@
-import { requireCronOrAdmin } from "../_shared/guard.ts";
+import { requireUser, isAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
@@ -15,42 +15,16 @@ const corsHeaders = {
 // covering every medication in that slot. Stamp `whatsapp_alerted_at` so we
 // never resend.
 Deno.serve(async (req) => {
-  if (req.method !== "OPTIONS") {
-    const __deny = await requireCronOrAdmin(req, corsHeaders);
-    if (__deny) return new Response(JSON.stringify({ skipped: true, reason: "scheduled job only" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const access = await requireUser(req, corsHeaders);
+  if (access.error) return access.error;
+  const scopeUserId = access.internal || (access.caller && await isAdmin(access.caller.id)) ? null : access.caller?.id;
+  if (!access.internal && !access.caller) return new Response("Unauthorized", { status: 401 });
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth: accept cron (service-role bearer OR shared cron secret) OR a valid user JWT
-    const authHeader = req.headers.get("Authorization") || "";
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const isCron =
-      authHeader === `Bearer ${serviceRoleKey}` ||
-      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
-    if (!isCron) {
-
-      const token = authHeader.replace(/^Bearer\s+/i, "");
-      if (!token) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-      const { data: userData, error: userErr } = await authClient.auth.getUser(token);
-      if (userErr || !userData?.user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -68,20 +42,24 @@ Deno.serve(async (req) => {
 
     // ── Server-side medication missed pre-population ──
     // Get all active medications
-    const { data: activeMeds, error: medError } = await supabase
+    let medsQuery = supabase
       .from("medications")
       .select("id, user_id, name, schedule_times, schedule_days")
       .eq("alarm_enabled", true);
+    if (scopeUserId) medsQuery = medsQuery.eq("user_id", scopeUserId);
+    const { data: activeMeds, error: medError } = await medsQuery;
 
     if (medError) {
       console.error("Error fetching medications for pre-population:", medError);
     } else if (activeMeds && activeMeds.length > 0) {
       // Get all existing logs for today
-      const { data: existingLogs, error: logsError } = await supabase
+      let existingQuery = supabase
         .from("medication_logs")
         .select("medication_id, scheduled_at")
         .gte("scheduled_at", todayStartUTC.toISOString())
         .lte("scheduled_at", todayEndUTC.toISOString());
+      if (scopeUserId) existingQuery = existingQuery.eq("user_id", scopeUserId);
+      const { data: existingLogs, error: logsError } = await existingQuery;
 
       if (logsError) {
         console.error("Error fetching medication logs for pre-population:", logsError);
@@ -134,7 +112,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: logs, error } = await supabase
+    let logsQuery = supabase
       .from("medication_logs")
       .select("id, user_id, scheduled_at, medication_id, medication:medications(name)")
       .eq("status", "missed")
@@ -143,6 +121,8 @@ Deno.serve(async (req) => {
       .lte("scheduled_at", todayEndUTC.toISOString())
       .lt("scheduled_at", graceCutoff.toISOString())
       .limit(500);
+    if (scopeUserId) logsQuery = logsQuery.eq("user_id", scopeUserId);
+    const { data: logs, error } = await logsQuery;
 
     if (error) {
       console.error("fetch logs error:", error);

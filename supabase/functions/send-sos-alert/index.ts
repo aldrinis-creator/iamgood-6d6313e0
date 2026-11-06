@@ -1165,7 +1165,7 @@ Deno.serve(async (req) => {
       .from("guardians")
       .select("guardian_email")
       .eq("user_id", user_id)
-      .in("status", ["accepted", "pending"]);
+      .eq("status", "accepted");
     const allowedEmails = new Set(
       (storedGuardianEmails || [])
         .map((g: any) => String(g.guardian_email || "").trim().toLowerCase())
@@ -1199,7 +1199,7 @@ Deno.serve(async (req) => {
                   user_name ||
                   "Check-iN User",
 
-                message,
+                message: "An emergency SOS alert requires your attention. Open Check-iN for the ward’s status and location.",
               },
             },
           },
@@ -1208,8 +1208,7 @@ Deno.serve(async (req) => {
         emailsQueued++;
       } catch (e) {
         console.error(
-          `Email queue error for ${email}:`,
-          e,
+          "SOS email queue failed",
         );
       }
     }

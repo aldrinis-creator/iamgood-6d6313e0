@@ -1,3 +1,4 @@
+import { canActForWard } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -44,12 +45,14 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    let callerId = "";
     {
       const _uc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: _u, error: _e } = await _uc.auth.getUser();
       if (_e || !_u?.user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      callerId = _u.user.id;
     }
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
     const integratedNumber =
@@ -76,16 +79,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = (await req.json()) as PharmacyOrderRequest;
-    const {
-      pharmacy_phone,
-      patient_name,
-      doctor_name,
-      hospital_name,
-      order_date,
-      items_text,
-    } = body;
-
+    const { order_id } = await req.json();
+    if (typeof order_id !== "string") return new Response(JSON.stringify({ error: "Saved order required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: order, error: orderError } = await svc.from("medication_orders").select("*").eq("id", order_id).maybeSingle();
+    if (orderError || !order || order.ordered_by !== callerId || !await canActForWard(callerId, order.user_id)) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (order.send_method === "msg91") return new Response(JSON.stringify({ success: true, already_sent: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { data: patient } = await svc.from("profiles").select("full_name").eq("id", order.user_id).maybeSingle();
+    const pharmacy_phone = order.pharmacy_phone;
+    const patient_name = patient?.full_name || "Patient";
+    const doctor_name = order.doctor_name || "—";
+    const hospital_name = order.hospital_name || "—";
+    const order_date = new Date(order.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" });
+    const items_text = (Array.isArray(order.items) ? order.items : []).map((it: any, i: number) => `${i + 1}. ${String(it.name || "")} - ${String(it.dosage || "")} (Qty: ${Number(it.qty) || 0})`).join("\n");
     if (!pharmacy_phone || !patient_name || !doctor_name || !hospital_name || !order_date || !items_text) {
       return new Response(
         JSON.stringify({ success: false, error: "Missing required fields" }),
@@ -130,7 +138,6 @@ Deno.serve(async (req) => {
     };
 
     console.log("[send-pharmacy-order] calling MSG91 WA", {
-      mobile,
       templateName,
       namespace,
     });
@@ -150,7 +157,7 @@ Deno.serve(async (req) => {
 
     console.log("[send-pharmacy-order] MSG91 WA response", {
       status: res.status,
-      body: rawText.slice(0, 600),
+
     });
 
     const obj = (typeof result === "object" && result !== null) ? (result as Record<string, unknown>) : null;
@@ -174,6 +181,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    await svc.from("medication_orders").update({ send_method: "msg91" }).eq("id", order.id);
     return new Response(
       JSON.stringify({
         success: true,

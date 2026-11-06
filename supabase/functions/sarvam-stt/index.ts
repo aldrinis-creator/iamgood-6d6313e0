@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const audio = form.get("audio");
     const language = (form.get("language") as string) || "unknown";
 
-    if (!(audio instanceof File) && !(audio instanceof Blob)) {
+    if (!(audio instanceof File)) {
       return new Response(JSON.stringify({ error: "audio file required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

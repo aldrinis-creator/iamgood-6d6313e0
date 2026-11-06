@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 // One-time seed for the blood_banks table from the CSV at
 // internal-seeds/blood_banks_march_2026.csv. Idempotent — only inserts
 // rows whose source_sno is not already present.
@@ -58,38 +59,8 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Bootstrap exception: allow first-time seed when the table is empty.
-    const { count: precount } = await admin
-      .from("blood_banks").select("id", { count: "exact", head: true });
-    const isBootstrap = (precount ?? 0) === 0;
-
-    if (!isBootstrap) {
-      if (!jwt) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-      });
-      const { data: userData } = await userClient.auth.getUser();
-      const isService = jwt === serviceKey;
-      if (!isService) {
-        if (!userData.user) {
-          return new Response(JSON.stringify({ error: "Unauthorized" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const { data: isAdmin } = await userClient.rpc("has_role", {
-          _user_id: userData.user.id, _role: "admin",
-        });
-        if (!isAdmin) {
-          return new Response(JSON.stringify({ error: "Forbidden" }), {
-            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
-    }
+    const denied = await requireCronOrAdmin(req, corsHeaders);
+    if (denied) return denied;
 
 
     // Download CSV from storage
@@ -146,7 +117,7 @@ Deno.serve(async (req) => {
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("seed-blood-banks error:", e);
-    return new Response(JSON.stringify({ error: String(e?.message || e) }), {
+    return new Response(JSON.stringify({ error: "Request failed" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

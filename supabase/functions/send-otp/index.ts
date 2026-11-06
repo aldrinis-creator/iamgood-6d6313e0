@@ -36,46 +36,6 @@ function generateOtp(): string {
   return String(100000 + (arr[0] % 900000));
 }
 
-/** App Store reviewer accounts: fixed OTP, no SMS/WhatsApp dispatch, no rate limit. */
-function reviewPhones(): string[] {
-  return (Deno.env.get("REVIEW_PHONES") ?? "")
-    .split(",")
-    .map((p) => normalizePhone(p.trim()))
-    .filter((p) => p.length >= 12);
-}
-
-function isReviewPhone(phone: string): boolean {
-  return reviewPhones().includes(phone);
-}
-
-/** Give a reviewer account full premium access for 30 days if they have none active. */
-async function ensureReviewAccess(admin: ReturnType<typeof getAdminClient>, userId: string) {
-  try {
-    const { data: existing } = await admin
-      .from("subscriptions")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .gt("expires_at", new Date().toISOString())
-      .limit(1)
-      .maybeSingle();
-    if (existing) return;
-
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    await admin.from("subscriptions").insert({
-      user_id: userId,
-      plan_type: "premium",
-      billing_cycle: "monthly",
-      status: "active",
-      amount_paise: 0,
-      coupon_code: "APPSTORE_REVIEW",
-      expires_at: expires,
-    });
-  } catch (e) {
-    console.error("[send-otp] ensureReviewAccess failed:", e);
-  }
-}
-
 function getAdminClient() {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -95,7 +55,7 @@ async function isRateLimited(admin: ReturnType<typeof getAdminClient>, phone: st
 
   if (error) {
     console.error("[send-otp] Rate limit check failed:", error.message);
-    return false;
+    return true;
   }
   return (count ?? 0) >= RATE_LIMIT_MAX;
 }
@@ -187,74 +147,11 @@ Deno.serve(async (req) => {
       return jsonResponse({
         success: true,
         delivery_status: event?.delivery_status ?? "pending",
-        failure_reason: event?.failure_reason ?? null,
+        failure_reason: event?.failure_reason ? "Delivery failed. Please try the other channel." : null,
       });
     }
 
-    // ── APP STORE REVIEW BYPASS ─────────────────────────────
-    if (isReviewPhone(phone)) {
-      const reviewCode = Deno.env.get("REVIEW_OTP_CODE") ?? "";
-
-      if (action !== "verify") {
-        console.log(`[send-otp] review bypass: skipping dispatch for ***${phone.slice(-4)}`);
-        await logOtpEvent(admin, phone, "review_bypass", undefined, "sent");
-        return jsonResponse({ success: true, channels: { sms: "skipped", whatsapp: "skipped" } });
-      }
-
-      // Lock the review bypass after 5 wrong codes in an hour (anti-guessing).
-      const sinceIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { count: failCount } = await admin
-        .from("otp_events")
-        .select("id", { count: "exact", head: true })
-        .eq("phone", phone)
-        .eq("action", "review_bypass_fail")
-        .gte("created_at", sinceIso);
-      if ((failCount ?? 0) >= 5) {
-        return jsonResponse({ success: false, error: "Too many attempts. Try again later." }, 429);
-      }
-
-      if (!reviewCode || reviewCode.length < 6 || otp !== reviewCode) {
-        await logOtpEvent(admin, phone, "review_bypass_fail", undefined, "failed", "Invalid review code");
-        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
-      }
-
-      await logOtpEvent(admin, phone, "review_bypass_verify", undefined, "verified");
-
-      if (purpose === "register") {
-        return jsonResponse({ success: true, verified: true });
-      }
-
-      const phoneWithPlus = `+${phone}`;
-      const { data: email, error: rpcError } = await admin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
-      if (rpcError || !email) {
-        return jsonResponse({ success: true, verified: true, no_account: true });
-      }
-
-      const { data: userRow } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("phone", phoneWithPlus)
-        .limit(1)
-        .maybeSingle();
-      if (userRow?.id) await ensureReviewAccess(admin, userRow.id);
-
-      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-        type: "magiclink",
-        email: email as string,
-      });
-      if (linkError || !linkData) {
-        console.error("[send-otp] review magic link failed:", linkError?.message);
-        return jsonResponse({ success: true, verified: true, error: "Failed to create session" });
-      }
-
-      return jsonResponse({
-        success: true,
-        verified: true,
-        token_hash: linkData.properties?.hashed_token,
-        email: email as string,
-      });
-    }
-
+    // All accounts, including review accounts, use normal expiring OTP verification.
 
     // ── VERIFY ──────────────────────────────────────────────
     if (action === "verify") {
@@ -262,63 +159,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Valid 6-digit OTP is required" }, 400);
       }
 
-      // Accept ANY unexpired, unused code for this phone — a resend must not
-      // invalidate the code already sitting in the guardian's WhatsApp/SMS.
-      const { data: liveRows, error: lookupErr } = await admin
-        .from("otp_events")
-        .select("id, otp_hash, expires_at, attempts")
-        .eq("phone", phone)
-        .in("action", ["send", "resend"])
-        .eq("status", "sent")
-        .not("otp_hash", "is", null)
-        .gte("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (lookupErr) {
-        console.error("[send-otp] OTP lookup error:", lookupErr.message);
-        return jsonResponse({ success: false, error: "Verification failed" }, 500);
-      }
-
-      const rows = liveRows ?? [];
-      if (rows.length === 0) {
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "No live OTP");
-        return jsonResponse(
-          { success: false, code: "expired", error: "This code has expired. Please request a new one." },
-          400,
-        );
-      }
-
-      const usable = rows.filter((r) => (r.attempts ?? 0) < MAX_VERIFY_ATTEMPTS);
-      if (usable.length === 0) {
-        return jsonResponse(
-          { success: false, code: "too_many_attempts", error: "Too many incorrect attempts. Please request a new code." },
-          400,
-        );
-      }
-
       const submittedHash = await sha256Hex(otp);
-      const otpRow = usable.find((r) => r.otp_hash === submittedHash);
-
-      if (!otpRow) {
-        // Burn one attempt on every live code so brute force is bounded.
-        for (const r of usable) {
-          await admin.from("otp_events").update({ attempts: (r.attempts ?? 0) + 1 }).eq("id", r.id);
-        }
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Wrong code");
-        return jsonResponse(
-          { success: false, code: "wrong_code", error: "That code is not correct. Please re-check the latest message." },
-          400,
-        );
+      const { data: result, error: verifyError } = await admin.rpc("consume_login_otp", { _phone: phone, _hash: submittedHash });
+      if (verifyError) return jsonResponse({ success: false, error: "Verification failed" }, 500);
+      if (result !== "verified") {
+        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", String(result));
+        const errors: Record<string, string> = {
+          expired: "This code has expired. Please request a new one.",
+          too_many_attempts: "Too many incorrect attempts. Please request a new code.",
+          wrong_code: "That code is not correct. Please re-check the latest message.",
+        };
+        return jsonResponse({ success: false, code: result, error: errors[String(result)] || "Verification failed" }, 400);
       }
-
-      // Mark as verified and nullify every live hash for this phone.
-      await admin
-        .from("otp_events")
-        .update({ verified: true, status: "verified", otp_hash: null })
-        .in("id", rows.map((r) => r.id));
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
-
 
       // Registration: just confirm
       if (purpose === "register") {
@@ -329,7 +182,7 @@ Deno.serve(async (req) => {
       try {
         const phoneWithPlus = `+${phone}`;
         const { data: email, error: rpcError } = await admin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
-        console.log(`[send-otp] get_email_by_phone(${phoneWithPlus}):`, email, rpcError?.message);
+        console.log("[send-otp] account lookup completed");
 
         if (rpcError || !email) {
           return jsonResponse({ success: true, verified: true, no_account: true });
@@ -363,7 +216,7 @@ Deno.serve(async (req) => {
         }
 
         const tokenHash = linkData.properties?.hashed_token;
-        console.log(`[send-otp] Session created for ${email}`);
+        console.log("[send-otp] session created");
 
         return jsonResponse({ success: true, verified: true, token_hash: tokenHash, email: email as string });
       } catch (authErr) {
@@ -384,7 +237,7 @@ Deno.serve(async (req) => {
       const invited = nom?.guardian_phone ? normalizePhone(nom.guardian_phone) : null;
       if (invited && invited !== phone) {
         const masked = `+${invited.slice(0, 4)}\u2026${invited.slice(-3)}`;
-        console.warn(`[send-otp] nomination phone mismatch: typed=${phone} invited=${invited}`);
+        console.warn("[send-otp] nomination phone mismatch");
         return jsonResponse(
           { error: `This invite was sent to ${masked}. Please use that number, or ask your ward to re-send the invite.` },
           400,
@@ -412,7 +265,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (live) {
         const secondsLeft = Math.max(0, Math.floor((new Date(live.expires_at).getTime() - Date.now()) / 1000));
-        console.log(`[send-otp] reusing live code for ${phone} (${secondsLeft}s left)`);
+        console.log("[send-otp] reusing live code");
         return jsonResponse({
           success: true,
           reused: true,
@@ -425,7 +278,7 @@ Deno.serve(async (req) => {
     }
 
     if (await isRateLimited(admin, phone)) {
-      console.log(`[send-otp] Rate limited: ${phone}`);
+      console.log("[send-otp] rate limited");
       return jsonResponse({ error: "Too many OTP requests. Please wait 10 minutes before trying again.", rate_limited: true }, 429);
     }
 
@@ -439,7 +292,7 @@ Deno.serve(async (req) => {
 
     if (channel === "sms") {
       // ── MSG91 SMS FLOW ───────────────────────────────────
-      console.log(`[send-otp] Dispatching MSG91 SMS flow for phone=${phone}`);
+      console.log("[send-otp] dispatching SMS");
       try {
         const smsRes = await fetch("https://control.msg91.com/api/v5/flow", {
           method: "POST",
@@ -451,7 +304,7 @@ Deno.serve(async (req) => {
           }),
         });
         const resBody: any = await smsRes.json().catch(() => ({}));
-        console.log(`[send-otp] MSG91 SMS response (${smsRes.status}):`, JSON.stringify(resBody).slice(0, 400));
+        console.log("[send-otp] SMS response status", smsRes.status);
         sendRequestId = resBody?.request_id || (typeof resBody?.message === "string" ? resBody.message : undefined);
         if (smsRes.ok && resBody?.type !== "error") {
           sendSuccess = true;
@@ -464,7 +317,7 @@ Deno.serve(async (req) => {
       }
     } else {
       // ── MSG91 WHATSAPP TEMPLATE ──────────────────────────
-      console.log(`[send-otp] Dispatching MSG91 WhatsApp template ${WA_OTP_TEMPLATE} for phone=${phone}`);
+      console.log("[send-otp] dispatching WhatsApp");
       try {
         const wa = await sendWhatsAppTemplate({
           templateName: WA_OTP_TEMPLATE,
@@ -479,7 +332,7 @@ Deno.serve(async (req) => {
           (typeof waBody?.message === "string" ? waBody.message : undefined);
         sendSuccess = wa.ok;
         if (!wa.ok) sendErrorMsg = JSON.stringify(waBody).slice(0, 300);
-        console.log(`[send-otp] WhatsApp OTP response (${wa.status}):`, JSON.stringify(waBody).slice(0, 400));
+        console.log("[send-otp] WhatsApp response status", wa.status);
       } catch (e) {
         sendErrorMsg = String(e);
         console.error("[send-otp] WhatsApp OTP error:", e);

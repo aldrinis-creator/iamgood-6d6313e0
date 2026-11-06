@@ -1,4 +1,4 @@
-import { requireCronOrAdmin } from "../_shared/guard.ts";
+import { requireUser, isAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 import { sendSmsFlow } from "../_shared/msg91Sms.ts";
@@ -118,44 +118,16 @@ async function sendPushNotification(
 // ── Main handler ──
 
 Deno.serve(async (req) => {
-  if (req.method !== "OPTIONS") {
-    const __deny = await requireCronOrAdmin(req, corsHeaders);
-    if (__deny) return new Response(JSON.stringify({ skipped: true, reason: "scheduled job only" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const access = await requireUser(req, corsHeaders);
+  if (access.error) return access.error;
+  const scopeUserId = access.internal || (access.caller && await isAdmin(access.caller.id)) ? null : access.caller?.id;
+  if (!access.internal && !access.caller) return new Response("Unauthorized", { status: 401 });
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Auth: accept cron (service-role bearer or shared cron secret) OR a valid user JWT
-    const authHeader = req.headers.get("Authorization") || "";
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const isCron =
-      authHeader === `Bearer ${serviceRoleKey}` ||
-      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
-
-    if (!isCron) {
-      const token = authHeader.replace(/^Bearer\s+/i, "");
-      if (!token) {
-        console.error("[check-missed-checkins] AUTH REJECTED: no bearer token — scheduled run will not process missed check-ins");
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-      const { data: userData, error: userErr } = await authClient.auth.getUser(token);
-      if (userErr || !userData?.user) {
-        console.error("[check-missed-checkins] AUTH REJECTED: bearer token is not the service-role key and not a valid user JWT (likely an anon key from a cron job) — no check-ins will be marked missed");
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
 
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -182,8 +154,8 @@ Deno.serve(async (req) => {
     // ── Server-side check-in pre-population ──
     // Get all users with 'user' role from both profiles and user_roles
     const [profilesRes, rolesRes, guardianRoleRes, guardianProfileRes] = await Promise.all([
-      supabase.from("profiles").select("id, phone").eq("role", "user"),
-      supabase.from("user_roles").select("user_id").eq("role", "user"),
+      scopeUserId ? supabase.from("profiles").select("id, phone").eq("role", "user").eq("id", scopeUserId) : supabase.from("profiles").select("id, phone").eq("role", "user"),
+      scopeUserId ? supabase.from("user_roles").select("user_id").eq("role", "user").eq("user_id", scopeUserId) : supabase.from("user_roles").select("user_id").eq("role", "user"),
       supabase.from("user_roles").select("user_id").eq("role", "guardian"),
       supabase.from("profiles").select("id").eq("role", "guardian"),
     ]);
@@ -281,13 +253,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: pendingCheckIns, error: fetchError } = await supabase
+    let pendingQuery = supabase
       .from("check_ins")
       .select("id, user_id, scheduled_at")
       .eq("status", "pending")
       .gte("scheduled_at", todayStartUTC.toISOString())
       .lte("scheduled_at", todayEndUTC.toISOString())
       .lt("scheduled_at", graceCutoff.toISOString());
+    if (scopeUserId) pendingQuery = pendingQuery.eq("user_id", scopeUserId);
+    const { data: pendingCheckIns, error: fetchError } = await pendingQuery;
 
     if (fetchError) {
       console.error("Error fetching pending check-ins:", fetchError);
@@ -699,13 +673,15 @@ Deno.serve(async (req) => {
       const nowMs = Date.now();
       const twoHoursAgo = new Date(nowMs - 2 * 60 * 60 * 1000).toISOString();
       const lookback = new Date(nowMs - 6 * 60 * 60 * 1000).toISOString();
-      const { data: stale } = await supabase
+      let staleQuery = supabase
         .from("check_ins")
         .select("id, user_id, scheduled_at")
         .eq("status", "missed")
         .is("responded_at", null)
         .lte("scheduled_at", twoHoursAgo)
         .gte("scheduled_at", lookback);
+      if (scopeUserId) staleQuery = staleQuery.eq("user_id", scopeUserId);
+      const { data: stale } = await staleQuery;
 
       for (const ci of stale ?? []) {
         const marker = `missed_checkin:${ci.id}`;

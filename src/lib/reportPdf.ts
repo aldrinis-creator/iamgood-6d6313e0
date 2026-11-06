@@ -23,7 +23,7 @@ interface ReportOptions {
 
 /** Convert basic markdown to HTML */
 export function markdownToHtml(md: string): string {
-  return md
+  return escapeHtml(md)
     .replace(/^### (.+)$/gm, '<h3 style="color:#1a365d;margin:16px 0 8px;font-size:15px;">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 style="color:#1a365d;margin:18px 0 8px;font-size:17px;">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 style="color:#1a365d;margin:20px 0 10px;font-size:20px;">$1</h1>')
@@ -123,8 +123,8 @@ function buildHtml(opts: ReportOptions): string {
   ${buildLetterheadHeader()}
   <div class="title-block">
     <h1>${escapeHtml(opts.title)}</h1>
-    ${opts.subtitle ? `<p class="subtitle">${sanitizePrintHtml(opts.subtitle)}</p>` : ""}
-    <p class="meta">Generated on: ${date} | ${time}</p>
+    ${opts.subtitle ? `<p class="subtitle">${escapeHtml(opts.subtitle)}</p>` : ""}
+    <p class="meta">Generated on: ${escapeHtml(date)} | ${time}</p>
   </div>
   <div class="content">
     ${opts.category ? `<span class="category-badge">${escapeHtml(opts.category)}</span>` : ""}
@@ -163,7 +163,7 @@ export function buildLetterheadHtml(opts: {
   ${buildLetterheadHeader()}
   <div class="title-block">
     <h1>${escapeHtml(opts.title)}</h1>
-    ${opts.subtitle ? `<p class="subtitle">${sanitizePrintHtml(opts.subtitle)}</p>` : ""}
+    ${opts.subtitle ? `<p class="subtitle">${escapeHtml(opts.subtitle)}</p>` : ""}
     <p class="meta">Generated on: ${date} | ${time}</p>
   </div>
   <div class="content">

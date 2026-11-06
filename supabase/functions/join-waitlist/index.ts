@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     if (selErr) throw selErr;
 
     if (existing) {
-      return json({ ok: true, alreadyJoined: true });
+      return json({ ok: true });
     }
 
     const { error: insErr } = await supabase
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     if (insErr) {
       // Unique conflict race
       if ((insErr as { code?: string }).code === "23505") {
-        return json({ ok: true, alreadyJoined: true });
+        return json({ ok: true });
       }
       throw insErr;
     }
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       })
       .catch((e) => console.error("confirmation email failed", e));
 
-    return json({ ok: true, alreadyJoined: false });
+    return json({ ok: true });
   } catch (err) {
     console.error("join-waitlist error", err);
     return json({ error: (err as Error).message || "Server error" }, 500);

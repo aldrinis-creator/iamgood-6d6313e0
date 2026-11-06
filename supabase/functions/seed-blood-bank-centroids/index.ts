@@ -1,3 +1,4 @@
+import { requireCronOrAdmin } from "../_shared/guard.ts";
 // One-time bulk state-centroid populator. Gives every blood bank an approximate
 // lat/lng (state-level) so the directory works immediately. Run geocode-blood-banks
 // afterwards to refine to precise per-address coordinates.
@@ -64,35 +65,8 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Auth: bootstrap is allowed when no rows have coordinates yet.
-    const { count: alreadyDone } = await admin
-      .from("blood_banks").select("id", { count: "exact", head: true })
-      .not("lat", "is", null);
-    const isBootstrap = (alreadyDone ?? 0) === 0;
-
-    if (!isBootstrap) {
-      const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-      });
-      const { data: userData } = await userClient.auth.getUser();
-      const isService = jwt === serviceKey;
-      if (!isService) {
-        if (!userData.user) {
-          return new Response(JSON.stringify({ error: "Unauthorized" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const { data: isAdmin } = await userClient.rpc("has_role", {
-          _user_id: userData.user.id, _role: "admin",
-        });
-        if (!isAdmin) {
-          return new Response(JSON.stringify({ error: "Forbidden" }), {
-            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
-    }
+    const denied = await requireCronOrAdmin(req, corsHeaders);
+    if (denied) return denied;
 
     // Pull every pending row
     const PAGE = 1000;
@@ -134,7 +108,7 @@ Deno.serve(async (req) => {
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("seed-blood-bank-centroids error:", e);
-    return new Response(JSON.stringify({ error: String(e?.message || e) }), {
+    return new Response(JSON.stringify({ error: "Request failed" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -19,14 +19,6 @@ Deno.serve(async (req) => {
   }
 
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  const cronHeader = req.headers.get("x-cron-secret");
-  if (CRON_SECRET && cronHeader !== CRON_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -78,13 +70,9 @@ Deno.serve(async (req) => {
             reminder_number: count + 1,
           }),
         });
-        const body = await res.text();
-        console.log("[guardian-invite-reminders] reminder", {
-          guardian: g.id,
-          reminder: count + 1,
-          status: res.status,
-          body: body.slice(0, 300),
-        });
+        const outcome = await res.json().catch(() => ({}));
+        console.log("[guardian-invite-reminders] dispatch", { status: res.status, sent: outcome.sent === true });
+        if (!res.ok || outcome.sent !== true) continue;
 
         await supabase
           .from("guardians")
