@@ -36,6 +36,13 @@
       "when": 1793639514030,
       "tag": "0004_restrict_signup_role",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793936477567,
+      "tag": "0005_close_signup_admin_escalation",
+      "breakpoints": true
     }
   ]
 }

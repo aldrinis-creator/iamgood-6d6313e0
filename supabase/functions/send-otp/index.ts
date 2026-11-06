@@ -191,70 +191,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── APP STORE REVIEW BYPASS ─────────────────────────────
-    if (isReviewPhone(phone)) {
-      const reviewCode = Deno.env.get("REVIEW_OTP_CODE") ?? "";
-
-      if (action !== "verify") {
-        console.log(`[send-otp] review bypass: skipping dispatch for ***${phone.slice(-4)}`);
-        await logOtpEvent(admin, phone, "review_bypass", undefined, "sent");
-        return jsonResponse({ success: true, channels: { sms: "skipped", whatsapp: "skipped" } });
-      }
-
-      // Lock the review bypass after 5 wrong codes in an hour (anti-guessing).
-      const sinceIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { count: failCount } = await admin
-        .from("otp_events")
-        .select("id", { count: "exact", head: true })
-        .eq("phone", phone)
-        .eq("action", "review_bypass_fail")
-        .gte("created_at", sinceIso);
-      if ((failCount ?? 0) >= 5) {
-        return jsonResponse({ success: false, error: "Too many attempts. Try again later." }, 429);
-      }
-
-      if (!reviewCode || reviewCode.length < 6 || otp !== reviewCode) {
-        await logOtpEvent(admin, phone, "review_bypass_fail", undefined, "failed", "Invalid review code");
-        return jsonResponse({ success: false, error: "Invalid or expired OTP" }, 400);
-      }
-
-      await logOtpEvent(admin, phone, "review_bypass_verify", undefined, "verified");
-
-      if (purpose === "register") {
-        return jsonResponse({ success: true, verified: true });
-      }
-
-      const phoneWithPlus = `+${phone}`;
-      const { data: email, error: rpcError } = await admin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
-      if (rpcError || !email) {
-        return jsonResponse({ success: true, verified: true, no_account: true });
-      }
-
-      const { data: userRow } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("phone", phoneWithPlus)
-        .limit(1)
-        .maybeSingle();
-      if (userRow?.id) await ensureReviewAccess(admin, userRow.id);
-
-      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-        type: "magiclink",
-        email: email as string,
-      });
-      if (linkError || !linkData) {
-        console.error("[send-otp] review magic link failed:", linkError?.message);
-        return jsonResponse({ success: true, verified: true, error: "Failed to create session" });
-      }
-
-      return jsonResponse({
-        success: true,
-        verified: true,
-        token_hash: linkData.properties?.hashed_token,
-        email: email as string,
-      });
-    }
-
+    // All accounts, including review accounts, use normal expiring OTP verification.
 
     // ── VERIFY ──────────────────────────────────────────────
     if (action === "verify") {
