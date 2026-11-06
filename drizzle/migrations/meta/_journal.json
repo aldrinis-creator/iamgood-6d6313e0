@@ -57,6 +57,13 @@
       "when": 1793936879915,
       "tag": "0007_align_atomic_otp_with_hash_only_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793937931385,
+      "tag": "0008_reassert_signup_role_clamp",
+      "breakpoints": true
     }
   ]
 }
