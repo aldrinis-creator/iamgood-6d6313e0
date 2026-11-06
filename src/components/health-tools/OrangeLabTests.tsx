@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   TestTube2,
   Calendar,
   Clock,
@@ -81,7 +88,6 @@ interface CatalogItem {
 
 const isSameCatalogItem = (a: CatalogItem, b: CatalogItem) => a.kind === b.kind && a.id === b.id;
 
-const CATALOG_PAGE_SIZE = 20;
 
 const DEFAULT_RESCHEDULE_REASON = "Patient not available at originally scheduled time";
 const DEFAULT_RESCHEDULE_EXPLANATION = "Patient is not available at the scheduled time";
@@ -147,7 +153,7 @@ export const OrangeLabTests: React.FC = () => {
   const [catalogueError, setCatalogueError] = useState<string | null>(null);
   const [catalogueSearch, setCatalogueSearch] = useState("");
   const [catalogueFilter, setCatalogueFilter] = useState<"all" | CatalogKind>("all");
-  const [visibleCatalogueCount, setVisibleCatalogueCount] = useState(CATALOG_PAGE_SIZE);
+  const [isCatalogueDialogOpen, setIsCatalogueDialogOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,7 +223,7 @@ export const OrangeLabTests: React.FC = () => {
       (item.categoryCode || "").toLowerCase().includes(normalizedCatalogueSearch);
     return matchesKind && matchesSearch;
   });
-  const visibleCatalogue = filteredCatalogue.slice(0, visibleCatalogueCount);
+  const visibleCatalogue = filteredCatalogue;
 
   // Slots state
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -869,15 +875,28 @@ export const OrangeLabTests: React.FC = () => {
                 </Badge>
               </div>
 
-              {/* Featured tests */}
+              {/* Search catalogue: opens the complete catalogue in a searchable dialog */}
+              <button
+                type="button"
+                onClick={() => setIsCatalogueDialogOpen(true)}
+                className="w-full flex items-center gap-3 rounded-xl border border-border bg-background px-3.5 py-3 text-left hover:border-orange-500/50 transition-colors"
+                aria-label="Search all tests and packages"
+              >
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-muted-foreground">
+                  Search by test, package, or ID...
+                </span>
+              </button>
+
+              {/* Show only the eight featured tests on the booking page */}
               {featuredTests.length > 0 && (
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-foreground">Featured Tests</h4>
-                    <Badge variant="outline" className="text-[10px]">Recommended</Badge>
+                    <h4 className="text-xs font-bold text-foreground">Top Tests</h4>
+                    <Badge variant="outline" className="text-[10px]">Popular</Badge>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {featuredTests.map((test) => {
+                    {featuredTests.slice(0, 8).map((test) => {
                       const isSelected = selectedTests.some((item) => isSameCatalogItem(item, test));
                       return (
                         <button
@@ -890,8 +909,11 @@ export const OrangeLabTests: React.FC = () => {
                               : "border-border/60 hover:border-orange-500/40 bg-card"
                           }`}
                         >
-                          <span className="space-y-1">
+                          <span className="space-y-1 min-w-0">
                             <span className="block text-xs font-bold text-foreground">{test.name}</span>
+                            <span className="block text-[10px] text-muted-foreground">
+                              Individual Test{test.categoryCode ? ` · Category ${test.categoryCode}` : ""}
+                            </span>
                             <span className="block text-xs font-semibold text-orange-600">₹{test.mrp.toLocaleString("en-IN")}</span>
                           </span>
                           <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
@@ -906,117 +928,116 @@ export const OrangeLabTests: React.FC = () => {
                 </div>
               )}
 
-              {/* Search and browse the complete provider catalogue */}
-              <div className="space-y-3 border-t pt-4">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">Browse All Tests & Packages</h4>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Search the complete Orange Health catalogue and select the tests or packages you need.
-                  </p>
-                </div>
+              <Dialog open={isCatalogueDialogOpen} onOpenChange={setIsCatalogueDialogOpen}>
+                <DialogContent className="w-[calc(100%-1.5rem)] max-w-2xl max-h-[85vh] flex flex-col gap-4 p-4 sm:p-6">
+                  <DialogHeader>
+                    <DialogTitle>Browse Tests & Packages</DialogTitle>
+                    <DialogDescription>
+                      Search the complete Orange Health catalogue. Select as many tests or packages as you need.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={catalogueSearch}
-                    onChange={(event) => {
-                      setCatalogueSearch(event.target.value);
-                      setVisibleCatalogueCount(CATALOG_PAGE_SIZE);
-                    }}
-                    placeholder="Search by test, package, or ID..."
-                    className="pl-9 text-xs h-10"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    { value: "all", label: "All" },
-                    { value: "test", label: "Individual Tests" },
-                    { value: "package", label: "Packages" },
-                  ] as const).map((filter) => (
-                    <Button
-                      key={filter.value}
-                      type="button"
-                      size="sm"
-                      variant={catalogueFilter === filter.value ? "default" : "outline"}
-                      onClick={() => {
-                        setCatalogueFilter(filter.value);
-                        setVisibleCatalogueCount(CATALOG_PAGE_SIZE);
-                      }}
-                      className={`h-8 text-xs ${catalogueFilter === filter.value ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}`}
-                    >
-                      {filter.label}
-                    </Button>
-                  ))}
-                </div>
-
-                {catalogueLoading ? (
-                  <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
-                    Loading tests and packages...
+                  <div className="relative shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={catalogueSearch}
+                      onChange={(event) => setCatalogueSearch(event.target.value)}
+                      placeholder="Type a test, package, or ID..."
+                      className="pl-9 h-11"
+                    />
                   </div>
-                ) : catalogueError ? (
-                  <div className="p-4 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
-                    {catalogueError}
+
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {([
+                      { value: "all", label: "All" },
+                      { value: "test", label: "Individual Tests" },
+                      { value: "package", label: "Packages" },
+                    ] as const).map((filter) => (
+                      <Button
+                        key={filter.value}
+                        type="button"
+                        size="sm"
+                        variant={catalogueFilter === filter.value ? "default" : "outline"}
+                        onClick={() => setCatalogueFilter(filter.value)}
+                        className={`h-8 text-xs ${catalogueFilter === filter.value ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}`}
+                      >
+                        {filter.label}
+                      </Button>
+                    ))}
                   </div>
-                ) : visibleCatalogue.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {visibleCatalogue.map((item) => {
-                        const isSelected = selectedTests.some((selected) => isSameCatalogItem(selected, item));
-                        return (
+
+                  {catalogueLoading ? (
+                    <div className="flex items-center justify-center py-10 text-xs text-muted-foreground gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
+                      Loading tests and packages...
+                    </div>
+                  ) : catalogueError ? (
+                    <div className="p-4 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
+                      {catalogueError}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between shrink-0">
+                        <span className="text-xs text-muted-foreground">
+                          {filteredCatalogue.length} {filteredCatalogue.length === 1 ? "result" : "results"}
+                        </span>
+                        {catalogueSearch && (
                           <button
-                            key={`catalogue-${item.kind}-${item.id}`}
                             type="button"
-                            onClick={() => toggleTest(item)}
-                            className={`p-3 rounded-xl border text-left transition-all flex items-start justify-between gap-3 ${
-                              isSelected
-                                ? "border-orange-500 bg-orange-500/10 dark:bg-orange-500/15"
-                                : "border-border/60 hover:border-orange-500/40 bg-card"
-                            }`}
+                            onClick={() => setCatalogueSearch("")}
+                            className="text-xs text-orange-600 hover:underline"
                           >
-                            <span className="space-y-1 min-w-0">
-                              <span className="block text-xs font-bold text-foreground">{item.name}</span>
-                              <span className="block text-[10px] text-muted-foreground">
-                                {item.kind === "package" ? "Health Package" : "Individual Test"}
-                                {item.categoryCode ? ` · Category ${item.categoryCode}` : ""}
-                              </span>
-                              <span className="block text-xs font-semibold text-orange-600">₹{item.mrp.toLocaleString("en-IN")}</span>
-                            </span>
-                            <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                              isSelected ? "bg-orange-600 border-orange-600 text-white" : "border-muted-foreground/30"
-                            }`}>
-                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                            </span>
+                            Clear search
                           </button>
-                        );
-                      })}
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        Showing {visibleCatalogue.length} of {filteredCatalogue.length} matching items
-                      </span>
-                      {visibleCatalogue.length < filteredCatalogue.length && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs"
-                          onClick={() => setVisibleCatalogueCount((count) => count + CATALOG_PAGE_SIZE)}
-                        >
-                          Show More
-                        </Button>
+                        )}
+                      </div>
+
+                      {visibleCatalogue.length > 0 ? (
+                        <div className="overflow-y-auto min-h-0 pr-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {visibleCatalogue.map((item) => {
+                              const isSelected = selectedTests.some((selected) => isSameCatalogItem(selected, item));
+                              return (
+                                <button
+                                  key={`catalogue-${item.kind}-${item.id}`}
+                                  type="button"
+                                  onClick={() => toggleTest(item)}
+                                  className={`p-3 rounded-xl border text-left transition-all flex items-start justify-between gap-3 ${
+                                    isSelected
+                                      ? "border-orange-500 bg-orange-500/10 dark:bg-orange-500/15"
+                                      : "border-border/60 hover:border-orange-500/40 bg-card"
+                                  }`}
+                                >
+                                  <span className="space-y-1 min-w-0">
+                                    <span className="block text-xs font-bold text-foreground">{item.name}</span>
+                                    <span className="block text-[10px] text-muted-foreground">
+                                      {item.kind === "package" ? "Health Package" : "Individual Test"}
+                                      {item.categoryCode ? ` · Category ${item.categoryCode}` : ""}
+                                    </span>
+                                    <span className="block text-xs font-semibold text-orange-600">₹{item.mrp.toLocaleString("en-IN")}</span>
+                                  </span>
+                                  <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                                    isSelected ? "bg-orange-600 border-orange-600 text-white" : "border-muted-foreground/30"
+                                  }`}>
+                                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-6 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
+                          {catalogue.length === 0
+                            ? "No active tests or packages are available right now."
+                            : "No tests or packages match your search."}
+                        </div>
                       )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="p-4 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
-                    {catalogue.length === 0
-                      ? "No active tests or packages are available right now."
-                      : "No tests or packages match your search."}
-                  </div>
-                )}
-              </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* Selected summary */}
               <div className="flex flex-wrap gap-1.5 pt-1">
