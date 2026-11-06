@@ -1,6 +1,12 @@
 // Shared request guards for edge functions.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+function requiredEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value) throw new Error("Missing server configuration");
+  return value;
+}
+
 export function isCronRequest(req: Request): boolean {
   const auth = req.headers.get("Authorization") || "";
   const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -13,14 +19,14 @@ export function isCronRequest(req: Request): boolean {
 export async function getCaller(req: Request): Promise<{ id: string; email?: string | null; phone?: string | null } | null> {
   const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
-  const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
+  const client = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_ANON_KEY"));
   const { data, error } = await client.auth.getUser(token);
   if (error || !data?.user) return null;
   return { id: data.user.id, email: data.user.email, phone: data.user.phone };
 }
 
 export function serviceClient() {
-  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  return createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
 }
 
 export async function isAdmin(userId: string): Promise<boolean> {

@@ -260,14 +260,16 @@ const WardRefillOrder = ({ wardUserId, wardName }: WardRefillOrderProps) => {
     setSending(true);
     try {
       if (!session?.user.id) throw new Error("Please sign in");
-      const { data: saved, error: saveError } = await supabase.from("medication_orders" as any).insert({
+      const newOrderId = crypto.randomUUID();
+      const { error: saveError } = await supabase.from("medication_orders" as any).insert({
+        id: newOrderId,
         user_id: wardUserId, ordered_by: session.user.id,
         items: itemsSnapshot.map(it => ({ med_id: it.med.id, name: it.med.name, dosage: it.med.dosage, qty: it.qty, total_quantity: it.med.total_quantity })),
         status: "pending_receipt", pharmacy_phone: pharmacyNumber, send_method: "browser",
         doctor_name: null, hospital_name: null,
-      }).select("id").single();
-      if (saveError || !saved?.id) throw new Error("Could not save the order");
-      savedOrderId = saved.id;
+      });
+      if (saveError) throw new Error("Could not save the order");
+      savedOrderId = newOrderId;
       const { data, error } = await supabase.functions.invoke("send-pharmacy-order", {
         body: { order_id: savedOrderId },
       });
