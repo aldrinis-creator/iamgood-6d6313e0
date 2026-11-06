@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
     try { body = await req.json(); } catch { return json({ error: "Invalid request body." }, 400); }
 
     const messages = Array.isArray(body?.messages) ? body.messages.slice(-10) : [];
+    if (messages.some((m: unknown) => !m || typeof m !== "object" || typeof (m as { content?: unknown }).content !== "string")) return json({ error: "Invalid messages." }, 400);
     if (messages.length === 0) return json({ error: "Please say something." }, 400);
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (!lastUserMsg?.content) return json({ error: "Please say something." }, 400);
@@ -238,7 +239,7 @@ Deno.serve(async (req) => {
     const chatMessages = [
       { role: "system", content: sys },
       ...messages.map((m: any) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
+        role: "user",
         content: String(m.content ?? "").slice(0, 2000),
       })),
     ];

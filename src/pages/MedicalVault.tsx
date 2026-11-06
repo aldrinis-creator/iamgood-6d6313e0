@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { encrypt, decrypt, hashPin } from "@/lib/encryption";
 import { buildLetterheadHtml } from "@/lib/reportPdf";
+import { escapeHtml } from "@/lib/printSafety";
 import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 import VaultCategorisedSection from "@/components/vault/VaultCategorisedSection";
 import { useVaultReminderScheduler } from "@/hooks/useVaultReminderScheduler";
@@ -474,8 +475,8 @@ const MedicalVaultContent = () => {
     const actionBarHtml = includeActionBar ? `
 <div class="action-bar" id="actionBar">
   <button onclick="document.getElementById('actionBar').style.display='none';window.print();setTimeout(()=>document.getElementById('actionBar').style.display='flex',500)" class="btn btn-print">🖨️ Print / Save PDF</button>
-  <button onclick="window.open('${whatsAppUrl}','_blank')" class="btn btn-whatsapp">💬 WhatsApp</button>
-  <button onclick="window.location.href='${emailUrl}'" class="btn btn-email">📧 Email</button>
+  <a href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">💬 WhatsApp</a>
+  <a href="${escapeHtml(emailUrl)}" class="btn btn-email">📧 Email</a>
 </div>` : undefined;
 
     const bodyHtml = `

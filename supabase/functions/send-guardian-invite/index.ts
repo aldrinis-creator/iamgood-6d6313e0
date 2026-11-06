@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
         if (!mailRes.ok) {
           result.email = "failed";
           result.email_error = `${mailRes.status}: ${mailBody.slice(0, 300)}`;
-          console.error("[send-guardian-invite] email send failed", mailRes.status, mailBody.slice(0, 600));
+          console.error("[send-guardian-invite] email send failed", mailRes.status);
         } else {
           result.email = "sent";
           console.log("[send-guardian-invite] email queued");
@@ -251,15 +251,13 @@ Deno.serve(async (req) => {
           });
           const inviteBody = await inviteRes.text();
           console.log("[send-guardian-invite] MSG91 response", {
-            mobile,
             status: inviteRes.status,
             ok: inviteRes.ok,
             templateId: msg91InviteTemplate,
-            body: inviteBody.slice(0, 600),
           });
           result.sms = inviteRes.ok ? "sent" : "failed";
           if (!inviteRes.ok) {
-            console.error("[send-guardian-invite] MSG91 returned non-OK status", inviteRes.status, inviteBody);
+            console.error("[send-guardian-invite] MSG91 returned non-OK status", inviteRes.status);
           }
         } catch (e) {
           result.sms = "failed";
@@ -267,11 +265,7 @@ Deno.serve(async (req) => {
         }
       } else {
         result.sms = "failed";
-        // Fallback: log WhatsApp link
-        const whatsappMsg = encodeURIComponent(
-          `🛡️ *Guardian Nomination — Check-iN*\n\nHi ${guardian_name},\n\n*${user_name}*${relationText} has nominated you as their Guardian on Check-iN.\n\n📲 Install the Guardian app: ${installLink}\n✅ Accept: ${acceptLink}\n${rejectLink ? `❌ Reject: ${rejectLink}\n` : ""}\nCheck-iN — Personal Emergency Response System`
-        );
-        console.log(`WhatsApp link: https://wa.me/${guardian_phone.replace(/[^0-9]/g, "")}?text=${whatsappMsg}`);
+        console.warn("[send-guardian-invite] messaging provider unavailable");
       }
     }
 

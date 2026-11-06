@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
     const query = typeof body?.query === "string" ? body.query.trim() : "";
     if (!query) return json({ error: "Please say something to ask." }, 400);
 
-    console.log(`[voice-query] user=${userId} query="${query}"`);
+    console.log("[voice-query] authenticated query received");
 
     const context = await gatherContext(supabase, userId);
     console.log(`[voice-query] context keys: ${Object.keys(context).join(",")}`);

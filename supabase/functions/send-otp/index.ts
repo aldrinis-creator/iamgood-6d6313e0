@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
       try {
         const phoneWithPlus = `+${phone}`;
         const { data: email, error: rpcError } = await admin.rpc("get_email_by_phone", { _phone: phoneWithPlus });
-        console.log(`[send-otp] get_email_by_phone(${phoneWithPlus}):`, email, rpcError?.message);
+        console.log("[send-otp] account lookup completed");
 
         if (rpcError || !email) {
           return jsonResponse({ success: true, verified: true, no_account: true });
@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
         }
 
         const tokenHash = linkData.properties?.hashed_token;
-        console.log(`[send-otp] Session created for ${email}`);
+        console.log("[send-otp] session created");
 
         return jsonResponse({ success: true, verified: true, token_hash: tokenHash, email: email as string });
       } catch (authErr) {
@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
       const invited = nom?.guardian_phone ? normalizePhone(nom.guardian_phone) : null;
       if (invited && invited !== phone) {
         const masked = `+${invited.slice(0, 4)}\u2026${invited.slice(-3)}`;
-        console.warn(`[send-otp] nomination phone mismatch: typed=${phone} invited=${invited}`);
+        console.warn("[send-otp] nomination phone mismatch");
         return jsonResponse(
           { error: `This invite was sent to ${masked}. Please use that number, or ask your ward to re-send the invite.` },
           400,
@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (live) {
         const secondsLeft = Math.max(0, Math.floor((new Date(live.expires_at).getTime() - Date.now()) / 1000));
-        console.log(`[send-otp] reusing live code for ${phone} (${secondsLeft}s left)`);
+        console.log("[send-otp] reusing live code");
         return jsonResponse({
           success: true,
           reused: true,
@@ -425,7 +425,7 @@ Deno.serve(async (req) => {
     }
 
     if (await isRateLimited(admin, phone)) {
-      console.log(`[send-otp] Rate limited: ${phone}`);
+      console.log("[send-otp] rate limited");
       return jsonResponse({ error: "Too many OTP requests. Please wait 10 minutes before trying again.", rate_limited: true }, 429);
     }
 
@@ -439,7 +439,7 @@ Deno.serve(async (req) => {
 
     if (channel === "sms") {
       // ── MSG91 SMS FLOW ───────────────────────────────────
-      console.log(`[send-otp] Dispatching MSG91 SMS flow for phone=${phone}`);
+      console.log("[send-otp] dispatching SMS");
       try {
         const smsRes = await fetch("https://control.msg91.com/api/v5/flow", {
           method: "POST",
@@ -451,7 +451,7 @@ Deno.serve(async (req) => {
           }),
         });
         const resBody: any = await smsRes.json().catch(() => ({}));
-        console.log(`[send-otp] MSG91 SMS response (${smsRes.status}):`, JSON.stringify(resBody).slice(0, 400));
+        console.log("[send-otp] SMS response status", smsRes.status);
         sendRequestId = resBody?.request_id || (typeof resBody?.message === "string" ? resBody.message : undefined);
         if (smsRes.ok && resBody?.type !== "error") {
           sendSuccess = true;
@@ -464,7 +464,7 @@ Deno.serve(async (req) => {
       }
     } else {
       // ── MSG91 WHATSAPP TEMPLATE ──────────────────────────
-      console.log(`[send-otp] Dispatching MSG91 WhatsApp template ${WA_OTP_TEMPLATE} for phone=${phone}`);
+      console.log("[send-otp] dispatching WhatsApp");
       try {
         const wa = await sendWhatsAppTemplate({
           templateName: WA_OTP_TEMPLATE,
@@ -479,7 +479,7 @@ Deno.serve(async (req) => {
           (typeof waBody?.message === "string" ? waBody.message : undefined);
         sendSuccess = wa.ok;
         if (!wa.ok) sendErrorMsg = JSON.stringify(waBody).slice(0, 300);
-        console.log(`[send-otp] WhatsApp OTP response (${wa.status}):`, JSON.stringify(waBody).slice(0, 400));
+        console.log("[send-otp] WhatsApp response status", wa.status);
       } catch (e) {
         sendErrorMsg = String(e);
         console.error("[send-otp] WhatsApp OTP error:", e);
