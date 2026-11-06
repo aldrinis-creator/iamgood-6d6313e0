@@ -1,4 +1,4 @@
-import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Receipt, Wallet, HeartHandshake } from "lucide-react";
+import { Pill, Stethoscope, Ambulance, Activity, ScanFace, HeartPulse, Apple, Wrench, FileText, Upload, Search, Info, Phone, ChevronRight, ArrowLeft, ShieldAlert, ShieldCheck, Heart, Lock, TestTube, Smile, Receipt, Wallet, HeartHandshake, Award } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import UrineCheck from "@/components/health-tools/UrineCheck";
 import TongueAnalysis from "@/components/health-tools/TongueAnalysis";
 import OrangeLabTests from "@/components/health-tools/OrangeLabTests";
 import DigitalLegacy from "@/components/health-tools/DigitalLegacy";
+import DigitalLifeCertificate from "@/components/health-tools/DigitalLifeCertificate";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -49,6 +50,7 @@ const healthToolsSubItems = [
 
 
 const wellnessHubSubItems = [
+  { icon: Award, label: "Digital Life Certificate", desc: "Instant Jeevan Pramaan download via DigiLocker Pull API" },
   { icon: HeartHandshake, label: "My Digital Legacy", desc: "Sealed voice, video & written messages for loved ones" },
   { icon: Activity, label: "Activity", desc: "Steps, exercise & daily movement" },
   { icon: HeartPulse, label: "Mindfulness", desc: "Mood, sleep & mindfulness tracking" },
@@ -56,6 +58,7 @@ const wellnessHubSubItems = [
 ];
 
 const subToolComponents: Record<string, React.FC> = {
+  "Digital Life Certificate": DigitalLifeCertificate,
   "Home Lab Tests": OrangeLabTests,
   "Doctor Visit Report": DoctorVisitReport,
   

@@ -7,6 +7,7 @@ export const FEATURE_TIERS: Record<string, PlanTier> = {
   "Emergency Profile": "free",
   "Basic Vitals": "free",
   "Ambulance": "free",
+  "Digital Life Certificate": "free",
 
   // Basic tier
   "Tablets": "basic",
@@ -53,6 +54,7 @@ export const FEATURE_DESCRIPTIONS: Record<string, string> = {
   "PDF Export": "Export and share health reports as PDF documents.",
   "Financial Healthcare": "Track healthcare expenses with voice notes, AI bill scanning, and shareable PDF reports.",
   "Guardian Limit": "Add more guardians to your safety network.",
+  "Digital Life Certificate": "Download and verify your Jeevan Pramaan DLC via DigiLocker Pull API.",
 };
 
 const TIER_RANK: Record<PlanTier, number> = {
