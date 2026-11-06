@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     }
     return json({ ok: true, fired });
   } catch (e) {
-    return json({ error: String(e?.message || e) }, 500);
+    return json({ error: "Request failed" }, 500);
   }
 });
 

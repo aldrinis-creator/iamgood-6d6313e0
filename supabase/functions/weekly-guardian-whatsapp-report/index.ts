@@ -1,3 +1,4 @@
+import { serviceClient } from "../_shared/guard.ts";
 import { requireCronOrAdmin } from "../_shared/guard.ts";
 /**
  * weekly-guardian-whatsapp-report
@@ -47,7 +48,7 @@ function prevWeekRangeIST(): { weekStart: Date; weekEnd: Date; label: string } {
 
 // ── Stats (same logic as weekly-guardian-report) ───────────────────────────
 async function buildStats(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof serviceClient>,
   userId: string,
   weekStart: Date,
   weekEnd: Date,
@@ -278,7 +279,7 @@ function generatePDF(opts: {
 
 // ── Upload PDF ─────────────────────────────────────────────────────────────
 async function uploadPDF(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof serviceClient>,
   pdfBytes: Uint8Array,
   wardName: string,
   guardianId: string,

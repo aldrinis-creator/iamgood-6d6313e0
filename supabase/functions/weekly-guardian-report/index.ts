@@ -1,3 +1,4 @@
+import { serviceClient } from "../_shared/guard.ts";
 import { requireCronOrAdmin } from "../_shared/guard.ts";
 import * as React from "npm:react@18.3.1";
 import { renderAsync } from "npm:@react-email/components@0.0.22";
@@ -35,7 +36,7 @@ function prevWeekRangeIST(): { weekStart: Date; weekEnd: Date; label: string } {
 }
 
 // ── Build stats for one ward ───────────────────────────────────────────────
-async function buildStats(supabase: ReturnType<typeof createClient>, userId: string, weekStart: Date, weekEnd: Date) {
+async function buildStats(supabase: ReturnType<typeof serviceClient>, userId: string, weekStart: Date, weekEnd: Date) {
   const s = weekStart.toISOString();
   const e = weekEnd.toISOString();
 
