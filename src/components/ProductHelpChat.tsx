@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/contexts/AppContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -21,7 +22,8 @@ const APIKEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export default function ProductHelpChat() {
   const { pathname } = useLocation();
-  const { role, session } = useApp();
+  const { role } = useApp();
+  const { session } = useAuth();
   const audience: "user" | "guardian" | "any" = role === "guardian" ? "guardian" : role === "user" ? "user" : "any";
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);

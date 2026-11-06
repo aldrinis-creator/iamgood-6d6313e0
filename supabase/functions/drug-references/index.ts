@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     if (fdaRes?.ok) {
       try {
         const j = await fdaRes.json();
-        const r = pickFirst(j.results);
+        const r = pickFirst<Record<string, any>>(j.results);
         if (r) {
           const of = r.openfda || {};
           fda = {
@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
             effective_time: r.effective_time || '',
           };
           // strip empty keys
-          Object.keys(fda).forEach((k) => { if (!fda![k]) delete fda![k]; });
+          for (const k of Object.keys(fda)) { if (!fda[k]) delete fda[k]; }
           if (Object.keys(fda).length === 0) fda = null;
         }
       } catch { /* ignore */ }

@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: auth } } },
     );
-    const { data: claims } = await userClient.auth.getClaims(auth.replace("Bearer ", ""));
-    if (!claims?.claims) return json({ error: "unauthorized" }, 401);
-    const adminUserId = claims.claims.sub as string;
+    const { data: identity, error: authError } = await userClient.auth.getUser(auth.replace("Bearer ", ""));
+    if (authError || !identity.user) return json({ error: "unauthorized" }, 401);
+    const adminUserId = identity.user.id;
 
     const supa = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -134,12 +134,12 @@ Deno.serve(async (req) => {
     await supa.from("admin_audit_log").insert({
       action: "vault_claim_released",
       user_id: adminUserId,
-      metadata: { claim_id, token: tokenRow.token, nominee_phone: g?.guardian_phone },
+      metadata: { claim_id },
     });
 
     return json({ ok: true, portal_url: portalUrl, expires_at: tokenRow.expires_at });
   } catch (e) {
-    return json({ error: String(e?.message || e) }, 500);
+    return json({ error: "Release failed" }, 500);
   }
 });
 
