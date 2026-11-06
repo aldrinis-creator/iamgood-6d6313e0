@@ -246,10 +246,10 @@ Deno.serve(async (req) => {
         await sendRes.text();
 
         sentCount++;
-        console.log(`Weekly report sent for ward ${wardName}`);
+        console.log("Weekly guardian report sent");
       } catch (err: any) {
         const msg = `Guardian ${g.guardian_email} (ward: ${g.user_id}): ${err.message}`;
-        console.error(msg);
+        console.error("Weekly guardian report delivery failed");
         errors.push(msg);
       }
     }

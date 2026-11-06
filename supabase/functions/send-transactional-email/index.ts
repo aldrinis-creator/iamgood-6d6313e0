@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     } else if (templateName === 'premium-plus-waitlist-confirmation' && !template.to) {
       const { data: w } = await supabase.from('premium_plus_waitlist').select('id')
         .ilike('email', target).limit(1)
-      allowed = !!w?.length
+      allowed = !!own && target === own && !!w?.length
     }
     if (!allowed) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {

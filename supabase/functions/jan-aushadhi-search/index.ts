@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validSearchText } from "../_shared/securityRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +36,10 @@ serve(async (req) => {
     }
 
     const { type, query, lat, lon, medications } = await req.json();
+    if ((query !== undefined && query !== "" && !validSearchText(query)) ||
+        (medications !== undefined && (!Array.isArray(medications) || medications.length > 20 || !medications.every(validSearchText)))) {
+      return new Response(JSON.stringify({ error: "Invalid search text" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const supabase = createClient(supabaseUrl, serviceKey);
 
 
@@ -84,6 +89,9 @@ serve(async (req) => {
         searchTerms = query ? [query] : [];
       }
 
+      if (!Array.isArray(searchTerms) || searchTerms.length > 20 || !searchTerms.every(validSearchText)) {
+        return new Response(JSON.stringify({ error: "Invalid search terms" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       // Search products for each term
       const results: Record<string, any[]> = {};
       for (const term of searchTerms) {

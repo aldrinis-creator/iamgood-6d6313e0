@@ -515,7 +515,7 @@ Deno.serve(async (req) => {
           ].join("  |  "),
         };
 
-        console.log(`[wa-report] → ${g.guardian_name} (+${phone}) for ${wardName}${dryRun ? " [dryRun]" : ""}`);
+        console.log("[wa-report] preparing report", { dryRun });
         if (!dryRun) {
           const ok = await sendTemplateMsg(phone, vars);
           if (!ok) throw new Error("Template message failed");
@@ -531,20 +531,20 @@ Deno.serve(async (req) => {
 
         const pdfUrl = await uploadPDF(supabase, pdfBytes, wardName, g.id, weekEnd);
         if (!pdfUrl) {
-          console.warn(`[wa-report] PDF upload failed for ${g.guardian_name} — skipping document send`);
+          console.warn("[wa-report] PDF upload failed — skipping document send");
         } else if (!dryRun) {
           await sendPDFDoc(phone, wardName, label, pdfUrl);
         }
 
         if (dryRun) {
           sentCount++;
-          console.log(`[wa-report] dryRun ok for ${g.guardian_name} — pdf: ${pdfUrl ? "uploaded" : "failed"}`);
+          console.log("[wa-report] dry run completed", { uploaded: !!pdfUrl });
           continue;
         }
 
         if (testPhone) {
           sentCount++;
-          console.log(`[wa-report] test send to +${testPhone} done (no log row)`);
+          console.log("[wa-report] test send completed (no log row)");
           break;
         }
 
@@ -557,10 +557,10 @@ Deno.serve(async (req) => {
         });
 
         sentCount++;
-        console.log(`[wa-report] ✓ ${g.guardian_name} for ward ${wardName}`);
+        console.log("[wa-report] report sent");
       } catch (err: any) {
         const msg = `${g.guardian_name} (${g.guardian_phone}): ${err.message}`;
-        console.error("[wa-report]", msg);
+        console.error("[wa-report] delivery failed");
         errors.push(msg);
       }
     }
