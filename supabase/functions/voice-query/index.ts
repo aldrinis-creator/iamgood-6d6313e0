@@ -62,7 +62,7 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
     });
     if (!resp.ok) {
       const err = await resp.text();
-      console.error("[voice-query] Sarvam TTS failed:", resp.status, err.slice(0, 300));
+      console.error("[voice-query] Sarvam TTS failed:", resp.status);
       return null;
     }
     const data = await resp.json();
@@ -261,7 +261,7 @@ ${PRODUCT_KB}`;
 
     if (!aiResp.ok) {
       const t = await aiResp.text();
-      console.error("[voice-query] AI gateway error:", aiResp.status, t.slice(0, 500));
+      console.error("[voice-query] AI gateway error:", aiResp.status);
       const info = classifyAiGatewayFailure(aiResp.status, t);
       if (info.code === "credits_exhausted" || info.code === "credit_limit_reached") {
         return json({ answer: info.message, audio: null, degraded: info.code, code: info.code }, 200);

@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     // NOTE: this is tracked in notification_logs, NOT on guardians.nominated_at —
     // a freshly-nominated guardian always has a recent nominated_at, which used to
     // rate-limit the very first invite and silently drop it.
-    const recipientKey = (guardian_email || guardian_phone || "").toString().toLowerCase();
+    const recipientKey = `nomination:${nomination.id}`;
     if (recipientKey && !force) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       // Only a PREVIOUS SUCCESSFUL attempt blocks a re-send. Failed attempts are

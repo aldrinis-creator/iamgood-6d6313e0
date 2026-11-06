@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
       return jsonResponse({
         success: true,
         delivery_status: event?.delivery_status ?? "pending",
-        failure_reason: event?.failure_reason ?? null,
+        failure_reason: event?.failure_reason ? "Delivery failed. Please try the other channel." : null,
       });
     }
 
@@ -159,63 +159,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Valid 6-digit OTP is required" }, 400);
       }
 
-      // Accept ANY unexpired, unused code for this phone — a resend must not
-      // invalidate the code already sitting in the guardian's WhatsApp/SMS.
-      const { data: liveRows, error: lookupErr } = await admin
-        .from("otp_events")
-        .select("id, otp_hash, expires_at, attempts")
-        .eq("phone", phone)
-        .in("action", ["send", "resend"])
-        .eq("status", "sent")
-        .not("otp_hash", "is", null)
-        .gte("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (lookupErr) {
-        console.error("[send-otp] OTP lookup error:", lookupErr.message);
-        return jsonResponse({ success: false, error: "Verification failed" }, 500);
-      }
-
-      const rows = liveRows ?? [];
-      if (rows.length === 0) {
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "No live OTP");
-        return jsonResponse(
-          { success: false, code: "expired", error: "This code has expired. Please request a new one." },
-          400,
-        );
-      }
-
-      const usable = rows.filter((r) => (r.attempts ?? 0) < MAX_VERIFY_ATTEMPTS);
-      if (usable.length === 0) {
-        return jsonResponse(
-          { success: false, code: "too_many_attempts", error: "Too many incorrect attempts. Please request a new code." },
-          400,
-        );
-      }
-
       const submittedHash = await sha256Hex(otp);
-      const otpRow = usable.find((r) => r.otp_hash === submittedHash);
-
-      if (!otpRow) {
-        // Burn one attempt on every live code so brute force is bounded.
-        for (const r of usable) {
-          await admin.from("otp_events").update({ attempts: (r.attempts ?? 0) + 1 }).eq("id", r.id);
-        }
-        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", "Wrong code");
-        return jsonResponse(
-          { success: false, code: "wrong_code", error: "That code is not correct. Please re-check the latest message." },
-          400,
-        );
+      const { data: result, error: verifyError } = await admin.rpc("consume_login_otp", { _phone: phone, _hash: submittedHash });
+      if (verifyError) return jsonResponse({ success: false, error: "Verification failed" }, 500);
+      if (result !== "verified") {
+        await logOtpEvent(admin, phone, "verify_fail", undefined, "failed", String(result));
+        const errors: Record<string, string> = {
+          expired: "This code has expired. Please request a new one.",
+          too_many_attempts: "Too many incorrect attempts. Please request a new code.",
+          wrong_code: "That code is not correct. Please re-check the latest message.",
+        };
+        return jsonResponse({ success: false, code: result, error: errors[String(result)] || "Verification failed" }, 400);
       }
-
-      // Mark as verified and nullify every live hash for this phone.
-      await admin
-        .from("otp_events")
-        .update({ verified: true, status: "verified", otp_hash: null })
-        .in("id", rows.map((r) => r.id));
       await logOtpEvent(admin, phone, "verify", undefined, "verified");
-
 
       // Registration: just confirm
       if (purpose === "register") {

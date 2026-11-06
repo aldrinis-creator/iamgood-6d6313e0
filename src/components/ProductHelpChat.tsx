@@ -21,7 +21,7 @@ const APIKEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export default function ProductHelpChat() {
   const { pathname } = useLocation();
-  const { role } = useApp();
+  const { role, session } = useApp();
   const audience: "user" | "guardian" | "any" = role === "guardian" ? "guardian" : role === "user" ? "user" : "any";
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -41,7 +41,7 @@ export default function ProductHelpChat() {
   }, [messages, busy]);
 
   // Hide on admin routes
-  if (pathname.startsWith("/admin")) return null;
+  if (pathname.startsWith("/admin") || !session) return null;
 
   async function send(text: string) {
     const q = text.trim();
@@ -55,7 +55,8 @@ export default function ProductHelpChat() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(APIKEY ? { Authorization: `Bearer ${APIKEY}`, apikey: APIKEY } : {}),
+          Authorization: `Bearer ${session?.access_token || ""}`,
+          ...(APIKEY ? { apikey: APIKEY } : {}),
         },
         body: JSON.stringify({ messages: next, audience }),
       });
