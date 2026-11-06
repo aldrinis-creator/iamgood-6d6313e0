@@ -440,6 +440,61 @@ function cleanIds(list: unknown, key: "test_id" | "package_id"): string[] | null
   return ids;
 }
 
+/**
+ * Validates every requested provider ID against the active catalogue.
+ * Test and package IDs are deliberately checked in separate namespaces:
+ * Orange can use the same literal ID for a test and a package.
+ */
+async function validateCatalogSelections(
+  serviceClient: ReturnType<typeof createClient>,
+  patients: JsonObject[],
+): Promise<{ valid: true; firstPatientSelections: JsonObject[] } | { valid: false; lookupFailed?: boolean }> {
+  const requested = patients.flatMap((patient) => [
+    ...(patient.tests || []).map((item: JsonObject) => ({ id: String(item.test_id), kind: "test" })),
+    ...(patient.packages || []).map((item: JsonObject) => ({ id: String(item.package_id), kind: "package" })),
+  ]);
+  const ids = [...new Set(requested.map((item) => item.id))];
+
+  if (!ids.length) return { valid: false };
+
+  const { data, error } = await serviceClient
+    .from("orange_lab_catalog")
+    .select("provider_item_id, kind, name")
+    .eq("is_active", true)
+    .in("provider_item_id", ids);
+
+  if (error) {
+    console.error("Orange Health catalogue validation failed:", error.message);
+    return { valid: false, lookupFailed: true };
+  }
+
+  const catalogue = new Map<string, string>();
+  for (const row of data || []) {
+    const kind = row.kind === "test" || row.kind === "package" ? row.kind : null;
+    if (kind && row.provider_item_id != null) {
+      catalogue.set(`${kind}:${String(row.provider_item_id)}`, String(row.name || ""));
+    }
+  }
+
+  for (const item of requested) {
+    if (!catalogue.has(`${item.kind}:${item.id}`)) return { valid: false };
+  }
+
+  const firstPatient = patients[0];
+  const firstPatientSelections: JsonObject[] = [
+    ...(firstPatient.tests || []).map((item: JsonObject) => ({
+      test_id: String(item.test_id),
+      name: catalogue.get(`test:${String(item.test_id)}`) || "",
+    })),
+    ...(firstPatient.packages || []).map((item: JsonObject) => ({
+      package_id: String(item.package_id),
+      name: catalogue.get(`package:${String(item.package_id)}`) || "",
+    })),
+  ];
+
+  return { valid: true, firstPatientSelections };
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -561,6 +616,16 @@ export async function handleRequest(req: Request): Promise<Response> {
         });
       }
 
+      // Do not trust IDs supplied by the browser alone. Confirm that every selected item is
+      // present, active, and stored under the matching test/package kind before booking.
+      const catalogValidation = await validateCatalogSelections(serviceClient, normalizedPatients);
+      if (catalogValidation.lookupFailed) {
+        return fail(500, "catalog_lookup_failed", "We couldn't verify the selected tests right now. Please try again.");
+      }
+      if (!catalogValidation.valid) {
+        return fail(400, "invalid_tests", "One or more selected tests or packages are unavailable. Please refresh the catalogue and try again.");
+      }
+
       let location: { latitude: string; longitude: string } | null;
       try {
         location = getLocation(body.latitude, body.longitude);
@@ -618,14 +683,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       }
 
       const firstProviderOrder = Array.isArray(providerData.orders) ? providerData.orders[0] : null;
-      const firstPatient = normalizedPatients[0];
-      const clientTests = Array.isArray(body.selected_tests) ? body.selected_tests : [];
-      const storedTests = clientTests.length
-        ? clientTests
-        : [
-          ...(firstPatient.tests || []).map((t: JsonObject) => ({ test_id: t.test_id })),
-          ...(firstPatient.packages || []).map((p: JsonObject) => ({ package_id: p.package_id })),
-        ];
+      // Store canonical names from the server-side catalogue, not labels supplied by the browser.
+      const storedTests = catalogValidation.firstPatientSelections;
 
       const { data: dbOrder, error: dbError } = await serviceClient
         .from("lab_orders")
