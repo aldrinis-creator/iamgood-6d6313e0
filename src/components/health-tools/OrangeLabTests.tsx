@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Ban,
   CalendarClock,
+  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,25 +74,14 @@ interface CatalogItem {
   id: string;
   name: string;
   kind: CatalogKind;
+  mrp: number;
+  categoryCode?: string | null;
+  isFeatured: boolean;
 }
 
 const isSameCatalogItem = (a: CatalogItem, b: CatalogItem) => a.kind === b.kind && a.id === b.id;
 
-// SANDBOX catalogue. These are the only ids Orange Health allows for testing:
-//   tests:    1, 2, 3
-//   packages: 1, 2
-// Orange keeps tests (test_id) and packages (package_id) in SEPARATE id spaces, so `kind` decides which list an
-// item is sent in (tests[] vs packages[]). The names/descriptions below are neutral labels because Orange has not
-// told us what these sandbox ids contain: rename them freely. `price` is optional and is simply hidden when absent
-// (Orange sends the payment link itself).
-// BEFORE PRODUCTION: replace this whole list with Orange's real production catalogue.
-const POPULAR_TESTS: Array<CatalogItem & { desc: string; price?: string }> = [
-  { id: "1", kind: "test", name: "Lab Test 1", desc: "Sandbox test (id 1)" },
-  { id: "2", kind: "test", name: "Lab Test 2", desc: "Sandbox test (id 2)" },
-  { id: "3", kind: "test", name: "Lab Test 3", desc: "Sandbox test (id 3)" },
-  { id: "1", kind: "package", name: "Health Package 1", desc: "Sandbox package (id 1)" },
-  { id: "2", kind: "package", name: "Health Package 2", desc: "Sandbox package (id 2)" },
-];
+const CATALOG_PAGE_SIZE = 20;
 
 const DEFAULT_RESCHEDULE_REASON = "Patient not available at originally scheduled time";
 const DEFAULT_RESCHEDULE_EXPLANATION = "Patient is not available at the scheduled time";
@@ -149,9 +139,85 @@ export const OrangeLabTests: React.FC = () => {
     return `${year}-${month}-${day}`;
   });
 
-  const [selectedTests, setSelectedTests] = useState<CatalogItem[]>([
-    { id: "1", name: "Lab Test 1", kind: "test" },
-  ]);
+  const [selectedTests, setSelectedTests] = useState<CatalogItem[]>([]);
+
+  // Orange Health catalogue. Only customer-safe columns are selected; partner_net_rate is never fetched by the browser.
+  const [catalogue, setCatalogue] = useState<CatalogItem[]>([]);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [catalogueError, setCatalogueError] = useState<string | null>(null);
+  const [catalogueSearch, setCatalogueSearch] = useState("");
+  const [catalogueFilter, setCatalogueFilter] = useState<"all" | CatalogKind>("all");
+  const [visibleCatalogueCount, setVisibleCatalogueCount] = useState(CATALOG_PAGE_SIZE);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCatalogue = async () => {
+      setCatalogueLoading(true);
+      setCatalogueError(null);
+      try {
+        const pageSize = 1000;
+        let from = 0;
+        const rows: any[] = [];
+
+        // Supabase projects commonly cap a response at 1,000 rows; page until the full catalogue is loaded.
+        while (true) {
+          const { data, error } = await supabase
+            .from("orange_lab_catalog" as any)
+            .select("provider_item_id, kind, name, category_code, mrp, is_featured, is_active, sort_order")
+            .eq("is_active", true)
+            .order("sort_order", { ascending: true })
+            .order("name", { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (error) throw error;
+          const page = (data || []) as any[];
+          rows.push(...page);
+          if (page.length < pageSize) break;
+          from += pageSize;
+        }
+
+        if (cancelled) return;
+        const mapped: CatalogItem[] = rows
+          .filter((row) => (row.kind === "test" || row.kind === "package") && row.provider_item_id && row.name)
+          .map((row) => ({
+            id: String(row.provider_item_id),
+            name: String(row.name),
+            kind: row.kind as CatalogKind,
+            mrp: Number(row.mrp) || 0,
+            categoryCode: row.category_code ?? null,
+            isFeatured: row.is_featured === true,
+          }));
+        setCatalogue(mapped);
+      } catch (error) {
+        console.error("Failed to load Orange Health catalogue:", error);
+        if (!cancelled) {
+          setCatalogueError("We couldn't load the lab catalogue. Please refresh or try again.");
+          toast.error("Could not load Orange Health tests and packages.");
+        }
+      } finally {
+        if (!cancelled) setCatalogueLoading(false);
+      }
+    };
+
+    void loadCatalogue();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const featuredTests = catalogue.filter((item) => item.kind === "test" && item.isFeatured);
+  const normalizedCatalogueSearch = catalogueSearch.trim().toLowerCase();
+  const filteredCatalogue = catalogue.filter((item) => {
+    const matchesKind = catalogueFilter === "all" || item.kind === catalogueFilter;
+    const matchesSearch =
+      !normalizedCatalogueSearch ||
+      item.name.toLowerCase().includes(normalizedCatalogueSearch) ||
+      item.id.toLowerCase().includes(normalizedCatalogueSearch) ||
+      (item.categoryCode || "").toLowerCase().includes(normalizedCatalogueSearch);
+    return matchesKind && matchesSearch;
+  });
+  const visibleCatalogue = filteredCatalogue.slice(0, visibleCatalogueCount);
 
   // Slots state
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -803,40 +869,155 @@ export const OrangeLabTests: React.FC = () => {
                 </Badge>
               </div>
 
-              {/* Grid of Tests */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                {POPULAR_TESTS.map((test) => {
-                  const isSelected = selectedTests.some((t) => isSameCatalogItem(t, test));
-                  return (
-                    <div
-                      key={`${test.kind}-${test.id}`}
-                      onClick={() => toggleTest({ id: test.id, name: test.name, kind: test.kind })}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                        isSelected
-                          ? "border-orange-500 bg-orange-500/10 dark:bg-orange-500/15"
-                          : "border-border/60 hover:border-orange-500/40 bg-card"
-                      }`}
+              {/* Featured tests */}
+              {featuredTests.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-foreground">Featured Tests</h4>
+                    <Badge variant="outline" className="text-[10px]">Recommended</Badge>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {featuredTests.map((test) => {
+                      const isSelected = selectedTests.some((item) => isSameCatalogItem(item, test));
+                      return (
+                        <button
+                          key={`featured-${test.kind}-${test.id}`}
+                          type="button"
+                          onClick={() => toggleTest(test)}
+                          className={`p-3 rounded-xl border text-left transition-all flex items-start justify-between gap-3 ${
+                            isSelected
+                              ? "border-orange-500 bg-orange-500/10 dark:bg-orange-500/15"
+                              : "border-border/60 hover:border-orange-500/40 bg-card"
+                          }`}
+                        >
+                          <span className="space-y-1">
+                            <span className="block text-xs font-bold text-foreground">{test.name}</span>
+                            <span className="block text-xs font-semibold text-orange-600">₹{test.mrp.toLocaleString("en-IN")}</span>
+                          </span>
+                          <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                            isSelected ? "bg-orange-600 border-orange-600 text-white" : "border-muted-foreground/30"
+                          }`}>
+                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Search and browse the complete provider catalogue */}
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <h4 className="text-xs font-bold text-foreground">Browse All Tests & Packages</h4>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Search the complete Orange Health catalogue and select the tests or packages you need.
+                  </p>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    value={catalogueSearch}
+                    onChange={(event) => {
+                      setCatalogueSearch(event.target.value);
+                      setVisibleCatalogueCount(CATALOG_PAGE_SIZE);
+                    }}
+                    placeholder="Search by test, package, or ID..."
+                    className="pl-9 text-xs h-10"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: "all", label: "All" },
+                    { value: "test", label: "Individual Tests" },
+                    { value: "package", label: "Packages" },
+                  ] as const).map((filter) => (
+                    <Button
+                      key={filter.value}
+                      type="button"
+                      size="sm"
+                      variant={catalogueFilter === filter.value ? "default" : "outline"}
+                      onClick={() => {
+                        setCatalogueFilter(filter.value);
+                        setVisibleCatalogueCount(CATALOG_PAGE_SIZE);
+                      }}
+                      className={`h-8 text-xs ${catalogueFilter === filter.value ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}`}
                     >
-                      <div className="space-y-1">
-                        <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          {test.name}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground leading-snug">{test.desc}</p>
-                        {test.price && <span className="text-xs font-semibold text-orange-600">{test.price}</span>}
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${
-                          isSelected ? "bg-orange-600 border-orange-600 text-white" : "border-muted-foreground/30"
-                        }`}
-                      >
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                      </div>
+                      {filter.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {catalogueLoading ? (
+                  <div className="flex items-center justify-center py-8 text-xs text-muted-foreground gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
+                    Loading tests and packages...
+                  </div>
+                ) : catalogueError ? (
+                  <div className="p-4 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
+                    {catalogueError}
+                  </div>
+                ) : visibleCatalogue.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {visibleCatalogue.map((item) => {
+                        const isSelected = selectedTests.some((selected) => isSameCatalogItem(selected, item));
+                        return (
+                          <button
+                            key={`catalogue-${item.kind}-${item.id}`}
+                            type="button"
+                            onClick={() => toggleTest(item)}
+                            className={`p-3 rounded-xl border text-left transition-all flex items-start justify-between gap-3 ${
+                              isSelected
+                                ? "border-orange-500 bg-orange-500/10 dark:bg-orange-500/15"
+                                : "border-border/60 hover:border-orange-500/40 bg-card"
+                            }`}
+                          >
+                            <span className="space-y-1 min-w-0">
+                              <span className="block text-xs font-bold text-foreground">{item.name}</span>
+                              <span className="block text-[10px] text-muted-foreground">
+                                {item.kind === "package" ? "Health Package" : "Individual Test"}
+                                {item.categoryCode ? ` · Category ${item.categoryCode}` : ""}
+                              </span>
+                              <span className="block text-xs font-semibold text-orange-600">₹{item.mrp.toLocaleString("en-IN")}</span>
+                            </span>
+                            <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                              isSelected ? "bg-orange-600 border-orange-600 text-white" : "border-muted-foreground/30"
+                            }`}>
+                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                      <span className="text-[10px] text-muted-foreground">
+                        Showing {visibleCatalogue.length} of {filteredCatalogue.length} matching items
+                      </span>
+                      {visibleCatalogue.length < filteredCatalogue.length && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          onClick={() => setVisibleCatalogueCount((count) => count + CATALOG_PAGE_SIZE)}
+                        >
+                          Show More
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed text-center text-xs text-muted-foreground">
+                    {catalogue.length === 0
+                      ? "No active tests or packages are available right now."
+                      : "No tests or packages match your search."}
+                  </div>
+                )}
               </div>
 
-              {/* Only Orange Health catalogue IDs can be submitted to the provider. */}
               {/* Selected summary */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {selectedTests.map((t) => (
