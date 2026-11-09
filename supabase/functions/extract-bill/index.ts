@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
+import { premiumHealthPlan } from "../_shared/securityRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +66,15 @@ serve(async (req) => {
     if (signErr || !signed?.signedUrl) {
       console.error("sign error", signErr);
       return new Response(JSON.stringify({ error: "Cannot read bill" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { data: _sub } = await service.from("subscriptions").select("plan_type")
+      .eq("user_id", ures.user.id).eq("status", "active")
+      .in("plan_type", ["premium", "premium-plus", "pro"])
+      .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
+    const { data: _adm } = await service.rpc("has_role", { _user_id: ures.user.id, _role: "admin" });
+    if (!premiumHealthPlan(_sub?.plan_type) && !_adm) {
+      return new Response(JSON.stringify({ error: "Bill scanning needs an active Premium or Premium Plus plan.", code: "premium_required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
