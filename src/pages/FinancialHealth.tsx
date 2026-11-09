@@ -600,7 +600,15 @@ const ScanPane = ({ onSaved }: { onSaved: () => void; onExtracted: () => void })
       if (upErr) throw upErr;
       setBillPath(path);
       const { data, error } = await supabase.functions.invoke("extract-bill", { body: { imagePath: path } });
-      if (error) throw error;
+      if (error) {
+        const ctx = (error as { context?: Response }).context;
+        const info = ctx && typeof ctx.json === "function" ? await ctx.json().catch(() => null) : null;
+        if (info?.code === "premium_required") {
+          toast.error("Bill scanning is for Premium plans. You can still type the amount below.");
+          return;
+        }
+        throw error;
+      }
       const ex = (data as { extracted?: Record<string, unknown> })?.extracted || {};
       const cat = String(ex.category || "other").toLowerCase();
       const valid = ALL_CATEGORIES.includes(cat as ExpenseCategory) ? (cat as ExpenseCategory) : "other";
