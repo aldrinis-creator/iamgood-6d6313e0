@@ -69,6 +69,7 @@ serve(async (req) => {
       // body_2: {#var2#} = Time of Check-in
       const waResult = await sendWhatsAppTemplate({
         templateName: "ward_late_check_in_v2",
+        languageCode: "en",
         namespace: WA_NAMESPACE_V2,
         recipients: [
           {
@@ -84,7 +85,7 @@ serve(async (req) => {
       // 2. Fallback Channel: SMS Flow (Template ID: 6ae727cb5a7cc8f2bb0e9334)
       // If WhatsApp fails or is not delivered, dispatch SMS
       if (!waResult.ok) {
-        console.warn("WhatsApp late check-in alert did not send, falling back to SMS:", waResult.error);
+        console.warn("WhatsApp late check-in alert did not send, falling back to SMS, status:", waResult.status);
         await sendSmsFlow({
           templateId: SMS_TEMPLATE_ID,
           recipients: guardianPhones.map((phone) => ({
@@ -100,7 +101,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("send-late-checkin-alert error:", error);
-    return new Response(JSON.stringify({ error: String(error) }), {
+    return new Response(JSON.stringify({ error: "Could not send late check-in alert" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
