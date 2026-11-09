@@ -188,12 +188,7 @@ export default function useLocationSync() {
                   );
                   if (phones.length > 0) {
                     await supabase.functions.invoke("msg91-whatsapp-safezone-return", {
-                      body: {
-                        wardName: userName,
-                        zoneName: nearest.name,
-                        occurredAt: new Date().toISOString(),
-                        phones,
-                      },
+                      body: { zoneId: nearest.id, lat: latitude, lng: longitude },
                     });
                   }
                 }

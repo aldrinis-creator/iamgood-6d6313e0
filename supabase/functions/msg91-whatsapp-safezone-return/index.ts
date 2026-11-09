@@ -1,4 +1,5 @@
-import { requireUser, acceptedGuardianPhones, phoneIn } from "../_shared/guard.ts";
+import { requireUser, acceptedGuardianPhones, serviceClient } from "../_shared/guard.ts";
+import { insideZone, RETURN_COOLDOWN_MS } from "../_shared/securityRules.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -43,21 +44,37 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => null);
-    const wardName = String(body?.wardName ?? "").trim();
-    const zoneName = String(body?.zoneName ?? "").trim();
     const __u = await requireUser(req, corsHeaders);
     if (__u.error) return __u.error;
-    const __allowed = __u.caller ? await acceptedGuardianPhones(__u.caller.id) : null;
-    const phonesIn: unknown = Array.isArray(body?.phones) && __allowed
-      ? (body.phones as unknown[]).filter((p) => phoneIn(__allowed, String(p ?? "")))
-      : body?.phones;
-
-    if (!wardName || !zoneName || !Array.isArray(phonesIn) || phonesIn.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "wardName, zoneName, phones[] required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!__u.caller) {
+      return new Response(JSON.stringify({ error: "Ward sign-in required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const wardId = __u.caller.id;
+    const zoneId = String(body?.zoneId ?? "");
+    const lat = Number(body?.lat), lng = Number(body?.lng);
+    if (!zoneId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return new Response(JSON.stringify({ error: "zoneId, lat, lng required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const svc = serviceClient();
+    const { data: zone } = await svc.from("safe_zones").select("id,name,lat,lng,radius_m,enabled,user_id")
+      .eq("id", zoneId).eq("user_id", wardId).maybeSingle();
+    if (!zone || !zone.enabled || !insideZone(lat, lng, zone)) {
+      return new Response(JSON.stringify({ error: "Not inside this safe zone" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: settingsRow } = await svc.from("user_settings").select("settings").eq("user_id", wardId).maybeSingle();
+    const settings = (settingsRow?.settings as Record<string, unknown>) || {};
+    const lastSent = Date.parse(String((settings as any).lastZoneReturnAlertAt ?? ""));
+    if (Number.isFinite(lastSent) && Date.now() - lastSent < RETURN_COOLDOWN_MS) {
+      return new Response(JSON.stringify({ success: true, skipped: "cooldown" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: prof } = await svc.from("profiles").select("full_name").eq("user_id", wardId).maybeSingle();
+    const wardName = String(prof?.full_name || "Your ward").trim();
+    const zoneName = String(zone.name).trim();
+    const phonesIn = Array.from(await acceptedGuardianPhones(wardId));
+    if (phonesIn.length === 0) {
+      return new Response(JSON.stringify({ error: "No accepted guardians" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    await svc.from("user_settings").update({ settings: { ...settings, lastZoneReturnAlertAt: new Date().toISOString() } }).eq("user_id", wardId);
 
     const phones = Array.from(
       new Set(
@@ -115,13 +132,13 @@ Deno.serve(async (req) => {
     }
 
     if (!res.ok) {
-      console.error("MSG91 WhatsApp safe_zone_return failed", res.status, text);
+      console.error("MSG91 WhatsApp safe_zone_return failed", res.status);
     } else {
       console.log("MSG91 WhatsApp safe_zone_return sent to", phones.length, "recipients");
     }
 
     return new Response(
-      JSON.stringify({ success: res.ok, status: res.status, result }),
+      JSON.stringify({ success: res.ok, status: res.status }),
       {
         status: res.ok ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -129,7 +146,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("msg91-whatsapp-safezone-return error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
+    return new Response(JSON.stringify({ error: "Could not send alert" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

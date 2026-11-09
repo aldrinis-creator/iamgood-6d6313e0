@@ -1,4 +1,5 @@
 import { PRODUCT_KB } from "../_shared/product-kb.ts";
+import { userTurnsOnly } from "../_shared/securityRules.ts";
 import { requireUser } from "../_shared/guard.ts";
 import { selectRelevantFaqs, type Audience } from "../_shared/faq-kb.ts";
 import { classifyAiGatewayFailure } from "../_shared/ai-gateway-error.ts";
@@ -74,8 +75,9 @@ Deno.serve(async (req) => {
         })
         .filter((m: any): m is ChatMessage => m && typeof m.content === "string" && m.content.length > 0)
         // Never let callers inject system instructions; cap size and history.
-        .map((m: ChatMessage) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content.slice(0, 2000) } as ChatMessage))
-        .slice(-12);
+        ;
+      // Assistant turns from the client can be forged, so only user questions are kept.
+      messages = userTurnsOnly(messages) as ChatMessage[];
     } else if (typeof body?.query === "string" && body.query.trim()) {
       messages = [{ role: "user", content: body.query.trim().slice(0, 2000) }];
     }
