@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 
 interface SocialAuthButtonsProps {
   onSuccessRedirect?: string;
@@ -16,18 +16,17 @@ export const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
   const handleOAuthLogin = async (provider: "google" | "apple") => {
     setLoadingProvider(provider);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}${onSuccessRedirect}`,
-        },
+      const result = await lovable.auth.signInWithOAuth(provider, {
+        redirect_uri: window.location.origin,
       });
-
-      if (error) {
+      if (result.error) {
         toast.error(`Sign in with ${provider === "google" ? "Google" : "Apple"} failed`, {
-          description: error.message,
+          description: result.error.message,
         });
+        return;
       }
+      if (result.redirected) return;
+      window.location.assign(onSuccessRedirect);
     } catch (err: any) {
       toast.error("Authentication error", {
         description: err?.message || "Could not connect to sign in provider",
@@ -75,19 +74,15 @@ export const SocialAuthButtons: React.FC<SocialAuthButtonsProps> = ({
         </span>
       </button>
 
-      {/* Apple Sign-In Button */}
+      {/* Apple Sign-In Button: white style on dark background per Apple HIG */}
       <button
         type="button"
         onClick={() => handleOAuthLogin("apple")}
         disabled={loadingProvider !== null}
-        className="w-full bg-[#182335] hover:bg-[#1E2C42] border border-auth-border-hi text-auth-text-1 text-[15px] font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
+        className="w-full min-w-[140px] h-[51px] bg-white text-black text-[22px] font-medium rounded-xl flex items-center justify-center transition-opacity disabled:opacity-60"
+        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif" }}
       >
-        <svg className="w-4 h-4 shrink-0 fill-current text-white" viewBox="0 0 170 170">
-          <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.58-7.71-11.64-14.01-6.19-9.57-11.16-20.59-14.92-33.07-3.76-12.48-5.64-24.16-5.64-35.03 0-14.15 3.51-26.04 10.53-35.68 7.02-9.64 16.03-14.58 27.03-14.83 4.89 0 10.33 1.25 16.32 3.75 6 2.5 9.94 3.8 11.83 3.91 1.63 0 5.66-1.3 12.09-3.91 6.43-2.61 11.77-3.8 16.03-3.59 12.06.66 21.72 5.38 28.98 14.17-10.45 6.31-15.57 14.9-15.35 25.77.22 8.48 3.54 15.82 9.97 22.02 6.43 6.19 14.1 9.68 23.01 10.45-2.28 7.18-5.19 14.58-8.71 22.18zM119.22 31.84c0-7.72 2.72-14.89 8.16-21.52 5.44-6.63 12.17-10.32 20.2-11.08.22 1.09.33 2.18.33 3.26 0 7.61-2.83 14.9-8.48 21.85-5.66 6.96-12.55 10.76-20.66 11.41-.22-1.31-.33-2.61-.33-3.92z" />
-        </svg>
-        <span>
-          {loadingProvider === "apple" ? "Connecting Apple..." : "Sign in with Apple"}
-        </span>
+        {loadingProvider === "apple" ? "Connecting Apple..." : "Continue with Apple"}
       </button>
     </div>
   );
