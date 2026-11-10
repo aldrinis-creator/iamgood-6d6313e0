@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { escapeHtml } from "@/lib/printSafety";
 
 const DIGILOCKER_CLIENT_ID = "in.futurewave";
 
@@ -152,7 +153,7 @@ export const DigitalLifeCertificate: React.FC = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Digital Life Certificate - ${certificate.pramaanId}</title>
+        <title>Digital Life Certificate - ${escapeHtml(String(certificate.pramaanId ?? ""))}</title>
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; background: #fff; }
           .cert-container { border: 4px double #0284c7; padding: 30px; border-radius: 8px; max-width: 700px; margin: auto; }
@@ -180,34 +181,34 @@ export const DigitalLifeCertificate: React.FC = () => {
           <div class="grid">
             <div class="field">
               <div class="label">Pramaan ID</div>
-              <div class="value">${certificate.pramaanId}</div>
+              <div class="value">${escapeHtml(String(certificate.pramaanId ?? ""))}</div>
             </div>
             <div class="field">
               <div class="label">PPO Number</div>
-              <div class="value">${certificate.ppoNumber}</div>
+              <div class="value">${escapeHtml(String(certificate.ppoNumber ?? ""))}</div>
             </div>
             <div class="field">
               <div class="label">Pensioner Name</div>
-              <div class="value">${certificate.pensionerName}</div>
+              <div class="value">${escapeHtml(String(certificate.pensionerName ?? ""))}</div>
             </div>
             <div class="field">
               <div class="label">Disbursing Authority</div>
-              <div class="value">${certificate.disbursingAgency}</div>
+              <div class="value">${escapeHtml(String(certificate.disbursingAgency ?? ""))}</div>
             </div>
             <div class="field">
               <div class="label">Date of Verification</div>
-              <div class="value">${certificate.issueDate}</div>
+              <div class="value">${escapeHtml(String(certificate.issueDate ?? ""))}</div>
             </div>
             <div class="field">
               <div class="label">Valid Until</div>
-              <div class="value" style="color: #047857;">${certificate.validUntil}</div>
+              <div class="value" style="color: #047857;">${escapeHtml(String(certificate.validUntil ?? ""))}</div>
             </div>
           </div>
 
           <div class="seal">
             <div style="font-size: 12px; color: #475569;">
-              <strong>Authentication Mode:</strong> ${certificate.authType}<br/>
-              <strong>Document URI:</strong> ${certificate.uri || 'in.gov.jeevanpramaan-LCERT'}
+              <strong>Authentication Mode:</strong> ${escapeHtml(String(certificate.authType ?? ""))}<br/>
+              <strong>Document URI:</strong> ${escapeHtml(String(certificate.uri || 'in.gov.jeevanpramaan-LCERT'))}
             </div>
             <div style="text-align: right;">
               <span style="color: #0284c7; font-weight: bold; font-size: 14px;">Check-iN Wellness Hub</span><br/>

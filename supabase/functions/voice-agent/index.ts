@@ -13,7 +13,7 @@ const json = (body: unknown, status = 200) =>
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SARVAM_API_KEY = Deno.env.get("SARVAM_API_KEY") || "sk_yl2d4msc_LouCY7vzRj0DS5xMkrez8iwQ";
+const SARVAM_API_KEY = Deno.env.get("SARVAM_API_KEY") || "";
 
 const MODEL = "google/gemini-2.5-flash";
 const TTS_SPEAKER = "aditya"; // Sarvam speaker

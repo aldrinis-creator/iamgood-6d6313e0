@@ -47,7 +47,7 @@ async function sendMsg91WhatsApp(templateName: string, toPhone: string, bodyValu
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
-    console.log(`MSG91 ${templateName} -> ${toPhone}:`, JSON.stringify(json));
+    console.log(`MSG91 ${templateName} sent, status:`, res?.status ?? "n/a");
     return { ok: res.ok, response: json };
   } catch (e) {
     return { ok: false, response: { error: String(e) } };

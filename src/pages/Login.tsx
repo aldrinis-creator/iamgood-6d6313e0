@@ -242,11 +242,11 @@ const Login = () => {
                     Send OTP ›
                   </button>
                   <div className="text-center text-[12px] text-auth-text-3 mt-1 leading-relaxed">
-                    {isIndianNum
+                    {(identifier.replace(/\s+/g, "").startsWith("+91") || /^91\d{10}$/.test(identifier.replace(/\D/g, "")))
                       ? "A 6-digit code will be sent via WhatsApp (SMS fallback available)"
                       : "A 6-digit code will be sent via SMS to this number"}
                   </div>
-                  {!isIndianNum && (
+                  {!(identifier.replace(/\s+/g, "").startsWith("+91") || /^91\d{10}$/.test(identifier.replace(/\D/g, ""))) && (
                     <div className="text-center text-[11px] text-auth-green/90 mt-1 leading-relaxed">
                       Tip: International users can also sign in instantly with Google or Apple on the main screen.
                     </div>
