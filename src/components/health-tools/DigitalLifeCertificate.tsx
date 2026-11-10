@@ -243,7 +243,7 @@ export const DigitalLifeCertificate: React.FC = () => {
     if (navigator.share && certificate) {
       navigator.share({
         title: "Digital Life Certificate",
-        text: `Digital Life Certificate (Jeevan Pramaan) for ${escapeHtml(String(certificate.pensionerName ?? ""))}. Pramaan ID: ${escapeHtml(String(certificate.pramaanId ?? ""))}. Valid until ${escapeHtml(String(certificate.validUntil ?? ""))}.`,
+        text: `Digital Life Certificate (Jeevan Pramaan) for ${certificate.pensionerName}. Pramaan ID: ${certificate.pramaanId}. Valid until ${certificate.validUntil}.`,
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(
