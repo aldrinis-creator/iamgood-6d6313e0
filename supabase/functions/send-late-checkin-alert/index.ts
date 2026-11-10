@@ -37,7 +37,8 @@ serve(async (req) => {
     }
 
     const { checkInTime } = await req.json().catch(() => ({}));
-    const formattedTime = checkInTime || new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+    const safeTime = typeof checkInTime === "string" && /^\d{1,2}:\d{2}(\s?[AaPp][Mm])?$/.test(checkInTime.trim()) ? checkInTime.trim() : null;
+    const formattedTime = safeTime || new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
     // Fetch Ward's profile name
     const { data: profile } = await serviceClient
