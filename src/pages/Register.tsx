@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import OtpVerification from "@/components/OtpVerification";
+import SocialAuthButtons from "@/components/SocialAuthButtons";
 import PhoneInput from "@/components/PhoneInput";
 import usePwaInstall from "@/hooks/usePwaInstall";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
@@ -480,15 +481,18 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
           </div>
 
           <div className="mt-auto pt-6 flex flex-col gap-2.5">
-            {selectedRole === "user" && (
-              <>
-                <div className="flex items-center gap-2.5 text-auth-text-3 text-[12px] tracking-wide mb-1.5">
-                  <div className="flex-1 h-px bg-auth-border" /> or sign up faster <div className="flex-1 h-px bg-auth-border" />
-                </div></>
-            )}
-            <button disabled={isInviteLink && inviteLookupState !== "loaded"} onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button disabled={isInviteLink && inviteLookupState !== "loaded"} onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed">
               Next — Verify phone ›
             </button>
+
+            {selectedRole === "user" && !isInviteLink && (
+              <>
+                <div className="flex items-center gap-2.5 text-auth-text-3 text-[12px] tracking-wide my-1">
+                  <div className="flex-1 h-px bg-auth-border" /> or sign up with <div className="flex-1 h-px bg-auth-border" />
+                </div>
+                <SocialAuthButtons onSuccessRedirect="/dashboard" />
+              </>
+            )}
           </div>
         </div>
       </div>

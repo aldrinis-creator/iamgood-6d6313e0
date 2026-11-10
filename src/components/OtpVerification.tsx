@@ -382,6 +382,19 @@ const OtpVerification = ({ phone, purpose = "login", nominationToken, onVerified
         </div>
       )}
 
+      {!isIndianNumber && (
+        <div className="rounded-xl bg-navy-mid border border-auth-border-hi px-3.5 py-2.5 mb-4 text-[12px] text-auth-text-2 flex items-center justify-between">
+          <span>International? Sign in instantly with Google or Apple.</span>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-auth-green font-semibold shrink-0 ml-2 hover:underline"
+          >
+            Switch ›
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between w-full mb-5">
         <InputOTP
           maxLength={6}

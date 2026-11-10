@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
+import SocialAuthButtons from "@/components/SocialAuthButtons";
 
 /** Shape of the sign-in service's reply once a code has been accepted. */
 type OtpResult = {
@@ -240,7 +241,16 @@ const Login = () => {
                   >
                     Send OTP ›
                   </button>
-                  <div className="text-center text-[12px] text-auth-text-3 mt-1 leading-relaxed">A 6-digit code will be sent via SMS to this number</div>
+                  <div className="text-center text-[12px] text-auth-text-3 mt-1 leading-relaxed">
+                    {isIndianNum
+                      ? "A 6-digit code will be sent via WhatsApp (SMS fallback available)"
+                      : "A 6-digit code will be sent via SMS to this number"}
+                  </div>
+                  {!isIndianNum && (
+                    <div className="text-center text-[11px] text-auth-green/90 mt-1 leading-relaxed">
+                      Tip: International users can also sign in instantly with Google or Apple on the main screen.
+                    </div>
+                  )}
                 </div>
               </>
             );
@@ -441,27 +451,32 @@ const Login = () => {
         <h1 className="text-[25px] font-bold text-auth-text-1 tracking-tight mb-1.5">Welcome back</h1>
         <div className="text-[16px] text-auth-text-2 mb-6">Let's get you signed in</div>
 
-        {/* Primary action — Phone OTP */}
+        {/* Primary action for India — Phone OTP */}
         <button
           onClick={() => setOtpMode(true)}
-          className="w-full bg-auth-green text-[#0A1525] rounded-2xl p-5 flex items-center gap-4 text-left transition-transform active:scale-[0.98]"
+          className="w-full bg-auth-green text-[#0A1525] rounded-2xl p-4 sm:p-5 flex items-center gap-4 text-left transition-transform active:scale-[0.98]"
         >
-          <div className="w-12 h-12 rounded-xl bg-black/10 flex items-center justify-center text-[26px] shrink-0">📱</div>
+          <div className="w-12 h-12 rounded-xl bg-black/10 flex items-center justify-center text-[24px] shrink-0">📱</div>
           <div className="flex-1">
-            <div className="text-[19px] font-bold mb-0.5">Text me a code</div>
-            <div className="text-[14px] opacity-80">Fastest way in — no password</div>
+            <div className="text-[18px] font-bold mb-0.5">Sign in with Phone</div>
+            <div className="text-[13px] opacity-85">WhatsApp (India +91) & SMS</div>
           </div>
         </button>
 
-        <div className="text-center text-[14px] text-auth-text-3 my-4">— or —</div>
+        <div className="text-center text-[13px] text-auth-text-3 my-3">— or continue with —</div>
+
+        {/* Global / Social Auth: Google & Apple */}
+        <SocialAuthButtons onSuccessRedirect={nextPath || "/dashboard"} />
+
+        <div className="text-center text-[13px] text-auth-text-3 my-3">— or —</div>
 
         <button
           onClick={() => setEmailMode(true)}
-          className="w-full bg-transparent border-[1.5px] border-auth-border-hi rounded-2xl p-4 flex items-center gap-4 text-left hover:border-auth-text-2 transition-colors"
+          className="w-full bg-transparent border-[1.5px] border-auth-border-hi rounded-2xl p-3.5 flex items-center gap-3.5 text-left hover:border-auth-text-2 transition-colors"
         >
-          <div className="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-[22px] shrink-0">🔑</div>
-          <div className="flex-1 text-[17px] font-semibold text-auth-text-1">Use email &amp; password</div>
-          <div className="text-[18px] text-auth-text-3">›</div>
+          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[20px] shrink-0">✉️</div>
+          <div className="flex-1 text-[16px] font-semibold text-auth-text-1">Use email &amp; password</div>
+          <div className="text-[16px] text-auth-text-3">›</div>
         </button>
 
         <div className="mt-auto pt-8 text-center">
