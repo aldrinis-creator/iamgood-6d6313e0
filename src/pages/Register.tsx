@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import ConsentNotice from "@/components/ConsentNotice";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -484,6 +485,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
             <button disabled={isInviteLink && inviteLookupState !== "loaded"} onClick={handleDetailsNext} className="w-full bg-auth-green text-[#0A1525] text-[17px] font-bold py-4 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed">
               Next — Verify phone ›
             </button>
+            <ConsentNotice />
 
             {selectedRole === "user" && !isInviteLink && (
               <>

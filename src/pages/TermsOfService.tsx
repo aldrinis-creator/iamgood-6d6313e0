@@ -1,5 +1,6 @@
 import LegalPageLayout from "@/components/LegalPageLayout";
 import SeoMeta from "@/components/SeoMeta";
+import { GRIEVANCE_OFFICER as G } from "@/lib/legal";
 
 const sections = [
   { heading: "Acceptance of Terms", content: "By accessing or using Check-iN, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services." },
@@ -10,6 +11,7 @@ const sections = [
   { heading: "Limitation of Liability", content: "To the maximum extent permitted by law, Check-iN and its affiliates shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service. Our total liability shall not exceed the amount you paid for the service in the preceding 12 months." },
   { heading: "Termination", content: "We reserve the right to suspend or terminate your account if you violate these terms. You may delete your account at any time through the Settings page. Upon termination, your data will be handled in accordance with our Privacy Policy." },
   { heading: "Governing Law", content: "These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in India." },
+  { heading: "Grievance Redressal Officer", content: `Under India's Digital Personal Data Protection Act, 2023, you may raise any complaint about how your personal data is handled with our Grievance Redressal Officer: ${G.name}, ${G.organisation}. Email: ${G.email}. Complaints are acknowledged promptly and resolved within 30 days.` },
   { heading: "Contact Us", content: "If you have questions about these Terms of Service, please contact us at checkin_support@futurewave.in." },
 ];
 
