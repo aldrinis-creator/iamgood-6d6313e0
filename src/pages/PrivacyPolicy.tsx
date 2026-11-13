@@ -3,7 +3,7 @@ import SeoMeta from "@/components/SeoMeta";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
+import { PRIVACY_POLICY_PDF_URL, GRIEVANCE_OFFICER as G } from "@/lib/legal";
 
 const PrivacyPolicy = () => {
   useEffect(() => {
@@ -29,6 +29,12 @@ const PrivacyPolicy = () => {
               Download Privacy Policy (PDF)
             </a>
           </Button>
+          <div className="mt-6 rounded-xl border border-border bg-card p-4 text-left text-sm space-y-1">
+            <p className="font-semibold text-foreground">Grievance Redressal Officer</p>
+            <p className="text-foreground">{G.name}, {G.organisation}</p>
+            <a href={`mailto:${G.email}`} className="text-primary underline">{G.email}</a>
+            <p className="text-muted-foreground">Complaints are resolved within 30 days.</p>
+          </div>
         </div>
       </AppLayout>
     </>

@@ -9,6 +9,7 @@ import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
 import SocialAuthButtons from "@/components/SocialAuthButtons";
+import ConsentNotice from "@/components/ConsentNotice";
 
 /** Shape of the sign-in service's reply once a code has been accepted. */
 type OtpResult = {
@@ -241,6 +242,7 @@ const Login = () => {
                   >
                     Send OTP ›
                   </button>
+                  <ConsentNotice />
                   <div className="text-center text-[12px] text-auth-text-3 mt-1 leading-relaxed">
                     {(identifier.replace(/\s+/g, "").startsWith("+91") || /^91\d{10}$/.test(identifier.replace(/\D/g, "")))
                       ? "A 6-digit code will be sent via WhatsApp (SMS fallback available)"
@@ -467,6 +469,7 @@ const Login = () => {
 
         {/* Global / Social Auth: Google & Apple */}
         <SocialAuthButtons onSuccessRedirect={nextPath || "/dashboard"} />
+        <ConsentNotice />
 
         <div className="text-center text-[13px] text-auth-text-3 my-3">— or —</div>
 

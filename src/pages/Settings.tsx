@@ -21,7 +21,7 @@ import ModeSelector from "@/components/ModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
+import { PRIVACY_POLICY_PDF_URL, GRIEVANCE_OFFICER } from "@/lib/legal";
 import { useNavigate } from "react-router-dom";
 import PhoneInput from "@/components/PhoneInput";
 import usePushSubscription from "@/hooks/usePushSubscription";
@@ -280,6 +280,9 @@ const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: a
           <a href={PRIVACY_POLICY_PDF_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1">
             View your rights in our Privacy Policy ↗
           </a>
+          <p className="text-xs text-muted-foreground mt-1">
+            Grievance Officer: {GRIEVANCE_OFFICER.name} — <a href={`mailto:${GRIEVANCE_OFFICER.email}`} className="text-primary hover:underline">{GRIEVANCE_OFFICER.email}</a>
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           {PRIVACY_ACTIONS.map((item) => (
