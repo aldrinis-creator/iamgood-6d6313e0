@@ -2,6 +2,10 @@ import { requireUser, isAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
+// Ward (user) missed-medication WhatsApp template settings (MSG91, new namespace).
+const WARD_MED_TEMPLATE = "user_missed_medication";
+const WARD_MED_LANG = "en_GB"; // must match the language the template was approved in
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -278,13 +282,42 @@ Deno.serve(async (req) => {
       const userPhone = normalizeIndianPhone(profile?.phone);
       const medList = [...g.medNames].join(", ") || "your medication";
 
-      // 1) User WhatsApp
-      if (userPhone) {
-        await sendWhatsAppTemplate({
-          templateName: "user_missed_medication",
-          languageCode: "en_US",
+      // 1) User (ward) WhatsApp
+      // The ward template lives in the NEW MSG91 namespace (same as the guardian
+      // template). Previously this call omitted `namespace`, so it fell back to the
+      // legacy namespace: MSG91 accepted the request (HTTP 200) but WhatsApp never
+      // delivered it. If you ever change the template's language in MSG91, update
+      // WARD_MED_LANG below.
+      if (!userPhone) {
+        console.log(`missed meds ${g.user_id} ${g.hourKey}: ward has no valid phone, skipping ward message`);
+      } else {
+        const userWa = await sendWhatsAppTemplate({
+          templateName: WARD_MED_TEMPLATE,
+          languageCode: WARD_MED_LANG,
+          namespace: WA_NAMESPACE_V2,
           recipients: [{ to: [userPhone], components: { body_1: medList } }],
         });
+        console.log(
+          `ward missed-med WA ${g.user_id} ${g.hourKey}: ok=${userWa.ok} status=${userWa.status} to=${userPhone} body=${JSON.stringify(userWa.body)}`,
+        );
+        try {
+          await supabase.from("notification_logs").insert({
+            user_id: g.user_id,
+            type: "missed_medication_user",
+            channel: "whatsapp",
+            status: userWa.ok ? "accepted" : "failed",
+            metadata: {
+              hour_key: g.hourKey,
+              template: WARD_MED_TEMPLATE,
+              language: WARD_MED_LANG,
+              recipient: userPhone,
+              request_id: (userWa.body as any)?.data?.request_id ?? null,
+              response: userWa.body,
+            },
+          });
+        } catch (logErr) {
+          console.error("ward missed-med log insert failed:", logErr);
+        }
       }
 
       // 2) Guardians WhatsApp
