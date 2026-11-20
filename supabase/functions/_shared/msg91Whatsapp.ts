@@ -17,6 +17,12 @@ export type WaComponents = {
   body_4?: string;
   /** URL button variable (e.g. OTP code for copy-code button templates). */
   button_1_url?: string;
+  /**
+   * Named body variables for templates defined with {{var_1}}, {{var_2}}...
+   * e.g. { var_1: "Asha", var_2: "08:00 AM" } is sent as
+   * body_var_1 = { type: "text", value: "Asha", parameter_name: "var_1" }.
+   */
+  named?: Record<string, string>;
 };
 
 export type WaRecipient = {
@@ -63,6 +69,11 @@ export async function sendWhatsAppTemplate(opts: {
     if (c.body_2 !== undefined) out.body_2 = { type: "text", value: c.body_2 };
     if (c.body_3 !== undefined) out.body_3 = { type: "text", value: c.body_3 };
     if (c.body_4 !== undefined) out.body_4 = { type: "text", value: c.body_4 };
+    if (c.named) {
+      for (const [name, value] of Object.entries(c.named)) {
+        out[`body_${name}`] = { type: "text", value, parameter_name: name };
+      }
+    }
     if (c.button_1_url !== undefined) out.button_1 = { subtype: "url", type: "text", value: c.button_1_url };
     return out;
   };
