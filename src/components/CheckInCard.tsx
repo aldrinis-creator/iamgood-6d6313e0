@@ -326,7 +326,13 @@ const CheckInCard = () => {
       .eq("scheduled_at", scheduledAt.toISOString())
       .maybeSingle();
       
-    const isLate = existing?.status === "missed";
+    // A slot is only flipped to "missed" by the cron after a 60-minute grace period
+    // (cron runs every 10 min). If the user checks in after the grace period but
+    // before the cron has run, the status is still "pending", so also treat that as late.
+    const GRACE_MS = 60 * 60 * 1000;
+    const pastGrace = Date.now() - scheduledAt.getTime() > GRACE_MS;
+    const isLate =
+      existing?.status === "missed" || (existing?.status === "pending" && pastGrace);
     const newStatus = isLate ? "late" : "responded";
 
     // Update ALL pending or missed check-ins for this user + scheduled_at
@@ -369,9 +375,20 @@ const CheckInCard = () => {
     } else {
       // If this was a late check-in, trigger the late check-in alert via edge function
       if (isLate) {
-        supabase.functions.invoke("send-late-checkin-alert", {
-          body: { checkInTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-        }).catch(err => console.error("Failed to send late check-in alert:", err));
+        const { data: alertData, error: alertError } = await supabase.functions.invoke(
+          "send-late-checkin-alert",
+          {
+            body: {
+              checkInTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            },
+          }
+        );
+        if (alertError) {
+          console.error("Late check-in alert failed:", alertError);
+          toast.error("Late check-in saved, but guardians could not be notified.");
+        } else {
+          console.log("Late check-in alert result:", alertData);
+        }
       }
 
       setCheckedIn(true);
