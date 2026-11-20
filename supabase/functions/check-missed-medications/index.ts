@@ -2,9 +2,10 @@ import { requireUser, isAdmin } from "../_shared/guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsAppTemplate, normalizeIndianPhone, WA_NAMESPACE_V2 } from "../_shared/msg91Whatsapp.ts";
 
-// Ward (user) missed-medication WhatsApp template settings (MSG91, new namespace).
-const WARD_MED_TEMPLATE = "user_missed_medication";
-const WARD_MED_LANG = "en_GB"; // must match the language the template was approved in
+// Ward (user) missed-medication WhatsApp template (MSG91, new namespace).
+// Body: "Dear {{var_1}}, You have missed your {{var_2}} {{var_3}} medication..."
+const WARD_MED_TEMPLATE = "ward_missed_medication";
+const WARD_MED_LANG = "en"; // must match the language the template was approved in
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -281,13 +282,16 @@ Deno.serve(async (req) => {
       const userName = profile?.full_name || "Your ward";
       const userPhone = normalizeIndianPhone(profile?.phone);
       const medList = [...g.medNames].join(", ") || "your medication";
+      const slotTime = g.scheduled.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "Asia/Kolkata",
+      });
 
       // 1) User (ward) WhatsApp
-      // The ward template lives in the NEW MSG91 namespace (same as the guardian
-      // template). Previously this call omitted `namespace`, so it fell back to the
-      // legacy namespace: MSG91 accepted the request (HTTP 200) but WhatsApp never
-      // delivered it. If you ever change the template's language in MSG91, update
-      // WARD_MED_LANG below.
+      // Ward template `ward_missed_medication` lives in the NEW MSG91 namespace and uses
+      // named variables (var_1..var_3). It must be APPROVED in MSG91 before it delivers.
       if (!userPhone) {
         console.log(`missed meds ${g.user_id} ${g.hourKey}: ward has no valid phone, skipping ward message`);
       } else {
@@ -295,7 +299,13 @@ Deno.serve(async (req) => {
           templateName: WARD_MED_TEMPLATE,
           languageCode: WARD_MED_LANG,
           namespace: WA_NAMESPACE_V2,
-          recipients: [{ to: [userPhone], components: { body_1: medList } }],
+          recipients: [{
+            to: [userPhone],
+            components: {
+              // var_1 = ward name, var_2 = scheduled time (IST), var_3 = medication(s)
+              named: { var_1: userName, var_2: slotTime, var_3: medList },
+            },
+          }],
         });
         console.log(
           `ward missed-med WA ${g.user_id} ${g.hourKey}: ok=${userWa.ok} status=${userWa.status} to=${userPhone} body=${JSON.stringify(userWa.body)}`,
