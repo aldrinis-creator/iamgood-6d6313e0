@@ -78,6 +78,8 @@ serve(async (req) => {
       });
     }
 
+    console.log(`send-late-checkin-alert: user=${user.id} accepted guardians=${guardians?.length ?? 0}`);
+
     if (!guardians || guardians.length === 0) {
       return new Response(
         JSON.stringify({ success: true, message: "No guardians to notify" }),
@@ -119,6 +121,10 @@ serve(async (req) => {
         },
       ],
     });
+
+    console.log(
+      `send-late-checkin-alert: WA ok=${waResult.ok} status=${waResult.status} to=${guardianPhones.join(",")} body=${JSON.stringify(waResult.body)}`
+    );
 
     // Best-effort delivery log (never blocks the response).
     try {
