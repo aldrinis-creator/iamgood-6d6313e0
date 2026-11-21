@@ -1,5 +1,6 @@
-export const PRIVACY_POLICY_PDF_URL =
-  "https://docs.google.com/document/d/1Rp2aUGX1MF-p3w9vVD5_rzXPMzt6ChpM/export?format=pdf";
+import privacyPolicyPdf from "@/assets/CheckiN-Privacy-Policy_3_June_2026.pdf.asset.json";
+
+export const PRIVACY_POLICY_PDF_URL = privacyPolicyPdf.url;
 
 export const GRIEVANCE_OFFICER = {
   name: "Aldrin Alphonso",
