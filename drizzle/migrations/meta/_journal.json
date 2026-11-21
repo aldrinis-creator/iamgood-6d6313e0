@@ -78,6 +78,13 @@
       "when": 1794326527119,
       "tag": "0010_harden_guardian_linking_and_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795281386608,
+      "tag": "0011_restrict_email_queue_admin_functions",
+      "breakpoints": true
     }
   ]
 }
