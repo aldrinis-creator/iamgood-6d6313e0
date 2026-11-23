@@ -35,6 +35,13 @@ import useGuardianAppointmentAlarms from "@/hooks/useGuardianAppointmentAlarms";
 import GuardianMissedAlarmOverlay from "@/components/GuardianMissedAlarmOverlay";
 import GuardianSafeZoneOverlay from "@/components/GuardianSafeZoneOverlay";
 import SafeZoneExitPrompt from "@/components/SafeZoneExitPrompt";
+import { useQuietPeriod } from "@/lib/popupQueue";
+
+const UserBackgroundHooks = () => {
+  useLocationSync();
+  useActivityHeartbeat();
+  return null;
+};
 
 const UserOnlyHooks = () => {
   useCheckInAudio();
@@ -42,9 +49,7 @@ const UserOnlyHooks = () => {
   useCheckInAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
-  useLocationSync();
   useAbnormalPatternCheck();
-  useActivityHeartbeat();
   useMorningBriefing();
   return null;
 };
@@ -66,6 +71,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [showCookieSettings, setShowCookieSettings] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
   useAutoPauseModes();
+  // 15-minute quiet period after sign-in: hold reminder alarms/chimes (not SOS/fall).
+  const quiet = useQuietPeriod();
 
 
   useEffect(() => {
@@ -91,8 +98,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="dark min-h-screen bg-background text-foreground safe-top">
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-background shadow-lg relative">
-        {isUser && !loginInProgress && <UserOnlyHooks />}
-        {isGuardian && !loginInProgress && <GuardianOnlyHooks />}
+        {isUser && !loginInProgress && <UserBackgroundHooks />}
+        {isUser && !loginInProgress && !quiet && <UserOnlyHooks />}
+        {isGuardian && !loginInProgress && !quiet && <GuardianOnlyHooks />}
         {offline && (
           <div className="bg-warning text-warning-foreground text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
             <WifiOff className="w-3.5 h-3.5" /> You're offline — SOS will queue and send when reconnected

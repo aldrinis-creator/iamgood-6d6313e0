@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { BatteryLow, Zap, AlertTriangle } from "lucide-react";
 import { playChime, playVoiceReminder, ensureAudioReady } from "@/lib/audioAlerts";
@@ -134,7 +135,8 @@ const BatteryWarning: React.FC = () => {
     }
   }, [battery, show]);
 
-  if (!visible) return null;
+  const popupAllowed = usePopupSlot("battery", visible);
+  if (!popupAllowed || !(visible)) return null;
 
   const isLow = phase === "low";
 

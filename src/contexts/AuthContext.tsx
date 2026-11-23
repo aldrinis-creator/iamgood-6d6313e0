@@ -1,3 +1,4 @@
+import { startQuietPeriod } from "@/lib/popupQueue";
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          const lastSignIn = session.user.last_sign_in_at ? Date.parse(session.user.last_sign_in_at) : 0;
+          const key = `quiet_started_${session.user.id}_${lastSignIn}`;
+          if (event === "SIGNED_IN" && Date.now() - lastSignIn < 2 * 60 * 1000 && !localStorage.getItem(key)) {
+            // Genuinely fresh sign-in/sign-up: hold non-emergency pop-ups for 15 minutes.
+            localStorage.setItem(key, "1");
+            startQuietPeriod(lastSignIn || Date.now());
+          }
           profileFetchedByListener = true;
           setLoginInProgress(true);
           // Use setTimeout to avoid Supabase deadlock

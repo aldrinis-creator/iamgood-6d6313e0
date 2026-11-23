@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,7 +76,8 @@ const GuardianPingOverlay = () => {
     return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id]);
 
-  if (!visible || !ping) return null;
+  const popupAllowed = usePopupSlot("userPing", visible && !!ping);
+  if (!popupAllowed || !(visible && !!ping)) return null;
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm">

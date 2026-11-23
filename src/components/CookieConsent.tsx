@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
@@ -24,7 +25,8 @@ const CookieConsent: React.FC<CookieConsentProps> = ({ forceShow = false, onClos
     onClose?.();
   };
 
-  if (!isVisible && !forceShow) return null;
+  const popupAllowed = usePopupSlot("cookie", isVisible || !!forceShow);
+  if (!popupAllowed || !(isVisible || !!forceShow)) return null;
 
   return (
     <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md">

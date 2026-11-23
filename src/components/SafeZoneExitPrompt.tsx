@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -95,7 +96,8 @@ const SafeZoneExitPrompt = () => {
     }
   };
 
-  if (!pending) return null;
+  const popupAllowed = usePopupSlot("safeZoneExit", !!pending);
+  if (!popupAllowed || !(!!pending)) return null;
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm">

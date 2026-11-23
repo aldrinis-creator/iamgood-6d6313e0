@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,7 +80,8 @@ const GuardianSafeZoneOverlay = () => {
     };
   }, [session?.user?.id, settings.guardianSafeZoneAlerts]);
 
-  if (!alert) return null;
+  const popupAllowed = usePopupSlot("guardianSafeZone", !!alert);
+  if (!popupAllowed || !(!!alert)) return null;
 
   const isReturn = alert.type === "zone_far_return";
   const isApproaching = alert.type === "zone_approaching_exit";

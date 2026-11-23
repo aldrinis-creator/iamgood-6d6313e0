@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,8 @@ const MorningBriefingOverlay = () => {
     };
   }, [handleShow, handleHide]);
 
-  if (!visible || !data) return null;
+  const popupAllowed = usePopupSlot("morningBriefing", visible && !!data);
+  if (!popupAllowed || !(visible && !!data)) return null;
 
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismiss()}>

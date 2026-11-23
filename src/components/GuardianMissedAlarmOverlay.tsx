@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,8 @@ const GuardianMissedAlarmOverlay = () => {
     return clear;
   }, [payload.token, payload.autoDismiss, items.length]);
 
-  if (items.length === 0) return null;
+  const popupAllowed = usePopupSlot("guardianMissed", items.length > 0);
+  if (!popupAllowed || !(items.length > 0)) return null;
 
   const primary = items[0];
 

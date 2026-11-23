@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,7 +48,8 @@ const RefillDuePopup = ({ isGuardian }: { isGuardian: boolean }) => {
     if (ids.length) await supabase.from("notifications").update({ read: true }).in("id", ids);
   }, [notes]);
 
-  if (!notes.length) return null;
+  const popupAllowed = usePopupSlot("refill", notes.length > 0);
+  if (!popupAllowed || !(notes.length > 0)) return null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-background/80 p-4" role="dialog" aria-modal="true" aria-label="Medicine refill due">

@@ -1,3 +1,4 @@
+import { usePopupSlot } from "@/lib/popupQueue";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, Pill, CalendarClock, X, Dumbbell } from "lucide-react";
@@ -222,7 +223,8 @@ const ReminderOverlay = () => {
     }
   };
 
-  if (!reminder) return null;
+  const popupAllowed = usePopupSlot("reminder", !!reminder);
+  if (!popupAllowed || !(!!reminder)) return null;
 
   const isCheckin = reminder.type === "checkin";
   const isAppointment = reminder.type === "appointment";
