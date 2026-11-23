@@ -1715,6 +1715,7 @@ export type Database = {
           instructions: string | null
           low_stock_threshold: number
           name: string
+          refill_due_since: string | null
           refill_reminder: boolean
           remaining_quantity: number
           schedule_days: number[] | null
@@ -1735,6 +1736,7 @@ export type Database = {
           instructions?: string | null
           low_stock_threshold?: number
           name: string
+          refill_due_since?: string | null
           refill_reminder?: boolean
           remaining_quantity?: number
           schedule_days?: number[] | null
@@ -1755,6 +1757,7 @@ export type Database = {
           instructions?: string | null
           low_stock_threshold?: number
           name?: string
+          refill_due_since?: string | null
           refill_reminder?: boolean
           remaining_quantity?: number
           schedule_days?: number[] | null
@@ -2209,6 +2212,30 @@ export type Database = {
           endpoint?: string
           id?: string
           p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      refill_alert_log: {
+        Row: {
+          alert_date: string
+          created_at: string
+          id: string
+          medication_id: string
+          user_id: string
+        }
+        Insert: {
+          alert_date: string
+          created_at?: string
+          id?: string
+          medication_id: string
+          user_id: string
+        }
+        Update: {
+          alert_date?: string
+          created_at?: string
+          id?: string
+          medication_id?: string
           user_id?: string
         }
         Relationships: []

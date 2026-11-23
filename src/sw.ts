@@ -183,6 +183,14 @@ self.addEventListener("push", (event: PushEvent) => {
       { action: "dismiss", title: "Dismiss" },
     ];
   }
+  if (data.type === "refill_due") {
+    options.requireInteraction = true;
+    // @ts-ignore
+    options.actions = [
+      { action: "open", title: "Open" },
+      { action: "dismiss", title: "Dismiss" },
+    ];
+  }
   if (data.type === "vitals_retention") {
     options.requireInteraction = true;
     // @ts-ignore

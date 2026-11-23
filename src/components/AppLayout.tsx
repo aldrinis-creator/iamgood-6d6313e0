@@ -22,6 +22,7 @@ import useAppointmentAlarms from "@/hooks/useAppointmentAlarms";
 import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoPauseModes from "@/hooks/useAutoPauseModes";
 import ReminderOverlay from "@/components/ReminderOverlay";
+import RefillDuePopup from "@/components/RefillDuePopup";
 import useLocationSync from "@/hooks/useLocationSync";
 import SOSActiveBar from "@/components/SOSActiveBar";
 import useAbnormalPatternCheck from "@/hooks/useAbnormalPatternCheck";
@@ -149,6 +150,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {isUser && !loginInProgress && <BatteryWarning />}
         {!loginInProgress && <CookieConsent forceShow={showCookieSettings} onClose={() => setShowCookieSettings(false)} />}
         {!loginInProgress && <ReminderOverlay />}
+        {!loginInProgress && <RefillDuePopup isGuardian={!!isGuardian} />}
         {isUser && !loginInProgress && <MorningBriefingOverlay />}
         {isUser && !loginInProgress && <GuardianPingOverlay />}
         {isGuardian && !loginInProgress && <UserPingOverlay />}
