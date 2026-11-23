@@ -85,6 +85,13 @@
       "when": 1795281386608,
       "tag": "0011_restrict_email_queue_admin_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795432822894,
+      "tag": "0012_revoke_email_queue_admin_functions_from_clients",
+      "breakpoints": true
     }
   ]
 }

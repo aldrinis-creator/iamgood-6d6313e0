@@ -146,7 +146,7 @@ const AdminEmails = () => {
       setLastSent(lastSentRow?.created_at ?? null);
 
       // Queue stats
-      const { data: qStats } = await supabase.rpc("email_queue_stats");
+      const qStats = await emailQueueAdmin({ action: "stats" });
       setQueueStats((qStats ?? []) as QueueStat[]);
 
       // Send state
@@ -166,14 +166,8 @@ const AdminEmails = () => {
       setAlerts((alertRows ?? []) as AlertRow[]);
 
       // DLQ contents
-      const { data: dlqA } = await supabase.rpc("read_dlq_messages", {
-        dlq_name: "auth_emails_dlq",
-        limit_count: dlqLimitAuth,
-      });
-      const { data: dlqT } = await supabase.rpc("read_dlq_messages", {
-        dlq_name: "transactional_emails_dlq",
-        limit_count: dlqLimitTxn,
-      });
+      const dlqA = await emailQueueAdmin({ action: "read", dlq_name: "auth_emails_dlq", limit_count: dlqLimitAuth });
+      const dlqT = await emailQueueAdmin({ action: "read", dlq_name: "transactional_emails_dlq", limit_count: dlqLimitTxn });
       setDlqAuth((dlqA ?? []) as DlqMessage[]);
       setDlqTxn((dlqT ?? []) as DlqMessage[]);
 
@@ -202,8 +196,7 @@ const AdminEmails = () => {
 
   const purgeDlq = async (queueName: string) => {
     try {
-      const { data, error } = await supabase.rpc("purge_dlq", { dlq_name: queueName });
-      if (error) throw error;
+      const data = await emailQueueAdmin({ action: "purge", dlq_name: queueName });
       toast.success(`Purged ${data ?? 0} message(s) from ${queueName}`);
       await load();
     } catch (e) {
@@ -225,11 +218,7 @@ const AdminEmails = () => {
 
   const requeueDlq = async (dlqName: string, msgId: number) => {
     try {
-      const { error } = await supabase.rpc("requeue_dlq_message", {
-        dlq_name: dlqName,
-        msg_id: msgId,
-      });
-      if (error) throw error;
+      await emailQueueAdmin({ action: "requeue", dlq_name: dlqName, msg_id: msgId });
       toast.success("Message requeued");
       await load();
     } catch (e) {
@@ -774,5 +763,12 @@ const DlqSection = ({
     </Card>
   );
 };
+
+async function emailQueueAdmin(body: Record<string, unknown>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke("admin-email-queue", { body });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data?.data;
+}
 
 export default AdminEmails;
