@@ -26,8 +26,9 @@ export function medsToAlert(
     if (m.remaining_quantity == null || m.low_stock_threshold == null) continue;
     if (m.remaining_quantity > m.low_stock_threshold) continue; // refilled
     if (!m.refill_due_since) continue;
-    const d = dayDiff(m.refill_due_since, today);
-    if (d < 0 || d >= REFILL_ALERT_DAYS) continue;
+    // Alerts start on the due day (or the next 12 PM run) and continue daily until 3 have been sent,
+    // so a medicine that becomes due after 12 PM still gets all 3 pop-ups.
+    if (dayDiff(m.refill_due_since, today) < 0) continue;
     const sent = (alertedDates[m.id] || []).filter((x) => x >= m.refill_due_since!);
     if (sent.includes(today) || sent.length >= REFILL_ALERT_DAYS) continue;
     const list = out.get(m.user_id) || [];
