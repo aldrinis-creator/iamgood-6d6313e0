@@ -2,16 +2,33 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 /** Quiet period after sign-in/sign-up during which non-emergency pop-ups are held. */
 export const QUIET_PERIOD_MS = 15 * 60 * 1000;
-const QUIET_KEY = "popup_quiet_until";
+const QUIET_KEY_PREFIX = "popup_quiet_until:";
 
-export function startQuietPeriod(now = Date.now()) {
-  try { localStorage.setItem(QUIET_KEY, String(now + QUIET_PERIOD_MS)); } catch { /* ignore */ }
+/** The signed-in user whose quiet period applies. Set by AuthContext (null = signed out). */
+let activeUserId: string | null = null;
+const quietKey = (userId: string) => `${QUIET_KEY_PREFIX}${userId}`;
+
+/** Tell the queue which user is signed in so the quiet period is tracked per user. */
+export function setQuietUser(userId: string | null) {
+  if (activeUserId === userId) return;
+  activeUserId = userId;
+  recompute();
   emit();
 }
-export function quietUntil(): number {
-  try { return Number(localStorage.getItem(QUIET_KEY)) || 0; } catch { return 0; }
+
+export function startQuietPeriod(userId: string, now = Date.now()) {
+  activeUserId = userId;
+  try { localStorage.setItem(quietKey(userId), String(now + QUIET_PERIOD_MS)); } catch { /* ignore */ }
+  recompute();
+  emit();
 }
-export function isQuiet(now = Date.now()) { return now < quietUntil(); }
+export function quietUntil(userId: string | null = activeUserId): number {
+  if (!userId) return 0;
+  try { return Number(localStorage.getItem(quietKey(userId))) || 0; } catch { return 0; }
+}
+export function isQuiet(now = Date.now(), userId: string | null = activeUserId) {
+  return now < quietUntil(userId);
+}
 
 /** Popup priority — lower number shows first. */
 export const POPUP_PRIORITY = {
@@ -38,7 +55,7 @@ function recompute() {
 }
 export function requestPopup(id: PopupId) { waiting.add(id); recompute(); }
 export function releasePopup(id: PopupId) { waiting.delete(id); if (current === id) current = null; recompute(); emit(); }
-export function __resetPopupQueue() { waiting.clear(); current = null; }
+export function __resetPopupQueue() { waiting.clear(); current = null; activeUserId = null; }
 export function currentPopup() { return current; }
 
 function subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; }
@@ -48,6 +65,7 @@ export function useQuietPeriod(): boolean {
   const [quiet, setQuiet] = useState(isQuiet());
   useEffect(() => {
     const check = () => setQuiet(isQuiet());
+    check();
     const unsub = subscribe(check);
     const t = setInterval(() => { check(); recompute(); }, 15000);
     return () => { unsub(); clearInterval(t); };
