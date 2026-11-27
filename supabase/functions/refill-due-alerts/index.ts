@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
 
     if (dryRun) { results.push({ wardId, meds: list.length, guardians: guardians?.length || 0 }); continue; }
 
+    // Claim today's slot first (unique per medicine+date) so a double cron run can't send twice.
+    const medIds = list.map((m) => m.id);
     const { error: logErr } = await sb.from("refill_alert_log").insert(
       list.map((m) => ({ medication_id: m.id, user_id: wardId, alert_date: today })),
     );
@@ -49,16 +51,27 @@ Deno.serve(async (req) => {
     const wardTitle = list.length > 1 ? "Medicines due for refill" : "Medicine due for refill";
     const wardMsg = `Time to refill: ${names}.`;
     const notifs: any[] = [{ user_id: wardId, title: wardTitle, message: wardMsg, type: "refill_due" }];
-    await pushToUser(sb, wardId, { title: wardTitle, body: wardMsg, type: "refill_due", tag: `refill-${today}`, url: "/my-health?refill=1" });
+    const pushes: Array<{ userId: string; payload: any }> = [
+      { userId: wardId, payload: { title: wardTitle, body: wardMsg, type: "refill_due", tag: `refill-${today}`, url: "/my-health" } },
+    ];
 
     for (const g of guardians || []) {
       if (!g.guardian_user_id) continue;
       const t = `${wardName}: refill due`;
       const msg = `${wardName}'s medicine${list.length > 1 ? "s need" : " needs"} a refill: ${names}.`;
       notifs.push({ user_id: g.guardian_user_id, title: t, message: msg, type: "refill_due", guardian_id: g.id });
-      await pushToUser(sb, g.guardian_user_id, { title: t, body: msg, type: "refill_due", tag: `refill-${wardId}-${today}`, url: "/guardian?refill=1" });
+      pushes.push({ userId: g.guardian_user_id, payload: { title: t, body: msg, type: "refill_due", tag: `refill-${wardId}-${today}`, url: "/guardian" } });
     }
-    await sb.rpc("insert_notifications_deduped", { p_notifications: notifs });
+
+    // Save the notifications BEFORE pushing. If this fails, release the claim so the next run retries.
+    const { error: notifErr } = await sb.rpc("insert_notifications_deduped", { p_notifications: notifs });
+    if (notifErr) {
+      await sb.from("refill_alert_log").delete().in("medication_id", medIds).eq("alert_date", today);
+      results.push({ wardId, error: "notification insert failed, will retry" });
+      continue;
+    }
+
+    for (const p of pushes) await pushToUser(sb, p.userId, p.payload);
     results.push({ wardId, meds: list.length, notified: notifs.length });
   }
 
