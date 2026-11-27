@@ -11,7 +11,11 @@ export function isCronRequest(req: Request): boolean {
   const auth = req.headers.get("Authorization") || "";
   const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const cronSecret = Deno.env.get("CRON_SECRET") || "";
+  const managed = Deno.env.get("LOVABLE_CRON_SECRET") || "";
+  const managedPrev = Deno.env.get("LOVABLE_CRON_SECRET_PREVIOUS") || "";
   return (!!svc && auth === `Bearer ${svc}`) ||
+    (!!managed && auth === `Bearer ${managed}`) ||
+    (!!managedPrev && auth === `Bearer ${managedPrev}`) ||
     (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
 }
 
