@@ -7,13 +7,18 @@ const med = (o: Partial<RefillMed> = {}): RefillMed => ({
 });
 
 describe("refill pop-up rules", () => {
-  it("fires on day 3 but not on day 4 after becoming due", () => {
-    expect(medsToAlert([med()], "2026-11-25", {}).size).toBe(1);
-    expect(medsToAlert([med()], "2026-11-26", {}).size).toBe(0);
+  it("does not fire before the medicine is due", () => {
+    expect(medsToAlert([med()], "2026-11-22", {}).size).toBe(0);
   });
-  it("stops after 3 pop-ups", () => {
+  it("stops after exactly 3 pop-ups", () => {
     const sent = { m1: ["2026-11-23", "2026-11-24", "2026-11-25"] };
-    expect(medsToAlert([med()], "2026-11-25", sent).size).toBe(0);
+    expect(medsToAlert([med()], "2026-11-26", sent).size).toBe(0);
+  });
+  it("a medicine that became due after 12 PM still gets all 3 pop-ups (starts next day)", () => {
+    expect(medsToAlert([med()], "2026-11-24", {}).size).toBe(1);
+    expect(medsToAlert([med()], "2026-11-25", { m1: ["2026-11-24"] }).size).toBe(1);
+    expect(medsToAlert([med()], "2026-11-26", { m1: ["2026-11-24", "2026-11-25"] }).size).toBe(1);
+    expect(medsToAlert([med()], "2026-11-27", { m1: ["2026-11-24", "2026-11-25", "2026-11-26"] }).size).toBe(0);
   });
   it("skips a refilled medicine", () => {
     expect(medsToAlert([med({ remaining_quantity: 30 })], "2026-11-23", {}).size).toBe(0);
