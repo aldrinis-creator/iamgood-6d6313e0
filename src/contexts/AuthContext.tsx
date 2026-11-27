@@ -1,4 +1,4 @@
-import { startQuietPeriod } from "@/lib/popupQueue";
+import { startQuietPeriod, setQuietUser, QUIET_PERIOD_MS } from "@/lib/popupQueue";
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,15 +65,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Track the quiet period per user (null when signed out).
+        setQuietUser(session?.user?.id ?? null);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          const lastSignIn = session.user.last_sign_in_at ? Date.parse(session.user.last_sign_in_at) : 0;
-          const key = `quiet_started_${session.user.id}_${lastSignIn}`;
-          if (event === "SIGNED_IN" && Date.now() - lastSignIn < 2 * 60 * 1000 && !localStorage.getItem(key)) {
-            // Genuinely fresh sign-in/sign-up: hold non-emergency pop-ups for 15 minutes.
+          // Anchor the 15 minutes on the real sign-in time (fall back to account creation for sign-ups).
+          const signedInAt =
+            (session.user.last_sign_in_at ? Date.parse(session.user.last_sign_in_at) : 0) ||
+            (session.user.created_at ? Date.parse(session.user.created_at) : 0);
+          const key = `quiet_started_${session.user.id}_${signedInAt}`;
+          const isEntryEvent = event === "SIGNED_IN" || event === "INITIAL_SESSION";
+          // Any sign-in still inside its 15-minute window counts, so a slow device/network
+          // can't skip the quiet period. The key stops reloads/tab refocus from restarting it.
+          if (
+            isEntryEvent &&
+            signedInAt > 0 &&
+            Date.now() - signedInAt < QUIET_PERIOD_MS &&
+            !localStorage.getItem(key)
+          ) {
             localStorage.setItem(key, "1");
-            startQuietPeriod(lastSignIn || Date.now());
+            startQuietPeriod(session.user.id, signedInAt);
           }
           profileFetchedByListener = true;
           setLoginInProgress(true);
@@ -141,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setQuietUser(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user && !profileFetchedByListener) {
